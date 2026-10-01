@@ -8,8 +8,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Modelo de domínio inicial e glossário
 
 ## Fase 1 — Fundação do código
-- [ ] Instalar pnpm (`npm i -g pnpm`)
-- [ ] Monorepo pnpm workspaces, TypeScript base, ESLint e Prettier
+- [x] Instalar pnpm (`npm i -g pnpm`)
+- [x] Monorepo pnpm workspaces, TypeScript base, ESLint e Prettier
 - [ ] `apps/api`: NestJS com rota `/health`, Swagger, config por variáveis de ambiente
 - [ ] `apps/web`: React + Vite + Tailwind + shadcn/ui, chamando `/health`
 - [ ] `packages/shared`: primeiro schema Zod consumido pelos dois lados
