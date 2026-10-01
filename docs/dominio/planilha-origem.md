@@ -9,47 +9,48 @@ A aplicação nasce de uma planilha Excel pessoal (`Financas-app.xlsx`). A plani
 
 ### Aba mensal
 
-| Área | Conteúdo |
-|---|---|
+| Área      | Conteúdo                                                            |
+| --------- | ------------------------------------------------------------------- |
 | `B22:G42` | **Créditos**: Descrição, Categoria, Valor, Valor Recebido, Data, OK |
-| `J22:O42` | **Débitos**: Descrição, Categoria, Valor, Valor Pago, Data, OK |
-| `Q2:R7` | Resumo do mês |
-| `Q9:R10` | Salário bruto e salário líquido aproximado (digitados) |
-| `Q11:R31` | Orçamento por percentual e resultado |
+| `J22:O42` | **Débitos**: Descrição, Categoria, Valor, Valor Pago, Data, OK      |
+| `Q2:R7`   | Resumo do mês                                                       |
+| `Q9:R10`  | Salário bruto e salário líquido aproximado (digitados)              |
+| `Q11:R31` | Orçamento por percentual e resultado                                |
 
 Um lançamento é dado como efetivado quando a coluna OK recebe `X`: `Valor Recebido = SE(OK="X"; Valor; 0)`.
 
 ## Indicadores (fórmulas)
 
-| Indicador | Fórmula na planilha | Significado |
-|---|---|---|
-| Créditos pendentes | Σ Valor − Σ Recebido | Créditos ainda não recebidos |
-| Créditos recebidos | Σ Recebido | |
-| Débitos pendentes | Σ Valor − Σ Pago | Débitos ainda não pagos |
-| Débitos pagos | Σ Pago | |
-| Saldo final simulado | (créditos pendentes + recebidos) − (débitos pendentes + pagos) | Saldo se tudo for efetivado |
-| Saldo final | créditos recebidos − débitos pagos | Saldo real até agora |
-| Despesas | débitos pendentes + pagos | Total de débitos do mês |
+| Indicador            | Fórmula na planilha                                            | Significado                  |
+| -------------------- | -------------------------------------------------------------- | ---------------------------- |
+| Créditos pendentes   | Σ Valor − Σ Recebido                                           | Créditos ainda não recebidos |
+| Créditos recebidos   | Σ Recebido                                                     |                              |
+| Débitos pendentes    | Σ Valor − Σ Pago                                               | Débitos ainda não pagos      |
+| Débitos pagos        | Σ Pago                                                         |                              |
+| Saldo final simulado | (créditos pendentes + recebidos) − (débitos pendentes + pagos) | Saldo se tudo for efetivado  |
+| Saldo final          | créditos recebidos − débitos pagos                             | Saldo real até agora         |
+| Despesas             | débitos pendentes + pagos                                      | Total de débitos do mês      |
 
 ### Orçamento por percentual
 
 Cada destino tem um percentual configurável e dois valores calculados:
+
 - **Simulado** = salário líquido × percentual
 - **Real** = total de créditos do mês × percentual
 
-| Destino | % padrão | Observação |
-|---|---|---|
-| Despesas | 60% | Comparado com as despesas reais: `Simulado − Despesas` (positivo = dentro da meta) |
-| Investimentos | 20% | |
-| Reserva de emergência | 15% | |
-| Viagens | 5% | |
+| Destino               | % padrão | Observação                                                                         |
+| --------------------- | -------- | ---------------------------------------------------------------------------------- |
+| Despesas              | 60%      | Comparado com as despesas reais: `Simulado − Despesas` (positivo = dentro da meta) |
+| Investimentos         | 20%      |                                                                                    |
+| Reserva de emergência | 15%      |                                                                                    |
+| Viagens               | 5%       |                                                                                    |
 
 **Resultado** = total de créditos − despesas − investimentos (real) − reserva (real) − viagens (real). Indica quanto sobra (ou falta) depois de pagar as despesas e separar as metas.
 
 ### Formatação condicional → status na aplicação
 
-- Categoria do débito em **vermelho** quando há valor e não está marcado como pago → status *pendente* (ou *vencido*, com a nova data de vencimento).
-- Em **verde** quando pago → status *efetivado*.
+- Categoria do débito em **vermelho** quando há valor e não está marcado como pago → status _pendente_ (ou _vencido_, com a nova data de vencimento).
+- Em **verde** quando pago → status _efetivado_.
 - Saldos e resultado coloridos por sinal (positivo/negativo).
 
 ### Gráfico

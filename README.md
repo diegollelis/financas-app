@@ -6,15 +6,15 @@ Aplicação web multiusuário para controle financeiro mensal: créditos, débit
 
 ## Stack
 
-| Camada | Tecnologia |
-|---|---|
-| Frontend | React + Vite + TypeScript, TanStack Query, Tailwind CSS + shadcn/ui |
-| Backend | NestJS (Node + TypeScript) |
-| Banco | PostgreSQL + Prisma |
-| Validação | Zod compartilhado entre front e back |
-| Autenticação | Better Auth (e-mail/senha e Google) + Resend |
-| Hospedagem | Cloudflare Pages · Render · Neon (planos gratuitos) |
-| Organização | Monorepo com pnpm workspaces |
+| Camada       | Tecnologia                                                          |
+| ------------ | ------------------------------------------------------------------- |
+| Frontend     | React + Vite + TypeScript, TanStack Query, Tailwind CSS + shadcn/ui |
+| Backend      | NestJS (Node + TypeScript)                                          |
+| Banco        | PostgreSQL + Prisma                                                 |
+| Validação    | Zod compartilhado entre front e back                                |
+| Autenticação | Better Auth (e-mail/senha e Google) + Resend                        |
+| Hospedagem   | Cloudflare Pages · Render · Neon (planos gratuitos)                 |
+| Organização  | Monorepo com pnpm workspaces                                        |
 
 ## Documentação
 

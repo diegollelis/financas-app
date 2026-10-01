@@ -25,7 +25,7 @@ pnpm workspaces monorepo: `apps/web` (React + Vite + TS, TanStack Query, React R
 - **Money and dates (ADR 0010):** store amounts as integer cents (`amount_cents`, always positive; the sign comes from `CREDIT`/`DEBIT`). Store percentages as integer basis points. Use `period` (`YYYY-MM`) for the accounting month, `due_date`, and `settled_at` (null = pending). Never use floats for money.
 - **Language (ADR 0011):** code, identifiers, DB, API routes and commit messages are in English (Conventional Commits). UI text and all docs are in pt-BR.
 - **Validation (ADR 0006):** Zod schemas in `packages/shared` are the single source of truth. The API always validates.
-- **Privacy (ADR 0012):** never log request bodies, descriptions, amounts or tokens. Never commit `.env`, spreadsheets or DB dumps. `.sql` is deliberately *not* ignored, because Prisma migrations are `.sql`.
+- **Privacy (ADR 0012):** never log request bodies, descriptions, amounts or tokens. Never commit `.env`, spreadsheets or DB dumps. `.sql` is deliberately _not_ ignored, because Prisma migrations are `.sql`.
 
 ## Environment notes
 
