@@ -16,7 +16,7 @@ Backend REST para uma aplicação multiusuário pública. O desenvolvedor vem do
 
 ## Decisão
 
-**NestJS** (adaptador Express ou Fastify — decidir na fase 1), organizado por módulos de domínio, cada um com:
+**NestJS** (adaptador Express, decidido em [0014](0014-api-nest12-esm-express.md)), organizado por módulos de domínio, cada um com:
 
 - `controller` — HTTP: rotas, DTOs, status codes;
 - `service` — regras de negócio;
