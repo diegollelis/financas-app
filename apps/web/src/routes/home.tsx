@@ -16,7 +16,12 @@ export function HomePage() {
           <span>Status da API</span>
           {health.isPending && <Badge variant="secondary">Verificando…</Badge>}
           {health.isError && <Badge variant="destructive">Indisponível</Badge>}
-          {health.isSuccess && <Badge>Online</Badge>}
+          {health.isSuccess &&
+            (health.data.status === 'ok' ? (
+              <Badge>Online</Badge>
+            ) : (
+              <Badge variant="outline">Sem banco de dados</Badge>
+            ))}
         </CardContent>
       </Card>
     </main>

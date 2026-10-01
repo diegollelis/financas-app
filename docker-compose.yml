@@ -1,0 +1,24 @@
+# Banco local de desenvolvimento (ADR 0005). Em produção usamos o Neon.
+# As credenciais abaixo valem só para a máquina local.
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: financas-postgres
+    environment:
+      POSTGRES_USER: financas
+      POSTGRES_PASSWORD: financas
+      POSTGRES_DB: financas
+    ports:
+      # 5432 e 5433 já são usadas por bancos de outros projetos nesta máquina.
+      - '5434:5432'
+    volumes:
+      # A partir do Postgres 18 a imagem guarda os dados em /var/lib/postgresql/<versão>.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U financas -d financas']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

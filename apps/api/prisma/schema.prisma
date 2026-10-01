@@ -1,0 +1,25 @@
+// Data dictionary of the app (ADR 0005). Conventions:
+// - models in PascalCase, tables and columns in snake_case (@@map / @map);
+// - ids are UUIDv7 (time-ordered, not guessable) — ADR 0017;
+// - money in integer cents, dates per ADR 0010;
+// - every business table has workspace_id (ADR 0008).
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Workspace {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("workspaces")
+}

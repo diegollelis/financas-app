@@ -6,8 +6,14 @@ packages:
 allowBuilds:
   # Telemetria do swagger-ui: não precisamos dela.
   '@scarf/scarf': false
+  # Prisma: baixa o schema engine usado pelas migrações.
+  '@prisma/engines': true
+  prisma: true
 
 # Versões compartilhadas: os pacotes declaram "catalog:" e o pnpm usa a versão daqui.
 catalog:
   typescript: ~6.0.3
   zod: ^4.6.5
+  prisma: 7.10.0
+  '@prisma/client': 7.10.0
+  '@prisma/adapter-pg': 7.10.0

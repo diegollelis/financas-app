@@ -15,7 +15,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] `apps/api`: NestJS com rota `/health`, Swagger, config por variáveis de ambiente
 - [x] `apps/web`: React + Vite + Tailwind + shadcn/ui, chamando `/health`
 - [x] `packages/shared`: primeiro schema Zod consumido pelos dois lados
-- [ ] Postgres local via Docker Compose; Prisma configurado com a primeira migração
+- [x] Postgres local via Docker Compose; Prisma configurado com a primeira migração
 - [ ] Vitest nos três pacotes
 - [ ] Repositório no GitHub + GitHub Actions (lint, typecheck, testes)
 - [ ] Comandos documentados no `CLAUDE.md` e no `README.md`

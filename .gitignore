@@ -5,6 +5,8 @@ build/
 .turbo/
 coverage/
 *.tsbuildinfo
+# Client do Prisma: gerado a partir do schema (pnpm db:generate)
+**/src/generated/
 
 # Variáveis de ambiente (nunca versionar segredos)
 .env
