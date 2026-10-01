@@ -14,7 +14,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Monorepo pnpm workspaces, TypeScript base, ESLint e Prettier
 - [x] `apps/api`: NestJS com rota `/health`, Swagger, config por variáveis de ambiente
 - [ ] `apps/web`: React + Vite + Tailwind + shadcn/ui, chamando `/health`
-- [ ] `packages/shared`: primeiro schema Zod consumido pelos dois lados
+- [ ] `packages/shared`: primeiro schema Zod consumido pelos dois lados (API ✓; web na próxima etapa)
 - [ ] Postgres local via Docker Compose; Prisma configurado com a primeira migração
 - [ ] Vitest nos três pacotes
 - [ ] Repositório no GitHub + GitHub Actions (lint, typecheck, testes)

@@ -10,6 +10,8 @@
     "declaration": true,
     "sourceMap": true,
     "removeComments": true,
+    // Allows the .ts imports used by packages/shared, which is consumed as TypeScript source.
+    "rewriteRelativeImportExtensions": true,
     "incremental": true,
     "rootDir": ".",
     "outDir": "./dist"

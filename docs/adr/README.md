@@ -18,3 +18,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0012](0012-privacidade-lgpd.md)               | Privacidade, segurança de dados e LGPD                             | Aceita |
 | [0013](0013-qualidade-de-codigo.md)            | Qualidade de código: TypeScript estrito, ESLint, Prettier e Vitest | Aceita |
 | [0014](0014-api-nest12-esm-express.md)         | API: NestJS 12 em ESM, adaptador Express e configuração validada   | Aceita |
+| [0015](0015-shared-como-codigo-fonte.md)       | `packages/shared` consumido como código-fonte TypeScript           | Aceita |
