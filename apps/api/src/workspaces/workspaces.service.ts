@@ -1,7 +1,10 @@
 import {
   PERSONAL_WORKSPACE_NAME,
   type CreateWorkspaceInput,
+  type MemberResponse,
+  type RenameWorkspaceInput,
   type Workspace,
+  type WorkspaceRole,
 } from '@financas/shared';
 import { Injectable } from '@nestjs/common';
 import type { Member, Workspace as WorkspaceRow } from '../generated/prisma/client.js';
@@ -55,6 +58,41 @@ export class WorkspacesService {
       data: { name: input.name, members: { create: { userId, role: 'OWNER' } } },
     });
     return { id: workspace.id, name: workspace.name, isPersonal: false, role: 'OWNER' };
+  }
+
+  // The methods below receive a workspace already checked by WorkspaceMemberGuard, and every
+  // query filters by that workspaceId (ADR 0008): never one without the other.
+
+  async get(workspaceId: string, role: WorkspaceRole): Promise<Workspace> {
+    const workspace = await this.prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
+    return { id: workspace.id, name: workspace.name, isPersonal: workspace.isPersonal, role };
+  }
+
+  async rename(
+    workspaceId: string,
+    role: WorkspaceRole,
+    input: RenameWorkspaceInput,
+  ): Promise<Workspace> {
+    const workspace = await this.prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { name: input.name },
+    });
+    return { id: workspace.id, name: workspace.name, isPersonal: workspace.isPersonal, role };
+  }
+
+  /** Owners first (the enum order: OWNER, EDITOR, VIEWER), then by name. */
+  async listMembers(workspaceId: string): Promise<MemberResponse[]> {
+    const members = await this.prisma.member.findMany({
+      where: { workspaceId },
+      include: { user: { select: { name: true, email: true } } },
+      orderBy: [{ role: 'asc' }, { user: { name: 'asc' } }],
+    });
+    return members.map((member) => ({
+      userId: member.userId,
+      name: member.user.name,
+      email: member.user.email,
+      role: member.role,
+    }));
   }
 
   private findMemberships(userId: string) {

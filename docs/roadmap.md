@@ -31,8 +31,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [ ] Login com Google
 - [x] Rate limit nas rotas de autenticação ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
 - [x] Workspace, Member e papéis; espaço pessoal criado no cadastro ([ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
-- [ ] Guard de espaço + repositórios sempre filtrando por `workspace_id`
-- [ ] Testes de isolamento entre espaços
+- [x] Guard de espaço + repositórios sempre filtrando por `workspace_id` ([ADR 0025](adr/0025-guard-de-espaco-e-isolamento.md))
+- [x] Testes de isolamento entre espaços (`expectHiddenFromOutsiders`, um por recurso)
 - [ ] RLS no PostgreSQL como segunda barreira (estudo)
 - [ ] Convite de membros por e-mail
 
