@@ -28,3 +28,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0022](0022-envio-de-email.md)                   | Envio de e-mail: Mailpit no desenvolvimento, Resend em produção                   | Aceita |
 | [0023](0023-rate-limit-autenticacao.md)          | Rate limit nas rotas de autenticação                                              | Aceita |
 | [0024](0024-espacos-membros-e-espaco-pessoal.md) | Espaços, membros e o espaço pessoal                                               | Aceita |
+| [0025](0025-guard-de-espaco-e-isolamento.md)     | Guard de espaço, papéis e testes de isolamento                                    | Aceita |

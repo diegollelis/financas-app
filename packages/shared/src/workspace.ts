@@ -36,3 +36,28 @@ export type Workspace = z.infer<typeof workspaceSchema>;
 
 /** `GET /workspaces`: the signed-in user's workspaces, the personal one first. */
 export const workspaceListResponseSchema = z.array(workspaceSchema);
+
+/** Renaming uses the same rules as creating. */
+export const renameWorkspaceInputSchema = createWorkspaceInputSchema;
+
+export type RenameWorkspaceInput = CreateWorkspaceInput;
+
+const roleRank: Record<WorkspaceRole, number> = { VIEWER: 1, EDITOR: 2, OWNER: 3 };
+
+/** Whether `role` can do what `minimum` can: VIEWER < EDITOR < OWNER (ADR 0025). */
+export function hasRole(role: WorkspaceRole, minimum: WorkspaceRole): boolean {
+  return roleRank[role] >= roleRank[minimum];
+}
+
+/** A member of a workspace, as listed to the other members. */
+export const memberSchema = z.object({
+  userId: z.uuid(),
+  name: z.string(),
+  email: z.email(),
+  role: workspaceRoleSchema,
+});
+
+export type MemberResponse = z.infer<typeof memberSchema>;
+
+/** `GET /workspaces/:workspaceId/members`: owners first, then by name. */
+export const memberListResponseSchema = z.array(memberSchema);

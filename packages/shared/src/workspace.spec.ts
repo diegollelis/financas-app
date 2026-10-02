@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createWorkspaceInputSchema, workspaceSchema } from './workspace.ts';
+import { createWorkspaceInputSchema, hasRole, workspaceSchema } from './workspace.ts';
 
 describe('createWorkspaceInputSchema', () => {
   it('trims the name', () => {
@@ -32,5 +32,19 @@ describe('workspaceSchema', () => {
 
   it('rejects an unknown role', () => {
     expect(workspaceSchema.safeParse({ ...workspace, role: 'ADMIN' }).success).toBe(false);
+  });
+});
+
+describe('hasRole', () => {
+  it.each([
+    { role: 'OWNER', minimum: 'VIEWER', expected: true },
+    { role: 'OWNER', minimum: 'OWNER', expected: true },
+    { role: 'EDITOR', minimum: 'VIEWER', expected: true },
+    { role: 'EDITOR', minimum: 'EDITOR', expected: true },
+    { role: 'EDITOR', minimum: 'OWNER', expected: false },
+    { role: 'VIEWER', minimum: 'VIEWER', expected: true },
+    { role: 'VIEWER', minimum: 'EDITOR', expected: false },
+  ] as const)('$role meets $minimum: $expected', ({ role, minimum, expected }) => {
+    expect(hasRole(role, minimum)).toBe(expected);
   });
 });

@@ -39,16 +39,29 @@ export async function createTestApp() {
   setupApp(app);
   await app.init();
 
+  const prisma = app.get(PrismaService);
+  const http = ({ ip = newIp() }: { ip?: string } = {}) =>
+    request
+      .agent(app.getHttpServer())
+      .set('Origin', testEnv.WEB_ORIGIN)
+      // How the client IP reaches the API behind a proxy (ADR 0023).
+      .set('X-Forwarded-For', ip);
+
   return {
     app,
     mailer,
-    prisma: app.get(PrismaService),
+    prisma,
     /** A cookie-keeping client: each call is a new "browser". */
-    http: ({ ip = newIp() }: { ip?: string } = {}) =>
-      request
-        .agent(app.getHttpServer())
-        .set('Origin', testEnv.WEB_ORIGIN)
-        // How the client IP reaches the API behind a proxy (ADR 0023).
-        .set('X-Forwarded-For', ip),
+    http,
+    /** Signs up and returns a browser holding the new user's session, plus ids. */
+    async signUp(user: { name: string; email: string; password: string }) {
+      const browser = http();
+      await browser.post('/api/auth/sign-up/email').send(user).expect(200);
+      const { id: userId } = await prisma.user.findUniqueOrThrow({ where: { email: user.email } });
+      const personal = await prisma.member.findFirstOrThrow({
+        where: { userId, workspace: { isPersonal: true } },
+      });
+      return { browser, userId, personalWorkspaceId: personal.workspaceId };
+    },
   };
 }

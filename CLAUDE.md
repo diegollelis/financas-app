@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Finanças App: a multi-user, public web app for monthly personal finance. Users record credits and debits, set a budget by percentages and track their balance. It replaces a personal Excel spreadsheet, which is kept out of the repo because it contains banking data. The repository is also a **full-stack learning lab** for the owner, who is moving from Protheus/AdvPL to modern web development. Explain the reasoning behind your choices, and record every new architectural decision as an ADR.
 
-**Current state:** phase 1 (code foundation) is done. Phase 2 (auth and workspaces) is in progress: the API has Better Auth with e-mail/password (`/api/auth/*`), a `SessionGuard` and `GET /me` (ADR 0020); the web app has sign-in (`/entrar`), sign-up (`/cadastro`) and sign-out, with route guards (ADR 0021); e-mail verification (sent, not required yet) and password reset (`/esqueci-senha`, `/redefinir-senha`) are done (ADR 0022); auth routes are rate-limited per IP with counters in `rate_limits` (ADR 0023). Every user has a personal workspace (created on sign-up, ADR 0024); `GET/POST /workspaces` list and create workspaces. Tables: `workspaces`, `members`, `users`, `sessions`, `accounts`, `verifications`, `rate_limits`. Next steps are in `docs/roadmap.md`.
+**Current state:** phase 1 (code foundation) is done. Phase 2 (auth and workspaces) is in progress: the API has Better Auth with e-mail/password (`/api/auth/*`), a `SessionGuard` and `GET /me` (ADR 0020); the web app has sign-in (`/entrar`), sign-up (`/cadastro`) and sign-out, with route guards (ADR 0021); e-mail verification (sent, not required yet) and password reset (`/esqueci-senha`, `/redefinir-senha`) are done (ADR 0022); auth routes are rate-limited per IP with counters in `rate_limits` (ADR 0023). Every user has a personal workspace (created on sign-up, ADR 0024); `GET/POST /workspaces` list and create workspaces; routes under `/workspaces/:workspaceId` go through `WorkspaceMemberGuard` (ADR 0025). Tables: `workspaces`, `members`, `users`, `sessions`, `accounts`, `verifications`, `rate_limits`. Next steps are in `docs/roadmap.md`.
 
 ## Key docs (read before designing anything)
 
@@ -15,7 +15,7 @@ Finanças App: a multi-user, public web app for monthly personal finance. Users 
 - `docs/dominio/modelo.md` has the entities, rules and default categories. `glossario.md` has the PT↔EN terms and the Protheus analogies.
 - `docs/roadmap.md` lists the phases as checklists. Tick items as they are completed.
 
-## Stack (see ADRs 0002–0024)
+## Stack (see ADRs 0002–0025)
 
 pnpm workspaces monorepo: `apps/web` (React 19 + Vite 8, TanStack Query, React Router 8, Tailwind 4 + shadcn/ui on Radix), `apps/api` (NestJS 12 as ESM on Express, Prisma 7, PostgreSQL 18), `packages/shared` (Zod schemas, types, money/date utils). TypeScript 6 (not 7: typescript-eslint does not support it yet). Auth is Better Auth with cookie sessions; email goes through Resend in production and Mailpit (Docker, inbox at http://localhost:8025) in development. Hosting: Cloudflare Pages (web), Render via Docker (api), Neon (Postgres). Locally, Postgres runs in Docker.
 
@@ -66,7 +66,7 @@ CI (`.github/workflows/ci.yml`) runs `format:check`, `lint`, `typecheck`, `test`
 
 ## Conventions that cut across the codebase
 
-- **Multi-tenancy (ADR 0008):** every business table has `workspace_id`. Every repository query must filter by it, and routes are scoped as `/workspaces/:workspaceId/...` behind a membership/role guard. A cross-workspace access returns 404. Each new resource needs an isolation test.
+- **Multi-tenancy (ADRs 0008, 0025):** every business table has `workspace_id`. A workspace resource has `@Controller('workspaces/:workspaceId/<resource>')` + `@WorkspaceScoped()` (session 401 → member 404 → role 403), `@RequireRole('EDITOR')` on routes that change data, and reads the workspace with `@CurrentMembership()`. Services take that validated `workspaceId` and filter every query by it; never accept a workspace id from the body. Each new resource lists its routes in a test with `expectHiddenFromOutsiders` (`apps/api/test/isolation.ts`).
 - **Database (ADR 0017):** UUIDv7 ids; Prisma models in PascalCase mapped to snake_case plural tables; `created_at`/`updated_at` as `timestamptz(3)`.
 - **Money and dates (ADR 0010):** store amounts as integer cents (`amount_cents`, always positive; the sign comes from `CREDIT`/`DEBIT`). Store percentages as integer basis points. Use `period` (`YYYY-MM`) for the accounting month, `due_date`, and `settled_at` (null = pending). Never use floats for money.
 - **Language (ADR 0011):** code, identifiers, DB, API routes and commit messages are in English (Conventional Commits). UI text and all docs are in pt-BR.
