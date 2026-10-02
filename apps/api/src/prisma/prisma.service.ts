@@ -2,7 +2,19 @@ import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { Env } from '../config/env.js';
-import { PrismaClient } from '../generated/prisma/client.js';
+import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
+
+/**
+ * Sets the workspace for Row Level Security (ADR 0028) until the end of the transaction. For
+ * interactive transactions that must touch protected tables, e.g. creating a workspace with its
+ * default categories; everything else uses `PrismaService.forWorkspace`.
+ */
+export function setWorkspaceContext(
+  client: Pick<Prisma.TransactionClient, '$executeRaw'>,
+  workspaceId: string,
+) {
+  return client.$executeRaw`SELECT set_config('app.workspace_id', ${workspaceId}, true)`;
+}
 
 /**
  * The Prisma client as a Nest provider. It connects lazily on the first query, so the API
@@ -30,7 +42,7 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
       query: {
         $allOperations: async ({ args, query }) => {
           const results: unknown[] = await this.$transaction([
-            this.$executeRaw`SELECT set_config('app.workspace_id', ${workspaceId}, true)`,
+            setWorkspaceContext(this, workspaceId),
             query(args),
           ]);
           return results[1];

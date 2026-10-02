@@ -23,8 +23,11 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 ### Category (Categoria)
 
 - `workspace_id`, `name`, `type` (`CREDIT` | `DEBIT`), `archived_at`
-- Único por (`workspace_id`, `type`, `name`).
-- Categorias em uso não são excluídas, só arquivadas.
+- Único por (`workspace_id`, `type`, `name`), sem diferenciar maiúsculas de minúsculas ("mercado" = "Mercado"). O mesmo nome pode existir nos dois tipos (ex.: "Consórcio").
+- O `type` não muda depois de criada: o lançamento precisa ter o mesmo tipo da categoria.
+- Arquivada: continua nos lançamentos antigos, mas não é oferecida para novos. Pode ser reativada.
+- Categorias em uso não são excluídas, só arquivadas (regra garantida pela chave estrangeira quando os lançamentos existirem).
+- Primeira tabela com Row Level Security ([ADR 0028](../adr/0028-row-level-security.md)).
 
 ### Transaction (Lançamento)
 

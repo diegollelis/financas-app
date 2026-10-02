@@ -7,6 +7,7 @@ import {
   type WorkspaceRole,
 } from '@financas/shared';
 import { Injectable } from '@nestjs/common';
+import { createDefaultCategories } from '../categories/default-categories.js';
 import type { Member, Workspace as WorkspaceRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -33,13 +34,14 @@ export class WorkspacesService {
       });
       if (personal) return;
 
-      await tx.workspace.create({
+      const workspace = await tx.workspace.create({
         data: {
           name: PERSONAL_WORKSPACE_NAME,
           isPersonal: true,
           members: { create: { userId, role: 'OWNER' } },
         },
       });
+      await createDefaultCategories(tx, workspace.id);
     });
   }
 
@@ -52,10 +54,14 @@ export class WorkspacesService {
     return (await this.findMemberships(userId)).map(toWorkspace);
   }
 
-  /** A shared workspace; whoever creates it becomes its OWNER. */
+  /** A shared workspace, with the default categories; whoever creates it becomes its OWNER. */
   async create(userId: string, input: CreateWorkspaceInput): Promise<Workspace> {
-    const workspace = await this.prisma.workspace.create({
-      data: { name: input.name, members: { create: { userId, role: 'OWNER' } } },
+    const workspace = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.workspace.create({
+        data: { name: input.name, members: { create: { userId, role: 'OWNER' } } },
+      });
+      await createDefaultCategories(tx, created.id);
+      return created;
     });
     return { id: workspace.id, name: workspace.name, isPersonal: false, role: 'OWNER' };
   }

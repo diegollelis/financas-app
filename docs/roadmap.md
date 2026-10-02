@@ -42,6 +42,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 - [x] RLS na prática ([ADR 0028](adr/0028-row-level-security.md)): papel `financas_app` para a API, URL separada para migrações e `prisma.forWorkspace()`
 - [ ] Categorias (com categorias padrão no novo espaço), primeira tabela com RLS
+  - [x] API: tabela `categories` com RLS, categorias padrão em todo espaço novo, rotas `/workspaces/:workspaceId/categories`
+  - [ ] Tela de categorias no front
 - [ ] Lançamentos por competência: criar, editar, excluir, efetivar em um clique
 - [ ] Configuração de orçamento por competência
 - [ ] Painel do mês: indicadores da planilha, status por cor, gráfico
