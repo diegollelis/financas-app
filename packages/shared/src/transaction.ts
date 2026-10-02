@@ -75,3 +75,21 @@ export type TransactionListQuery = z.infer<typeof transactionListQuerySchema>;
 
 /** Credits first, then debits; each by due date (none last), then by order of creation. */
 export const transactionListResponseSchema = z.array(transactionSchema);
+
+/**
+ * Never stored, always derived (ADR 0029): SETTLED once there is a settlement date; OVERDUE when
+ * still pending after the due date; PENDING otherwise. `today` is `YYYY-MM-DD` in São Paulo
+ * (`todayIso()`); ISO dates compare correctly as text.
+ */
+export const transactionStatusSchema = z.enum(['PENDING', 'OVERDUE', 'SETTLED']);
+
+export type TransactionStatus = z.infer<typeof transactionStatusSchema>;
+
+export function transactionStatus(
+  transaction: Pick<Transaction, 'dueDate' | 'settledAt'>,
+  today: string,
+): TransactionStatus {
+  if (transaction.settledAt) return 'SETTLED';
+  if (transaction.dueDate && transaction.dueDate < today) return 'OVERDUE';
+  return 'PENDING';
+}
