@@ -66,7 +66,7 @@ Pizza com "Débitos pagos" × "Saldo final".
 5. **Categorias problemáticas**: "Energia" na lista de créditos, "Salário + PLR" (duas categorias em uma), quebra de linha em "Saque Aniversário" → corrigidas nas [categorias padrão](modelo.md#categorias-padrão).
 6. **Parcelamentos e rateios só no texto** ("Parcela 04 de 08", "valor dividido com…") → entidades `InstallmentPlan` e divisão de valor.
 7. **Lançamento efetivado com valor zero** cuja descrição cita outro valor → validação `amount > 0`; a importação deve sinalizar esses casos.
-8. **Valores "Real" usam créditos ainda não recebidos** → decidir na fase 3 se o painel mostra as duas visões (previsto e efetivado).
+8. **Valores "Real" usam créditos ainda não recebidos** → o painel mostra as duas visões, prevista e efetivada ([ADR 0031](../adr/0031-painel-do-mes-previsto-e-efetivado.md)).
 9. **Percentuais sem validação** → a soma deve ser ≤ 100%.
 10. **Salário líquido digitado à parte** e divergente dos créditos lançados → configuração de orçamento por competência, com sugestão a partir dos créditos.
 11. **Valores em ponto flutuante** e **datas em formato americano** → centavos inteiros e formato pt-BR.

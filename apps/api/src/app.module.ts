@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { SummaryModule } from './summary/summary.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { WorkspacesModule } from './workspaces/workspaces.module.js';
 
@@ -23,6 +24,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     CategoriesModule,
     TransactionsModule,
     BudgetModule,
+    SummaryModule,
   ],
 })
 export class AppModule {}

@@ -34,3 +34,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0028](0028-row-level-security.md)                    | Row Level Security como segunda barreira entre espaços                            | Aceita |
 | [0029](0029-lancamentos-e-integridade-no-banco.md)    | Lançamentos: regras garantidas pelo banco e status derivado                       | Aceita |
 | [0030](0030-orcamento-por-competencia-com-heranca.md) | Orçamento por competência, herdado da última competência salva                    | Aceita |
+| [0031](0031-painel-do-mes-previsto-e-efetivado.md)    | Painel do mês: indicadores calculados na API, nas visões prevista e efetivada     | Aceita |

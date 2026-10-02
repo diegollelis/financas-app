@@ -61,7 +61,7 @@ Lançamento dividido com outra pessoa (membro do espaço ou contato externo). Mo
 
 ## Indicadores do painel (por espaço e competência)
 
-Calculados na API a partir dos lançamentos — nunca armazenados. Fórmulas de referência em [planilha-origem.md](planilha-origem.md#indicadores-fórmulas).
+Calculados na API a partir dos lançamentos, nunca armazenados, nas visões prevista (tudo) e efetivada (só o recebido e o pago), pela função `summarizePeriod` do `packages/shared` ([ADR 0031](../adr/0031-painel-do-mes-previsto-e-efetivado.md)). Fórmulas de referência em [planilha-origem.md](planilha-origem.md#indicadores-fórmulas).
 
 ## Categorias padrão
 
