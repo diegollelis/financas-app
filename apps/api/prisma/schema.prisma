@@ -18,15 +18,16 @@ datasource db {
 // Owner of all financial data (ADR 0008). The personal workspace is created with the user, is
 // never shared nor deleted, and there is exactly one per user (ADR 0024).
 model Workspace {
-  id           String        @id @default(uuid(7)) @db.Uuid
-  name         String        @db.VarChar(100)
-  isPersonal   Boolean       @default(false) @map("is_personal")
-  members      Member[]
-  invitations  Invitation[]
-  categories   Category[]
-  transactions Transaction[]
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id            String         @id @default(uuid(7)) @db.Uuid
+  name          String         @db.VarChar(100)
+  isPersonal    Boolean        @default(false) @map("is_personal")
+  members       Member[]
+  invitations   Invitation[]
+  categories    Category[]
+  transactions  Transaction[]
+  budgetConfigs BudgetConfig[]
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("workspaces")
 }
@@ -215,4 +216,25 @@ model Transaction {
   @@index([workspaceId, period])
   @@index([categoryId])
   @@map("transactions")
+}
+
+// Budget of one competência: income and the share of it for each destination, in basis points
+// (ADR 0010). Only competências someone saved have a row; the others inherit the latest earlier
+// one (ADR 0030). The CHECKs (ranges, sum <= 100%) are in the migration.
+model BudgetConfig {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  workspaceId        String    @map("workspace_id") @db.Uuid
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  period             String    @db.Char(7)
+  netIncomeCents     Int       @map("net_income_cents")
+  grossIncomeCents   Int?      @map("gross_income_cents")
+  expensesBp         Int       @map("expenses_bp")
+  investmentsBp      Int       @map("investments_bp")
+  emergencyReserveBp Int       @map("emergency_reserve_bp")
+  travelBp           Int       @map("travel_bp")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([workspaceId, period])
+  @@map("budget_configs")
 }
