@@ -184,6 +184,14 @@ export function WorkspacePage() {
             ))}
           {workspace.isSuccess && (
             <>
+              <nav aria-label="Cadastros do espaço">
+                <Link
+                  to={`/espacos/${workspaceId}/categorias`}
+                  className="font-medium hover:underline"
+                >
+                  Categorias →
+                </Link>
+              </nav>
               <Members workspaceId={workspaceId} />
               <Sharing workspace={workspace.data} />
             </>
