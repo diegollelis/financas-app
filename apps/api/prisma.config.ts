@@ -9,7 +9,9 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: { path: 'prisma/migrations' },
   datasource: {
+    // The CLI (migrations, studio) connects as the owner of the tables. The API uses DATABASE_URL,
+    // with the financas_app role, which can neither change the schema nor bypass RLS (ADR 0028).
     // `prisma generate` does not connect, so it must work without the variable (e.g. in CI).
-    url: process.env.DATABASE_URL ?? '',
+    url: process.env.MIGRATION_DATABASE_URL ?? '',
   },
 });

@@ -41,7 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Postgres de verdade para os testes HTTP da API (ADR 0020). Mesmas credenciais e porta do
-    # docker-compose.yml local; o globalSetup dos testes cria o banco financas_test e aplica as migrações.
+    # docker-compose.yml local; o globalSetup dos testes cria o banco financas_test, aplica as migrações
+    # e habilita o login do papel financas_app, com o qual a API conecta (ADR 0028).
     services:
       postgres:
         image: postgres:18-alpine

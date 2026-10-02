@@ -37,7 +37,7 @@ describe('invitations', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(t.prisma);
+    await resetDatabase();
     t.mailer.sent.length = 0;
   });
 

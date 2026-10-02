@@ -18,7 +18,7 @@ describe('Google sign-in', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(t.prisma);
+    await resetDatabase();
   });
 
   afterEach(() => {

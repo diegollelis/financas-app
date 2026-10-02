@@ -16,7 +16,7 @@ describe('authentication (e-mail and password)', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(t.prisma);
+    await resetDatabase();
   });
 
   afterAll(async () => {

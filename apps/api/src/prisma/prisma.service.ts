@@ -16,6 +16,29 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
     });
   }
 
+  /**
+   * A client bound to one workspace, for the business tables protected by Row Level Security
+   * (ADR 0028). Each query runs in its own transaction that first sets `app.workspace_id`; the
+   * setting is transaction-local, so it never leaks to the next user of the pooled connection.
+   *
+   * Pass only the id validated by `WorkspaceMemberGuard` (`@CurrentMembership()`), and keep
+   * filtering by `workspaceId` in the query: RLS is the second barrier, not the first.
+   * Each call is already a transaction, so do not open `$transaction` on the returned client.
+   */
+  forWorkspace(workspaceId: string) {
+    return this.$extends({
+      query: {
+        $allOperations: async ({ args, query }) => {
+          const results: unknown[] = await this.$transaction([
+            this.$executeRaw`SELECT set_config('app.workspace_id', ${workspaceId}, true)`,
+            query(args),
+          ]);
+          return results[1];
+        },
+      },
+    });
+  }
+
   async onModuleDestroy() {
     await this.$disconnect();
   }

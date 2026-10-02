@@ -8,6 +8,7 @@ API REST: NestJS 12 (ESM, Express) + Prisma 7 + PostgreSQL ([ADR 0004](../../doc
 cp apps/api/.env.example apps/api/.env   # uma vez
 pnpm db:up                               # Postgres no Docker (raiz do repo), porta 5434
 pnpm --filter @financas/api db:deploy    # aplica as migrações pendentes
+pnpm db:app-role                         # uma vez: habilita o login do papel da API (ADR 0028)
 pnpm --filter @financas/api dev          # modo watch em http://localhost:3333
 ```
 
@@ -35,10 +36,13 @@ Rode-os dentro de `apps/api` ou, da raiz, com `pnpm --filter @financas/api <scri
 - **Unitários** ao lado do código (`src/**/*.spec.ts`): a classe é instanciada direto, com dublês só do que ela usa.
 - **HTTP** em `test/**/*.spec.ts`: sobem o `AppModule` real com `@nestjs/testing` e fazem requisições com `supertest`. Só o banco é substituído.
 - Os testes nunca leem o `.env`: as variáveis vêm de `vitest.config.ts`.
+- A API dos testes conecta como `financas_app`, igual à produção. Limpeza e preparação de dados usam o dono das tabelas (`ownerClient()` / `resetDatabase()` em `test/db.ts`).
 
 ## Variáveis de ambiente
 
 Validadas com Zod na inicialização (`src/config/env.ts`). A API não sobe se alguma for inválida. Veja a lista em `.env.example`.
+
+São duas conexões com o banco ([ADR 0028](../../docs/adr/0028-row-level-security.md)): `DATABASE_URL` é a da API, com o papel `financas_app` (lê e grava dados, sem alterar o schema nem ignorar o RLS); `MIGRATION_DATABASE_URL` é a do dono das tabelas, usada só pelo Prisma CLI (`prisma.config.ts`).
 
 ## Estrutura
 

@@ -23,7 +23,7 @@ type Entry = { workspace_id: string; description: string };
 describe('Row Level Security (proof of concept)', () => {
   // A client of its own, with one connection: tests 4 and 5 need to reuse the same session.
   const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: testEnv.DATABASE_URL, max: 1 }),
+    adapter: new PrismaPg({ connectionString: testEnv.MIGRATION_DATABASE_URL, max: 1 }),
   });
 
   /** What the API will do on every request inside a workspace (ADR 0028). */
