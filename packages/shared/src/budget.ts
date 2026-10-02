@@ -15,7 +15,9 @@ export const budgetShareKeys = [
   'travelBp',
 ] as const;
 
-export type BudgetShareKey = (typeof budgetShareKeys)[number];
+export const budgetShareKeySchema = z.enum(budgetShareKeys);
+
+export type BudgetShareKey = z.infer<typeof budgetShareKeySchema>;
 
 /** The spreadsheet's percentages, used until the workspace saves its own (ADR 0030). */
 export const DEFAULT_BUDGET_SHARES: Record<BudgetShareKey, number> = {
