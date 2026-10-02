@@ -15,7 +15,7 @@ describe('rate limit', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(t.prisma);
+    await resetDatabase();
     t.mailer.sent.length = 0;
     await t.http().post('/api/auth/sign-up/email').send(user).expect(200);
     t.mailer.sent.length = 0;

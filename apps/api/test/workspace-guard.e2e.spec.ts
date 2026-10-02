@@ -25,7 +25,7 @@ describe('workspace guard', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(t.prisma);
+    await resetDatabase();
   });
 
   afterAll(async () => {

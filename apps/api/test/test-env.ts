@@ -4,7 +4,10 @@
  */
 export const testEnv = {
   NODE_ENV: 'test',
-  DATABASE_URL: 'postgresql://financas:financas@localhost:5434/financas_test',
+  // The API connects as financas_app, as in production: RLS applies to it (ADR 0028).
+  DATABASE_URL: 'postgresql://financas_app:financas_app@localhost:5434/financas_test',
+  // Owner of the tables: migrations and test setup (resetDatabase).
+  MIGRATION_DATABASE_URL: 'postgresql://financas:financas@localhost:5434/financas_test',
   BETTER_AUTH_SECRET: 'test-secret-only-for-automated-tests-000',
   BETTER_AUTH_URL: 'http://localhost:3333',
   WEB_ORIGIN: 'http://localhost:5173',

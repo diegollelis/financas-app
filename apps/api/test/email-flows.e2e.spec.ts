@@ -18,7 +18,7 @@ describe('e-mail flows', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(t.prisma);
+    await resetDatabase();
     t.mailer.sent.length = 0;
   });
 

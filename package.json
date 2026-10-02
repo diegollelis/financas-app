@@ -14,6 +14,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
+    "db:app-role": "docker compose exec -T postgres psql -U financas -d financas -c \"ALTER ROLE financas_app LOGIN PASSWORD 'financas_app'\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",

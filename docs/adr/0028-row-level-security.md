@@ -56,3 +56,11 @@ O estudo levou a três constatações:
 - Primeiro item da fase 3: criar o papel `financas_app`, separar as URLs (API e migrações), implementar `forWorkspace` e aplicar a política em `categories`. Cada tabela de negócio seguinte nasce com `workspace_id`, a política e um teste mostrando que uma consulta sem filtro, pela API, não vê outro espaço.
 - Toda requisição dentro de um espaço passa a rodar numa transação, com dois comandos a mais. O custo é pequeno e será medido quando a fase 3 existir.
 - Erros de RLS aparecem como erro de banco (ex.: `new row violates row-level security policy`). Se um desses acontecer em produção, é sinal de um bug que o filtro do código deixou passar: deve ir para o log e para o Sentry (fase 4).
+
+## Notas de implementação (fase 3)
+
+- **O papel nasce numa migração** (`20261002193322_add_app_role`): `financas_app` é criado **sem login e sem senha**, porque a migração é pública. Ela concede `SELECT/INSERT/UPDATE/DELETE` nas tabelas de `public`, define privilégios padrão para as tabelas futuras e tira o acesso a `_prisma_migrations`. Sem `TRUNCATE` e sem DDL.
+- **Cada ambiente habilita o login com a própria senha:** `ALTER ROLE financas_app LOGIN PASSWORD '...'`. Localmente, `pnpm db:app-role` (senha `financas_app`, só desta máquina). Nos testes e no CI, o `globalSetup` faz isso sozinho. No Neon, o comando roda no editor SQL do console, com uma senha gerada; **não** se cria o papel pela tela de papéis, porque esses ganham o grupo `neon_superuser`.
+- **Variáveis:** `DATABASE_URL` (API, `financas_app`) e `MIGRATION_DATABASE_URL` (Prisma CLI, dono). A API não conhece a segunda.
+- **`prisma.forWorkspace(id)`** é uma extensão de consulta (`$allOperations`, que cobre também `$queryRaw`) que roda cada operação numa transação em lote: `set_config(..., true)` e depois a consulta. Por já ser uma transação, não se abre `$transaction` sobre o client devolvido. Prova em `apps/api/test/prisma-for-workspace.e2e.spec.ts`.
+- **Testes:** a API dos testes conecta como `financas_app`, igual à produção. A limpeza (`resetDatabase()`) e a preparação de cenários usam um client do dono (`ownerClient()` em `apps/api/test/db.ts`).
