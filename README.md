@@ -37,14 +37,14 @@ pnpm install                                   # dependências, client do Prisma
 cp apps/api/.env.example apps/api/.env         # variáveis da API (gere um BETTER_AUTH_SECRET)
 cp apps/web/.env.example apps/web/.env.local   # variáveis do front
 
-pnpm db:up                                     # Postgres no Docker (porta 5434); os testes também precisam dele
+pnpm db:up                                     # Postgres (porta 5434) e Mailpit no Docker; os testes precisam do Postgres
 pnpm --filter @financas/api db:deploy          # cria as tabelas
 
 pnpm --filter @financas/api dev                # API em http://localhost:3333 (Swagger em /docs)
 pnpm --filter @financas/web dev                # em outro terminal: front em http://localhost:5173
 ```
 
-Abra http://localhost:5173, crie uma conta em "Cadastre-se" e entre. A página inicial mostra o status da API e do banco: se aparecer "Online", está tudo funcionando.
+Abra http://localhost:5173, crie uma conta em "Cadastre-se" e entre. Os e-mails (confirmação de cadastro, redefinição de senha) não saem da sua máquina: eles aparecem na caixa de entrada do Mailpit, em http://localhost:8025. A página inicial mostra o status da API e do banco: se aparecer "Online", está tudo funcionando.
 
 ## Comandos do dia a dia
 
@@ -59,7 +59,7 @@ Abra http://localhost:5173, crie uma conta em "Cadastre-se" e entre. A página i
 | `pnpm format`                 | formata tudo com o Prettier                    |
 | `pnpm typecheck`              | checa os tipos dos três pacotes                |
 | `pnpm build`                  | compila a API e o front                        |
-| `pnpm db:up` / `pnpm db:down` | liga / desliga o Postgres local                |
+| `pnpm db:up` / `pnpm db:down` | liga / desliga o Postgres e o Mailpit locais   |
 | `pnpm secrets`                | procura credenciais em todo o histórico do git |
 
 Os comandos de cada pacote estão nos READMEs de [`apps/api`](apps/api/README.md), [`apps/web`](apps/web/README.md) e [`packages/shared`](packages/shared/README.md).

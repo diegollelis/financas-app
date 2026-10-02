@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Finanças App: a multi-user, public web app for monthly personal finance. Users record credits and debits, set a budget by percentages and track their balance. It replaces a personal Excel spreadsheet, which is kept out of the repo because it contains banking data. The repository is also a **full-stack learning lab** for the owner, who is moving from Protheus/AdvPL to modern web development. Explain the reasoning behind your choices, and record every new architectural decision as an ADR.
 
-**Current state:** phase 1 (code foundation) is done. Phase 2 (auth and workspaces) is in progress: the API has Better Auth with e-mail/password (`/api/auth/*`), a `SessionGuard` and `GET /me` (ADR 0020); the web app has sign-in (`/entrar`), sign-up (`/cadastro`) and sign-out, with route guards (ADR 0021). Tables: `workspaces`, `users`, `sessions`, `accounts`, `verifications`. Next steps are in `docs/roadmap.md`.
+**Current state:** phase 1 (code foundation) is done. Phase 2 (auth and workspaces) is in progress: the API has Better Auth with e-mail/password (`/api/auth/*`), a `SessionGuard` and `GET /me` (ADR 0020); the web app has sign-in (`/entrar`), sign-up (`/cadastro`) and sign-out, with route guards (ADR 0021); e-mail verification (sent, not required yet) and password reset (`/esqueci-senha`, `/redefinir-senha`) are done (ADR 0022). Tables: `workspaces`, `users`, `sessions`, `accounts`, `verifications`. Next steps are in `docs/roadmap.md`.
 
 ## Key docs (read before designing anything)
 
@@ -15,9 +15,9 @@ Finanças App: a multi-user, public web app for monthly personal finance. Users 
 - `docs/dominio/modelo.md` has the entities, rules and default categories. `glossario.md` has the PT↔EN terms and the Protheus analogies.
 - `docs/roadmap.md` lists the phases as checklists. Tick items as they are completed.
 
-## Stack (see ADRs 0002–0021)
+## Stack (see ADRs 0002–0022)
 
-pnpm workspaces monorepo: `apps/web` (React 19 + Vite 8, TanStack Query, React Router 8, Tailwind 4 + shadcn/ui on Radix), `apps/api` (NestJS 12 as ESM on Express, Prisma 7, PostgreSQL 18), `packages/shared` (Zod schemas, types, money/date utils). TypeScript 6 (not 7: typescript-eslint does not support it yet). Auth will be Better Auth with cookie sessions; email goes through Resend. Hosting: Cloudflare Pages (web), Render via Docker (api), Neon (Postgres). Locally, Postgres runs in Docker.
+pnpm workspaces monorepo: `apps/web` (React 19 + Vite 8, TanStack Query, React Router 8, Tailwind 4 + shadcn/ui on Radix), `apps/api` (NestJS 12 as ESM on Express, Prisma 7, PostgreSQL 18), `packages/shared` (Zod schemas, types, money/date utils). TypeScript 6 (not 7: typescript-eslint does not support it yet). Auth is Better Auth with cookie sessions; email goes through Resend in production and Mailpit (Docker, inbox at http://localhost:8025) in development. Hosting: Cloudflare Pages (web), Render via Docker (api), Neon (Postgres). Locally, Postgres runs in Docker.
 
 ## Commands
 
@@ -26,7 +26,7 @@ Run from the repo root. Package scripts run with `pnpm --filter @financas/<api|w
 | Task                                                              | Command                                                               |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Install (also generates the Prisma client and installs git hooks) | `pnpm install`                                                        |
-| Start / stop local Postgres                                       | `pnpm db:up` / `pnpm db:down`                                         |
+| Start / stop local Postgres and Mailpit                           | `pnpm db:up` / `pnpm db:down`                                         |
 | Apply migrations                                                  | `pnpm --filter @financas/api db:deploy`                               |
 | Create a migration after editing `schema.prisma`                  | `pnpm --filter @financas/api db:migrate --name <change>`              |
 | Run the API (watch, :3333) / the web app (:5173)                  | `pnpm --filter @financas/api dev` / `pnpm --filter @financas/web dev` |
@@ -60,6 +60,7 @@ CI (`.github/workflows/ci.yml`) runs `format:check`, `lint`, `typecheck`, `test`
 
 - **API tests need Postgres** (ADR 0020): `pnpm test` migrates and uses a separate `financas_test` database, so run `pnpm db:up` first. CI has a Postgres service on the same port. HTTP tests call `resetDatabase()` in `beforeEach`; add new tables to its TRUNCATE.
 - **Web session and forms** (ADR 0021): the session is the TanStack query `['me']` (`useMe`); pages behind `RequireAuth` read the user with `useCurrentUser()`. Forms use React Hook Form + `zodResolver` with the shared schema. Page URLs are pt-BR. Page tests use `renderApp(path)` with `mockApi({...})`.
+- **E-mail** (ADR 0022): inject `Mailer` (`apps/api/src/mail/`); templates are pt-BR with escaped HTML. Never log a message or its link (it carries a token). HTTP tests use `createTestApp()` (`apps/api/test/app.ts`), which swaps in a `FakeMailer`; open links with `mailer.lastLinkTo(email)`.
 - **Better Auth** is mounted on Express before the body parser by `setupApp` (`apps/api/src/setup-app.ts`). The app is created with `bodyParser: false`, and HTTP tests must call `setupApp` too. Protect routes with `@UseGuards(SessionGuard)` and read the user with `@CurrentUser()`.
 
 ## Conventions that cut across the codebase
@@ -75,4 +76,4 @@ CI (`.github/workflows/ci.yml`) runs `format:check`, `lint`, `typecheck`, `test`
 
 ## Environment notes
 
-Development is on Windows. Node 26 is installed, and it no longer ships corepack, so install pnpm with `npm i -g pnpm`. Docker Desktop, git and gitleaks are installed; Docker Desktop is not always running, so start it before `pnpm db:up`. Commits use the GitHub noreply e-mail (repo-local git config). Local ports: API 3333, web 5173, Postgres 5434 on 127.0.0.1 (3000/3001 and 5432/5433 are taken by other projects on this machine). When stopping dev servers, kill only `node` processes by port: a Windows `svchost` (port proxy) also listens on 3000.
+Development is on Windows. Node 26 is installed, and it no longer ships corepack, so install pnpm with `npm i -g pnpm`. Docker Desktop, git and gitleaks are installed; Docker Desktop is not always running, so start it before `pnpm db:up`. Commits use the GitHub noreply e-mail (repo-local git config). Local ports: API 3333, web 5173, Postgres 5434 and Mailpit 8025 on 127.0.0.1 (3000/3001 and 5432/5433 are taken by other projects on this machine). When stopping dev servers, kill only `node` processes by port: a Windows `svchost` (port proxy) also listens on 3000.

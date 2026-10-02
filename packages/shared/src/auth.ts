@@ -4,31 +4,65 @@ import { z } from 'zod';
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
+/** Web page that receives the password reset link (the API builds the e-mail link to it). */
+export const RESET_PASSWORD_PATH = '/redefinir-senha';
+
 /** Matches the `users.name` column (varchar 100). */
 export const NAME_MAX_LENGTH = 100;
 
 // Messages are UI text (pt-BR, ADR 0011): the web form shows them as they are.
+
+const emailSchema = z.email('Informe um e-mail válido.');
+
+/** Rules for a new password: sign-up and password reset. */
+export const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`)
+  .max(PASSWORD_MAX_LENGTH, `A senha pode ter no máximo ${PASSWORD_MAX_LENGTH} caracteres.`);
+
 export const signUpInputSchema = z.object({
   name: z
     .string()
     .trim()
     .min(1, 'Informe seu nome.')
     .max(NAME_MAX_LENGTH, `Use no máximo ${NAME_MAX_LENGTH} caracteres.`),
-  email: z.email('Informe um e-mail válido.'),
-  password: z
-    .string()
-    .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`)
-    .max(PASSWORD_MAX_LENGTH, `A senha pode ter no máximo ${PASSWORD_MAX_LENGTH} caracteres.`),
+  email: emailSchema,
+  password: passwordSchema,
 });
 
 export type SignUpInput = z.infer<typeof signUpInputSchema>;
 
 export const signInInputSchema = z.object({
-  email: z.email('Informe um e-mail válido.'),
+  email: emailSchema,
   password: z.string().min(1, 'Informe sua senha.'),
 });
 
 export type SignInInput = z.infer<typeof signInInputSchema>;
+
+export const forgotPasswordInputSchema = z.object({ email: emailSchema });
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>;
+
+/** The web form: the new password typed twice. */
+export const resetPasswordFormSchema = z
+  .object({ password: passwordSchema, confirmPassword: z.string() })
+  .refine((input) => input.password === input.confirmPassword, {
+    message: 'As senhas não conferem.',
+    path: ['confirmPassword'],
+  });
+
+export type ResetPasswordForm = z.infer<typeof resetPasswordFormSchema>;
+
+/** Body of `POST /api/auth/reset-password`: the token comes from the e-mail link. */
+export const resetPasswordInputSchema = z.object({
+  newPassword: passwordSchema,
+  token: z.string().min(1),
+});
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;
+
+/** Body of the auth routes that only confirm the action (reset, resend verification...). */
+export const statusResponseSchema = z.object({ status: z.boolean() });
 
 /** The signed-in user, as returned by `GET /me`. Never includes password or session data. */
 export const meResponseSchema = z.object({

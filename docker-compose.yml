@@ -22,5 +22,13 @@ services:
       timeout: 3s
       retries: 10
 
+  # Carteiro falso para desenvolvimento (ADR 0022): recebe os e-mails que a API envia e os mostra
+  # em uma caixa de entrada web em http://localhost:8025. Nada sai desta máquina.
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    container_name: financas-mailpit
+    ports:
+      - '127.0.0.1:8025:8025'
+
 volumes:
   postgres-data:

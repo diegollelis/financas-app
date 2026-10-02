@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { meResponseSchema, signInInputSchema, signUpInputSchema } from './auth.ts';
+import {
+  meResponseSchema,
+  resetPasswordFormSchema,
+  signInInputSchema,
+  signUpInputSchema,
+} from './auth.ts';
 
 const validMe = {
   id: '01920000-0000-7000-8000-000000000000',
@@ -69,5 +74,25 @@ describe('signInInputSchema', () => {
     expect(signInInputSchema.safeParse({ email: 'maria@example.com', password: '' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('resetPasswordFormSchema', () => {
+  it('accepts matching passwords', () => {
+    expect(
+      resetPasswordFormSchema.safeParse({ password: '12345678', confirmPassword: '12345678' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('points the mismatch at the confirmation field', () => {
+    const result = resetPasswordFormSchema.safeParse({
+      password: '12345678',
+      confirmPassword: '87654321',
+    });
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ['confirmPassword'],
+      message: 'As senhas não conferem.',
+    });
   });
 });

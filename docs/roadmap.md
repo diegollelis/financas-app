@@ -27,7 +27,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Better Auth ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))
   - [x] API: cadastro, login e logout com e-mail e senha; `GET /me`; testes com Postgres real
   - [x] Web: telas de cadastro, login e logout ([ADR 0021](adr/0021-sessao-e-formularios-no-front.md))
-  - [ ] Verificação de e-mail e recuperação de senha (Resend)
+  - [x] Verificação de e-mail e recuperação de senha (Mailpit local, Resend em produção — [ADR 0022](adr/0022-envio-de-email.md))
   - [ ] Login com Google
 - [ ] Rate limit nas rotas de autenticação
 - [ ] Workspace, Member e papéis; espaço pessoal criado no cadastro
