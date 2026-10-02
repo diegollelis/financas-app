@@ -22,5 +22,12 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO financas_app;
 
--- Prisma's migration history is the owner's business only.
-REVOKE ALL ON TABLE _prisma_migrations FROM financas_app;
+-- Prisma's migration history is the owner's business only. The table does not exist in the
+-- shadow database where `prisma migrate dev` replays the migrations, hence the check.
+DO $$
+BEGIN
+  IF to_regclass('_prisma_migrations') IS NOT NULL THEN
+    REVOKE ALL ON TABLE _prisma_migrations FROM financas_app;
+  END IF;
+END
+$$;
