@@ -31,6 +31,8 @@ import { SessionGuard } from './session.guard.js';
             BETTER_AUTH_SECRET: config.get('BETTER_AUTH_SECRET', { infer: true }),
             BETTER_AUTH_URL: config.get('BETTER_AUTH_URL', { infer: true }),
             WEB_ORIGIN: config.get('WEB_ORIGIN', { infer: true }),
+            GOOGLE_CLIENT_ID: config.get('GOOGLE_CLIENT_ID', { infer: true }),
+            GOOGLE_CLIENT_SECRET: config.get('GOOGLE_CLIENT_SECRET', { infer: true }),
           },
           mailer,
           (userId) => workspaces.ensurePersonalWorkspace(userId),

@@ -17,8 +17,18 @@ const envSchema = z
     // Without our own domain, Resend only sends from its test address (ADR 0022).
     MAIL_FROM_EMAIL: z.email().default('onboarding@resend.dev'),
     MAIL_FROM_NAME: z.string().default('Finanças'),
+    // Google sign-in (ADR 0026). Optional: without them, only e-mail and password.
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
   })
   .superRefine((env, ctx) => {
+    if (!env.GOOGLE_CLIENT_ID !== !env.GOOGLE_CLIENT_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GOOGLE_CLIENT_SECRET'],
+        message: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET go together',
+      });
+    }
     if (env.MAIL_TRANSPORT === 'resend' && !env.RESEND_API_KEY) {
       ctx.addIssue({
         code: 'custom',

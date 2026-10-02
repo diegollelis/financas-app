@@ -8,4 +8,7 @@ export const testEnv = {
   BETTER_AUTH_SECRET: 'test-secret-only-for-automated-tests-000',
   BETTER_AUTH_URL: 'http://localhost:3333',
   WEB_ORIGIN: 'http://localhost:5173',
+  // Fake credentials: tests answer for Google themselves (test/fake-google.ts).
+  GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
+  GOOGLE_CLIENT_SECRET: 'test-client-secret',
 } as const;

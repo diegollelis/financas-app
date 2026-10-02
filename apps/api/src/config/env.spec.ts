@@ -25,3 +25,16 @@ describe('validateEnv', () => {
     );
   });
 });
+
+describe('validateEnv (Google)', () => {
+  it('accepts neither or both Google credentials', () => {
+    expect(validateEnv(base).GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(
+      validateEnv({ ...base, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret' }),
+    ).toMatchObject({ GOOGLE_CLIENT_ID: 'id' });
+  });
+
+  it('refuses only one of them', () => {
+    expect(() => validateEnv({ ...base, GOOGLE_CLIENT_ID: 'id' })).toThrow(/GOOGLE_CLIENT_SECRET/);
+  });
+});

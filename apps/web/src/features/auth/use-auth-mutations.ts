@@ -9,6 +9,7 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiPost } from '@/lib/api';
+import { navigateAway } from '@/lib/browser';
 import { meQueryKey } from './use-me';
 
 // Better Auth routes (ADR 0020). On success the session cookie is set by the API; here we only
@@ -66,5 +67,26 @@ export function useResendVerification() {
   return useMutation({
     mutationFn: (email: string) =>
       apiPost('/api/auth/send-verification-email', { email }, statusResponseSchema),
+  });
+}
+
+/**
+ * Starts the Google sign-in (ADR 0026): the API answers with Google's URL and the browser goes
+ * there. Google sends it back to the API, which signs in and redirects to `callbackURL`, or to
+ * `errorCallbackURL` with `?error=` when something fails.
+ */
+export function useGoogleSignIn() {
+  return useMutation({
+    mutationFn: () =>
+      apiPost(
+        '/api/auth/sign-in/social',
+        {
+          provider: 'google',
+          callbackURL: `${window.location.origin}/`,
+          errorCallbackURL: `${window.location.origin}/entrar`,
+        },
+        z.object({ url: z.url() }),
+      ),
+    onSuccess: ({ url }) => navigateAway(url),
   });
 }
