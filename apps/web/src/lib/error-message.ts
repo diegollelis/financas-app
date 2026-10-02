@@ -7,6 +7,7 @@ const ptBrCodes = new Set([
   'ALREADY_MEMBER',
   'TOO_MANY_INVITATIONS',
   'EMAIL_MISMATCH',
+  'CATEGORY_EXISTS',
 ]);
 
 /** Turns an error from our own API routes (not /api/auth) into a message for the user. */

@@ -1,6 +1,7 @@
 import { INVITATION_PATH, RESET_PASSWORD_PATH } from '@financas/shared';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
+import { CategoriesPage } from '@/routes/categories';
 import { ForgotPasswordPage } from '@/routes/forgot-password';
 import { HomePage } from '@/routes/home';
 import { InvitationPage } from '@/routes/invitation';
@@ -24,6 +25,7 @@ export const routes: RouteObject[] = [
     children: [
       { path: '/', element: <HomePage /> },
       { path: '/espacos/:workspaceId', element: <WorkspacePage /> },
+      { path: '/espacos/:workspaceId/categorias', element: <CategoriesPage /> },
     ],
   },
   // Outside the guards: the e-mail link works whether or not someone is signed in here.
