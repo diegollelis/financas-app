@@ -30,3 +30,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0024](0024-espacos-membros-e-espaco-pessoal.md) | Espaços, membros e o espaço pessoal                                               | Aceita |
 | [0025](0025-guard-de-espaco-e-isolamento.md)     | Guard de espaço, papéis e testes de isolamento                                    | Aceita |
 | [0026](0026-login-com-google.md)                 | Login com Google e vínculo de contas                                              | Aceita |
+| [0027](0027-convites-por-email.md)               | Convite de membros por e-mail                                                     | Aceita |

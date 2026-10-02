@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Finanças App: a multi-user, public web app for monthly personal finance. Users record credits and debits, set a budget by percentages and track their balance. It replaces a personal Excel spreadsheet, which is kept out of the repo because it contains banking data. The repository is also a **full-stack learning lab** for the owner, who is moving from Protheus/AdvPL to modern web development. Explain the reasoning behind your choices, and record every new architectural decision as an ADR.
 
-**Current state:** phase 1 (code foundation) is done. Phase 2 (auth and workspaces) is in progress: the API has Better Auth with e-mail/password and Google (optional `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, ADR 0026) (`/api/auth/*`), a `SessionGuard` and `GET /me` (ADR 0020); the web app has sign-in (`/entrar`), sign-up (`/cadastro`) and sign-out, with route guards (ADR 0021); e-mail verification (sent, not required yet) and password reset (`/esqueci-senha`, `/redefinir-senha`) are done (ADR 0022); auth routes are rate-limited per IP with counters in `rate_limits` (ADR 0023). Every user has a personal workspace (created on sign-up, ADR 0024); `GET/POST /workspaces` list and create workspaces; routes under `/workspaces/:workspaceId` go through `WorkspaceMemberGuard` (ADR 0025). Tables: `workspaces`, `members`, `users`, `sessions`, `accounts`, `verifications`, `rate_limits`. Next steps are in `docs/roadmap.md`.
+**Current state:** phase 1 (code foundation) is done. Phase 2 (auth and workspaces) is in progress: the API has Better Auth with e-mail/password and Google (optional `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, ADR 0026) (`/api/auth/*`), a `SessionGuard` and `GET /me` (ADR 0020); the web app has sign-in (`/entrar`), sign-up (`/cadastro`) and sign-out, with route guards (ADR 0021); e-mail verification (sent, not required yet) and password reset (`/esqueci-senha`, `/redefinir-senha`) are done (ADR 0022); auth routes are rate-limited per IP with counters in `rate_limits` (ADR 0023). Every user has a personal workspace (created on sign-up, ADR 0024); `GET/POST /workspaces` list and create workspaces; routes under `/workspaces/:workspaceId` go through `WorkspaceMemberGuard` (ADR 0025). OWNERs invite EDITORs/VIEWERs by e-mail; the link (`/convites/:token`) is accepted only by the invited e-mail (ADR 0027). Tables: `workspaces`, `members`, `invitations`, `users`, `sessions`, `accounts`, `verifications`, `rate_limits`. Next steps are in `docs/roadmap.md`.
 
 ## Key docs (read before designing anything)
 
@@ -15,7 +15,7 @@ Finanças App: a multi-user, public web app for monthly personal finance. Users 
 - `docs/dominio/modelo.md` has the entities, rules and default categories. `glossario.md` has the PT↔EN terms and the Protheus analogies.
 - `docs/roadmap.md` lists the phases as checklists. Tick items as they are completed.
 
-## Stack (see ADRs 0002–0026)
+## Stack (see ADRs 0002–0027)
 
 pnpm workspaces monorepo: `apps/web` (React 19 + Vite 8, TanStack Query, React Router 8, Tailwind 4 + shadcn/ui on Radix), `apps/api` (NestJS 12 as ESM on Express, Prisma 7, PostgreSQL 18), `packages/shared` (Zod schemas, types, money/date utils). TypeScript 6 (not 7: typescript-eslint does not support it yet). Auth is Better Auth with cookie sessions; email goes through Resend in production and Mailpit (Docker, inbox at http://localhost:8025) in development. Hosting: Cloudflare Pages (web), Render via Docker (api), Neon (Postgres). Locally, Postgres runs in Docker.
 
