@@ -22,7 +22,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Repositório público: proteção contra vazamento de segredos ([ADR 0019](adr/0019-repositorio-publico.md))
 - [x] Comandos documentados no `CLAUDE.md` e no `README.md`
 
-## Fase 2 — Autenticação e espaços
+## Fase 2 — Autenticação e espaços ✅
 
 - [x] Better Auth ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))
   - [x] API: cadastro, login e logout com e-mail e senha; `GET /me`; testes com Postgres real
@@ -33,14 +33,15 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Workspace, Member e papéis; espaço pessoal criado no cadastro ([ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
 - [x] Guard de espaço + repositórios sempre filtrando por `workspace_id` ([ADR 0025](adr/0025-guard-de-espaco-e-isolamento.md))
 - [x] Testes de isolamento entre espaços (`expectHiddenFromOutsiders`, um por recurso)
-- [ ] RLS no PostgreSQL como segunda barreira (estudo)
+- [x] RLS no PostgreSQL como segunda barreira: desenho e prova de conceito ([ADR 0028](adr/0028-row-level-security.md))
 - [x] Convite de membros por e-mail ([ADR 0027](adr/0027-convites-por-email.md))
   - [x] API: convidar, listar, cancelar, ver e aceitar pelo link
   - [x] Web: página do espaço (membros e convite), página do convite e volta após o login
 
 ## Fase 3 — Núcleo financeiro
 
-- [ ] Categorias (com categorias padrão no novo espaço)
+- [ ] RLS na prática ([ADR 0028](adr/0028-row-level-security.md)): papel `financas_app` para a API, URL separada para migrações e `prisma.forWorkspace()`
+- [ ] Categorias (com categorias padrão no novo espaço), primeira tabela com RLS
 - [ ] Lançamentos por competência: criar, editar, excluir, efetivar em um clique
 - [ ] Configuração de orçamento por competência
 - [ ] Painel do mês: indicadores da planilha, status por cor, gráfico
