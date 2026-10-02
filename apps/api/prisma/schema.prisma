@@ -18,14 +18,15 @@ datasource db {
 // Owner of all financial data (ADR 0008). The personal workspace is created with the user, is
 // never shared nor deleted, and there is exactly one per user (ADR 0024).
 model Workspace {
-  id          String       @id @default(uuid(7)) @db.Uuid
-  name        String       @db.VarChar(100)
-  isPersonal  Boolean      @default(false) @map("is_personal")
-  members     Member[]
-  invitations Invitation[]
-  categories  Category[]
-  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id           String        @id @default(uuid(7)) @db.Uuid
+  name         String        @db.VarChar(100)
+  isPersonal   Boolean       @default(false) @map("is_personal")
+  members      Member[]
+  invitations  Invitation[]
+  categories   Category[]
+  transactions Transaction[]
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("workspaces")
 }
@@ -174,15 +175,44 @@ enum TransactionType {
 // Classifies transactions, per type. New workspaces get the default ones; a category in use is
 // archived, not deleted (docs/dominio/modelo.md).
 model Category {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  workspaceId  String          @map("workspace_id") @db.Uuid
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String          @db.VarChar(50)
+  type         TransactionType
+  archivedAt   DateTime?       @map("archived_at") @db.Timestamptz(3)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions Transaction[]
+
+  @@unique([workspaceId, type, name])
+  // Target of the composite foreign key of transactions (ADR 0029).
+  @@unique([id, workspaceId, type])
+  @@map("categories")
+}
+
+// Lançamento: a credit or debit of one competência (ADR 0010). The category is referenced with
+// (category_id, workspace_id, type), so the database itself refuses a category of another
+// workspace or of the other type, and the deletion of a category in use (ADR 0029). NoAction
+// (checked at the end of the statement) instead of Restrict lets a workspace be deleted with
+// its categories and transactions in one go. CHECKs on amount and period are in the migration.
+model Transaction {
   id          String          @id @default(uuid(7)) @db.Uuid
   workspaceId String          @map("workspace_id") @db.Uuid
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String          @db.VarChar(50)
   type        TransactionType
-  archivedAt  DateTime?       @map("archived_at") @db.Timestamptz(3)
+  description String          @db.VarChar(200)
+  notes       String?         @db.VarChar(1000)
+  categoryId  String          @map("category_id") @db.Uuid
+  category    Category        @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
+  amountCents Int             @map("amount_cents")
+  period      String          @db.Char(7)
+  dueDate     DateTime?       @map("due_date") @db.Date
+  settledAt   DateTime?       @map("settled_at") @db.Date
   createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  @@unique([workspaceId, type, name])
-  @@map("categories")
+  @@index([workspaceId, period])
+  @@index([categoryId])
+  @@map("transactions")
 }

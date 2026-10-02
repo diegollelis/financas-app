@@ -8,6 +8,8 @@ const ptBrCodes = new Set([
   'TOO_MANY_INVITATIONS',
   'EMAIL_MISMATCH',
   'CATEGORY_EXISTS',
+  'CATEGORY_IN_USE',
+  'INVALID_CATEGORY',
 ]);
 
 /** Turns an error from our own API routes (not /api/auth) into a message for the user. */

@@ -26,16 +26,16 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 - Único por (`workspace_id`, `type`, `name`), sem diferenciar maiúsculas de minúsculas ("mercado" = "Mercado"). O mesmo nome pode existir nos dois tipos (ex.: "Consórcio").
 - O `type` não muda depois de criada: o lançamento precisa ter o mesmo tipo da categoria.
 - Arquivada: continua nos lançamentos antigos, mas não é oferecida para novos. Pode ser reativada.
-- Categorias em uso não são excluídas, só arquivadas (regra garantida pela chave estrangeira quando os lançamentos existirem).
+- Categorias em uso não são excluídas, só arquivadas (regra garantida pela chave estrangeira dos lançamentos, [ADR 0029](../adr/0029-lancamentos-e-integridade-no-banco.md)).
 - Primeira tabela com Row Level Security ([ADR 0028](../adr/0028-row-level-security.md)).
 
 ### Transaction (Lançamento)
 
 - `workspace_id`, `type` (`CREDIT` | `DEBIT`), `description`, `notes`, `category_id`
-- `amount_cents` (> 0), `period` (competência `YYYY-MM`), `due_date`, `settled_at`
+- `amount_cents` (> 0), `period` (competência `YYYY-MM`), `due_date` (opcional), `settled_at`
 - `installment_plan_id?`, `installment_number?`, `recurrence_id?`
 - Regras:
-  - a categoria pertence ao mesmo espaço e tem o mesmo `type`;
+  - a categoria pertence ao mesmo espaço e tem o mesmo `type` (garantido pelo banco, [ADR 0029](../adr/0029-lancamentos-e-integridade-no-banco.md)); categoria arquivada não pode ser escolhida;
   - status: **pendente** (`settled_at` nulo), **vencido** (pendente e `due_date` < hoje), **efetivado** (`settled_at` preenchido).
 
 ### InstallmentPlan (Parcelamento) — fase 5

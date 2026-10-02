@@ -1,0 +1,77 @@
+import { z } from 'zod';
+import { transactionTypeSchema } from './category.ts';
+import { amountCentsSchema, isoDateSchema, periodSchema } from './money-and-dates.ts';
+
+/** Matches the `transactions.description` column (varchar 200). */
+export const TRANSACTION_DESCRIPTION_MAX_LENGTH = 200;
+
+/** Matches the `transactions.notes` column (varchar 1000). */
+export const TRANSACTION_NOTES_MAX_LENGTH = 1000;
+
+const descriptionSchema = z
+  .string()
+  .trim()
+  .min(1, 'Descreva o lançamento.')
+  .max(
+    TRANSACTION_DESCRIPTION_MAX_LENGTH,
+    `Use no máximo ${TRANSACTION_DESCRIPTION_MAX_LENGTH} caracteres.`,
+  );
+
+/** Optional free text. A blank one is stored as null. */
+const notesSchema = z
+  .string()
+  .trim()
+  .max(TRANSACTION_NOTES_MAX_LENGTH, `Use no máximo ${TRANSACTION_NOTES_MAX_LENGTH} caracteres.`)
+  .nullable()
+  .transform((notes) => notes || null);
+
+/**
+ * A credit or a debit of one competência (ADR 0010). The category must be of the same type and
+ * of the same workspace (ADR 0029). `settledAt` null = still pending.
+ */
+export const createTransactionInputSchema = z.object({
+  type: transactionTypeSchema,
+  description: descriptionSchema,
+  notes: notesSchema.optional(),
+  categoryId: z.uuid('Escolha uma categoria.'),
+  amountCents: amountCentsSchema,
+  period: periodSchema,
+  dueDate: isoDateSchema.nullable().optional(),
+  settledAt: isoDateSchema.nullable().optional(),
+});
+
+export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
+
+/**
+ * Any subset of the fields. Settling in one click is `{ settledAt: '<today>' }`; undoing it is
+ * `{ settledAt: null }`.
+ */
+export const updateTransactionInputSchema = createTransactionInputSchema
+  .partial()
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: 'Nada para alterar.',
+  });
+
+export type UpdateTransactionInput = z.infer<typeof updateTransactionInputSchema>;
+
+export const transactionSchema = z.object({
+  id: z.uuid(),
+  type: transactionTypeSchema,
+  description: z.string(),
+  notes: z.string().nullable(),
+  categoryId: z.uuid(),
+  amountCents: z.number().int(),
+  period: periodSchema,
+  dueDate: isoDateSchema.nullable(),
+  settledAt: isoDateSchema.nullable(),
+});
+
+export type Transaction = z.infer<typeof transactionSchema>;
+
+/** `GET /workspaces/:workspaceId/transactions?period=YYYY-MM`. */
+export const transactionListQuerySchema = z.object({ period: periodSchema });
+
+export type TransactionListQuery = z.infer<typeof transactionListQuerySchema>;
+
+/** Credits first, then debits; each by due date (none last), then by order of creation. */
+export const transactionListResponseSchema = z.array(transactionSchema);
