@@ -92,3 +92,15 @@ model Verification {
   @@index([identifier])
   @@map("verifications")
 }
+
+// Rate limit counters of the auth routes, one row per client IP + route (ADR 0023). Stored in the
+// database so they survive API restarts. A technical table owned by Better Auth: no
+// created_at/updated_at, last_request (epoch milliseconds, as Better Auth writes it) plays that role.
+model RateLimit {
+  id          String @id @default(uuid(7)) @db.Uuid
+  key         String @unique
+  count       Int
+  lastRequest BigInt @map("last_request")
+
+  @@map("rate_limits")
+}

@@ -7,13 +7,21 @@ export class ApiError extends Error {
   readonly code?: string;
   /** The API's own message. Shown to the user only when it is known to be pt-BR. */
   readonly detail?: string;
+  /** Seconds to wait before trying again, when the API rate-limited the request (429). */
+  readonly retryAfter?: number;
 
-  constructor(status: number, message: string, body?: { code?: string; message?: string }) {
+  constructor(
+    status: number,
+    message: string,
+    body?: { code?: string; message?: string },
+    retryAfter?: number,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = body?.code;
     this.detail = body?.message;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -48,6 +56,7 @@ async function request<T extends z.ZodType>(
       response.status,
       `${method} ${path} failed with status ${response.status}`,
       errorBody.data,
+      Number(response.headers.get('X-Retry-After')) || undefined,
     );
   }
   return schema.parse(await response.json());
