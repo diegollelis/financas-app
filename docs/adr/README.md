@@ -31,3 +31,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0025](0025-guard-de-espaco-e-isolamento.md)     | Guard de espaço, papéis e testes de isolamento                                    | Aceita |
 | [0026](0026-login-com-google.md)                 | Login com Google e vínculo de contas                                              | Aceita |
 | [0027](0027-convites-por-email.md)               | Convite de membros por e-mail                                                     | Aceita |
+| [0028](0028-row-level-security.md)               | Row Level Security como segunda barreira entre espaços                            | Aceita |
