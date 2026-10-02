@@ -64,6 +64,24 @@ export const reaisInputSchema = z
   })
   .pipe(amountCentsSchema);
 
+const percent = new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 2 });
+
+/** Percentages are integer basis points (ADR 0010): 1250 → "12,5%". */
+export function formatBasisPoints(basisPoints: number): string {
+  return percent.format(basisPoints / 10_000);
+}
+
+/**
+ * Reads a percentage typed the Brazilian way into basis points, with integer math only: "60",
+ * "12,5", "12.55" and "5%" all work. Returns null when it is not a percentage with up to two
+ * decimal places (it may still be above 100%: the schema says so, in pt-BR).
+ */
+export function parsePercent(text: string): number | null {
+  const match = /^(\d+)(?:[.,](\d{1,2}))?%?$/.exec(text.replace(/\s/g, ''));
+  if (!match) return null;
+  return Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
+}
+
 /** The app's time zone (ADR 0010): "today" is the user's today, not the server's. */
 export const APP_TIME_ZONE = 'America/Sao_Paulo';
 

@@ -25,6 +25,14 @@ export const DEFAULT_BUDGET_SHARES: Record<BudgetShareKey, number> = {
   travelBp: 500,
 };
 
+/**
+ * The part of an income that a percentage represents, rounded to the cent: R$ 5.000,00 at 12,5%
+ * is R$ 625,00. Cents × basis points stays far below 2^53, so the product is exact.
+ */
+export function shareOfIncome(incomeCents: number, basisPoints: number): number {
+  return Math.round((incomeCents * basisPoints) / FULL_BASIS_POINTS);
+}
+
 const basisPointsSchema = z
   .number('Informe o percentual.')
   .int('Use no máximo duas casas decimais no percentual.')

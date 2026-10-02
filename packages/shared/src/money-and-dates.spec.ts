@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   currentPeriod,
+  formatBasisPoints,
   formatCents,
   formatIsoDate,
   formatPeriod,
+  parsePercent,
   parseReais,
   reaisInputSchema,
   todayIso,
@@ -40,6 +42,34 @@ describe('parseReais', () => {
 
   it('never goes through floating point (0,1 + 0,2 problem)', () => {
     expect((parseReais('0,10') ?? 0) + (parseReais('0,20') ?? 0)).toBe(parseReais('0,30'));
+  });
+});
+
+describe('formatBasisPoints', () => {
+  it.each([
+    [6_000, '60%'],
+    [1_250, '12,5%'],
+    [1_255, '12,55%'],
+    [0, '0%'],
+  ])('formats %i basis points as %s', (basisPoints, text) => {
+    expect(formatBasisPoints(basisPoints)).toBe(text);
+  });
+});
+
+describe('parsePercent', () => {
+  it.each([
+    ['60', 6_000],
+    ['12,5', 1_250],
+    ['12.55', 1_255],
+    ['5%', 500],
+    [' 0 ', 0],
+    ['150', 15_000],
+  ])('reads %j as %i basis points', (text, basisPoints) => {
+    expect(parsePercent(text)).toBe(basisPoints);
+  });
+
+  it.each(['', 'abc', '12,555', '-5', '1,2,3', ',5'])('refuses %j', (text) => {
+    expect(parsePercent(text)).toBeNull();
   });
 });
 
