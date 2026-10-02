@@ -6,7 +6,7 @@ Modelo conceitual inicial. O schema definitivo nasce no Prisma, nas fases 2 e 3 
 
 ### User
 
-Pessoa autenticada. Tabelas de usuário, sessão e conta OAuth são geridas pelo Better Auth ([ADR 0007](../adr/0007-autenticacao-better-auth.md)).
+Pessoa autenticada. As tabelas `users`, `sessions`, `accounts` (senha em _hash_ ou conta OAuth) e `verifications` têm o formato exigido pelo Better Auth ([ADR 0007](../adr/0007-autenticacao-better-auth.md), [ADR 0020](../adr/0020-integracao-better-auth-nestjs.md)).
 
 ### Workspace (Espaço)
 
