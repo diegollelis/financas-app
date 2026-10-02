@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Finanças App: a multi-user, public web app for monthly personal finance. Users record credits and debits, set a budget by percentages and track their balance. It replaces a personal Excel spreadsheet, which is kept out of the repo because it contains banking data. The repository is also a **full-stack learning lab** for the owner, who is moving from Protheus/AdvPL to modern web development. Explain the reasoning behind your choices, and record every new architectural decision as an ADR.
 
-**Current state:** phase 1 (code foundation) is done: monorepo, API with `/health` and Prisma, web app calling it, shared Zod schemas, tests and CI. The only table is `workspaces`. Next is phase 2 (auth and workspaces) in `docs/roadmap.md`.
+**Current state:** phase 1 (code foundation) is done. Phase 2 (auth and workspaces) is in progress: the API has Better Auth with e-mail/password (`/api/auth/*`), a `SessionGuard` and `GET /me` (ADR 0020). Tables: `workspaces`, `users`, `sessions`, `accounts`, `verifications`. Next steps are in `docs/roadmap.md`.
 
 ## Key docs (read before designing anything)
 
@@ -15,7 +15,7 @@ Finanças App: a multi-user, public web app for monthly personal finance. Users 
 - `docs/dominio/modelo.md` has the entities, rules and default categories. `glossario.md` has the PT↔EN terms and the Protheus analogies.
 - `docs/roadmap.md` lists the phases as checklists. Tick items as they are completed.
 
-## Stack (see ADRs 0002–0019)
+## Stack (see ADRs 0002–0020)
 
 pnpm workspaces monorepo: `apps/web` (React 19 + Vite 8, TanStack Query, React Router 8, Tailwind 4 + shadcn/ui on Radix), `apps/api` (NestJS 12 as ESM on Express, Prisma 7, PostgreSQL 18), `packages/shared` (Zod schemas, types, money/date utils). TypeScript 6 (not 7: typescript-eslint does not support it yet). Auth will be Better Auth with cookie sessions; email goes through Resend. Hosting: Cloudflare Pages (web), Render via Docker (api), Neon (Postgres). Locally, Postgres runs in Docker.
 
@@ -55,8 +55,11 @@ CI (`.github/workflows/ci.yml`) runs `format:check`, `lint`, `typecheck`, `test`
 - **Prisma client is generated** into `apps/api/src/generated/` (git-ignored) on `pnpm install`. After changing `schema.prisma`, run `db:migrate` or `db:generate`.
 - **Shared versions** of `typescript`, `zod`, `prisma`, `@prisma/*` and `vitest` live in the `catalog:` of `pnpm-workspace.yaml`. Packages reference them as `"catalog:"`. Prisma is pinned exactly because npm's `latest` tag pointed at an 8.0 release candidate.
 - **Install scripts** of dependencies are blocked by pnpm unless listed in `allowBuilds` (`pnpm-workspace.yaml`).
-- **Env vars** are validated with Zod at startup (`apps/api/src/config/env.ts`, `apps/web/src/lib/env.ts`). Adding a variable means updating the schema and the `.env.example`. Tests never read `.env`; they get values from each `vitest.config.ts`.
+- **Env vars** are validated with Zod at startup (`apps/api/src/config/env.ts`, `apps/web/src/lib/env.ts`). Adding a variable means updating the schema and the `.env.example`. Tests never read `.env`; they get values from each `vitest.config.ts` (the API ones from `apps/api/test/test-env.ts`).
 - **shadcn/ui** components are copied into `apps/web/src/components/ui/`. Run `pnpm format` after adding one.
+
+- **API tests need Postgres** (ADR 0020): `pnpm test` migrates and uses a separate `financas_test` database, so run `pnpm db:up` first. CI has a Postgres service on the same port. HTTP tests call `resetDatabase()` in `beforeEach`; add new tables to its TRUNCATE.
+- **Better Auth** is mounted on Express before the body parser by `setupApp` (`apps/api/src/setup-app.ts`). The app is created with `bodyParser: false`, and HTTP tests must call `setupApp` too. Protect routes with `@UseGuards(SessionGuard)` and read the user with `@CurrentUser()`.
 
 ## Conventions that cut across the codebase
 

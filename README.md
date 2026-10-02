@@ -34,10 +34,10 @@ git clone https://github.com/diegollelis/financas-app.git
 cd financas-app
 pnpm install                                   # dependências, client do Prisma e git hooks
 
-cp apps/api/.env.example apps/api/.env         # variáveis da API
+cp apps/api/.env.example apps/api/.env         # variáveis da API (gere um BETTER_AUTH_SECRET)
 cp apps/web/.env.example apps/web/.env.local   # variáveis do front
 
-pnpm db:up                                     # Postgres no Docker (porta 5434)
+pnpm db:up                                     # Postgres no Docker (porta 5434); os testes também precisam dele
 pnpm --filter @financas/api db:deploy          # cria as tabelas
 
 pnpm --filter @financas/api dev                # API em http://localhost:3333 (Swagger em /docs)

@@ -24,7 +24,11 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 ## Fase 2 — Autenticação e espaços
 
-- [ ] Better Auth: cadastro, login, verificação de e-mail, recuperação de senha (Resend), Google
+- [ ] Better Auth ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))
+  - [x] API: cadastro, login e logout com e-mail e senha; `GET /me`; testes com Postgres real
+  - [ ] Web: telas de cadastro, login e logout
+  - [ ] Verificação de e-mail e recuperação de senha (Resend)
+  - [ ] Login com Google
 - [ ] Rate limit nas rotas de autenticação
 - [ ] Workspace, Member e papéis; espaço pessoal criado no cadastro
 - [ ] Guard de espaço + repositórios sempre filtrando por `workspace_id`

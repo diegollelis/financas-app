@@ -40,6 +40,22 @@ jobs:
     name: Lint, typecheck, testes e build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Postgres de verdade para os testes HTTP da API (ADR 0020). Mesmas credenciais e porta do
+    # docker-compose.yml local; o globalSetup dos testes cria o banco financas_test e aplica as migrações.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: financas
+          POSTGRES_PASSWORD: financas
+          POSTGRES_DB: financas
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U financas -d financas"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       # Actions fixadas por SHA (o comentário indica a versão). O Dependabot as atualiza.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
