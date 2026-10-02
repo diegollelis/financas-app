@@ -5,6 +5,7 @@ import { useSignOut } from '@/features/auth/use-auth-mutations';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { VerifyEmailBanner } from '@/features/auth/verify-email-banner';
 import { useHealth } from '@/features/health/use-health';
+import { WorkspaceList } from '@/features/workspaces/workspace-list';
 
 export function HomePage() {
   const user = useCurrentUser();
@@ -22,6 +23,7 @@ export function HomePage() {
         </CardHeader>
         <CardContent className="grid gap-4 text-sm">
           {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
+          <WorkspaceList />
           <div className="flex items-center justify-between">
             <span>Status da API</span>
             {health.isPending && <Badge variant="secondary">Verificando…</Badge>}

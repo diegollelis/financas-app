@@ -39,7 +39,13 @@ const logger = new Logger('Auth');
  * Builds the Better Auth instance (ADRs 0007, 0020 and 0022). Users, sessions and accounts are
  * stored in our own database through Prisma; the session travels in an HttpOnly cookie.
  */
-export function createAuth(prisma: PrismaClient, env: AuthEnv, mailer: Mailer) {
+export function createAuth(
+  prisma: PrismaClient,
+  env: AuthEnv,
+  mailer: Mailer,
+  /** Runs after a user is created, by any sign-up method (e-mail now, Google later): ADR 0024. */
+  onUserCreated: (userId: string) => Promise<void>,
+) {
   /**
    * Sends without making the request wait. Besides being faster, the response time no longer
    * depends on whether the e-mail exists (a slow send would reveal it). Failures are logged
@@ -106,6 +112,18 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv, mailer: Mailer) {
         '/send-verification-email': { window: 300, max: 3 },
         '/reset-password': { window: 300, max: 5 },
         '/reset-password/*': { window: 300, max: 5 },
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          // Runs after the user is committed. A failure must not fail the sign-up: the user can
+          // already sign in, and listing workspaces creates the missing personal one.
+          after: (user) =>
+            onUserCreated(user.id).catch((error: unknown) => {
+              logger.error(`Could not create the personal workspace: ${(error as Error).message}`);
+            }),
+        },
       },
     },
     hooks: {

@@ -1,12 +1,16 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { fakeUser, healthy, mockApi } from '@/test/mock-api';
+import { fakeUser, healthy, mockApi, personalWorkspace, signedInHome } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 describe('HomePage', () => {
   it('greets the signed-in user and shows Online when the API and the database are up', async () => {
-    const fetchMock = mockApi({ 'GET /me': { body: fakeUser }, 'GET /health': healthy });
+    const fetchMock = mockApi({
+      'GET /me': { body: fakeUser },
+      'GET /health': healthy,
+      'GET /workspaces': { body: [personalWorkspace] },
+    });
 
     renderApp('/');
 
@@ -41,6 +45,7 @@ describe('HomePage', () => {
     mockApi({
       'GET /me': { body: fakeUser },
       'GET /health': healthy,
+      'GET /workspaces': { body: [personalWorkspace] },
       'POST /api/auth/sign-out': { body: { success: true } },
     });
     const { router } = renderApp('/');
@@ -57,6 +62,7 @@ describe('VerifyEmailBanner', () => {
     const fetchMock = mockApi({
       'GET /me': { body: fakeUser },
       'GET /health': healthy,
+      'GET /workspaces': { body: [personalWorkspace] },
       'POST /api/auth/send-verification-email': { body: { status: true } },
     });
     renderApp('/');
@@ -72,7 +78,11 @@ describe('VerifyEmailBanner', () => {
   });
 
   it('explains when the confirmation link failed', async () => {
-    mockApi({ 'GET /me': { body: fakeUser }, 'GET /health': healthy });
+    mockApi({
+      'GET /me': { body: fakeUser },
+      'GET /health': healthy,
+      'GET /workspaces': { body: [personalWorkspace] },
+    });
 
     renderApp('/?error=invalid_token');
 
@@ -80,10 +90,40 @@ describe('VerifyEmailBanner', () => {
   });
 
   it('is hidden once the e-mail is confirmed', async () => {
-    mockApi({ 'GET /me': { body: { ...fakeUser, emailVerified: true } }, 'GET /health': healthy });
+    mockApi({
+      'GET /me': { body: { ...fakeUser, emailVerified: true } },
+      'GET /health': healthy,
+      'GET /workspaces': { body: [personalWorkspace] },
+    });
     renderApp('/');
 
     expect(await screen.findByText('Online')).toBeInTheDocument();
     expect(screen.queryByText(/Confirme seu e-mail/)).not.toBeInTheDocument();
+  });
+});
+
+describe('WorkspaceList', () => {
+  it("lists the user's workspaces with the role", async () => {
+    mockApi({
+      ...signedInHome,
+      'GET /workspaces': {
+        body: [
+          personalWorkspace,
+          {
+            id: '01920000-0000-7000-8000-000000000002',
+            name: 'Casa',
+            isPersonal: false,
+            role: 'EDITOR',
+          },
+        ],
+      },
+    });
+
+    renderApp('/');
+
+    const list = await screen.findByRole('list');
+    expect(list).toHaveTextContent('Pessoal (só seu)');
+    expect(list).toHaveTextContent('Casa');
+    expect(list).toHaveTextContent('Editor');
   });
 });
