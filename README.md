@@ -44,7 +44,7 @@ pnpm --filter @financas/api dev                # API em http://localhost:3333 (S
 pnpm --filter @financas/web dev                # em outro terminal: front em http://localhost:5173
 ```
 
-O front mostra o status da API e do banco. Se aparecer "Online", está tudo funcionando.
+Abra http://localhost:5173, crie uma conta em "Cadastre-se" e entre. A página inicial mostra o status da API e do banco: se aparecer "Online", está tudo funcionando.
 
 ## Comandos do dia a dia
 

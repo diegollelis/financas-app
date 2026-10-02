@@ -1,0 +1,20 @@
+import { ApiError } from '@/lib/api';
+
+/** Turns an error from the auth routes into a message for the user (pt-BR). */
+export function authErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case 'USER_ALREADY_EXISTS':
+      case 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL':
+        return 'Já existe uma conta com este e-mail.';
+      case 'INVALID_EMAIL_OR_PASSWORD':
+        return 'E-mail ou senha incorretos.';
+      case 'INVALID_INPUT':
+        // Our own validation on the API (shared Zod schema): the message is already pt-BR.
+        return error.detail ?? 'Confira os dados informados.';
+    }
+    if (error.status === 401) return 'E-mail ou senha incorretos.';
+    if (error.status === 429) return 'Muitas tentativas. Aguarde um pouco e tente de novo.';
+  }
+  return 'Não foi possível concluir agora. Tente de novo em instantes.';
+}
