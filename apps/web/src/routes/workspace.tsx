@@ -184,7 +184,10 @@ export function WorkspacePage() {
             ))}
           {workspace.isSuccess && (
             <>
-              <nav aria-label="Cadastros do espaço" className="flex gap-4">
+              <nav aria-label="Cadastros do espaço" className="flex flex-wrap gap-4">
+                <Link to={`/espacos/${workspaceId}/painel`} className="font-medium hover:underline">
+                  Painel →
+                </Link>
                 <Link
                   to={`/espacos/${workspaceId}/lancamentos`}
                   className="font-medium hover:underline"

@@ -6,6 +6,7 @@ import {
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { summaryKey } from '@/features/summary/use-summary';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
 /** ['workspaces', id, 'transactions', period]: a change refreshes every loaded competência. */
@@ -25,7 +26,12 @@ export function useTransactions(workspaceId: string, period: string) {
 
 function useInvalidateTransactions(workspaceId: string) {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: transactionsKey(workspaceId) });
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: transactionsKey(workspaceId) }),
+      // The month's dashboard is computed from the transactions.
+      queryClient.invalidateQueries({ queryKey: summaryKey(workspaceId) }),
+    ]);
 }
 
 export function useCreateTransaction(workspaceId: string) {

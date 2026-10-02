@@ -50,9 +50,9 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Configuração de orçamento por competência
   - [x] API: tabela `budget_configs` com RLS e herança da última competência salva ([ADR 0030](adr/0030-orcamento-por-competencia-com-heranca.md)), rotas `/workspaces/:workspaceId/budget/:period`
   - [x] Tela de orçamento da competência (`/espacos/:workspaceId/orcamento?competencia=AAAA-MM`)
-- [ ] Painel do mês: indicadores da planilha, status por cor, gráfico
+- [x] Painel do mês: indicadores da planilha, status por cor, gráfico
   - [x] API: `GET /workspaces/:workspaceId/summary/:period`, visões prevista e efetivada ([ADR 0031](adr/0031-painel-do-mes-previsto-e-efetivado.md))
-  - [ ] Tela do painel com status por cor e gráfico
+  - [x] Tela do painel (`/espacos/:workspaceId/painel?competencia=AAAA-MM`), gráfico sem biblioteca ([ADR 0032](adr/0032-graficos-sem-biblioteca.md))
 - [ ] Navegação entre competências
 
 ## Fase 4 — Deploy
