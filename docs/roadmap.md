@@ -48,6 +48,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] API: tabela `transactions` com RLS e regras no banco ([ADR 0029](adr/0029-lancamentos-e-integridade-no-banco.md)), rotas `/workspaces/:workspaceId/transactions?period=`
   - [x] Tela de lançamentos da competência (`/espacos/:workspaceId/lancamentos?competencia=AAAA-MM`)
 - [ ] Configuração de orçamento por competência
+  - [x] API: tabela `budget_configs` com RLS e herança da última competência salva ([ADR 0030](adr/0030-orcamento-por-competencia-com-heranca.md)), rotas `/workspaces/:workspaceId/budget/:period`
+  - [ ] Tela de orçamento da competência
 - [ ] Painel do mês: indicadores da planilha, status por cor, gráfico
 - [ ] Navegação entre competências
 
