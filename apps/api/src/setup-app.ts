@@ -2,6 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { toNodeHandler } from 'better-auth/node';
 import { AUTH, AUTH_BASE_PATH, type Auth } from './auth/auth.js';
+import { createValidationPipe } from './common/validation.js';
 import type { Env } from './config/env.js';
 
 /**
@@ -31,4 +32,6 @@ export function setupApp(app: NestExpressApplication) {
 
   app.useBodyParser('json');
   app.useBodyParser('urlencoded', { extended: true });
+
+  app.useGlobalPipes(createValidationPipe());
 }

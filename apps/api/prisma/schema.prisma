@@ -15,13 +15,41 @@ datasource db {
   provider = "postgresql"
 }
 
+// Owner of all financial data (ADR 0008). The personal workspace is created with the user, is
+// never shared nor deleted, and there is exactly one per user (ADR 0024).
 model Workspace {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  name      String   @db.VarChar(100)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id         String   @id @default(uuid(7)) @db.Uuid
+  name       String   @db.VarChar(100)
+  isPersonal Boolean  @default(false) @map("is_personal")
+  members    Member[]
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("workspaces")
+}
+
+enum WorkspaceRole {
+  OWNER
+  EDITOR
+  VIEWER
+
+  @@map("workspace_role")
+}
+
+// Who can access a workspace, and with which role (ADR 0008).
+model Member {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String        @map("user_id") @db.Uuid
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("members")
 }
 
 // ---------------------------------------------------------------------------
@@ -40,6 +68,7 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions      Session[]
   accounts      Account[]
+  memberships   Member[]
 
   @@map("users")
 }

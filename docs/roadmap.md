@@ -30,7 +30,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Verificação de e-mail e recuperação de senha (Mailpit local, Resend em produção — [ADR 0022](adr/0022-envio-de-email.md))
   - [ ] Login com Google
 - [x] Rate limit nas rotas de autenticação ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
-- [ ] Workspace, Member e papéis; espaço pessoal criado no cadastro
+- [x] Workspace, Member e papéis; espaço pessoal criado no cadastro ([ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
 - [ ] Guard de espaço + repositórios sempre filtrando por `workspace_id`
 - [ ] Testes de isolamento entre espaços
 - [ ] RLS no PostgreSQL como segunda barreira (estudo)
@@ -47,7 +47,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 ## Fase 4 — Deploy
 
 - [ ] Conferir limites atuais dos planos gratuitos
-- [ ] Neon (produção) + migrações no deploy
+- [ ] Neon (produção, PostgreSQL 18+: as migrações usam `uuidv7()`) + migrações no deploy
 - [ ] API no Render (Docker) e front no Cloudflare Pages
 - [ ] IP real do cliente atrás do proxy do Render para o rate limit ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
 - [ ] Cookies entre front e API em sites diferentes ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))

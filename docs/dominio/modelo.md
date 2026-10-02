@@ -12,8 +12,8 @@ Pessoa autenticada. As tabelas `users`, `sessions`, `accounts` (senha em _hash_ 
 
 Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-espaco.md)).
 
-- `id`, `name`, `created_at`
-- Criado automaticamente (espaço pessoal) no primeiro login.
+- `id`, `name`, `is_personal`, `created_at`
+- Todo usuário ganha um **espaço pessoal** ("Pessoal") no cadastro: é só dele, nunca é compartilhado nem excluído. Para dividir finanças, cria-se outro espaço ([ADR 0024](../adr/0024-espacos-membros-e-espaco-pessoal.md)).
 
 ### Member (Membro)
 
