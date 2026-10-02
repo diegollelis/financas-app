@@ -21,7 +21,14 @@ export const AUTH_BASE_PATH = '/api/auth';
 /** Nest injection token for the Better Auth instance. */
 export const AUTH = Symbol('AUTH');
 
-type AuthEnv = Pick<Env, 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL' | 'WEB_ORIGIN'>;
+type AuthEnv = Pick<
+  Env,
+  | 'BETTER_AUTH_SECRET'
+  | 'BETTER_AUTH_URL'
+  | 'WEB_ORIGIN'
+  | 'GOOGLE_CLIENT_ID'
+  | 'GOOGLE_CLIENT_SECRET'
+>;
 
 /**
  * Bodies checked with the shared schemas before Better Auth runs (ADR 0006): the API applies the
@@ -65,6 +72,25 @@ export function createAuth(
     return link.toString();
   }
 
+  /**
+   * Account pre-hijacking protection (ADR 0026). E-mail verification is not required yet, so
+   * anyone can sign up with someone else's e-mail and a password of their own. When the real
+   * owner later signs in with Google, Better Auth links the accounts and marks the e-mail as
+   * verified, and the intruder's password would keep working. So, when an external account is
+   * linked to a user whose e-mail was never verified, that password and every open session go.
+   */
+  async function dropUnverifiedCredentials(userId: string): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerified: true },
+    });
+    if (!user || user.emailVerified) return;
+    await prisma.$transaction([
+      prisma.account.deleteMany({ where: { userId, providerId: 'credential' } }),
+      prisma.session.deleteMany({ where: { userId } }),
+    ]);
+  }
+
   return betterAuth({
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
     basePath: AUTH_BASE_PATH,
@@ -87,6 +113,25 @@ export function createAuth(
           resetPasswordEmail(user.email, user.name, withCallback(url, RESET_PASSWORD_PATH)),
         ),
     },
+    account: {
+      accountLinking: {
+        // Better Auth refuses by default to link Google to an account whose e-mail is not verified,
+        // which locks the real owner out. We link (Google proves the e-mail is theirs) and remove
+        // the old password and sessions in dropUnverifiedCredentials (ADR 0026).
+        requireLocalEmailVerified: false,
+      },
+    },
+    socialProviders:
+      env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        ? {
+            google: {
+              clientId: env.GOOGLE_CLIENT_ID,
+              clientSecret: env.GOOGLE_CLIENT_SECRET,
+              // Lets someone with several Google accounts pick the right one.
+              prompt: 'select_account',
+            },
+          }
+        : {},
     emailVerification: {
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
@@ -115,6 +160,15 @@ export function createAuth(
       },
     },
     databaseHooks: {
+      account: {
+        create: {
+          // Before the link is saved: Better Auth marks the e-mail as verified right after it.
+          before: async (account) => {
+            if (account.providerId !== 'credential')
+              await dropUnverifiedCredentials(account.userId);
+          },
+        },
+      },
       user: {
         create: {
           // Runs after the user is committed. A failure must not fail the sign-up: the user can

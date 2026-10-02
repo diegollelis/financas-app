@@ -17,6 +17,8 @@ export function authErrorMessage(error: unknown): string {
         return 'Já existe uma conta com este e-mail.';
       case 'INVALID_EMAIL_OR_PASSWORD':
         return 'E-mail ou senha incorretos.';
+      case 'PROVIDER_NOT_FOUND':
+        return 'O login com Google não está disponível no momento.';
       case 'INVALID_TOKEN':
         return 'Este link é inválido ou expirou. Peça um novo.';
       case 'INVALID_INPUT':

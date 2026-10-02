@@ -24,11 +24,11 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 ## Fase 2 — Autenticação e espaços
 
-- [ ] Better Auth ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))
+- [x] Better Auth ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))
   - [x] API: cadastro, login e logout com e-mail e senha; `GET /me`; testes com Postgres real
   - [x] Web: telas de cadastro, login e logout ([ADR 0021](adr/0021-sessao-e-formularios-no-front.md))
   - [x] Verificação de e-mail e recuperação de senha (Mailpit local, Resend em produção — [ADR 0022](adr/0022-envio-de-email.md))
-  - [ ] Login com Google
+  - [x] Login com Google ([ADR 0026](adr/0026-login-com-google.md))
 - [x] Rate limit nas rotas de autenticação ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
 - [x] Workspace, Member e papéis; espaço pessoal criado no cadastro ([ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
 - [x] Guard de espaço + repositórios sempre filtrando por `workspace_id` ([ADR 0025](adr/0025-guard-de-espaco-e-isolamento.md))
@@ -50,6 +50,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Neon (produção, PostgreSQL 18+: as migrações usam `uuidv7()`) + migrações no deploy
 - [ ] API no Render (Docker) e front no Cloudflare Pages
 - [ ] IP real do cliente atrás do proxy do Render para o rate limit ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
+- [ ] Google OAuth de produção: URI de retorno, origens e tela de consentimento publicada ([ADR 0026](adr/0026-login-com-google.md))
 - [ ] Cookies entre front e API em sites diferentes ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))
 - [ ] Sentry no front e na API (sem dados pessoais)
 - [ ] Backup periódico do banco via GitHub Actions + teste de restauração

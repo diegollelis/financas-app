@@ -6,6 +6,7 @@ import { FormField } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
+import { GoogleButton } from '@/features/auth/google-button';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
 import { useSignUp } from '@/features/auth/use-auth-mutations';
 
@@ -56,6 +57,7 @@ export function SignUpPage() {
           {signUp.isPending ? 'Criando conta…' : 'Criar conta'}
         </Button>
       </form>
+      <GoogleButton />
     </AuthCard>
   );
 }
