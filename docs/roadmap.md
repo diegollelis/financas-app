@@ -38,7 +38,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] API: convidar, listar, cancelar, ver e aceitar pelo link
   - [x] Web: página do espaço (membros e convite), página do convite e volta após o login
 
-## Fase 3 — Núcleo financeiro
+## Fase 3 — Núcleo financeiro ✅
 
 - [x] RLS na prática ([ADR 0028](adr/0028-row-level-security.md)): papel `financas_app` para a API, URL separada para migrações e `prisma.forWorkspace()`
 - [x] Categorias (com categorias padrão no novo espaço), primeira tabela com RLS
@@ -53,7 +53,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Painel do mês: indicadores da planilha, status por cor, gráfico
   - [x] API: `GET /workspaces/:workspaceId/summary/:period`, visões prevista e efetivada ([ADR 0031](adr/0031-painel-do-mes-previsto-e-efetivado.md))
   - [x] Tela do painel (`/espacos/:workspaceId/painel?competencia=AAAA-MM`), gráfico sem biblioteca ([ADR 0032](adr/0032-graficos-sem-biblioteca.md))
-- [ ] Navegação entre competências
+- [x] Navegação entre competências (anterior, próxima e mês atual nas telas de lançamentos, orçamento e painel)
 
 ## Fase 4 — Deploy
 

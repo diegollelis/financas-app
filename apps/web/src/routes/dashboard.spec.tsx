@@ -147,4 +147,45 @@ describe('DashboardPage', () => {
       vi.useRealTimers();
     }
   });
+
+  it('moves between competências, across the year, and back to this month', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-15T12:00:00-03:00'));
+    const summaryOf = (period: string) => ({
+      body: summarizePeriod([], { ...budget, period }, today),
+    });
+    const fetchMock = mockApi({
+      'GET /me': { body: fakeUser },
+      [`GET /workspaces/${houseId}`]: { body: house },
+      [`GET /workspaces/${houseId}/summary/2026-12`]: summaryOf('2026-12'),
+      [`GET /workspaces/${houseId}/summary/2027-01`]: summaryOf('2027-01'),
+      [`GET /workspaces/${houseId}/summary/2026-10`]: summaryOf('2026-10'),
+    });
+    const { router } = renderApp(`/espacos/${houseId}/painel?competencia=2026-12`);
+
+    try {
+      await userEvent.click(
+        await screen.findByRole('link', { name: 'Próxima competência: janeiro de 2027' }),
+      );
+      expect(router.state.location.search).toBe('?competencia=2027-01');
+      expect(await screen.findByText('Competência: janeiro de 2027')).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: 'Competência anterior: dezembro de 2026' }),
+      ).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('link', { name: 'Mês atual' }));
+      expect(await screen.findByText('Competência: outubro de 2026')).toBeInTheDocument();
+      // Already on this month: no link to it.
+      expect(screen.queryByRole('link', { name: 'Mês atual' })).not.toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);
+      await vi.waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          new URL(`/workspaces/${houseId}/summary/2027-01`, 'http://api.test'),
+          expect.anything(),
+        ),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
