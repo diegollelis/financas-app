@@ -1,6 +1,7 @@
 import { budgetSchema, type BudgetInput } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPut } from '@/lib/api';
+import { summaryKey } from '@/features/summary/use-summary';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
 /** ['workspaces', id, 'budget', period]. */
@@ -20,6 +21,11 @@ export function useSaveBudget(workspaceId: string, period: string) {
       apiPut(`/workspaces/${workspaceId}/budget/${period}`, input, budgetSchema),
     // Every competência, not only this one: the later ones that were never saved inherit
     // from it (ADR 0030), so what was loaded for them is now stale too.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: budgetKey(workspaceId) }),
+    // The dashboards use the budget too, and follow the same inheritance.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: budgetKey(workspaceId) }),
+        queryClient.invalidateQueries({ queryKey: summaryKey(workspaceId) }),
+      ]),
   });
 }

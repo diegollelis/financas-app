@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
 import { BudgetPage } from '@/routes/budget';
 import { CategoriesPage } from '@/routes/categories';
+import { DashboardPage } from '@/routes/dashboard';
 import { ForgotPasswordPage } from '@/routes/forgot-password';
 import { HomePage } from '@/routes/home';
 import { InvitationPage } from '@/routes/invitation';
@@ -31,6 +32,7 @@ export const routes: RouteObject[] = [
       // The competência travels as ?competencia=YYYY-MM (default: this month).
       { path: '/espacos/:workspaceId/lancamentos', element: <TransactionsPage /> },
       { path: '/espacos/:workspaceId/orcamento', element: <BudgetPage /> },
+      { path: '/espacos/:workspaceId/painel', element: <DashboardPage /> },
     ],
   },
   // Outside the guards: the e-mail link works whether or not someone is signed in here.
