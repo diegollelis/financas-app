@@ -1,0 +1,56 @@
+import { forgotPasswordInputSchema, type ForgotPasswordInput } from '@financas/shared';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { Link } from 'react-router';
+import { FormField } from '@/components/form-field';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AuthCard } from '@/features/auth/auth-card';
+import { authErrorMessage } from '@/features/auth/auth-error-message';
+import { useRequestPasswordReset } from '@/features/auth/use-auth-mutations';
+
+export function ForgotPasswordPage() {
+  const requestReset = useRequestPasswordReset();
+  const { register, handleSubmit, formState } = useForm<ForgotPasswordInput>({
+    resolver: zodResolver(forgotPasswordInputSchema),
+    defaultValues: { email: '' },
+  });
+
+  return (
+    <AuthCard
+      title="Esqueci minha senha"
+      description="Enviaremos um link para você criar uma nova senha."
+      footer={
+        <Link to="/entrar" className="text-primary underline-offset-4 hover:underline">
+          Voltar para o login
+        </Link>
+      }
+    >
+      {requestReset.isSuccess ? (
+        // The same answer whether or not the e-mail has an account (no account enumeration).
+        <p role="status" className="text-sm">
+          Se houver uma conta com esse e-mail, você vai receber um link em instantes. Confira também
+          a caixa de spam.
+        </p>
+      ) : (
+        <form
+          noValidate
+          className="grid gap-4"
+          onSubmit={(event) => void handleSubmit((input) => requestReset.mutate(input))(event)}
+        >
+          <FormField id="email" label="E-mail" error={formState.errors.email?.message}>
+            <Input type="email" autoComplete="email" {...register('email')} />
+          </FormField>
+          {requestReset.isError && (
+            <p role="alert" className="text-destructive text-sm">
+              {authErrorMessage(requestReset.error)}
+            </p>
+          )}
+          <Button type="submit" disabled={requestReset.isPending}>
+            {requestReset.isPending ? 'Enviando…' : 'Enviar link'}
+          </Button>
+        </form>
+      )}
+    </AuthCard>
+  );
+}

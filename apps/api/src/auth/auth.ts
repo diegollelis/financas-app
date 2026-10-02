@@ -1,9 +1,19 @@
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, signUpInputSchema } from '@financas/shared';
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  RESET_PASSWORD_PATH,
+  resetPasswordInputSchema,
+  signUpInputSchema,
+} from '@financas/shared';
+import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
+import type { z } from 'zod';
 import type { Env } from '../config/env.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
+import type { Mailer, MailMessage } from '../mail/mailer.js';
+import { resetPasswordEmail, verificationEmail } from '../mail/templates.js';
 
 /** Every Better Auth route lives under this prefix (sign-up, sign-in, sign-out, get-session...). */
 export const AUTH_BASE_PATH = '/api/auth';
@@ -14,10 +24,41 @@ export const AUTH = Symbol('AUTH');
 type AuthEnv = Pick<Env, 'BETTER_AUTH_SECRET' | 'BETTER_AUTH_URL' | 'WEB_ORIGIN'>;
 
 /**
- * Builds the Better Auth instance (ADRs 0007 and 0020). Users, sessions and accounts are stored
- * in our own database through Prisma; the session travels in an HttpOnly cookie.
+ * Bodies checked with the shared schemas before Better Auth runs (ADR 0006): the API applies the
+ * same rules as the web forms, with the same pt-BR messages, and an overlong name becomes a 400
+ * instead of a database error.
  */
-export function createAuth(prisma: PrismaClient, env: AuthEnv) {
+const bodySchemas: Record<string, z.ZodType<Record<string, unknown>>> = {
+  '/sign-up/email': signUpInputSchema,
+  '/reset-password': resetPasswordInputSchema,
+};
+
+const logger = new Logger('Auth');
+
+/**
+ * Builds the Better Auth instance (ADRs 0007, 0020 and 0022). Users, sessions and accounts are
+ * stored in our own database through Prisma; the session travels in an HttpOnly cookie.
+ */
+export function createAuth(prisma: PrismaClient, env: AuthEnv, mailer: Mailer) {
+  /**
+   * Sends without making the request wait. Besides being faster, the response time no longer
+   * depends on whether the e-mail exists (a slow send would reveal it). Failures are logged
+   * without the message, whose link carries a token (ADR 0012).
+   */
+  function deliver(kind: string, message: MailMessage): Promise<void> {
+    mailer.send(message).catch((error: unknown) => {
+      logger.error(`Could not send the ${kind} e-mail: ${(error as Error).message}`);
+    });
+    return Promise.resolve();
+  }
+
+  /** Links in e-mails always lead back to the web app, whatever the request asked for. */
+  function withCallback(url: string, path: string): string {
+    const link = new URL(url);
+    link.searchParams.set('callbackURL', new URL(path, env.WEB_ORIGIN).toString());
+    return link.toString();
+  }
+
   return betterAuth({
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
     basePath: AUTH_BASE_PATH,
@@ -29,13 +70,29 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
       enabled: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,
       maxPasswordLength: PASSWORD_MAX_LENGTH,
+      // Not yet: without our own domain, Resend only delivers to the account owner (ADR 0022).
+      requireEmailVerification: false,
+      resetPasswordTokenExpiresIn: 60 * 60,
+      // Whoever had the old password (maybe an attacker) is signed out everywhere.
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: ({ user, url }) =>
+        deliver(
+          'password reset',
+          resetPasswordEmail(user.email, user.name, withCallback(url, RESET_PASSWORD_PATH)),
+        ),
+    },
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      expiresIn: 60 * 60,
+      sendVerificationEmail: ({ user, url }) =>
+        deliver('verification', verificationEmail(user.email, user.name, withCallback(url, '/'))),
     },
     hooks: {
-      // The shared schema is the source of truth (ADR 0006): sign-up goes through the same rules
-      // as the web form, and an overlong name becomes a 400 instead of a database error.
       before: createAuthMiddleware((ctx): Promise<{ context: { body: unknown } } | undefined> => {
-        if (ctx.path !== '/sign-up/email') return Promise.resolve(undefined);
-        const result = signUpInputSchema.safeParse(ctx.body);
+        const schema = bodySchemas[ctx.path];
+        if (!schema) return Promise.resolve(undefined);
+        const result = schema.safeParse(ctx.body);
         if (!result.success) {
           throw new APIError('BAD_REQUEST', {
             code: 'INVALID_INPUT',

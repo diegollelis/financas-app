@@ -25,3 +25,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0019](0019-repositorio-publico.md)            | Repositório público: proteção contra vazamento de segredos e dados pessoais       | Aceita |
 | [0020](0020-integracao-better-auth-nestjs.md)  | Integração do Better Auth na API NestJS                                           | Aceita |
 | [0021](0021-sessao-e-formularios-no-front.md)  | Sessão, rotas protegidas e formulários no front                                   | Aceita |
+| [0022](0022-envio-de-email.md)                 | Envio de e-mail: Mailpit no desenvolvimento, Resend em produção                   | Aceita |

@@ -9,6 +9,8 @@ export function authErrorMessage(error: unknown): string {
         return 'Já existe uma conta com este e-mail.';
       case 'INVALID_EMAIL_OR_PASSWORD':
         return 'E-mail ou senha incorretos.';
+      case 'INVALID_TOKEN':
+        return 'Este link é inválido ou expirou. Peça um novo.';
       case 'INVALID_INPUT':
         // Our own validation on the API (shared Zod schema): the message is already pt-BR.
         return error.detail ?? 'Confira os dados informados.';
