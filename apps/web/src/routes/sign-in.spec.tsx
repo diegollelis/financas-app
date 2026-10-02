@@ -77,3 +77,23 @@ describe('SignInPage', () => {
     expect(router.state.location.pathname).toBe('/');
   });
 });
+
+describe('SignInPage when rate-limited', () => {
+  it('tells how long to wait, read from the X-Retry-After header', async () => {
+    mockApi({
+      'GET /me': noSession,
+      'POST /api/auth/sign-in/email': {
+        status: 429,
+        body: { message: 'Too many requests. Please try again later.' },
+        headers: { 'X-Retry-After': '45' },
+      },
+    });
+    renderApp('/entrar');
+
+    await fillAndSubmit('maria@example.com', 'senha-de-teste-123');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Muitas tentativas. Tente de novo em 45 segundos.',
+    );
+  });
+});

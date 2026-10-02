@@ -88,6 +88,26 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv, mailer: Mailer) {
       sendVerificationEmail: ({ user, url }) =>
         deliver('verification', verificationEmail(user.email, user.name, withCallback(url, '/'))),
     },
+    // Brute force and e-mail flooding protection (ADR 0023): per client IP and route. A blocked
+    // request gets 429 with an X-Retry-After header (seconds).
+    rateLimit: {
+      // Also in development and tests (Better Auth's default is production only), so the
+      // behavior is the same everywhere and can be tested.
+      enabled: true,
+      storage: 'database',
+      // Any other auth route.
+      window: 60,
+      max: 100,
+      customRules: {
+        '/sign-in/email': { window: 60, max: 5 },
+        '/sign-up/email': { window: 60, max: 3 },
+        // Routes that send e-mail: they must not become a way to flood someone's inbox.
+        '/request-password-reset': { window: 300, max: 3 },
+        '/send-verification-email': { window: 300, max: 3 },
+        '/reset-password': { window: 300, max: 5 },
+        '/reset-password/*': { window: 300, max: 5 },
+      },
+    },
     hooks: {
       before: createAuthMiddleware((ctx): Promise<{ context: { body: unknown } } | undefined> => {
         const schema = bodySchemas[ctx.path];

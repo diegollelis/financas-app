@@ -29,7 +29,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Web: telas de cadastro, login e logout ([ADR 0021](adr/0021-sessao-e-formularios-no-front.md))
   - [x] Verificação de e-mail e recuperação de senha (Mailpit local, Resend em produção — [ADR 0022](adr/0022-envio-de-email.md))
   - [ ] Login com Google
-- [ ] Rate limit nas rotas de autenticação
+- [x] Rate limit nas rotas de autenticação ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
 - [ ] Workspace, Member e papéis; espaço pessoal criado no cadastro
 - [ ] Guard de espaço + repositórios sempre filtrando por `workspace_id`
 - [ ] Testes de isolamento entre espaços
@@ -49,6 +49,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Conferir limites atuais dos planos gratuitos
 - [ ] Neon (produção) + migrações no deploy
 - [ ] API no Render (Docker) e front no Cloudflare Pages
+- [ ] IP real do cliente atrás do proxy do Render para o rate limit ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
+- [ ] Cookies entre front e API em sites diferentes ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))
 - [ ] Sentry no front e na API (sem dados pessoais)
 - [ ] Backup periódico do banco via GitHub Actions + teste de restauração
 

@@ -16,7 +16,13 @@ export function setupApp(app: NestExpressApplication) {
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
   // The web app runs on another origin; credentials allow the session cookie (ADR 0007).
-  app.enableCors({ origin: config.get('WEB_ORIGIN', { infer: true }), credentials: true });
+  // X-Retry-After: how long a rate-limited client must wait (ADR 0023); the browser only lets the
+  // web app read response headers listed here.
+  app.enableCors({
+    origin: config.get('WEB_ORIGIN', { infer: true }),
+    credentials: true,
+    exposedHeaders: ['X-Retry-After'],
+  });
 
   app
     .getHttpAdapter()

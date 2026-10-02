@@ -26,3 +26,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0020](0020-integracao-better-auth-nestjs.md)  | Integração do Better Auth na API NestJS                                           | Aceita |
 | [0021](0021-sessao-e-formularios-no-front.md)  | Sessão, rotas protegidas e formulários no front                                   | Aceita |
 | [0022](0022-envio-de-email.md)                 | Envio de e-mail: Mailpit no desenvolvimento, Resend em produção                   | Aceita |
+| [0023](0023-rate-limit-autenticacao.md)        | Rate limit nas rotas de autenticação                                              | Aceita |
