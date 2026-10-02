@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { TransactionsModule } from './transactions/transactions.module.js';
 import { WorkspacesModule } from './workspaces/workspaces.module.js';
 
 @Module({
@@ -19,6 +20,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     WorkspacesModule,
     InvitationsModule,
     CategoriesModule,
+    TransactionsModule,
   ],
 })
 export class AppModule {}

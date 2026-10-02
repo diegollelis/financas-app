@@ -28,8 +28,11 @@ const categoryExists = () =>
     message: 'Já existe uma categoria com esse nome. Se ela estiver arquivada, reative-a.',
   });
 
-/** Prisma error codes: P2002 = unique constraint violated, P2025 = record to update not found. */
-function isPrismaError(error: unknown, code: 'P2002' | 'P2025') {
+/**
+ * Prisma error codes: P2002 = unique constraint violated, P2003 = foreign key violated,
+ * P2025 = record to update not found.
+ */
+function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
 }
 
@@ -93,15 +96,25 @@ export class CategoriesService {
   }
 
   /**
-   * Deletes a category. Once transactions exist, one in use can only be archived: the foreign
-   * key will refuse the delete and this method will answer 409.
+   * Deletes a category. One in use can only be archived: the foreign key of transactions
+   * (ADR 0029) refuses the delete, which becomes a 409.
    */
   async remove(workspaceId: string, categoryId: string): Promise<void> {
     if (!z.uuid().safeParse(categoryId).success) throw new NotFoundException();
-    const { count } = await this.prisma
-      .forWorkspace(workspaceId)
-      .category.deleteMany({ where: { id: categoryId, workspaceId } });
-    if (count === 0) throw new NotFoundException();
+    try {
+      const { count } = await this.prisma
+        .forWorkspace(workspaceId)
+        .category.deleteMany({ where: { id: categoryId, workspaceId } });
+      if (count === 0) throw new NotFoundException();
+    } catch (error) {
+      if (isPrismaError(error, 'P2003')) {
+        throw new ConflictException({
+          code: 'CATEGORY_IN_USE',
+          message: 'Esta categoria tem lançamentos: ela não pode ser excluída, só arquivada.',
+        });
+      }
+      throw error;
+    }
   }
 
   /** An id that is not a uuid, or that belongs to another workspace, is simply not found. */

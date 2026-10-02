@@ -1,0 +1,501 @@
+import {
+  categoryListResponseSchema,
+  transactionListResponseSchema,
+  transactionSchema,
+  workspaceSchema,
+  type CreateTransactionInput,
+  type TransactionType,
+} from '@financas/shared';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createTestApp } from './app.js';
+import { resetDatabase } from './db.js';
+import { expectHiddenFromOutsiders, type WorkspaceRoute } from './isolation.js';
+
+// Transactions (lançamentos) of a workspace (ADRs 0010 and 0029).
+// All data here is fictitious (ADR 0019).
+const maria = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
+const joao = { name: 'João Exemplo', email: 'joao@example.com', password: 'senha-de-teste-456' };
+
+const SOME_ID = '01920000-0000-7000-8000-000000000000';
+
+const transactionRoutes: WorkspaceRoute[] = [
+  { method: 'get', path: (id) => `/workspaces/${id}/transactions?period=2026-10` },
+  {
+    method: 'post',
+    path: (id) => `/workspaces/${id}/transactions`,
+    body: {
+      type: 'DEBIT',
+      description: 'Intruso',
+      categoryId: SOME_ID,
+      amountCents: 100,
+      period: '2026-10',
+    },
+  },
+  {
+    method: 'patch',
+    path: (id) => `/workspaces/${id}/transactions/${SOME_ID}`,
+    body: { settledAt: '2026-10-02' },
+  },
+  { method: 'delete', path: (id) => `/workspaces/${id}/transactions/${SOME_ID}` },
+];
+
+describe('transactions', () => {
+  let t: Awaited<ReturnType<typeof createTestApp>>;
+
+  beforeAll(async () => {
+    t = await createTestApp();
+  });
+
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  afterAll(async () => {
+    await t.app.close();
+  });
+
+  type Browser = ReturnType<typeof t.http>;
+
+  /** Maria with her personal workspace, and a way to find its default categories by name. */
+  async function mariaReady() {
+    const { browser, personalWorkspaceId: workspaceId, userId } = await t.signUp(maria);
+    const response = await browser.get(`/workspaces/${workspaceId}/categories`).expect(200);
+    const categories = categoryListResponseSchema.parse(response.body);
+    const categoryId = (name: string, type: TransactionType) => {
+      const found = categories.find((category) => category.name === name && category.type === type);
+      if (!found) throw new Error(`No category ${name} (${type})`);
+      return found.id;
+    };
+    return { browser, workspaceId, userId, categoryId };
+  }
+
+  async function create(browser: Browser, workspaceId: string, input: CreateTransactionInput) {
+    const response = await browser
+      .post(`/workspaces/${workspaceId}/transactions`)
+      .send(input)
+      .expect(201);
+    return transactionSchema.parse(response.body);
+  }
+
+  async function list(browser: Browser, workspaceId: string, period: string) {
+    const response = await browser
+      .get(`/workspaces/${workspaceId}/transactions?period=${period}`)
+      .expect(200);
+    return transactionListResponseSchema.parse(response.body);
+  }
+
+  describe('creating and listing', () => {
+    it('creates a pending transaction and lists it in its competência only', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+
+      const light = await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'Conta de luz',
+        categoryId: categoryId('Energia', 'DEBIT'),
+        amountCents: 15_990,
+        period: '2026-10',
+        dueDate: '2026-10-10',
+      });
+
+      expect(light).toEqual({
+        id: light.id,
+        type: 'DEBIT',
+        description: 'Conta de luz',
+        notes: null,
+        categoryId: categoryId('Energia', 'DEBIT'),
+        amountCents: 15_990,
+        period: '2026-10',
+        dueDate: '2026-10-10',
+        settledAt: null,
+      });
+      expect(await list(browser, workspaceId, '2026-10')).toEqual([light]);
+      expect(await list(browser, workspaceId, '2026-11')).toEqual([]);
+    });
+
+    it('lists credits first, then debits by due date, those without one last', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+      const debit = (description: string, dueDate: string | null) =>
+        create(browser, workspaceId, {
+          type: 'DEBIT',
+          description,
+          categoryId: categoryId('Mercado', 'DEBIT'),
+          amountCents: 1_000,
+          period: '2026-10',
+          dueDate,
+        });
+      await debit('Sem vencimento', null);
+      await debit('Dia 20', '2026-10-20');
+      await debit('Dia 5', '2026-10-05');
+      await create(browser, workspaceId, {
+        type: 'CREDIT',
+        description: 'Salário',
+        categoryId: categoryId('Salário', 'CREDIT'),
+        amountCents: 500_000,
+        period: '2026-10',
+        dueDate: '2026-10-30',
+      });
+
+      const descriptions = (await list(browser, workspaceId, '2026-10')).map(
+        (transaction) => transaction.description,
+      );
+
+      expect(descriptions).toEqual(['Salário', 'Dia 5', 'Dia 20', 'Sem vencimento']);
+    });
+
+    it('requires a valid competência to list', async () => {
+      const { browser, workspaceId } = await mariaReady();
+
+      await browser.get(`/workspaces/${workspaceId}/transactions`).expect(400);
+      const response = await browser
+        .get(`/workspaces/${workspaceId}/transactions?period=2026-13`)
+        .expect(400);
+
+      expect(response.body).toMatchObject({
+        code: 'INVALID_INPUT',
+        message: 'Use uma competência no formato AAAA-MM.',
+      });
+    });
+
+    it('validates the input with the shared schema', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+
+      const response = await browser
+        .post(`/workspaces/${workspaceId}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'Mercado',
+          categoryId: categoryId('Mercado', 'DEBIT'),
+          amountCents: 0,
+          period: '2026-10',
+        })
+        .expect(400);
+
+      expect(response.body).toMatchObject({
+        code: 'INVALID_INPUT',
+        message: 'O valor precisa ser maior que zero.',
+      });
+    });
+  });
+
+  describe('category rules', () => {
+    it('refuses a category of the other type', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+
+      const response = await browser
+        .post(`/workspaces/${workspaceId}/transactions`)
+        .send({
+          type: 'CREDIT',
+          description: 'Salário',
+          categoryId: categoryId('Mercado', 'DEBIT'),
+          amountCents: 100,
+          period: '2026-10',
+        })
+        .expect(400);
+
+      expect(response.body).toMatchObject({
+        code: 'INVALID_CATEGORY',
+        message: 'Escolha uma categoria de crédito.',
+      });
+    });
+
+    it('refuses an archived category, but keeps it on transactions made before', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+      const ipva = categoryId('IPVA', 'DEBIT');
+      const tax = await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'IPVA 2026',
+        categoryId: ipva,
+        amountCents: 120_000,
+        period: '2026-10',
+      });
+      await browser
+        .patch(`/workspaces/${workspaceId}/categories/${ipva}`)
+        .send({ archived: true })
+        .expect(200);
+
+      const refused = await browser
+        .post(`/workspaces/${workspaceId}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'IPVA 2027',
+          categoryId: ipva,
+          amountCents: 1,
+          period: '2026-10',
+        })
+        .expect(400);
+      expect(refused.body).toMatchObject({ code: 'INVALID_CATEGORY' });
+
+      await browser
+        .patch(`/workspaces/${workspaceId}/transactions/${tax.id}`)
+        .send({ description: 'IPVA 2026 (cota única)' })
+        .expect(200);
+    });
+
+    it('refuses a category of another workspace', async () => {
+      const { browser, workspaceId } = await mariaReady();
+      const created = await browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const houseId = workspaceSchema.parse(created.body).id;
+      const houseCategories = categoryListResponseSchema.parse(
+        (await browser.get(`/workspaces/${houseId}/categories`).expect(200)).body,
+      );
+      const houseMarket = houseCategories.find((category) => category.name === 'Mercado');
+
+      const response = await browser
+        .post(`/workspaces/${workspaceId}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'Mercado',
+          categoryId: houseMarket?.id,
+          amountCents: 100,
+          period: '2026-10',
+        })
+        .expect(400);
+
+      expect(response.body).toMatchObject({
+        code: 'INVALID_CATEGORY',
+        message: 'Categoria não encontrada neste espaço.',
+      });
+    });
+
+    it('the database itself refuses a category of the other type (composite foreign key)', async () => {
+      const { workspaceId, categoryId } = await mariaReady();
+
+      // Straight to the database, skipping the service checks.
+      const write = t.prisma.forWorkspace(workspaceId).transaction.create({
+        data: {
+          workspaceId,
+          type: 'CREDIT',
+          description: 'Burlando o serviço',
+          categoryId: categoryId('Mercado', 'DEBIT'),
+          amountCents: 100,
+          period: '2026-10',
+        },
+      });
+
+      await expect(write).rejects.toThrow(/foreign key/i);
+    });
+
+    it('the database itself refuses a zero amount and a malformed competência', async () => {
+      const { workspaceId, categoryId } = await mariaReady();
+      const data = {
+        workspaceId,
+        type: 'DEBIT' as const,
+        description: 'Burlando o serviço',
+        categoryId: categoryId('Mercado', 'DEBIT'),
+        amountCents: 100,
+        period: '2026-10',
+      };
+      const db = t.prisma.forWorkspace(workspaceId);
+
+      await expect(db.transaction.create({ data: { ...data, amountCents: 0 } })).rejects.toThrow(
+        /transactions_amount_cents_positive/,
+      );
+      await expect(db.transaction.create({ data: { ...data, period: '2026-13' } })).rejects.toThrow(
+        /transactions_period_format/,
+      );
+    });
+
+    it('a category in use cannot be deleted, only archived', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+      const market = categoryId('Mercado', 'DEBIT');
+      await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'Compras da semana',
+        categoryId: market,
+        amountCents: 35_000,
+        period: '2026-10',
+      });
+
+      const response = await browser
+        .delete(`/workspaces/${workspaceId}/categories/${market}`)
+        .expect(409);
+
+      expect(response.body).toMatchObject({ code: 'CATEGORY_IN_USE' });
+    });
+  });
+
+  describe('updating', () => {
+    it('settles in one click and undoes it', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+      const light = await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'Conta de luz',
+        categoryId: categoryId('Energia', 'DEBIT'),
+        amountCents: 15_990,
+        period: '2026-10',
+      });
+      const path = `/workspaces/${workspaceId}/transactions/${light.id}`;
+
+      const settled = await browser.patch(path).send({ settledAt: '2026-10-02' }).expect(200);
+      expect(settled.body).toEqual({ ...light, settledAt: '2026-10-02' });
+
+      const undone = await browser.patch(path).send({ settledAt: null }).expect(200);
+      expect(undone.body).toEqual(light);
+    });
+
+    it('changes the type only together with a category of the new type', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+      const loan = await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'Empréstimo',
+        categoryId: categoryId('Empréstimo', 'DEBIT'),
+        amountCents: 100_000,
+        period: '2026-10',
+      });
+      const path = `/workspaces/${workspaceId}/transactions/${loan.id}`;
+
+      await browser.patch(path).send({ type: 'CREDIT' }).expect(400);
+      const changed = await browser
+        .patch(path)
+        .send({ type: 'CREDIT', categoryId: categoryId('Empréstimo', 'CREDIT') })
+        .expect(200);
+
+      expect(changed.body).toMatchObject({ type: 'CREDIT' });
+    });
+
+    it('edits the other fields and clears the optional ones', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+      const course = await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'Curso',
+        notes: 'Turma de sábado',
+        categoryId: categoryId('Curso', 'DEBIT'),
+        amountCents: 30_000,
+        period: '2026-10',
+        dueDate: '2026-10-15',
+      });
+
+      const response = await browser
+        .patch(`/workspaces/${workspaceId}/transactions/${course.id}`)
+        .send({ amountCents: 32_000, period: '2026-11', notes: '', dueDate: null })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        ...course,
+        amountCents: 32_000,
+        period: '2026-11',
+        notes: null,
+        dueDate: null,
+      });
+    });
+
+    it('answers 404 for an unknown or malformed id', async () => {
+      const { browser, workspaceId } = await mariaReady();
+      const base = `/workspaces/${workspaceId}/transactions`;
+
+      await browser.patch(`${base}/${SOME_ID}`).send({ settledAt: null }).expect(404);
+      await browser.patch(`${base}/not-a-uuid`).send({ settledAt: null }).expect(404);
+      await browser.delete(`${base}/${SOME_ID}`).expect(404);
+    });
+  });
+
+  describe('deleting', () => {
+    it('removes the transaction', async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+      const light = await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'Conta de luz',
+        categoryId: categoryId('Energia', 'DEBIT'),
+        amountCents: 15_990,
+        period: '2026-10',
+      });
+
+      await browser.delete(`/workspaces/${workspaceId}/transactions/${light.id}`).expect(204);
+
+      expect(await list(browser, workspaceId, '2026-10')).toEqual([]);
+    });
+  });
+
+  describe('roles', () => {
+    it('a VIEWER reads but cannot change anything', async () => {
+      const owner = await t.signUp(maria);
+      const created = await owner.browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const workspaceId = workspaceSchema.parse(created.body).id;
+      const categories = categoryListResponseSchema.parse(
+        (await owner.browser.get(`/workspaces/${workspaceId}/categories`).expect(200)).body,
+      );
+      const market = categories.find((category) => category.name === 'Mercado');
+      const input = {
+        type: 'DEBIT' as const,
+        description: 'Compras',
+        categoryId: market?.id ?? '',
+        amountCents: 10_000,
+        period: '2026-10',
+      };
+      const shopping = await create(owner.browser, workspaceId, input);
+      const viewer = await t.signUp(joao);
+      await t.prisma.member.create({
+        data: { workspaceId, userId: viewer.userId, role: 'VIEWER' },
+      });
+      const base = `/workspaces/${workspaceId}/transactions`;
+
+      expect(await list(viewer.browser, workspaceId, '2026-10')).toEqual([shopping]);
+      await viewer.browser.post(base).send(input).expect(403);
+      await viewer.browser
+        .patch(`${base}/${shopping.id}`)
+        .send({ settledAt: '2026-10-02' })
+        .expect(403);
+      await viewer.browser.delete(`${base}/${shopping.id}`).expect(403);
+    });
+  });
+
+  describe('isolation', () => {
+    it('hides every route from non-members', async () => {
+      const { personalWorkspaceId } = await t.signUp(maria);
+
+      await expectHiddenFromOutsiders(t, personalWorkspaceId, transactionRoutes);
+    });
+
+    it("a member of two workspaces cannot reach one workspace's transaction through the other", async () => {
+      const { browser, workspaceId, categoryId } = await mariaReady();
+      const created = await browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const houseId = workspaceSchema.parse(created.body).id;
+      const light = await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'Conta de luz',
+        categoryId: categoryId('Energia', 'DEBIT'),
+        amountCents: 15_990,
+        period: '2026-10',
+      });
+      const wrongPath = `/workspaces/${houseId}/transactions/${light.id}`;
+
+      await browser.patch(wrongPath).send({ settledAt: '2026-10-02' }).expect(404);
+      await browser.delete(wrongPath).expect(404);
+      expect(await list(browser, houseId, '2026-10')).toEqual([]);
+    });
+
+    it('RLS: a query by the API role WITHOUT a workspace filter sees only the bound workspace', async () => {
+      const mariaSide = await mariaReady();
+      const joaoUser = await t.signUp(joao);
+      const joaoCategories = categoryListResponseSchema.parse(
+        (
+          await joaoUser.browser
+            .get(`/workspaces/${joaoUser.personalWorkspaceId}/categories`)
+            .expect(200)
+        ).body,
+      );
+      const joaoMarket = joaoCategories.find((category) => category.name === 'Mercado');
+      await create(mariaSide.browser, mariaSide.workspaceId, {
+        type: 'DEBIT',
+        description: 'Mercado da Maria',
+        categoryId: mariaSide.categoryId('Mercado', 'DEBIT'),
+        amountCents: 100,
+        period: '2026-10',
+      });
+      await create(joaoUser.browser, joaoUser.personalWorkspaceId, {
+        type: 'DEBIT',
+        description: 'Mercado do João',
+        categoryId: joaoMarket?.id ?? '',
+        amountCents: 200,
+        period: '2026-10',
+      });
+
+      // No `where` at all: only the database stands between the two workspaces.
+      const unbound = await t.prisma.transaction.findMany();
+      const bound = await t.prisma.forWorkspace(mariaSide.workspaceId).transaction.findMany();
+
+      expect(unbound).toEqual([]);
+      expect(bound.map((row) => row.description)).toEqual(['Mercado da Maria']);
+    });
+  });
+});
