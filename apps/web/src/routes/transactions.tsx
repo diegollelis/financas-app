@@ -1,10 +1,8 @@
 import {
-  currentPeriod,
   formatCents,
   formatIsoDate,
   formatPeriod,
   hasRole,
-  periodSchema,
   todayIso,
   transactionStatus,
   type Category,
@@ -13,11 +11,12 @@ import {
   type TransactionType,
 } from '@financas/shared';
 import { useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCategories } from '@/features/categories/use-categories';
+import { usePeriod } from '@/features/periods/use-period';
 import {
   TransactionForm,
   type TransactionFormValues,
@@ -231,13 +230,6 @@ function NewTransaction({
       />
     </section>
   );
-}
-
-/** The competência comes from `?competencia=YYYY-MM`; without it (or invalid), this month. */
-function usePeriod() {
-  const [searchParams] = useSearchParams();
-  const requested = periodSchema.safeParse(searchParams.get('competencia'));
-  return requested.success ? requested.data : currentPeriod();
 }
 
 export function TransactionsPage() {

@@ -35,7 +35,7 @@ const errorBodySchema = z.object({
  * breaks the contract, the error shows up here instead of deep inside a component.
  */
 async function request<T extends z.ZodType>(
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   schema: T,
   body?: unknown,
@@ -69,6 +69,10 @@ export function apiGet<T extends z.ZodType>(path: string, schema: T) {
 
 export function apiPost<T extends z.ZodType>(path: string, body: unknown, schema: T) {
   return request('POST', path, schema, body);
+}
+
+export function apiPut<T extends z.ZodType>(path: string, body: unknown, schema: T) {
+  return request('PUT', path, schema, body);
 }
 
 export function apiPatch<T extends z.ZodType>(path: string, body: unknown, schema: T) {

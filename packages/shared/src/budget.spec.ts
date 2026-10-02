@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { budgetInputSchema, DEFAULT_BUDGET_SHARES } from './budget.ts';
+import { budgetInputSchema, DEFAULT_BUDGET_SHARES, shareOfIncome } from './budget.ts';
 
 // Fictitious data (ADR 0019).
 const valid = { netIncomeCents: 500_000, grossIncomeCents: 650_000, ...DEFAULT_BUDGET_SHARES };
+
+describe('shareOfIncome', () => {
+  it('applies the percentage to the income, rounded to the cent', () => {
+    expect(shareOfIncome(500_000, 6_000)).toBe(300_000);
+    expect(shareOfIncome(500_000, 1_250)).toBe(62_500);
+    expect(shareOfIncome(333, 3_333)).toBe(111);
+    expect(shareOfIncome(0, 6_000)).toBe(0);
+  });
+});
 
 describe('budgetInputSchema', () => {
   it('accepts the spreadsheet defaults, which add up to exactly 100%', () => {

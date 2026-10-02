@@ -192,6 +192,12 @@ export function WorkspacePage() {
                   Lançamentos →
                 </Link>
                 <Link
+                  to={`/espacos/${workspaceId}/orcamento`}
+                  className="font-medium hover:underline"
+                >
+                  Orçamento →
+                </Link>
+                <Link
                   to={`/espacos/${workspaceId}/categorias`}
                   className="font-medium hover:underline"
                 >
