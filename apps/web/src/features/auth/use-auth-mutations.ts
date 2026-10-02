@@ -75,14 +75,14 @@ export function useResendVerification() {
  * there. Google sends it back to the API, which signs in and redirects to `callbackURL`, or to
  * `errorCallbackURL` with `?error=` when something fails.
  */
-export function useGoogleSignIn() {
+export function useGoogleSignIn(returnTo = '/') {
   return useMutation({
     mutationFn: () =>
       apiPost(
         '/api/auth/sign-in/social',
         {
           provider: 'google',
-          callbackURL: `${window.location.origin}/`,
+          callbackURL: `${window.location.origin}${returnTo}`,
           errorCallbackURL: `${window.location.origin}/entrar`,
         },
         z.object({ url: z.url() }),

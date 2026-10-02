@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
 import { GoogleButton } from '@/features/auth/google-button';
+import { useReturnTo, withReturnTo } from '@/features/auth/return-to';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
 import { useSignUp } from '@/features/auth/use-auth-mutations';
 
 export function SignUpPage() {
+  const returnTo = useReturnTo();
   const signUp = useSignUp();
   const { register, handleSubmit, formState } = useForm<SignUpInput>({
     resolver: zodResolver(signUpInputSchema),
@@ -24,7 +26,10 @@ export function SignUpPage() {
       footer={
         <span>
           Já tem conta?{' '}
-          <Link to="/entrar" className="text-primary underline-offset-4 hover:underline">
+          <Link
+            to={withReturnTo('/entrar', returnTo)}
+            className="text-primary underline-offset-4 hover:underline"
+          >
             Entrar
           </Link>
         </span>
