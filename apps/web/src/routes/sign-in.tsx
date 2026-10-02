@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
 import { GoogleButton } from '@/features/auth/google-button';
+import { useReturnTo, withReturnTo } from '@/features/auth/return-to';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
 import { useSignIn } from '@/features/auth/use-auth-mutations';
 
@@ -15,6 +16,7 @@ import { useSignIn } from '@/features/auth/use-auth-mutations';
 const locationStateSchema = z.object({ notice: z.string() });
 
 export function SignInPage() {
+  const returnTo = useReturnTo();
   const notice = locationStateSchema.safeParse(useLocation().state).data?.notice;
   // The API sends the browser back here with ?error= when the Google sign-in fails (ADR 0026).
   const [searchParams] = useSearchParams();
@@ -33,7 +35,10 @@ export function SignInPage() {
       footer={
         <span>
           Ainda não tem conta?{' '}
-          <Link to="/cadastro" className="text-primary underline-offset-4 hover:underline">
+          <Link
+            to={withReturnTo('/cadastro', returnTo)}
+            className="text-primary underline-offset-4 hover:underline"
+          >
             Cadastre-se
           </Link>
         </span>

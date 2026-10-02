@@ -35,7 +35,7 @@ const errorBodySchema = z.object({
  * breaks the contract, the error shows up here instead of deep inside a component.
  */
 async function request<T extends z.ZodType>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   schema: T,
   body?: unknown,
@@ -59,7 +59,8 @@ async function request<T extends z.ZodType>(
       Number(response.headers.get('X-Retry-After')) || undefined,
     );
   }
-  return schema.parse(await response.json());
+  // 204 No Content (e.g. DELETE): there is no body to read.
+  return schema.parse(response.status === 204 ? undefined : await response.json());
 }
 
 export function apiGet<T extends z.ZodType>(path: string, schema: T) {
@@ -68,4 +69,13 @@ export function apiGet<T extends z.ZodType>(path: string, schema: T) {
 
 export function apiPost<T extends z.ZodType>(path: string, body: unknown, schema: T) {
   return request('POST', path, schema, body);
+}
+
+export function apiPatch<T extends z.ZodType>(path: string, body: unknown, schema: T) {
+  return request('PATCH', path, schema, body);
+}
+
+/** For routes that answer 204 No Content. */
+export async function apiDelete(path: string): Promise<void> {
+  await request('DELETE', path, z.undefined());
 }

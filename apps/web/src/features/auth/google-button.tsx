@@ -1,10 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { authErrorMessage } from './auth-error-message';
+import { useReturnTo } from './return-to';
 import { useGoogleSignIn } from './use-auth-mutations';
 
 /** "Continuar com Google", below the e-mail form, on the sign-in and sign-up pages. */
 export function GoogleButton() {
-  const googleSignIn = useGoogleSignIn();
+  const googleSignIn = useGoogleSignIn(useReturnTo());
 
   return (
     <div className="mt-4 grid gap-4">

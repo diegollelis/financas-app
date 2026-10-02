@@ -47,11 +47,12 @@ Espaços compartilhados ([ADR 0024](0024-espacos-membros-e-espaco-pessoal.md)) s
   - o e-mail fica **confirmado**, porque o link chegou na caixa da pessoa.
 - **E-mail** em segundo plano, como os da autenticação ([ADR 0022](0022-envio-de-email.md)): uma falha vai para o log sem o conteúdo, e o dono pode convidar de novo. O assunto leva nomes digitados por usuários, então é reduzido a uma linha (sem quebras que injetem cabeçalhos), e o HTML escapa os nomes.
 
+- **No front:**
+  - **`/espacos/:id`** mostra os membros. Num espaço compartilhado, o dono vê também o formulário de convite ("Pode editar" ou "Só visualizar") e os convites pendentes, com o botão de cancelar. No espaço pessoal, a página explica que ele não é compartilhado. A página inicial ganhou links para os espaços e o formulário "Criar espaço".
+  - **`/convites/:token`** fica fora das proteções de rota e mostra o convite antes de pedir login. Quem não está logado vê os botões "Entrar" e "Criar conta". Quem está com outro e-mail é avisado e pode sair. Quem está com o e-mail certo vê "Aceitar convite" e, ao aceitar, vai para o espaço.
+- **Volta após o login (`?voltar=`):** o `RequireAuth` manda para `/entrar?voltar=<página>`, e o `GuestOnly` leva a pessoa de volta depois do login, do cadastro ou do Google. Os links entre login e cadastro mantêm o parâmetro. Só são aceitos **caminhos internos**: `//site.com`, `/\site.com` ou URLs completas viram `/`, para que um link malicioso não use o nosso login para mandar alguém a outro site (_open redirect_, comum em phishing).
+
 ## Consequências
 
-- O front (próximo passo) precisa de:
-  - uma página do espaço com os membros e o formulário de convite;
-  - a página `/convites/:token`;
-  - a volta ao convite depois do login ou do cadastro.
 - Faltam a remoção de membro, a saída do espaço e a promoção a dono. Com elas vem a regra de que todo espaço tem ao menos um `OWNER` ([modelo](../dominio/modelo.md)).
 - Convites aceitos ficam na tabela como histórico (`accepted_at`). Uma limpeza periódica de convites vencidos pode vir depois, se a tabela crescer.

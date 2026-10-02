@@ -34,9 +34,9 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Guard de espaço + repositórios sempre filtrando por `workspace_id` ([ADR 0025](adr/0025-guard-de-espaco-e-isolamento.md))
 - [x] Testes de isolamento entre espaços (`expectHiddenFromOutsiders`, um por recurso)
 - [ ] RLS no PostgreSQL como segunda barreira (estudo)
-- [ ] Convite de membros por e-mail ([ADR 0027](adr/0027-convites-por-email.md))
+- [x] Convite de membros por e-mail ([ADR 0027](adr/0027-convites-por-email.md))
   - [x] API: convidar, listar, cancelar, ver e aceitar pelo link
-  - [ ] Web: página do espaço (membros e convite), página do convite e volta após o login
+  - [x] Web: página do espaço (membros e convite), página do convite e volta após o login
 
 ## Fase 3 — Núcleo financeiro
 
