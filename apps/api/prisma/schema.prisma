@@ -18,12 +18,13 @@ datasource db {
 // Owner of all financial data (ADR 0008). The personal workspace is created with the user, is
 // never shared nor deleted, and there is exactly one per user (ADR 0024).
 model Workspace {
-  id         String   @id @default(uuid(7)) @db.Uuid
-  name       String   @db.VarChar(100)
-  isPersonal Boolean  @default(false) @map("is_personal")
-  members    Member[]
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id          String       @id @default(uuid(7)) @db.Uuid
+  name        String       @db.VarChar(100)
+  isPersonal  Boolean      @default(false) @map("is_personal")
+  members     Member[]
+  invitations Invitation[]
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("workspaces")
 }
@@ -59,16 +60,17 @@ model Member {
 // ---------------------------------------------------------------------------
 
 model User {
-  id            String    @id @default(uuid(7)) @db.Uuid
-  name          String    @db.VarChar(100)
-  email         String    @unique @db.VarChar(254)
-  emailVerified Boolean   @default(false) @map("email_verified")
-  image         String?
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  sessions      Session[]
-  accounts      Account[]
-  memberships   Member[]
+  id              String       @id @default(uuid(7)) @db.Uuid
+  name            String       @db.VarChar(100)
+  email           String       @unique @db.VarChar(254)
+  emailVerified   Boolean      @default(false) @map("email_verified")
+  image           String?
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sessions        Session[]
+  accounts        Account[]
+  memberships     Member[]
+  invitationsSent Invitation[]
 
   @@map("users")
 }
@@ -132,4 +134,24 @@ model RateLimit {
   lastRequest BigInt @map("last_request")
 
   @@map("rate_limits")
+}
+
+// Invitation to join a workspace, sent by e-mail (ADR 0027). Only a hash of the token is stored:
+// a leaked database does not expose working links. Pending = not accepted and not expired.
+model Invitation {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String        @db.VarChar(254)
+  role        WorkspaceRole
+  tokenHash   String        @unique @map("token_hash")
+  invitedById String?       @map("invited_by_id") @db.Uuid
+  invitedBy   User?         @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+  expiresAt   DateTime      @map("expires_at") @db.Timestamptz(3)
+  acceptedAt  DateTime?     @map("accepted_at") @db.Timestamptz(3)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([workspaceId])
+  @@map("invitations")
 }

@@ -10,6 +10,11 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
+/** Subjects are headers: user-typed names must not carry line breaks into them. */
+function oneLine(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
 function layout(paragraphs: string[], button: { label: string; url: string }, note: string) {
   const html = `<!doctype html>
 <html lang="pt-BR">
@@ -52,6 +57,29 @@ export function resetPasswordEmail(to: string, name: string, url: string): MailM
     html: layout(
       [`Olá, ${escapeHtml(name)}!`, 'Recebemos um pedido para redefinir a sua senha.'],
       { label: 'Criar nova senha', url },
+      note,
+    ),
+  };
+}
+
+export function invitationEmail(
+  to: string,
+  invite: { inviterName: string; workspaceName: string; canEdit: boolean; url: string },
+): MailMessage {
+  const access = invite.canEdit ? 'ver e editar' : 'ver';
+  const note =
+    'O convite vale por 7 dias. Para aceitar, entre (ou crie sua conta) com este mesmo e-mail. Se não esperava este convite, ignore este e-mail.';
+  return {
+    to,
+    subject: oneLine(
+      `${invite.inviterName} convidou você para "${invite.workspaceName}" no Finanças`,
+    ),
+    text: `${invite.inviterName} convidou você para ${access} as finanças do espaço "${invite.workspaceName}".\n\nPara aceitar, abra o link abaixo:\n${invite.url}\n\n${note}`,
+    html: layout(
+      [
+        `<strong>${escapeHtml(invite.inviterName)}</strong> convidou você para ${access} as finanças do espaço <strong>${escapeHtml(invite.workspaceName)}</strong>.`,
+      ],
+      { label: 'Ver convite', url: invite.url },
       note,
     ),
   };
