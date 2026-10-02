@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module.js';
+import { CategoriesModule } from './categories/categories.module.js';
 import { validateEnv } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { InvitationsModule } from './invitations/invitations.module.js';
@@ -17,6 +18,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     AuthModule,
     WorkspacesModule,
     InvitationsModule,
+    CategoriesModule,
   ],
 })
 export class AppModule {}

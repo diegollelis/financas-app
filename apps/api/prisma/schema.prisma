@@ -23,6 +23,7 @@ model Workspace {
   isPersonal  Boolean      @default(false) @map("is_personal")
   members     Member[]
   invitations Invitation[]
+  categories  Category[]
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -154,4 +155,34 @@ model Invitation {
 
   @@index([workspaceId])
   @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Business tables (phase 3). Each one has workspace_id and the Row Level Security policy of
+// ADR 0028, added by hand to its migration (Prisma does not manage policies). The API reads and
+// writes them through PrismaService.forWorkspace().
+// ---------------------------------------------------------------------------
+
+// Money in (CREDIT) or out (DEBIT): the type of categories and, later, of transactions.
+enum TransactionType {
+  CREDIT
+  DEBIT
+
+  @@map("transaction_type")
+}
+
+// Classifies transactions, per type. New workspaces get the default ones; a category in use is
+// archived, not deleted (docs/dominio/modelo.md).
+model Category {
+  id          String          @id @default(uuid(7)) @db.Uuid
+  workspaceId String          @map("workspace_id") @db.Uuid
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String          @db.VarChar(50)
+  type        TransactionType
+  archivedAt  DateTime?       @map("archived_at") @db.Timestamptz(3)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([workspaceId, type, name])
+  @@map("categories")
 }
