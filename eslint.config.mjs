@@ -23,7 +23,10 @@ export default tseslint.config(
       globals: { ...globals.node },
       parserOptions: {
         // Cada pacote tem seu tsconfig; o project service encontra o mais próximo de cada arquivo.
-        projectService: true,
+        projectService: {
+          // Root config files that do not belong to any package tsconfig.
+          allowDefaultProject: ['vitest.config.ts'],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },

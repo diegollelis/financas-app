@@ -26,4 +26,5 @@ Um único desenvolvedor, vindo do AdvPL, mantém três pacotes TypeScript ([0002
 
 - Na raiz: `pnpm lint`, `pnpm format`, `pnpm format:check` e `pnpm typecheck`. O CI roda os mesmos comandos.
 - O lint com tipos é mais lento, pois precisa do compilador, mas pega erros reais como promessas esquecidas e `any` vazando.
-- O Nest CLI gera projetos com Jest; na Fase 1 trocamos o runner pelo Vitest (com o plugin SWC para os decorators).
+- O Nest 12 já oferece um template com Vitest. O plugin SWC, previsto para os decorators, **não foi necessário**: o Vite 8 (via Oxc) emite os metadados de decorators de que a injeção de dependência do Nest depende.
+- Um `vitest.config.ts` na raiz roda todos os pacotes como _projects_, e cada pacote tem a própria config: `node` na API e no shared, `jsdom` no front.

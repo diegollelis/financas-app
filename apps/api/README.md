@@ -22,12 +22,19 @@ pnpm --filter @financas/api dev          # modo watch em http://localhost:3333
 | `pnpm build`               | compila para `dist/`                                           |
 | `pnpm start`               | roda o build compilado (`dist/main.js`)                        |
 | `pnpm typecheck`           | checa os tipos sem gerar arquivos                              |
+| `pnpm test`                | roda os testes (Vitest)                                        |
 | `pnpm db:migrate --name x` | cria uma migração a partir do `schema.prisma` e a aplica (dev) |
 | `pnpm db:deploy`           | aplica migrações pendentes (produção e máquinas novas)         |
 | `pnpm db:generate`         | regenera o client do Prisma (roda sozinho no `pnpm install`)   |
 | `pnpm db:studio`           | abre o Prisma Studio para inspecionar os dados                 |
 
 Rode-os dentro de `apps/api` ou, da raiz, com `pnpm --filter @financas/api <script>`.
+
+## Testes
+
+- **Unitários** ao lado do código (`src/**/*.spec.ts`): a classe é instanciada direto, com dublês só do que ela usa.
+- **HTTP** em `test/**/*.spec.ts`: sobem o `AppModule` real com `@nestjs/testing` e fazem requisições com `supertest`. Só o banco é substituído.
+- Os testes nunca leem o `.env`: as variáveis vêm de `vitest.config.ts`.
 
 ## Variáveis de ambiente
 

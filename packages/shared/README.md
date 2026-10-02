@@ -18,3 +18,4 @@ O pacote consumidor declara `"@financas/shared": "workspace:*"` no `package.json
 - Sem `enum`, `namespace` ou _parameter properties_ (o type stripping do Node não os suporta). Para listas fixas, use `z.enum([...])`.
 - Cada schema exporta também o tipo inferido: `export type X = z.infer<typeof xSchema>`.
 - Todo novo arquivo é reexportado em `src/index.ts`.
+- Todo schema tem testes ao lado (`health.spec.ts`), cobrindo o que aceita e o que rejeita.

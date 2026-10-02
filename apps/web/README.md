@@ -18,6 +18,7 @@ pnpm --filter @financas/web dev                # front em http://localhost:5173
 | `pnpm build`     | checa tipos e gera os estáticos em `dist/` |
 | `pnpm preview`   | serve o build de produção localmente       |
 | `pnpm typecheck` | checa os tipos sem gerar arquivos          |
+| `pnpm test`      | roda os testes (Vitest + Testing Library)  |
 
 ## Estrutura
 
@@ -31,6 +32,12 @@ src/
   lib/api.ts            cliente da API: valida respostas com os schemas de @financas/shared
   lib/env.ts            variáveis VITE_* validadas com Zod
 ```
+
+## Testes
+
+- Ficam ao lado do componente (`home.spec.tsx`) e rodam em `jsdom`.
+- Use `renderWithProviders` (`src/test/render.tsx`): cria um QueryClient novo, sem retry, a cada teste.
+- A API é simulada com `vi.stubGlobal('fetch', ...)`. Os testes buscam pelo texto que o usuário vê (`findByText`), não por detalhes de implementação.
 
 ## Componentes do shadcn/ui
 
