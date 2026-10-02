@@ -10,7 +10,9 @@ services:
       POSTGRES_DB: financas
     ports:
       # 5432 e 5433 já são usadas por bancos de outros projetos nesta máquina.
-      - '5434:5432'
+      # 127.0.0.1: só esta máquina acessa. Sem isso, qualquer um na mesma rede conectaria
+      # com a senha acima, que é pública no repositório.
+      - '127.0.0.1:5434:5432'
     volumes:
       # A partir do Postgres 18 a imagem guarda os dados em /var/lib/postgresql/<versão>.
       - postgres-data:/var/lib/postgresql

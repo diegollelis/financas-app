@@ -1,0 +1,7 @@
+# Git hooks versionados (ADR 0019). Instalados pelo "pnpm install" (script "prepare").
+pre-commit:
+  commands:
+    secrets:
+      # Bloqueia o commit se o que está sendo commitado contiver credenciais.
+      # Requer o gitleaks instalado: winget install Gitleaks.Gitleaks
+      run: gitleaks git --pre-commit --staged --redact --no-banner -v

@@ -9,6 +9,8 @@ allowBuilds:
   # Prisma: baixa o schema engine usado pelas migrações.
   '@prisma/engines': true
   prisma: true
+  # lefthook: os hooks são instalados pelo script "prepare" da raiz, de forma explícita.
+  lefthook: false
 
 # Versões compartilhadas: os pacotes declaram "catalog:" e o pnpm usa a versão daqui.
 catalog:

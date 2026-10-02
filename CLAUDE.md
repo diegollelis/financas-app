@@ -26,7 +26,8 @@ pnpm workspaces monorepo: `apps/web` (React + Vite + TS, TanStack Query, React R
 - **Language (ADR 0011):** code, identifiers, DB, API routes and commit messages are in English (Conventional Commits). UI text and all docs are in pt-BR.
 - **Validation (ADR 0006):** Zod schemas in `packages/shared` are the single source of truth. The API always validates.
 - **Privacy (ADR 0012):** never log request bodies, descriptions, amounts or tokens. Never commit `.env`, spreadsheets or DB dumps. `.sql` is deliberately _not_ ignored, because Prisma migrations are `.sql`.
+- **Public repository (ADR 0019):** the GitHub repo is public, so the whole history is visible. Never put real credentials or real personal/financial data in code, tests, docs or commit messages; test data is always fictitious. A gitleaks pre-commit hook (lefthook) and a CI job enforce this. If a secret ever leaks, rotate it; rewriting history is not enough.
 
 ## Environment notes
 
-Development is on Windows. Node 26 is installed, and it no longer ships corepack, so install pnpm with `npm i -g pnpm`. Docker Desktop and git are installed. GitHub CLI is not installed, and the repo is local-only for now.
+Development is on Windows. Node 26 is installed, and it no longer ships corepack, so install pnpm with `npm i -g pnpm`. Docker Desktop, git and gitleaks are installed. GitHub CLI is not installed. The repo is public at `github.com/diegollelis/financas-app`, with rulesets protecting `main`. Commits use the GitHub noreply e-mail (repo-local git config). Local ports: API 3333, web 5173, Postgres 5434 (3000/3001 and 5432/5433 are taken by other projects on this machine).

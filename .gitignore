@@ -13,12 +13,29 @@ coverage/
 .env.*
 !.env.example
 
-# Dados pessoais / financeiros — nunca versionar
+# Dados pessoais / financeiros — nunca versionar (o repositório é público, ADR 0019)
 *.xlsx
 *.xls
+*.xlsm
+*.ods
+*.csv
+*.ofx
+*.qif
 *.dump
+*.backup
+*.sqlite
+*.db
 backups/
 dumps/
+# Fixtures de teste com dados fictícios podem ser liberadas por exceção, ex.: !**/fixtures/*.csv
+
+# Chaves e certificados
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+secrets/
 # (não ignorar *.sql: as migrações do Prisma são migration.sql)
 
 # Logs e SO

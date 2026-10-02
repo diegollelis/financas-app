@@ -22,3 +22,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0016](0016-estrutura-do-front.md)             | Estrutura do front: shadcn/ui com Radix, React Router 8 e cliente de API validado | Aceita |
 | [0017](0017-convencoes-de-banco-e-prisma-7.md) | Convenções de banco e uso do Prisma 7                                             | Aceita |
 | [0018](0018-integracao-continua.md)            | Integração contínua com GitHub Actions                                            | Aceita |
+| [0019](0019-repositorio-publico.md)            | Repositório público: proteção contra vazamento de segredos e dados pessoais       | Aceita |

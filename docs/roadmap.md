@@ -18,7 +18,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Postgres local via Docker Compose; Prisma configurado com a primeira migração
 - [x] Vitest nos três pacotes
 - [x] GitHub Actions: workflow de CI (lint, typecheck, testes, build) e Dependabot
-- [ ] Criar o repositório no GitHub, fazer o primeiro push e proteger a `main`
+- [x] Criar o repositório no GitHub, fazer o primeiro push e proteger a `main`
+- [x] Repositório público: proteção contra vazamento de segredos ([ADR 0019](adr/0019-repositorio-publico.md))
 - [ ] Comandos documentados no `CLAUDE.md` e no `README.md`
 
 ## Fase 2 — Autenticação e espaços
