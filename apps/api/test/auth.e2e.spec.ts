@@ -70,6 +70,25 @@ describe('authentication (e-mail and password)', () => {
     expect(await prisma.user.count()).toBe(1);
   });
 
+  it('validates sign-up with the shared schema', async () => {
+    const response = await http()
+      .post('/api/auth/sign-up/email')
+      .send({ ...user, name: 'a'.repeat(101) })
+      .expect(400);
+
+    expect(response.body).toMatchObject({ message: 'Use no máximo 100 caracteres.' });
+    expect(await prisma.user.count()).toBe(0);
+  });
+
+  it('stores the name trimmed', async () => {
+    await http()
+      .post('/api/auth/sign-up/email')
+      .send({ ...user, name: '  Maria Exemplo  ' })
+      .expect(200);
+
+    expect(await prisma.user.findFirstOrThrow()).toMatchObject({ name: 'Maria Exemplo' });
+  });
+
   it('rejects sign-in with a wrong password', async () => {
     await http().post('/api/auth/sign-up/email').send(user).expect(200);
 
