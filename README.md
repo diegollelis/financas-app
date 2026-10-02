@@ -1,20 +1,85 @@
 # Finanças App
 
-Aplicação web multiusuário para controle financeiro mensal: créditos, débitos, orçamento por percentual e saldo. Nasce de uma planilha Excel pessoal e é desenvolvida como **laboratório de estudo full stack**, com cada decisão de arquitetura registrada.
+[![CI](https://github.com/diegollelis/financas-app/actions/workflows/ci.yml/badge.svg)](https://github.com/diegollelis/financas-app/actions/workflows/ci.yml)
 
-> **Status:** em planejamento — documentação pronta, código a partir da [fase 1](docs/roadmap.md#fase-1--fundação-do-código).
+Aplicação web multiusuário para controle financeiro mensal: créditos, débitos, orçamento por percentual e saldo. Nasce de uma planilha Excel pessoal e é desenvolvida como **laboratório de estudo full stack**, com cada decisão de arquitetura registrada em [ADRs](docs/adr/README.md).
+
+> **Status:** fase 1 concluída (fundação do código). A API e o front estão no ar localmente e se comunicam; autenticação e espaços vêm na [fase 2](docs/roadmap.md#fase-2--autenticação-e-espaços).
 
 ## Stack
 
-| Camada       | Tecnologia                                                          |
-| ------------ | ------------------------------------------------------------------- |
-| Frontend     | React + Vite + TypeScript, TanStack Query, Tailwind CSS + shadcn/ui |
-| Backend      | NestJS (Node + TypeScript)                                          |
-| Banco        | PostgreSQL + Prisma                                                 |
-| Validação    | Zod compartilhado entre front e back                                |
-| Autenticação | Better Auth (e-mail/senha e Google) + Resend                        |
-| Hospedagem   | Cloudflare Pages · Render · Neon (planos gratuitos)                 |
-| Organização  | Monorepo com pnpm workspaces                                        |
+| Camada       | Tecnologia                                                                         |
+| ------------ | ---------------------------------------------------------------------------------- |
+| Frontend     | React 19 + Vite 8 + TypeScript, TanStack Query, React Router, Tailwind + shadcn/ui |
+| Backend      | NestJS 12 (Node + TypeScript)                                                      |
+| Banco        | PostgreSQL 18 + Prisma 7                                                           |
+| Validação    | Zod compartilhado entre front e back                                               |
+| Testes       | Vitest + Testing Library                                                           |
+| Autenticação | Better Auth (e-mail/senha e Google) + Resend _(fase 2)_                            |
+| Hospedagem   | Cloudflare Pages · Render · Neon (planos gratuitos) _(fase 4)_                     |
+| Organização  | Monorepo com pnpm workspaces                                                       |
+
+## Pré-requisitos
+
+- [Node.js](https://nodejs.org/) ≥ 24 (o projeto usa o 26; veja `.nvmrc`)
+- pnpm: `npm i -g pnpm` (o Node ≥ 25 não traz mais o corepack)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Git
+- [gitleaks](https://github.com/gitleaks/gitleaks): `winget install Gitleaks.Gitleaks` (usado pelo hook de pre-commit)
+
+## Rodando do zero
+
+```sh
+git clone https://github.com/diegollelis/financas-app.git
+cd financas-app
+pnpm install                                   # dependências, client do Prisma e git hooks
+
+cp apps/api/.env.example apps/api/.env         # variáveis da API
+cp apps/web/.env.example apps/web/.env.local   # variáveis do front
+
+pnpm db:up                                     # Postgres no Docker (porta 5434)
+pnpm --filter @financas/api db:deploy          # cria as tabelas
+
+pnpm --filter @financas/api dev                # API em http://localhost:3333 (Swagger em /docs)
+pnpm --filter @financas/web dev                # em outro terminal: front em http://localhost:5173
+```
+
+O front mostra o status da API e do banco. Se aparecer "Online", está tudo funcionando.
+
+## Comandos do dia a dia
+
+| Comando                       | O que faz                                      |
+| ----------------------------- | ---------------------------------------------- |
+| `pnpm test`                   | todos os testes                                |
+| `pnpm test --project api`     | testes de um pacote (`api`, `web` ou `shared`) |
+| `pnpm test <arquivo>`         | testes de um arquivo                           |
+| `pnpm test -t "<nome>"`       | testes cujo nome contém o texto                |
+| `pnpm test:watch`             | testes em modo watch                           |
+| `pnpm lint`                   | ESLint com verificação de tipos                |
+| `pnpm format`                 | formata tudo com o Prettier                    |
+| `pnpm typecheck`              | checa os tipos dos três pacotes                |
+| `pnpm build`                  | compila a API e o front                        |
+| `pnpm db:up` / `pnpm db:down` | liga / desliga o Postgres local                |
+| `pnpm secrets`                | procura credenciais em todo o histórico do git |
+
+Os comandos de cada pacote estão nos READMEs de [`apps/api`](apps/api/README.md), [`apps/web`](apps/web/README.md) e [`packages/shared`](packages/shared/README.md).
+
+## Estrutura
+
+```
+apps/web         frontend (SPA)
+apps/api         API REST + Prisma (schema e migrações)
+packages/shared  schemas Zod, tipos e utilitários compartilhados
+docs/            ADRs, domínio e roadmap
+```
+
+## Contribuindo
+
+A `main` é protegida: toda mudança entra por pull request, com o CI verde (lint, tipos, testes, build e varredura de segredos). As mensagens de commit seguem o [Conventional Commits](https://www.conventionalcommits.org/), em inglês.
+
+## Segurança e privacidade
+
+Este repositório é público. Ele nunca contém credenciais, a planilha original nem dados financeiros reais. Os dados de teste são fictícios. As proteções (hook de pre-commit, varredura no CI e `.gitignore`) estão descritas no [ADR 0019](docs/adr/0019-repositorio-publico.md).
 
 ## Documentação
 
@@ -22,18 +87,6 @@ Aplicação web multiusuário para controle financeiro mensal: créditos, débit
 - [Roadmap](docs/roadmap.md)
 - Domínio: [planilha de origem](docs/dominio/planilha-origem.md) · [modelo](docs/dominio/modelo.md) · [glossário](docs/dominio/glossario.md)
 
-## Pré-requisitos (a partir da fase 1)
+## Licença
 
-- Node.js ≥ 22
-- pnpm (`npm i -g pnpm`)
-- Docker Desktop
-- Git
-
-## Estrutura
-
-```
-apps/web         frontend (SPA)
-apps/api         API REST
-packages/shared  schemas Zod, tipos e utilitários compartilhados
-docs/            ADRs, domínio e roadmap
-```
+[MIT](LICENSE)

@@ -8,7 +8,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Stack, hospedagem e multi-tenancy decididos (ADRs 0001–0012)
 - [x] Modelo de domínio inicial e glossário
 
-## Fase 1 — Fundação do código
+## Fase 1 — Fundação do código ✅
 
 - [x] Instalar pnpm (`npm i -g pnpm`)
 - [x] Monorepo pnpm workspaces, TypeScript base, ESLint e Prettier
@@ -20,7 +20,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] GitHub Actions: workflow de CI (lint, typecheck, testes, build) e Dependabot
 - [x] Criar o repositório no GitHub, fazer o primeiro push e proteger a `main`
 - [x] Repositório público: proteção contra vazamento de segredos ([ADR 0019](adr/0019-repositorio-publico.md))
-- [ ] Comandos documentados no `CLAUDE.md` e no `README.md`
+- [x] Comandos documentados no `CLAUDE.md` e no `README.md`
 
 ## Fase 2 — Autenticação e espaços
 

@@ -27,4 +27,4 @@ O código precisa ser verificado a cada mudança, da mesma forma que localmente 
 - O CI não usa banco. Quando houver testes de integração com Postgres (isolamento entre espaços, fase 2), adicionar um _service container_ `postgres:18` ao job.
 - `--frozen-lockfile` faz o CI falhar se o `pnpm-lock.yaml` não foi commitado junto com uma mudança de dependência.
 - Se o tempo de CI crescer, dividir em jobs paralelos ou adotar cache de build (Turborepo, [0002](0002-monorepo-pnpm-workspaces.md)).
-- Proteção do branch `main` (exigir CI verde para merge) fica para quando o repositório existir no GitHub.
+- A `main` é protegida por um _ruleset_ do GitHub: sem push direto nem force push, mudanças só por pull request, e os dois jobs (`Lint, typecheck, testes e build` e `Varredura de segredos`) são _status checks_ obrigatórios, com o branch atualizado em relação à `main`. Renomear um job exige atualizar o ruleset, senão os PRs ficam esperando um check que nunca chega.
