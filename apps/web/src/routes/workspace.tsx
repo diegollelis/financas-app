@@ -184,7 +184,13 @@ export function WorkspacePage() {
             ))}
           {workspace.isSuccess && (
             <>
-              <nav aria-label="Cadastros do espaço">
+              <nav aria-label="Cadastros do espaço" className="flex gap-4">
+                <Link
+                  to={`/espacos/${workspaceId}/lancamentos`}
+                  className="font-medium hover:underline"
+                >
+                  Lançamentos →
+                </Link>
                 <Link
                   to={`/espacos/${workspaceId}/categorias`}
                   className="font-medium hover:underline"

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { amountCentsSchema, periodSchema } from './money-and-dates.ts';
-import { createTransactionInputSchema, updateTransactionInputSchema } from './transaction.ts';
+import {
+  createTransactionInputSchema,
+  transactionStatus,
+  updateTransactionInputSchema,
+} from './transaction.ts';
 
 // Fictitious data (ADR 0019).
 const valid = {
@@ -70,5 +74,24 @@ describe('updateTransactionInputSchema', () => {
     expect(updateTransactionInputSchema.safeParse({}).error?.issues[0]?.message).toBe(
       'Nada para alterar.',
     );
+  });
+});
+
+describe('transactionStatus', () => {
+  const today = '2026-10-15';
+
+  it('is SETTLED once there is a settlement date, even after the due date', () => {
+    expect(transactionStatus({ dueDate: '2026-10-01', settledAt: '2026-10-02' }, today)).toBe(
+      'SETTLED',
+    );
+  });
+
+  it('is OVERDUE only when pending after the due date', () => {
+    expect(transactionStatus({ dueDate: '2026-10-14', settledAt: null }, today)).toBe('OVERDUE');
+    expect(transactionStatus({ dueDate: '2026-10-15', settledAt: null }, today)).toBe('PENDING');
+  });
+
+  it('without a due date, a pending transaction is never overdue', () => {
+    expect(transactionStatus({ dueDate: null, settledAt: null }, today)).toBe('PENDING');
   });
 });

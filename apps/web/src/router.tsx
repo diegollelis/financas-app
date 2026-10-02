@@ -8,6 +8,7 @@ import { InvitationPage } from '@/routes/invitation';
 import { ResetPasswordPage } from '@/routes/reset-password';
 import { SignInPage } from '@/routes/sign-in';
 import { SignUpPage } from '@/routes/sign-up';
+import { TransactionsPage } from '@/routes/transactions';
 import { WorkspacePage } from '@/routes/workspace';
 
 // Paths are UI text, so they are pt-BR (ADR 0021); component names stay in English.
@@ -26,6 +27,8 @@ export const routes: RouteObject[] = [
       { path: '/', element: <HomePage /> },
       { path: '/espacos/:workspaceId', element: <WorkspacePage /> },
       { path: '/espacos/:workspaceId/categorias', element: <CategoriesPage /> },
+      // The competência travels as ?competencia=YYYY-MM (default: this month).
+      { path: '/espacos/:workspaceId/lancamentos', element: <TransactionsPage /> },
     ],
   },
   // Outside the guards: the e-mail link works whether or not someone is signed in here.

@@ -44,9 +44,9 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Categorias (com categorias padrão no novo espaço), primeira tabela com RLS
   - [x] API: tabela `categories` com RLS, categorias padrão em todo espaço novo, rotas `/workspaces/:workspaceId/categories`
   - [x] Tela de categorias no front (`/espacos/:workspaceId/categorias`)
-- [ ] Lançamentos por competência: criar, editar, excluir, efetivar em um clique
+- [x] Lançamentos por competência: criar, editar, excluir, efetivar em um clique
   - [x] API: tabela `transactions` com RLS e regras no banco ([ADR 0029](adr/0029-lancamentos-e-integridade-no-banco.md)), rotas `/workspaces/:workspaceId/transactions?period=`
-  - [ ] Tela de lançamentos da competência
+  - [x] Tela de lançamentos da competência (`/espacos/:workspaceId/lancamentos?competencia=AAAA-MM`)
 - [ ] Configuração de orçamento por competência
 - [ ] Painel do mês: indicadores da planilha, status por cor, gráfico
 - [ ] Navegação entre competências
