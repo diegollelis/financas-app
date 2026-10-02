@@ -1,7 +1,6 @@
 import {
   formatCents,
   formatIsoDate,
-  formatPeriod,
   hasRole,
   todayIso,
   transactionStatus,
@@ -14,8 +13,9 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCategories } from '@/features/categories/use-categories';
+import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import {
   TransactionForm,
@@ -255,7 +255,7 @@ export function TransactionsPage() {
           <CardTitle>
             <h1>Lançamentos</h1>
           </CardTitle>
-          <CardDescription>Competência: {formatPeriod(period)}</CardDescription>
+          <PeriodNav period={period} />
         </CardHeader>
         <CardContent className="grid gap-6 text-sm">
           {!ready && !error && <p className="text-muted-foreground">Carregando…</p>}
@@ -305,6 +305,8 @@ export function TransactionsPage() {
               })}
               {hasRole(workspace.data.role, 'EDITOR') && (
                 <NewTransaction
+                  // Another competência starts with an empty form and no error left over.
+                  key={period}
                   workspaceId={workspaceId}
                   period={period}
                   categories={categories.data}

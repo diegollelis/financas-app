@@ -9,10 +9,11 @@ import {
   type Budget,
 } from '@financas/shared';
 import { Link, useParams } from 'react-router';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BudgetForm } from '@/features/budget/budget-form';
 import { shareLabels } from '@/features/budget/share-labels';
 import { useBudget, useSaveBudget } from '@/features/budget/use-budget';
+import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import { useWorkspace } from '@/features/workspaces/use-workspace';
 import { ApiError } from '@/lib/api';
@@ -75,12 +76,25 @@ function BudgetSummary({ budget }: { budget: Budget }) {
   );
 }
 
+function BudgetEditor({ workspaceId, budget }: { workspaceId: string; budget: Budget }) {
+  const save = useSaveBudget(workspaceId, budget.period);
+  return (
+    <BudgetForm
+      initial={budget}
+      submitLabel={save.isPending ? 'Salvando…' : `Salvar para ${formatPeriod(budget.period)}`}
+      pending={save.isPending}
+      error={save.error}
+      saved={save.isSuccess}
+      onSubmit={(input) => save.mutateAsync(input)}
+    />
+  );
+}
+
 export function BudgetPage() {
   const { workspaceId = '' } = useParams();
   const period = usePeriod();
   const workspace = useWorkspace(workspaceId);
   const budget = useBudget(workspaceId, period);
-  const save = useSaveBudget(workspaceId, period);
   const error = workspace.error ?? budget.error;
   const ready = workspace.isSuccess && budget.isSuccess;
   const canEdit = ready && hasRole(workspace.data.role, 'EDITOR');
@@ -98,7 +112,7 @@ export function BudgetPage() {
           <CardTitle>
             <h1>Orçamento</h1>
           </CardTitle>
-          <CardDescription>Competência: {formatPeriod(period)}</CardDescription>
+          <PeriodNav period={period} />
         </CardHeader>
         <CardContent className="grid gap-6 text-sm">
           {!ready && !error && <p className="text-muted-foreground">Carregando…</p>}
@@ -115,15 +129,12 @@ export function BudgetPage() {
             <>
               <SourceNotice budget={budget.data} canEdit={canEdit} />
               {canEdit ? (
-                <BudgetForm
-                  // Another competência starts a fresh form with its own values.
+                <BudgetEditor
+                  // Another competência starts fresh: its own values, no "saved" or error left
+                  // over from the month seen before.
                   key={period}
-                  initial={budget.data}
-                  submitLabel={save.isPending ? 'Salvando…' : `Salvar para ${formatPeriod(period)}`}
-                  pending={save.isPending}
-                  error={save.error}
-                  saved={save.isSuccess}
-                  onSubmit={(input) => save.mutateAsync(input)}
+                  workspaceId={workspaceId}
+                  budget={budget.data}
                 />
               ) : (
                 <BudgetSummary budget={budget.data} />

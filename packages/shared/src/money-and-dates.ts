@@ -101,6 +101,17 @@ export function formatIsoDate(isoDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/**
+ * The competência `months` away: shiftPeriod('2026-01', -1) → '2025-12'. Integer math on the
+ * month count, no Date, so no time zone can move it.
+ */
+export function shiftPeriod(period: string, months: number): string {
+  const [year, month] = period.split('-').map(Number);
+  const index = (year ?? 0) * 12 + (month ?? 1) - 1 + months;
+  const shiftedMonth = (index % 12) + 1;
+  return `${Math.floor(index / 12)}-${String(shiftedMonth).padStart(2, '0')}`;
+}
+
 const monthNames = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' });
 
 /** "2026-10" → "outubro de 2026". */

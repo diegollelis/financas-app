@@ -2,8 +2,9 @@ import { formatBasisPoints, formatCents, formatPeriod, type Summary } from '@fin
 import { TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { shareLabels } from '@/features/budget/share-labels';
+import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import { CreditsBar } from '@/features/summary/credits-bar';
 import { ExpensesMeter } from '@/features/summary/expenses-meter';
@@ -197,7 +198,7 @@ export function DashboardPage() {
           <CardTitle>
             <h1>Painel</h1>
           </CardTitle>
-          <CardDescription>Competência: {formatPeriod(period)}</CardDescription>
+          <PeriodNav period={period} />
         </CardHeader>
         <CardContent className="grid gap-6 text-sm">
           {!ready && !error && <p className="text-muted-foreground">Carregando…</p>}

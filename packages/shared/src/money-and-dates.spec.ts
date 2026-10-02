@@ -8,6 +8,7 @@ import {
   parsePercent,
   parseReais,
   reaisInputSchema,
+  shiftPeriod,
   todayIso,
 } from './money-and-dates.ts';
 
@@ -83,6 +84,19 @@ describe('reaisInputSchema', () => {
     expect(reaisInputSchema.safeParse('0,00').error?.issues[0]?.message).toBe(
       'O valor precisa ser maior que zero.',
     );
+  });
+});
+
+describe('shiftPeriod', () => {
+  it.each([
+    ['2026-10', 1, '2026-11'],
+    ['2026-10', -1, '2026-09'],
+    ['2026-12', 1, '2027-01'],
+    ['2026-01', -1, '2025-12'],
+    ['2026-10', -22, '2024-12'],
+    ['2026-10', 0, '2026-10'],
+  ])('moves %s by %i months to %s', (period, months, shifted) => {
+    expect(shiftPeriod(period, months)).toBe(shifted);
   });
 });
 

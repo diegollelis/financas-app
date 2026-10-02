@@ -139,6 +139,35 @@ describe('BudgetPage', () => {
     );
   });
 
+  it('another competência starts fresh, without the "saved" of the previous one', async () => {
+    mockBudget({
+      [`PUT ${base}/2026-10`]: { body: { ...inherited, source: 'SAVED', inheritedFrom: null } },
+      [`GET ${base}/2026-11`]: {
+        body: {
+          ...inherited,
+          period: '2026-11',
+          netIncomeCents: 520_000,
+          inheritedFrom: '2026-10',
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/orcamento`);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Salvar para outubro de 2026' }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('Orçamento salvo.');
+    await userEvent.click(
+      screen.getByRole('link', { name: 'Próxima competência: novembro de 2026' }),
+    );
+
+    expect(await screen.findByLabelText('Renda líquida (R$)')).toHaveValue('5.200,00');
+    expect(
+      screen.getByRole('button', { name: 'Salvar para novembro de 2026' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('is read-only for a VIEWER', async () => {
     mockBudget({ [`GET /workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
 
