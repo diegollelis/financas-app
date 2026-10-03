@@ -36,3 +36,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0030](0030-orcamento-por-competencia-com-heranca.md) | Orçamento por competência, herdado da última competência salva                    | Aceita |
 | [0031](0031-painel-do-mes-previsto-e-efetivado.md)    | Painel do mês: indicadores calculados na API, nas visões prevista e efetivada     | Aceita |
 | [0032](0032-graficos-sem-biblioteca.md)               | Gráficos sem biblioteca, com paleta validada                                      | Aceita |
+| [0033](0033-topologia-e-limites-do-deploy.md)         | Topologia do deploy (proxy no Cloudflare Pages) e limites dos planos gratuitos    | Aceita |

@@ -48,6 +48,6 @@ O [ADR 0007](0007-autenticacao-better-auth.md) escolheu o Better Auth. Para colo
 
 - `pnpm test` agora precisa do Postgres local ligado (`pnpm db:up`).
 - O teste de `/health` continua com o Prisma falso, porque o que ele verifica é o caso de banco fora do ar.
-- **Pendência para a fase 4:** em produção, front (`*.pages.dev`) e API (`*.onrender.com`) ficam em _sites_ diferentes, e cookies `SameSite=Lax` não seriam enviados. Será preciso usar um domínio próprio (`app.` e `api.` do mesmo site) ou cookies `SameSite=None; Secure`. Revisar este ADR nesse momento.
+- **Pendência para a fase 4:** em produção, front (`*.pages.dev`) e API (`*.onrender.com`) ficam em _sites_ diferentes, e cookies `SameSite=Lax` não seriam enviados. Será preciso usar um domínio próprio (`app.` e `api.` do mesmo site) ou cookies `SameSite=None; Secure`. Revisar este ADR nesse momento. **Resolvido no [ADR 0033](0033-topologia-e-limites-do-deploy.md):** proxy `/api/*` numa Pages Function, front e API no mesmo site.
 - O rate limit embutido do Better Auth só fica ativo com `NODE_ENV=production` e guarda os contadores em memória. A configuração própria é o próximo item do roadmap.
 - `sessions` guarda IP e _user agent_, que são dados pessoais ([ADR 0012](0012-privacidade-lgpd.md)). Eles são apagados junto com o usuário (`ON DELETE CASCADE`).

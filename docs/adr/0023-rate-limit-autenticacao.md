@@ -40,7 +40,7 @@ O Better Auth tem um limitador embutido. Por padrão, ele só funciona em produ�
 
 ## Consequências
 
-- **Pendência obrigatória da fase 4 (deploy):** o limitador só separa os clientes se conseguir o IP real. Sem um `X-Forwarded-For` confiável, ele cai num **contador único compartilhado** (chave `no-trusted-ip`). Foi o que aconteceu no teste local, sem proxy. Em produção, isso permitiria que um atacante bloqueasse o login de todo mundo. Também não basta aceitar qualquer `X-Forwarded-For`: o cliente pode forjar o cabeçalho. No deploy, é preciso:
+- **Pendência obrigatória da fase 4 (deploy):** o limitador só separa os clientes se conseguir o IP real. Sem um `X-Forwarded-For` confiável, ele cai num **contador único compartilhado** (chave `no-trusted-ip`). Foi o que aconteceu no teste local, sem proxy. Em produção, isso permitiria que um atacante bloqueasse o login de todo mundo. Também não basta aceitar qualquer `X-Forwarded-For`: o cliente pode forjar o cabeçalho. No deploy, é preciso (o [ADR 0033](0033-topologia-e-limites-do-deploy.md) define a origem do IP: `CF-Connecting-IP`, repassado pela Pages Function junto com um segredo):
   - descobrir que cabeçalho o proxy do Render preenche com o IP do cliente;
   - configurar `advanced.ipAddress` (`ipAddressHeaders` ou `trustedProxies`);
   - conferir na tabela `rate_limits` que as chaves têm o IP real.
