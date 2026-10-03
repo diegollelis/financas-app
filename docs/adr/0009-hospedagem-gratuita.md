@@ -30,3 +30,4 @@ Projeto de estudo, sem receita, que será aberto ao público. Custo zero é requ
 - Como a API roda em Docker, migrar para uma VM (Oracle) ou plano pago não exige reescrita.
 - O backup do plano gratuito do Neon é limitado: dumps periódicos via GitHub Actions ([0012](0012-privacidade-lgpd.md)).
 - Ambientes: `local` (Docker) e `produção`; um ambiente de homologação pode usar um branch do Neon.
+- Limites conferidos em 2026-10-03 e topologia de produção (front e API no mesmo site via proxy): [ADR 0033](0033-topologia-e-limites-do-deploy.md).

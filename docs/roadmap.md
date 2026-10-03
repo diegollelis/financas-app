@@ -57,14 +57,14 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 ## Fase 4 — Deploy
 
-- [ ] Conferir limites atuais dos planos gratuitos
-- [ ] Neon (produção, PostgreSQL 18+: as migrações usam `uuidv7()`) + migrações no deploy
+- [x] Conferir limites atuais dos planos gratuitos e definir a topologia ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
+- [ ] Proxy `/api/*` numa Pages Function: front e API no mesmo site, cookie `Lax` ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
+- [ ] IP real do cliente para o rate limit: `CF-Connecting-IP` repassado pela Function com um segredo ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
+- [ ] Neon (produção, PostgreSQL 18+: as migrações usam `uuidv7()`) + migrações ao iniciar o container (o Render free não tem _pre-deploy_)
 - [ ] API no Render (Docker) e front no Cloudflare Pages
-- [ ] IP real do cliente atrás do proxy do Render para o rate limit ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
 - [ ] Google OAuth de produção: URI de retorno, origens e tela de consentimento publicada ([ADR 0026](adr/0026-login-com-google.md))
-- [ ] Cookies entre front e API em sites diferentes ([ADR 0020](adr/0020-integracao-better-auth-nestjs.md))
 - [ ] Sentry no front e na API (sem dados pessoais)
-- [ ] Backup periódico do banco via GitHub Actions + teste de restauração
+- [ ] Backup periódico do banco via GitHub Actions (dump criptografado: artefatos são públicos aqui) + teste de restauração
 
 ## Fase 5 — Evolução e abertura ao público
 
