@@ -10,7 +10,7 @@ const budgetKey = (workspaceId: string) => [...workspacesQueryKey, workspaceId, 
 export function useBudget(workspaceId: string, period: string) {
   return useQuery({
     queryKey: [...budgetKey(workspaceId), period],
-    queryFn: () => apiGet(`/workspaces/${workspaceId}/budget/${period}`, budgetSchema),
+    queryFn: () => apiGet(`/api/workspaces/${workspaceId}/budget/${period}`, budgetSchema),
   });
 }
 
@@ -18,7 +18,7 @@ export function useSaveBudget(workspaceId: string, period: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: BudgetInput) =>
-      apiPut(`/workspaces/${workspaceId}/budget/${period}`, input, budgetSchema),
+      apiPut(`/api/workspaces/${workspaceId}/budget/${period}`, input, budgetSchema),
     // Every competência, not only this one: the later ones that were never saved inherit
     // from it (ADR 0030), so what was loaded for them is now stale too.
     // The dashboards use the budget too, and follow the same inheritance.

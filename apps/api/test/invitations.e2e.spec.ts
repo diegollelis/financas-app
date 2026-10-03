@@ -19,13 +19,13 @@ const ana = { name: 'Ana Exemplo', email: 'ana@example.com', password: 'senha-de
 const invitationRoutes: WorkspaceRoute[] = [
   {
     method: 'post',
-    path: (id) => `/workspaces/${id}/invitations`,
+    path: (id) => `/api/workspaces/${id}/invitations`,
     body: { email: 'de-fora@example.com', role: 'EDITOR' },
   },
-  { method: 'get', path: (id) => `/workspaces/${id}/invitations` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/invitations` },
   {
     method: 'delete',
-    path: (id) => `/workspaces/${id}/invitations/01920000-0000-7000-8000-000000000000`,
+    path: (id) => `/api/workspaces/${id}/invitations/01920000-0000-7000-8000-000000000000`,
   },
 ];
 
@@ -48,7 +48,7 @@ describe('invitations', () => {
   /** Maria (OWNER) with a shared workspace "Casa". */
   async function mariaWithHouse() {
     const owner = await t.signUp(maria);
-    const created = await owner.browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+    const created = await owner.browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
     return { owner, workspaceId: workspaceSchema.parse(created.body).id };
   }
 
@@ -60,7 +60,7 @@ describe('invitations', () => {
   ) {
     t.mailer.sent.length = 0;
     const response = await browser
-      .post(`/workspaces/${workspaceId}/invitations`)
+      .post(`/api/workspaces/${workspaceId}/invitations`)
       .send({ email, role })
       .expect(201);
     const token = t.mailer.lastLinkTo(email.toLowerCase()).pathname.split('/').at(-1) ?? '';
@@ -85,13 +85,15 @@ describe('invitations', () => {
       const { owner, workspaceId } = await mariaWithHouse();
       const { invitation, token } = await invite(owner.browser, workspaceId, joao.email, 'VIEWER');
 
-      const list = await owner.browser.get(`/workspaces/${workspaceId}/invitations`).expect(200);
+      const list = await owner.browser
+        .get(`/api/workspaces/${workspaceId}/invitations`)
+        .expect(200);
       expect(invitationListResponseSchema.parse(list.body)).toEqual([invitation]);
 
       await owner.browser
-        .delete(`/workspaces/${workspaceId}/invitations/${invitation.id}`)
+        .delete(`/api/workspaces/${workspaceId}/invitations/${invitation.id}`)
         .expect(204);
-      await t.http().get(`/invitations/${token}`).expect(404);
+      await t.http().get(`/api/invitations/${token}`).expect(404);
     });
 
     it('replaces the previous invitation to the same e-mail', async () => {
@@ -100,7 +102,7 @@ describe('invitations', () => {
 
       await invite(owner.browser, workspaceId, joao.email);
 
-      await t.http().get(`/invitations/${first.token}`).expect(404);
+      await t.http().get(`/api/invitations/${first.token}`).expect(404);
       expect(await t.prisma.invitation.count()).toBe(1);
     });
 
@@ -108,15 +110,15 @@ describe('invitations', () => {
       const { owner, workspaceId } = await mariaWithHouse();
 
       const personal = await owner.browser
-        .post(`/workspaces/${owner.personalWorkspaceId}/invitations`)
+        .post(`/api/workspaces/${owner.personalWorkspaceId}/invitations`)
         .send({ email: joao.email, role: 'EDITOR' })
         .expect(409);
       const member = await owner.browser
-        .post(`/workspaces/${workspaceId}/invitations`)
+        .post(`/api/workspaces/${workspaceId}/invitations`)
         .send({ email: maria.email, role: 'EDITOR' })
         .expect(409);
       await owner.browser
-        .post(`/workspaces/${workspaceId}/invitations`)
+        .post(`/api/workspaces/${workspaceId}/invitations`)
         .send({ email: joao.email, role: 'OWNER' })
         .expect(400);
 
@@ -137,7 +139,7 @@ describe('invitations', () => {
       });
 
       const response = await owner.browser
-        .post(`/workspaces/${workspaceId}/invitations`)
+        .post(`/api/workspaces/${workspaceId}/invitations`)
         .send({ email: joao.email, role: 'EDITOR' })
         .expect(409);
 
@@ -159,9 +161,9 @@ describe('invitations', () => {
         data: { workspaceId, userId: editor.userId, role: 'EDITOR' },
       });
 
-      await editor.browser.get(`/workspaces/${workspaceId}/invitations`).expect(403);
+      await editor.browser.get(`/api/workspaces/${workspaceId}/invitations`).expect(403);
       await editor.browser
-        .post(`/workspaces/${workspaceId}/invitations`)
+        .post(`/api/workspaces/${workspaceId}/invitations`)
         .send({ email: ana.email, role: 'VIEWER' })
         .expect(403);
     });
@@ -170,14 +172,17 @@ describe('invitations', () => {
       const { owner, workspaceId } = await mariaWithHouse();
       const { invitation, token } = await invite(owner.browser, workspaceId, joao.email);
       const other = await t.signUp(ana);
-      const created = await other.browser.post('/workspaces').send({ name: 'Da Ana' }).expect(201);
+      const created = await other.browser
+        .post('/api/workspaces')
+        .send({ name: 'Da Ana' })
+        .expect(201);
       const anasWorkspaceId = workspaceSchema.parse(created.body).id;
 
       await other.browser
-        .delete(`/workspaces/${anasWorkspaceId}/invitations/${invitation.id}`)
+        .delete(`/api/workspaces/${anasWorkspaceId}/invitations/${invitation.id}`)
         .expect(404);
 
-      await t.http().get(`/invitations/${token}`).expect(200);
+      await t.http().get(`/api/invitations/${token}`).expect(200);
     });
   });
 
@@ -186,7 +191,7 @@ describe('invitations', () => {
       const { owner, workspaceId } = await mariaWithHouse();
       const { token } = await invite(owner.browser, workspaceId, joao.email, 'VIEWER');
 
-      const preview = await t.http().get(`/invitations/${token}`).expect(200);
+      const preview = await t.http().get(`/api/invitations/${token}`).expect(200);
 
       expect(invitationPreviewSchema.parse(preview.body)).toMatchObject({
         workspaceName: 'Casa',
@@ -201,20 +206,22 @@ describe('invitations', () => {
       const { token } = await invite(owner.browser, workspaceId, joao.email, 'VIEWER');
       const invited = await t.signUp(joao);
 
-      const accepted = await invited.browser.post(`/invitations/${token}/accept`).expect(200);
+      const accepted = await invited.browser.post(`/api/invitations/${token}/accept`).expect(200);
 
       expect(workspaceSchema.parse(accepted.body)).toMatchObject({
         id: workspaceId,
         name: 'Casa',
         role: 'VIEWER',
       });
-      await invited.browser.get(`/workspaces/${workspaceId}`).expect(200);
+      await invited.browser.get(`/api/workspaces/${workspaceId}`).expect(200);
       expect(
         await t.prisma.user.findUniqueOrThrow({ where: { id: invited.userId } }),
       ).toMatchObject({ emailVerified: true });
       // Used once: the link is gone and no longer listed.
-      await t.http().get(`/invitations/${token}`).expect(404);
-      const list = await owner.browser.get(`/workspaces/${workspaceId}/invitations`).expect(200);
+      await t.http().get(`/api/invitations/${token}`).expect(404);
+      const list = await owner.browser
+        .get(`/api/workspaces/${workspaceId}/invitations`)
+        .expect(200);
       expect(list.body).toEqual([]);
     });
 
@@ -222,7 +229,7 @@ describe('invitations', () => {
       const { owner, workspaceId } = await mariaWithHouse();
       const { token } = await invite(owner.browser, workspaceId, joao.email);
 
-      await t.http().post(`/invitations/${token}/accept`).expect(401);
+      await t.http().post(`/api/invitations/${token}/accept`).expect(401);
     });
 
     it('refuses someone signed in with another e-mail (a forwarded link)', async () => {
@@ -230,23 +237,25 @@ describe('invitations', () => {
       const { token } = await invite(owner.browser, workspaceId, joao.email);
       const someoneElse = await t.signUp(ana);
 
-      const response = await someoneElse.browser.post(`/invitations/${token}/accept`).expect(403);
+      const response = await someoneElse.browser
+        .post(`/api/invitations/${token}/accept`)
+        .expect(403);
 
       expect(response.body).toMatchObject({ code: 'EMAIL_MISMATCH' });
-      await someoneElse.browser.get(`/workspaces/${workspaceId}`).expect(404);
+      await someoneElse.browser.get(`/api/workspaces/${workspaceId}`).expect(404);
     });
 
     it('refuses expired links and accepts each link only once', async () => {
       const { owner, workspaceId } = await mariaWithHouse();
       const { token } = await invite(owner.browser, workspaceId, joao.email);
       const invited = await t.signUp(joao);
-      await invited.browser.post(`/invitations/${token}/accept`).expect(200);
-      await invited.browser.post(`/invitations/${token}/accept`).expect(404);
+      await invited.browser.post(`/api/invitations/${token}/accept`).expect(200);
+      await invited.browser.post(`/api/invitations/${token}/accept`).expect(404);
 
       const expired = await invite(owner.browser, workspaceId, ana.email);
       await t.prisma.invitation.updateMany({ data: { expiresAt: new Date(Date.now() - 1000) } });
       const late = await t.signUp(ana);
-      await late.browser.post(`/invitations/${expired.token}/accept`).expect(404);
+      await late.browser.post(`/api/invitations/${expired.token}/accept`).expect(404);
     });
 
     it('never downgrades someone who is already a member', async () => {
@@ -257,7 +266,7 @@ describe('invitations', () => {
         data: { workspaceId, userId: invited.userId, role: 'EDITOR' },
       });
 
-      const accepted = await invited.browser.post(`/invitations/${token}/accept`).expect(200);
+      const accepted = await invited.browser.post(`/api/invitations/${token}/accept`).expect(200);
 
       expect(accepted.body).toMatchObject({ role: 'EDITOR' });
     });

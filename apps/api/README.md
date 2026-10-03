@@ -12,7 +12,7 @@ pnpm db:app-role                         # uma vez: habilita o login do papel da
 pnpm --filter @financas/api dev          # modo watch em http://localhost:3333
 ```
 
-- `GET /health`: verificação de saúde (`database: up | down`)
+- `GET /api/health`: verificação de saúde (`database: up | down`)
 - `/docs`: Swagger (só fora de produção)
 
 ## Scripts

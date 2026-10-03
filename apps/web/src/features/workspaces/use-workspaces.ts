@@ -8,6 +8,6 @@ export const workspacesQueryKey = ['workspaces'] as const;
 export function useWorkspaces() {
   return useQuery({
     queryKey: workspacesQueryKey,
-    queryFn: () => apiGet('/workspaces', workspaceListResponseSchema),
+    queryFn: () => apiGet('/api/workspaces', workspaceListResponseSchema),
   });
 }

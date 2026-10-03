@@ -9,7 +9,10 @@ export function useInvitationPreview(token: string) {
     queryKey: ['invitations', token],
     queryFn: async () => {
       try {
-        return await apiGet(`/invitations/${encodeURIComponent(token)}`, invitationPreviewSchema);
+        return await apiGet(
+          `/api/invitations/${encodeURIComponent(token)}`,
+          invitationPreviewSchema,
+        );
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) return null;
         throw error;
@@ -22,7 +25,7 @@ export function useAcceptInvitation(token: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () =>
-      apiPost(`/invitations/${encodeURIComponent(token)}/accept`, {}, workspaceSchema),
+      apiPost(`/api/invitations/${encodeURIComponent(token)}/accept`, {}, workspaceSchema),
     // The new workspace appears in the list; the e-mail is now verified too.
     onSuccess: () =>
       Promise.all([

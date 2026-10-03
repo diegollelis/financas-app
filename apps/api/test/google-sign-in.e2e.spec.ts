@@ -68,9 +68,9 @@ describe('Google sign-in', () => {
     const { browser, location } = await signInWithGoogle(mariaOnGoogle);
 
     expect(location).toBe(`${testEnv.WEB_ORIGIN}/`);
-    const me = await browser.get('/me').expect(200);
+    const me = await browser.get('/api/me').expect(200);
     expect(me.body).toMatchObject({ email: maria.email, emailVerified: true });
-    const workspaces = await browser.get('/workspaces').expect(200);
+    const workspaces = await browser.get('/api/workspaces').expect(200);
     expect(workspaces.body).toMatchObject([{ name: 'Pessoal', isPersonal: true, role: 'OWNER' }]);
   });
 
@@ -95,9 +95,9 @@ describe('Google sign-in', () => {
     const { browser } = await signInWithGoogle(mariaOnGoogle);
 
     // Maria gets in through Google...
-    await browser.get('/me').expect(200);
+    await browser.get('/api/me').expect(200);
     // ...and the intruder is out: the old session is gone and the password no longer works.
-    await intruder.browser.get('/me').expect(401);
+    await intruder.browser.get('/api/me').expect(401);
     await t
       .http()
       .post('/api/auth/sign-in/email')

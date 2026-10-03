@@ -7,7 +7,7 @@ import { renderApp } from '@/test/render';
 // Fictitious data (ADR 0019).
 const houseId = '01920000-0000-7000-8000-000000000002';
 const house = { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' };
-const base = `/workspaces/${houseId}/budget`;
+const base = `/api/workspaces/${houseId}/budget`;
 
 const inherited = {
   period: '2026-10',
@@ -23,8 +23,8 @@ const inherited = {
 
 function mockBudget(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
-    'GET /me': { body: fakeUser },
-    [`GET /workspaces/${houseId}`]: { body: house },
+    'GET /api/me': { body: fakeUser },
+    [`GET /api/workspaces/${houseId}`]: { body: house },
     [`GET ${base}/2026-10`]: { body: inherited },
     ...overrides,
   });
@@ -169,7 +169,7 @@ describe('BudgetPage', () => {
   });
 
   it('is read-only for a VIEWER', async () => {
-    mockBudget({ [`GET /workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
+    mockBudget({ [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
 
     renderApp(`/espacos/${houseId}/orcamento`);
 
@@ -180,7 +180,7 @@ describe('BudgetPage', () => {
   });
 
   it('is reached from the workspace page', async () => {
-    mockBudget({ [`GET /workspaces/${houseId}/members`]: { body: [] } });
+    mockBudget({ [`GET /api/workspaces/${houseId}/members`]: { body: [] } });
     const { router } = renderApp(`/espacos/${houseId}`);
 
     await userEvent.click(await screen.findByRole('link', { name: 'Orçamento →' }));

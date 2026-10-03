@@ -10,6 +10,7 @@ import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import type { z } from 'zod';
+import { CLIENT_IP_HEADER } from '../common/client-ip.js';
 import type { Env } from '../config/env.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Mailer, MailMessage } from '../mail/mailer.js';
@@ -197,6 +198,8 @@ export function createAuth(
       }),
     },
     advanced: {
+      // Set only by our proxy; trustProxiedClientIp drops it from anyone else (ADR 0033).
+      ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
       // false: Better Auth leaves the id to Prisma, which generates UUIDv7 (ADR 0017).
       database: { generateId: false },
     },

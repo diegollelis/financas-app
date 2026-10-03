@@ -40,9 +40,9 @@ const october = [
 
 function mockDashboard(summary: object, period = '2026-10') {
   return mockApi({
-    'GET /me': { body: fakeUser },
-    [`GET /workspaces/${houseId}`]: { body: house },
-    [`GET /workspaces/${houseId}/summary/${period}`]: { body: summary },
+    'GET /api/me': { body: fakeUser },
+    [`GET /api/workspaces/${houseId}`]: { body: house },
+    [`GET /api/workspaces/${houseId}/summary/${period}`]: { body: summary },
   });
 }
 
@@ -128,10 +128,10 @@ describe('DashboardPage', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-15T12:00:00-03:00'));
     mockApi({
-      'GET /me': { body: fakeUser },
-      [`GET /workspaces/${houseId}`]: { body: house },
-      [`GET /workspaces/${houseId}/members`]: { body: [] },
-      [`GET /workspaces/${houseId}/summary/2026-10`]: {
+      'GET /api/me': { body: fakeUser },
+      [`GET /api/workspaces/${houseId}`]: { body: house },
+      [`GET /api/workspaces/${houseId}/members`]: { body: [] },
+      [`GET /api/workspaces/${houseId}/summary/2026-10`]: {
         body: summarizePeriod(october, budget, today),
       },
     });
@@ -155,11 +155,11 @@ describe('DashboardPage', () => {
       body: summarizePeriod([], { ...budget, period }, today),
     });
     const fetchMock = mockApi({
-      'GET /me': { body: fakeUser },
-      [`GET /workspaces/${houseId}`]: { body: house },
-      [`GET /workspaces/${houseId}/summary/2026-12`]: summaryOf('2026-12'),
-      [`GET /workspaces/${houseId}/summary/2027-01`]: summaryOf('2027-01'),
-      [`GET /workspaces/${houseId}/summary/2026-10`]: summaryOf('2026-10'),
+      'GET /api/me': { body: fakeUser },
+      [`GET /api/workspaces/${houseId}`]: { body: house },
+      [`GET /api/workspaces/${houseId}/summary/2026-12`]: summaryOf('2026-12'),
+      [`GET /api/workspaces/${houseId}/summary/2027-01`]: summaryOf('2027-01'),
+      [`GET /api/workspaces/${houseId}/summary/2026-10`]: summaryOf('2026-10'),
     });
     const { router } = renderApp(`/espacos/${houseId}/painel?competencia=2026-12`);
 
@@ -180,7 +180,7 @@ describe('DashboardPage', () => {
       expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);
       await vi.waitFor(() =>
         expect(fetchMock).toHaveBeenCalledWith(
-          new URL(`/workspaces/${houseId}/summary/2027-01`, 'http://api.test'),
+          new URL(`/api/workspaces/${houseId}/summary/2027-01`, 'http://api.test'),
           expect.anything(),
         ),
       );

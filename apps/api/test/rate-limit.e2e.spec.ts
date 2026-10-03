@@ -1,6 +1,8 @@
+import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp } from './app.js';
 import { resetDatabase } from './db.js';
+import { testEnv } from './test-env.js';
 
 // Rate limit of the auth routes (ADR 0023): per client IP and route, counters in the database.
 // All data here is fictitious (ADR 0019).
@@ -76,5 +78,35 @@ describe('rate limit', () => {
 
     for (let n = 1; n <= 3; n++) await signUp(n).expect(200);
     await signUp(4).expect(429);
+  });
+
+  describe('client IP told by the proxy (ADR 0033)', () => {
+    /** A request that claims an IP by itself, without going through our proxy. */
+    const forgedSignIn = (ip: string, secret?: string) => {
+      const req = request(t.app.getHttpServer())
+        .post('/api/auth/sign-in/email')
+        .set('Origin', testEnv.WEB_ORIGIN)
+        .set('X-Client-IP', ip);
+      return (secret ? req.set('X-Proxy-Secret', secret) : req).send({
+        email: user.email,
+        password: 'chute',
+      });
+    };
+
+    it('ignores an IP sent without the proxy secret, so forging one does not dodge the limit', async () => {
+      for (let n = 1; n <= 5; n++) await forgedSignIn(`203.0.113.${n}`).expect(401);
+
+      await forgedSignIn('203.0.113.99').expect(429);
+    });
+
+    it('ignores an IP sent with the wrong secret', async () => {
+      for (let n = 1; n <= 5; n++) {
+        await forgedSignIn(`203.0.113.${n}`, 'segredo-errado-'.repeat(3)).expect(401);
+      }
+
+      await forgedSignIn('203.0.113.99', 'segredo-errado-'.repeat(3)).expect(429);
+      const counters = await t.prisma.rateLimit.findMany();
+      expect(counters.some((c) => c.key.startsWith('203.0.113.'))).toBe(false);
+    });
   });
 });

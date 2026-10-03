@@ -8,7 +8,7 @@ export const meQueryKey = ['me'] as const;
 /** The signed-in user, or `null` without a session (401 is an answer here, not an error). */
 async function fetchMe(): Promise<MeResponse | null> {
   try {
-    return await apiGet('/me', meResponseSchema);
+    return await apiGet('/api/me', meResponseSchema);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;

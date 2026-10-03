@@ -39,7 +39,7 @@ export const personalWorkspace = {
 
 /** What every page behind RequireAuth loads on the home page: user, health and workspaces. */
 export const signedInHome = {
-  'GET /me': { body: fakeUser },
-  'GET /health': healthy,
-  'GET /workspaces': { body: [personalWorkspace] },
+  'GET /api/me': { body: fakeUser },
+  'GET /api/health': healthy,
+  'GET /api/workspaces': { body: [personalWorkspace] },
 };

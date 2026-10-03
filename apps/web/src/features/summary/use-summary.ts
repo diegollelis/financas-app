@@ -13,6 +13,6 @@ export const summaryKey = (workspaceId: string) =>
 export function useSummary(workspaceId: string, period: string) {
   return useQuery({
     queryKey: [...summaryKey(workspaceId), period],
-    queryFn: () => apiGet(`/workspaces/${workspaceId}/summary/${period}`, summarySchema),
+    queryFn: () => apiGet(`/api/workspaces/${workspaceId}/summary/${period}`, summarySchema),
   });
 }

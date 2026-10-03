@@ -14,4 +14,6 @@ export const testEnv = {
   // Fake credentials: tests answer for Google themselves (test/fake-google.ts).
   GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'test-client-secret',
+  // What the web app's proxy sends with the client IP (ADR 0033).
+  PROXY_SECRET: 'test-proxy-secret-only-for-automated-tests',
 } as const;

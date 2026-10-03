@@ -44,7 +44,7 @@ describe('e-mail flows', () => {
 
       expect(response.headers.location).toBe(`${testEnv.WEB_ORIGIN}/`);
       expect(await t.prisma.user.findFirstOrThrow()).toMatchObject({ emailVerified: true });
-      const me = await browser.get('/me').expect(200);
+      const me = await browser.get('/api/me').expect(200);
       expect(me.body).toMatchObject({ emailVerified: true });
     });
 
@@ -101,7 +101,7 @@ describe('e-mail flows', () => {
 
       await t.http().post('/api/auth/reset-password').send({ newPassword, token }).expect(200);
 
-      await oldBrowser.get('/me').expect(401);
+      await oldBrowser.get('/api/me').expect(401);
       await t
         .http()
         .post('/api/auth/sign-in/email')

@@ -7,9 +7,9 @@ import { renderApp } from '@/test/render';
 describe('HomePage', () => {
   it('greets the signed-in user and shows Online when the API and the database are up', async () => {
     const fetchMock = mockApi({
-      'GET /me': { body: fakeUser },
-      'GET /health': healthy,
-      'GET /workspaces': { body: [personalWorkspace] },
+      'GET /api/me': { body: fakeUser },
+      'GET /api/health': healthy,
+      'GET /api/workspaces': { body: [personalWorkspace] },
     });
 
     renderApp('/');
@@ -17,15 +17,15 @@ describe('HomePage', () => {
     expect(await screen.findByRole('heading', { name: 'Olá, Maria Exemplo' })).toBeInTheDocument();
     expect(await screen.findByText('Online')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL('/health', 'http://api.test'),
+      new URL('/api/health', 'http://api.test'),
       expect.objectContaining({ credentials: 'include' }),
     );
   });
 
   it('warns when the database is down', async () => {
     mockApi({
-      'GET /me': { body: fakeUser },
-      'GET /health': { body: { status: 'degraded', database: 'down' } },
+      'GET /api/me': { body: fakeUser },
+      'GET /api/health': { body: { status: 'degraded', database: 'down' } },
     });
 
     renderApp('/');
@@ -34,7 +34,7 @@ describe('HomePage', () => {
   });
 
   it('shows unavailable when the health check breaks the contract', async () => {
-    mockApi({ 'GET /me': { body: fakeUser }, 'GET /health': { body: { status: 'up' } } });
+    mockApi({ 'GET /api/me': { body: fakeUser }, 'GET /api/health': { body: { status: 'up' } } });
 
     renderApp('/');
 
@@ -43,9 +43,9 @@ describe('HomePage', () => {
 
   it('signs out and goes back to the sign-in page', async () => {
     mockApi({
-      'GET /me': { body: fakeUser },
-      'GET /health': healthy,
-      'GET /workspaces': { body: [personalWorkspace] },
+      'GET /api/me': { body: fakeUser },
+      'GET /api/health': healthy,
+      'GET /api/workspaces': { body: [personalWorkspace] },
       'POST /api/auth/sign-out': { body: { success: true } },
     });
     const { router } = renderApp('/');
@@ -60,9 +60,9 @@ describe('HomePage', () => {
 describe('VerifyEmailBanner', () => {
   it('asks to confirm the e-mail and resends the link', async () => {
     const fetchMock = mockApi({
-      'GET /me': { body: fakeUser },
-      'GET /health': healthy,
-      'GET /workspaces': { body: [personalWorkspace] },
+      'GET /api/me': { body: fakeUser },
+      'GET /api/health': healthy,
+      'GET /api/workspaces': { body: [personalWorkspace] },
       'POST /api/auth/send-verification-email': { body: { status: true } },
     });
     renderApp('/');
@@ -79,9 +79,9 @@ describe('VerifyEmailBanner', () => {
 
   it('explains when the confirmation link failed', async () => {
     mockApi({
-      'GET /me': { body: fakeUser },
-      'GET /health': healthy,
-      'GET /workspaces': { body: [personalWorkspace] },
+      'GET /api/me': { body: fakeUser },
+      'GET /api/health': healthy,
+      'GET /api/workspaces': { body: [personalWorkspace] },
     });
 
     renderApp('/?error=invalid_token');
@@ -91,9 +91,9 @@ describe('VerifyEmailBanner', () => {
 
   it('is hidden once the e-mail is confirmed', async () => {
     mockApi({
-      'GET /me': { body: { ...fakeUser, emailVerified: true } },
-      'GET /health': healthy,
-      'GET /workspaces': { body: [personalWorkspace] },
+      'GET /api/me': { body: { ...fakeUser, emailVerified: true } },
+      'GET /api/health': healthy,
+      'GET /api/workspaces': { body: [personalWorkspace] },
     });
     renderApp('/');
 
@@ -106,7 +106,7 @@ describe('WorkspaceList', () => {
   it("lists the user's workspaces with the role", async () => {
     mockApi({
       ...signedInHome,
-      'GET /workspaces': {
+      'GET /api/workspaces': {
         body: [
           personalWorkspace,
           {
