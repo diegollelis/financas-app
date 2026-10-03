@@ -44,8 +44,9 @@ export async function createTestApp() {
     request
       .agent(app.getHttpServer())
       .set('Origin', testEnv.WEB_ORIGIN)
-      // How the client IP reaches the API behind a proxy (ADR 0023).
-      .set('X-Forwarded-For', ip);
+      // How our proxy tells the API the client IP (ADRs 0023 and 0033).
+      .set('X-Client-IP', ip)
+      .set('X-Proxy-Secret', testEnv.PROXY_SECRET);
 
   return {
     app,

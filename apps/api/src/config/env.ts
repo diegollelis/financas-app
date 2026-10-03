@@ -20,6 +20,9 @@ const envSchema = z
     // Google sign-in (ADR 0026). Optional: without them, only e-mail and password.
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
+    // Shared with the web app's proxy (ADR 0033): only a request carrying it may tell the client IP.
+    // Optional outside production, where there is no proxy.
+    PROXY_SECRET: z.string().min(32).optional(),
   })
   .superRefine((env, ctx) => {
     if (!env.GOOGLE_CLIENT_ID !== !env.GOOGLE_CLIENT_SECRET) {
@@ -41,6 +44,21 @@ const envSchema = z
         code: 'custom',
         path: ['MAIL_TRANSPORT'],
         message: 'Production must send e-mail with resend',
+      });
+    }
+    if (env.NODE_ENV === 'production' && !env.PROXY_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['PROXY_SECRET'],
+        message: 'Production needs the proxy secret to know the client IP',
+      });
+    }
+    // Better Auth only marks the session cookie Secure when its URL is https.
+    if (env.NODE_ENV === 'production' && !env.BETTER_AUTH_URL.startsWith('https://')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['BETTER_AUTH_URL'],
+        message: 'Production must use https',
       });
     }
   });

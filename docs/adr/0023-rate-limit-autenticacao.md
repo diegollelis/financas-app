@@ -44,5 +44,6 @@ O Better Auth tem um limitador embutido. Por padrão, ele só funciona em produ�
   - descobrir que cabeçalho o proxy do Render preenche com o IP do cliente;
   - configurar `advanced.ipAddress` (`ipAddressHeaders` ou `trustedProxies`);
   - conferir na tabela `rate_limits` que as chaves têm o IP real.
+  - **Resolvido** no passo 1 da fase 4 ([ADR 0033](0033-topologia-e-limites-do-deploy.md)): a API lê o IP de `X-Client-IP`, aceito só com o segredo do proxy. Falta conferir a tabela `rate_limits` depois do deploy.
 - O limite é por IP. Pessoas atrás do mesmo IP (rede de empresa, 4G) dividem o contador, e um atacante com muitos IPs não é contido. Um limite por e-mail (ex.: pedidos de redefinição para a mesma conta) fica como evolução, se for necessário.
 - Rotas fora do Better Auth (futuras rotas de negócio do Nest) não estão cobertas. Avaliar `@nestjs/throttler` quando houver rotas públicas sensíveis.

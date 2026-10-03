@@ -58,8 +58,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 ## Fase 4 — Deploy
 
 - [x] Conferir limites atuais dos planos gratuitos e definir a topologia ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
-- [ ] Proxy `/api/*` numa Pages Function: front e API no mesmo site, cookie `Lax` ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
-- [ ] IP real do cliente para o rate limit: `CF-Connecting-IP` repassado pela Function com um segredo ([ADR 0023](adr/0023-rate-limit-autenticacao.md))
+- [x] Proxy `/api/*` numa Pages Function: front e API no mesmo site, cookie `Lax` ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
+- [x] IP real do cliente para o rate limit: `CF-Connecting-IP` repassado pela Function com um segredo ([ADR 0023](adr/0023-rate-limit-autenticacao.md)); conferir `rate_limits` após o deploy
 - [ ] Neon (produção, PostgreSQL 18+: as migrações usam `uuidv7()`) + migrações ao iniciar o container (o Render free não tem _pre-deploy_)
 - [ ] API no Render (Docker) e front no Cloudflare Pages
 - [ ] Google OAuth de produção: URI de retorno, origens e tela de consentimento publicada ([ADR 0026](adr/0026-login-com-google.md))
