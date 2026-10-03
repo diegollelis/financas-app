@@ -22,14 +22,14 @@ const keys = {
 export function useWorkspace(workspaceId: string) {
   return useQuery({
     queryKey: keys.workspace(workspaceId),
-    queryFn: () => apiGet(`/workspaces/${workspaceId}`, workspaceSchema),
+    queryFn: () => apiGet(`/api/workspaces/${workspaceId}`, workspaceSchema),
   });
 }
 
 export function useMembers(workspaceId: string) {
   return useQuery({
     queryKey: keys.members(workspaceId),
-    queryFn: () => apiGet(`/workspaces/${workspaceId}/members`, memberListResponseSchema),
+    queryFn: () => apiGet(`/api/workspaces/${workspaceId}/members`, memberListResponseSchema),
   });
 }
 
@@ -37,7 +37,8 @@ export function useMembers(workspaceId: string) {
 export function useInvitations(workspaceId: string, enabled: boolean) {
   return useQuery({
     queryKey: keys.invitations(workspaceId),
-    queryFn: () => apiGet(`/workspaces/${workspaceId}/invitations`, invitationListResponseSchema),
+    queryFn: () =>
+      apiGet(`/api/workspaces/${workspaceId}/invitations`, invitationListResponseSchema),
     enabled,
   });
 }
@@ -45,7 +46,7 @@ export function useInvitations(workspaceId: string, enabled: boolean) {
 export function useCreateWorkspace() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateWorkspaceInput) => apiPost('/workspaces', input, workspaceSchema),
+    mutationFn: (input: CreateWorkspaceInput) => apiPost('/api/workspaces', input, workspaceSchema),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: workspacesQueryKey }),
   });
 }
@@ -54,7 +55,7 @@ export function useCreateInvitation(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: z.input<typeof createInvitationInputSchema>) =>
-      apiPost(`/workspaces/${workspaceId}/invitations`, input, invitationSchema),
+      apiPost(`/api/workspaces/${workspaceId}/invitations`, input, invitationSchema),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.invitations(workspaceId) }),
   });
 }
@@ -63,7 +64,7 @@ export function useRevokeInvitation(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (invitationId: string) =>
-      apiDelete(`/workspaces/${workspaceId}/invitations/${invitationId}`),
+      apiDelete(`/api/workspaces/${workspaceId}/invitations/${invitationId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.invitations(workspaceId) }),
   });
 }

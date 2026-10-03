@@ -12,9 +12,9 @@ const joao = { name: 'João Exemplo', email: 'joao@example.com', password: 'senh
 
 /** Every route under /workspaces/:workspaceId. New ones go here too. */
 const workspaceRoutes: WorkspaceRoute[] = [
-  { method: 'get', path: (id) => `/workspaces/${id}` },
-  { method: 'patch', path: (id) => `/workspaces/${id}`, body: { name: 'Invadido' } },
-  { method: 'get', path: (id) => `/workspaces/${id}/members` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}` },
+  { method: 'patch', path: (id) => `/api/workspaces/${id}`, body: { name: 'Invadido' } },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/members` },
 ];
 
 describe('workspace guard', () => {
@@ -35,7 +35,7 @@ describe('workspace guard', () => {
   /** Maria's shared workspace "Casa", with João added under `role` (invitations come later). */
   async function sharedWorkspaceWithJoaoAs(role: WorkspaceRole) {
     const owner = await t.signUp(maria);
-    const created = await owner.browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+    const created = await owner.browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
     const workspaceId = workspaceSchema.parse(created.body).id;
     const member = await t.signUp(joao);
     await t.prisma.member.create({ data: { workspaceId, userId: member.userId, role } });
@@ -57,14 +57,14 @@ describe('workspace guard', () => {
     it('answers the same 404 for a workspace that does not exist or an invalid id', async () => {
       const { browser } = await t.signUp(maria);
 
-      await browser.get('/workspaces/01920000-0000-7000-8000-000000000000').expect(404);
-      await browser.get('/workspaces/nao-e-um-uuid').expect(404);
+      await browser.get('/api/workspaces/01920000-0000-7000-8000-000000000000').expect(404);
+      await browser.get('/api/workspaces/nao-e-um-uuid').expect(404);
     });
 
     it('asks for a session before anything else', async () => {
       const { personalWorkspaceId } = await t.signUp(maria);
 
-      await t.http().get(`/workspaces/${personalWorkspaceId}`).expect(401);
+      await t.http().get(`/api/workspaces/${personalWorkspaceId}`).expect(401);
     });
   });
 
@@ -72,8 +72,10 @@ describe('workspace guard', () => {
     it('lets any member read the workspace and its members', async () => {
       const { workspaceId, owner, member } = await sharedWorkspaceWithJoaoAs('VIEWER');
 
-      const workspace = await member.browser.get(`/workspaces/${workspaceId}`).expect(200);
-      const members = await member.browser.get(`/workspaces/${workspaceId}/members`).expect(200);
+      const workspace = await member.browser.get(`/api/workspaces/${workspaceId}`).expect(200);
+      const members = await member.browser
+        .get(`/api/workspaces/${workspaceId}/members`)
+        .expect(200);
 
       expect(workspaceSchema.parse(workspace.body)).toMatchObject({ name: 'Casa', role: 'VIEWER' });
       expect(memberListResponseSchema.parse(members.body)).toEqual([
@@ -86,7 +88,7 @@ describe('workspace guard', () => {
       const { workspaceId, member } = await sharedWorkspaceWithJoaoAs(role);
 
       await member.browser
-        .patch(`/workspaces/${workspaceId}`)
+        .patch(`/api/workspaces/${workspaceId}`)
         .send({ name: 'Outro nome' })
         .expect(403);
     });
@@ -95,10 +97,10 @@ describe('workspace guard', () => {
       const { workspaceId, owner } = await sharedWorkspaceWithJoaoAs('VIEWER');
 
       const renamed = await owner.browser
-        .patch(`/workspaces/${workspaceId}`)
+        .patch(`/api/workspaces/${workspaceId}`)
         .send({ name: '  Casa da praia ' })
         .expect(200);
-      await owner.browser.patch(`/workspaces/${workspaceId}`).send({ name: '' }).expect(400);
+      await owner.browser.patch(`/api/workspaces/${workspaceId}`).send({ name: '' }).expect(400);
 
       expect(workspaceSchema.parse(renamed.body)).toMatchObject({
         name: 'Casa da praia',

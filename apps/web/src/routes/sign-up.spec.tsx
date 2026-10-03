@@ -16,10 +16,10 @@ async function fillAndSubmit({ name, email, password }: typeof maria) {
 describe('SignUpPage', () => {
   it('creates the account and goes to the home page', async () => {
     mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/sign-up/email': { body: { token: 'fake', user: fakeUser } },
-      'GET /health': healthy,
-      'GET /workspaces': { body: [personalWorkspace] },
+      'GET /api/health': healthy,
+      'GET /api/workspaces': { body: [personalWorkspace] },
     });
     renderApp('/cadastro');
 
@@ -29,7 +29,7 @@ describe('SignUpPage', () => {
   });
 
   it('shows the password rule before calling the API', async () => {
-    const fetchMock = mockApi({ 'GET /me': noSession });
+    const fetchMock = mockApi({ 'GET /api/me': noSession });
     renderApp('/cadastro');
 
     await fillAndSubmit({ ...maria, password: '1234567' });
@@ -37,12 +37,12 @@ describe('SignUpPage', () => {
     expect(
       await screen.findByText('A senha precisa ter pelo menos 8 caracteres.'),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /me
+    expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /api/me
   });
 
   it('tells when the e-mail is already registered', async () => {
     mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/sign-up/email': {
         status: 422,
         body: { code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', message: 'User already exists.' },
@@ -58,7 +58,7 @@ describe('SignUpPage', () => {
   });
 
   it('links to the sign-in page', async () => {
-    mockApi({ 'GET /me': noSession });
+    mockApi({ 'GET /api/me': noSession });
     const { router } = renderApp('/cadastro');
 
     await userEvent.click(await screen.findByRole('link', { name: 'Entrar' }));

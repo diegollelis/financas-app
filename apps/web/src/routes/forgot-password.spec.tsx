@@ -6,7 +6,7 @@ import { renderApp } from '@/test/render';
 
 describe('ForgotPasswordPage', () => {
   it('is reachable from the sign-in page', async () => {
-    mockApi({ 'GET /me': noSession });
+    mockApi({ 'GET /api/me': noSession });
     const { router } = renderApp('/entrar');
 
     await userEvent.click(await screen.findByRole('link', { name: 'Esqueci minha senha' }));
@@ -16,7 +16,7 @@ describe('ForgotPasswordPage', () => {
 
   it('requests the link and gives the same answer for any e-mail', async () => {
     const fetchMock = mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/request-password-reset': { body: { status: true, message: 'ok' } },
     });
     renderApp('/esqueci-senha');

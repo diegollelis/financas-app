@@ -33,7 +33,7 @@ describe('workspaces', () => {
   it('creates a personal workspace on sign-up, owned by the new user', async () => {
     const browser = await signUp(maria);
 
-    const response = await browser.get('/workspaces').expect(200);
+    const response = await browser.get('/api/workspaces').expect(200);
 
     expect(workspaceListResponseSchema.parse(response.body)).toMatchObject([
       { name: 'Pessoal', isPersonal: true, role: 'OWNER' },
@@ -41,16 +41,16 @@ describe('workspaces', () => {
   });
 
   it('requires a session', async () => {
-    await t.http().get('/workspaces').expect(401);
-    await t.http().post('/workspaces').send({ name: 'Casa' }).expect(401);
+    await t.http().get('/api/workspaces').expect(401);
+    await t.http().post('/api/workspaces').send({ name: 'Casa' }).expect(401);
   });
 
   it("lists only the user's own workspaces", async () => {
     const mariaBrowser = await signUp(maria);
     const joaoBrowser = await signUp(joao);
-    await joaoBrowser.post('/workspaces').send({ name: 'Viagem do João' }).expect(201);
+    await joaoBrowser.post('/api/workspaces').send({ name: 'Viagem do João' }).expect(201);
 
-    const response = await mariaBrowser.get('/workspaces').expect(200);
+    const response = await mariaBrowser.get('/api/workspaces').expect(200);
 
     expect(response.body).toHaveLength(1);
     expect(response.body).not.toContainEqual(expect.objectContaining({ name: 'Viagem do João' }));
@@ -59,14 +59,14 @@ describe('workspaces', () => {
   it('creates a shared workspace with the caller as OWNER, listed after the personal one', async () => {
     const browser = await signUp(maria);
 
-    const created = await browser.post('/workspaces').send({ name: '  Casa  ' }).expect(201);
+    const created = await browser.post('/api/workspaces').send({ name: '  Casa  ' }).expect(201);
 
     expect(workspaceSchema.parse(created.body)).toMatchObject({
       name: 'Casa',
       isPersonal: false,
       role: 'OWNER',
     });
-    const list = await browser.get('/workspaces').expect(200);
+    const list = await browser.get('/api/workspaces').expect(200);
     const names = workspaceListResponseSchema.parse(list.body).map((workspace) => workspace.name);
     expect(names).toEqual(['Pessoal', 'Casa']);
   });
@@ -74,7 +74,7 @@ describe('workspaces', () => {
   it('validates the new workspace with the shared schema', async () => {
     const browser = await signUp(maria);
 
-    const response = await browser.post('/workspaces').send({ name: '   ' }).expect(400);
+    const response = await browser.post('/api/workspaces').send({ name: '   ' }).expect(400);
 
     expect(response.body).toMatchObject({
       code: 'INVALID_INPUT',
@@ -87,7 +87,7 @@ describe('workspaces', () => {
     // Simulates a failed hook after sign-up: the user exists without a personal workspace.
     await t.prisma.workspace.deleteMany({ where: { isPersonal: true } });
 
-    const response = await browser.get('/workspaces').expect(200);
+    const response = await browser.get('/api/workspaces').expect(200);
 
     expect(response.body).toMatchObject([{ name: 'Pessoal', isPersonal: true, role: 'OWNER' }]);
   });

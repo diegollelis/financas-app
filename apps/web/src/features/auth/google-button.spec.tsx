@@ -10,7 +10,7 @@ vi.mock('@/lib/browser', () => ({ navigateAway: vi.fn() }));
 describe('Google sign-in', () => {
   it.each(['/entrar', '/cadastro'])('goes to Google from %s', async (path) => {
     const fetchMock = mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/sign-in/social': {
         body: { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=x', redirect: true },
       },
@@ -38,7 +38,7 @@ describe('Google sign-in', () => {
 
   it('explains when Google sign-in is not configured on the API', async () => {
     mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/sign-in/social': {
         status: 404,
         body: { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' },
@@ -54,7 +54,7 @@ describe('Google sign-in', () => {
   });
 
   it('tells when the return from Google failed', async () => {
-    mockApi({ 'GET /me': noSession });
+    mockApi({ 'GET /api/me': noSession });
 
     renderApp('/entrar?error=access_denied');
 

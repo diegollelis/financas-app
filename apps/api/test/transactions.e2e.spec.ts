@@ -19,10 +19,10 @@ const joao = { name: 'João Exemplo', email: 'joao@example.com', password: 'senh
 const SOME_ID = '01920000-0000-7000-8000-000000000000';
 
 const transactionRoutes: WorkspaceRoute[] = [
-  { method: 'get', path: (id) => `/workspaces/${id}/transactions?period=2026-10` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/transactions?period=2026-10` },
   {
     method: 'post',
-    path: (id) => `/workspaces/${id}/transactions`,
+    path: (id) => `/api/workspaces/${id}/transactions`,
     body: {
       type: 'DEBIT',
       description: 'Intruso',
@@ -33,10 +33,10 @@ const transactionRoutes: WorkspaceRoute[] = [
   },
   {
     method: 'patch',
-    path: (id) => `/workspaces/${id}/transactions/${SOME_ID}`,
+    path: (id) => `/api/workspaces/${id}/transactions/${SOME_ID}`,
     body: { settledAt: '2026-10-02' },
   },
-  { method: 'delete', path: (id) => `/workspaces/${id}/transactions/${SOME_ID}` },
+  { method: 'delete', path: (id) => `/api/workspaces/${id}/transactions/${SOME_ID}` },
 ];
 
 describe('transactions', () => {
@@ -59,7 +59,7 @@ describe('transactions', () => {
   /** Maria with her personal workspace, and a way to find its default categories by name. */
   async function mariaReady() {
     const { browser, personalWorkspaceId: workspaceId, userId } = await t.signUp(maria);
-    const response = await browser.get(`/workspaces/${workspaceId}/categories`).expect(200);
+    const response = await browser.get(`/api/workspaces/${workspaceId}/categories`).expect(200);
     const categories = categoryListResponseSchema.parse(response.body);
     const categoryId = (name: string, type: TransactionType) => {
       const found = categories.find((category) => category.name === name && category.type === type);
@@ -71,7 +71,7 @@ describe('transactions', () => {
 
   async function create(browser: Browser, workspaceId: string, input: CreateTransactionInput) {
     const response = await browser
-      .post(`/workspaces/${workspaceId}/transactions`)
+      .post(`/api/workspaces/${workspaceId}/transactions`)
       .send(input)
       .expect(201);
     return transactionSchema.parse(response.body);
@@ -79,7 +79,7 @@ describe('transactions', () => {
 
   async function list(browser: Browser, workspaceId: string, period: string) {
     const response = await browser
-      .get(`/workspaces/${workspaceId}/transactions?period=${period}`)
+      .get(`/api/workspaces/${workspaceId}/transactions?period=${period}`)
       .expect(200);
     return transactionListResponseSchema.parse(response.body);
   }
@@ -145,9 +145,9 @@ describe('transactions', () => {
     it('requires a valid competência to list', async () => {
       const { browser, workspaceId } = await mariaReady();
 
-      await browser.get(`/workspaces/${workspaceId}/transactions`).expect(400);
+      await browser.get(`/api/workspaces/${workspaceId}/transactions`).expect(400);
       const response = await browser
-        .get(`/workspaces/${workspaceId}/transactions?period=2026-13`)
+        .get(`/api/workspaces/${workspaceId}/transactions?period=2026-13`)
         .expect(400);
 
       expect(response.body).toMatchObject({
@@ -160,7 +160,7 @@ describe('transactions', () => {
       const { browser, workspaceId, categoryId } = await mariaReady();
 
       const response = await browser
-        .post(`/workspaces/${workspaceId}/transactions`)
+        .post(`/api/workspaces/${workspaceId}/transactions`)
         .send({
           type: 'DEBIT',
           description: 'Mercado',
@@ -182,7 +182,7 @@ describe('transactions', () => {
       const { browser, workspaceId, categoryId } = await mariaReady();
 
       const response = await browser
-        .post(`/workspaces/${workspaceId}/transactions`)
+        .post(`/api/workspaces/${workspaceId}/transactions`)
         .send({
           type: 'CREDIT',
           description: 'Salário',
@@ -209,12 +209,12 @@ describe('transactions', () => {
         period: '2026-10',
       });
       await browser
-        .patch(`/workspaces/${workspaceId}/categories/${ipva}`)
+        .patch(`/api/workspaces/${workspaceId}/categories/${ipva}`)
         .send({ archived: true })
         .expect(200);
 
       const refused = await browser
-        .post(`/workspaces/${workspaceId}/transactions`)
+        .post(`/api/workspaces/${workspaceId}/transactions`)
         .send({
           type: 'DEBIT',
           description: 'IPVA 2027',
@@ -226,22 +226,22 @@ describe('transactions', () => {
       expect(refused.body).toMatchObject({ code: 'INVALID_CATEGORY' });
 
       await browser
-        .patch(`/workspaces/${workspaceId}/transactions/${tax.id}`)
+        .patch(`/api/workspaces/${workspaceId}/transactions/${tax.id}`)
         .send({ description: 'IPVA 2026 (cota única)' })
         .expect(200);
     });
 
     it('refuses a category of another workspace', async () => {
       const { browser, workspaceId } = await mariaReady();
-      const created = await browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const created = await browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
       const houseId = workspaceSchema.parse(created.body).id;
       const houseCategories = categoryListResponseSchema.parse(
-        (await browser.get(`/workspaces/${houseId}/categories`).expect(200)).body,
+        (await browser.get(`/api/workspaces/${houseId}/categories`).expect(200)).body,
       );
       const houseMarket = houseCategories.find((category) => category.name === 'Mercado');
 
       const response = await browser
-        .post(`/workspaces/${workspaceId}/transactions`)
+        .post(`/api/workspaces/${workspaceId}/transactions`)
         .send({
           type: 'DEBIT',
           description: 'Mercado',
@@ -307,7 +307,7 @@ describe('transactions', () => {
       });
 
       const response = await browser
-        .delete(`/workspaces/${workspaceId}/categories/${market}`)
+        .delete(`/api/workspaces/${workspaceId}/categories/${market}`)
         .expect(409);
 
       expect(response.body).toMatchObject({ code: 'CATEGORY_IN_USE' });
@@ -324,7 +324,7 @@ describe('transactions', () => {
         amountCents: 15_990,
         period: '2026-10',
       });
-      const path = `/workspaces/${workspaceId}/transactions/${light.id}`;
+      const path = `/api/workspaces/${workspaceId}/transactions/${light.id}`;
 
       const settled = await browser.patch(path).send({ settledAt: '2026-10-02' }).expect(200);
       expect(settled.body).toEqual({ ...light, settledAt: '2026-10-02' });
@@ -342,7 +342,7 @@ describe('transactions', () => {
         amountCents: 100_000,
         period: '2026-10',
       });
-      const path = `/workspaces/${workspaceId}/transactions/${loan.id}`;
+      const path = `/api/workspaces/${workspaceId}/transactions/${loan.id}`;
 
       await browser.patch(path).send({ type: 'CREDIT' }).expect(400);
       const changed = await browser
@@ -366,7 +366,7 @@ describe('transactions', () => {
       });
 
       const response = await browser
-        .patch(`/workspaces/${workspaceId}/transactions/${course.id}`)
+        .patch(`/api/workspaces/${workspaceId}/transactions/${course.id}`)
         .send({ amountCents: 32_000, period: '2026-11', notes: '', dueDate: null })
         .expect(200);
 
@@ -381,7 +381,7 @@ describe('transactions', () => {
 
     it('answers 404 for an unknown or malformed id', async () => {
       const { browser, workspaceId } = await mariaReady();
-      const base = `/workspaces/${workspaceId}/transactions`;
+      const base = `/api/workspaces/${workspaceId}/transactions`;
 
       await browser.patch(`${base}/${SOME_ID}`).send({ settledAt: null }).expect(404);
       await browser.patch(`${base}/not-a-uuid`).send({ settledAt: null }).expect(404);
@@ -400,7 +400,7 @@ describe('transactions', () => {
         period: '2026-10',
       });
 
-      await browser.delete(`/workspaces/${workspaceId}/transactions/${light.id}`).expect(204);
+      await browser.delete(`/api/workspaces/${workspaceId}/transactions/${light.id}`).expect(204);
 
       expect(await list(browser, workspaceId, '2026-10')).toEqual([]);
     });
@@ -409,10 +409,13 @@ describe('transactions', () => {
   describe('roles', () => {
     it('a VIEWER reads but cannot change anything', async () => {
       const owner = await t.signUp(maria);
-      const created = await owner.browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const created = await owner.browser
+        .post('/api/workspaces')
+        .send({ name: 'Casa' })
+        .expect(201);
       const workspaceId = workspaceSchema.parse(created.body).id;
       const categories = categoryListResponseSchema.parse(
-        (await owner.browser.get(`/workspaces/${workspaceId}/categories`).expect(200)).body,
+        (await owner.browser.get(`/api/workspaces/${workspaceId}/categories`).expect(200)).body,
       );
       const market = categories.find((category) => category.name === 'Mercado');
       const input = {
@@ -427,7 +430,7 @@ describe('transactions', () => {
       await t.prisma.member.create({
         data: { workspaceId, userId: viewer.userId, role: 'VIEWER' },
       });
-      const base = `/workspaces/${workspaceId}/transactions`;
+      const base = `/api/workspaces/${workspaceId}/transactions`;
 
       expect(await list(viewer.browser, workspaceId, '2026-10')).toEqual([shopping]);
       await viewer.browser.post(base).send(input).expect(403);
@@ -448,7 +451,7 @@ describe('transactions', () => {
 
     it("a member of two workspaces cannot reach one workspace's transaction through the other", async () => {
       const { browser, workspaceId, categoryId } = await mariaReady();
-      const created = await browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const created = await browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
       const houseId = workspaceSchema.parse(created.body).id;
       const light = await create(browser, workspaceId, {
         type: 'DEBIT',
@@ -457,7 +460,7 @@ describe('transactions', () => {
         amountCents: 15_990,
         period: '2026-10',
       });
-      const wrongPath = `/workspaces/${houseId}/transactions/${light.id}`;
+      const wrongPath = `/api/workspaces/${houseId}/transactions/${light.id}`;
 
       await browser.patch(wrongPath).send({ settledAt: '2026-10-02' }).expect(404);
       await browser.delete(wrongPath).expect(404);
@@ -470,7 +473,7 @@ describe('transactions', () => {
       const joaoCategories = categoryListResponseSchema.parse(
         (
           await joaoUser.browser
-            .get(`/workspaces/${joaoUser.personalWorkspaceId}/categories`)
+            .get(`/api/workspaces/${joaoUser.personalWorkspaceId}/categories`)
             .expect(200)
         ).body,
       );

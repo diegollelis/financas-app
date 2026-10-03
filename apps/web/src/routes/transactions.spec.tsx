@@ -7,7 +7,7 @@ import { renderApp } from '@/test/render';
 // Fictitious data (ADR 0019).
 const houseId = '01920000-0000-7000-8000-000000000002';
 const house = { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' };
-const base = `/workspaces/${houseId}/transactions`;
+const base = `/api/workspaces/${houseId}/transactions`;
 
 const salaryCategory = {
   id: '01920000-0000-7000-8000-000000000101',
@@ -59,9 +59,9 @@ const shopping = transaction(3, {
 
 function mockTransactions(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
-    'GET /me': { body: fakeUser },
-    [`GET /workspaces/${houseId}`]: { body: house },
-    [`GET /workspaces/${houseId}/categories`]: {
+    'GET /api/me': { body: fakeUser },
+    [`GET /api/workspaces/${houseId}`]: { body: house },
+    [`GET /api/workspaces/${houseId}/categories`]: {
       body: [salaryCategory, energyCategory, marketCategory],
     },
     [`GET ${base}`]: { body: [salary, light, shopping] },
@@ -246,7 +246,9 @@ describe('TransactionsPage', () => {
   });
 
   it('is read-only for a VIEWER', async () => {
-    mockTransactions({ [`GET /workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
+    mockTransactions({
+      [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } },
+    });
 
     renderApp(`/espacos/${houseId}/lancamentos`);
 
@@ -256,7 +258,7 @@ describe('TransactionsPage', () => {
   });
 
   it('is reached from the workspace page', async () => {
-    mockTransactions({ [`GET /workspaces/${houseId}/members`]: { body: [] } });
+    mockTransactions({ [`GET /api/workspaces/${houseId}/members`]: { body: [] } });
     const { router } = renderApp(`/espacos/${houseId}`);
 
     await userEvent.click(await screen.findByRole('link', { name: 'Lançamentos →' }));

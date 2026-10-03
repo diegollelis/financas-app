@@ -5,6 +5,6 @@ import { apiGet } from '@/lib/api';
 export function useHealth() {
   return useQuery({
     queryKey: ['health'],
-    queryFn: () => apiGet('/health', healthResponseSchema),
+    queryFn: () => apiGet('/api/health', healthResponseSchema),
   });
 }

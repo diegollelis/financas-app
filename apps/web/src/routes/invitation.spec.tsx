@@ -17,7 +17,7 @@ const joao = { ...fakeUser, name: 'João Exemplo', email: 'joao@example.com' };
 
 describe('InvitationPage', () => {
   it('explains the invitation and asks a visitor to sign in, coming back afterwards', async () => {
-    mockApi({ 'GET /me': noSession, [`GET /invitations/${token}`]: { body: preview } });
+    mockApi({ 'GET /api/me': noSession, [`GET /api/invitations/${token}`]: { body: preview } });
     const { router } = renderApp(`/convites/${token}`);
 
     expect(
@@ -33,15 +33,15 @@ describe('InvitationPage', () => {
 
   it('accepts and opens the workspace', async () => {
     const fetchMock = mockApi({
-      'GET /me': { body: joao },
-      [`GET /invitations/${token}`]: { body: preview },
-      [`POST /invitations/${token}/accept`]: {
+      'GET /api/me': { body: joao },
+      [`GET /api/invitations/${token}`]: { body: preview },
+      [`POST /api/invitations/${token}/accept`]: {
         body: { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' },
       },
-      [`GET /workspaces/${houseId}`]: {
+      [`GET /api/workspaces/${houseId}`]: {
         body: { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' },
       },
-      [`GET /workspaces/${houseId}/members`]: { body: [] },
+      [`GET /api/workspaces/${houseId}/members`]: { body: [] },
     });
     const { router } = renderApp(`/convites/${token}`);
 
@@ -50,13 +50,16 @@ describe('InvitationPage', () => {
     expect(await screen.findByRole('heading', { name: 'Casa' })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}`);
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL(`/invitations/${token}/accept`, 'http://api.test'),
+      new URL(`/api/invitations/${token}/accept`, 'http://api.test'),
       expect.objectContaining({ method: 'POST', credentials: 'include' }),
     );
   });
 
   it('tells someone signed in with another e-mail to switch accounts', async () => {
-    mockApi({ 'GET /me': { body: fakeUser }, [`GET /invitations/${token}`]: { body: preview } });
+    mockApi({
+      'GET /api/me': { body: fakeUser },
+      [`GET /api/invitations/${token}`]: { body: preview },
+    });
 
     renderApp(`/convites/${token}`);
 
@@ -69,8 +72,8 @@ describe('InvitationPage', () => {
 
   it('explains an invalid, used or expired link', async () => {
     mockApi({
-      'GET /me': noSession,
-      [`GET /invitations/${token}`]: { status: 404, body: { message: 'Not Found' } },
+      'GET /api/me': noSession,
+      [`GET /api/invitations/${token}`]: { status: 404, body: { message: 'Not Found' } },
     });
 
     renderApp(`/convites/${token}`);
@@ -82,9 +85,9 @@ describe('InvitationPage', () => {
 describe('coming back after signing in', () => {
   it('goes to ?voltar= once signed in', async () => {
     mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/sign-in/email': { body: { token: 'fake', user: joao } },
-      [`GET /invitations/${token}`]: { body: preview },
+      [`GET /api/invitations/${token}`]: { body: preview },
     });
     const { router } = renderApp(`/entrar?voltar=%2Fconvites%2F${token}`);
 
@@ -98,9 +101,9 @@ describe('coming back after signing in', () => {
 
   it('ignores a ?voltar= pointing to another site', async () => {
     mockApi({
-      'GET /me': { body: fakeUser },
-      'GET /health': { body: { status: 'ok', database: 'up' } },
-      'GET /workspaces': { body: [] },
+      'GET /api/me': { body: fakeUser },
+      'GET /api/health': { body: { status: 'ok', database: 'up' } },
+      'GET /api/workspaces': { body: [] },
     });
 
     const { router } = renderApp('/entrar?voltar=%2F%2Fsite-malicioso.com');
@@ -109,7 +112,7 @@ describe('coming back after signing in', () => {
   });
 
   it('remembers the page a visitor was trying to open', async () => {
-    mockApi({ 'GET /me': noSession });
+    mockApi({ 'GET /api/me': noSession });
 
     const { router } = renderApp(`/espacos/${houseId}`);
 

@@ -13,7 +13,7 @@ async function fillAndSubmit(password: string, confirmPassword: string) {
 describe('ResetPasswordPage', () => {
   it('saves the new password and sends to the sign-in page with a notice', async () => {
     const fetchMock = mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/reset-password': { body: { status: true } },
     });
     const { router } = renderApp('/redefinir-senha?token=token-de-teste');

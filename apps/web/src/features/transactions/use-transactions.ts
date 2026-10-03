@@ -18,7 +18,7 @@ export function useTransactions(workspaceId: string, period: string) {
     queryKey: [...transactionsKey(workspaceId), period],
     queryFn: () =>
       apiGet(
-        `/workspaces/${workspaceId}/transactions?period=${period}`,
+        `/api/workspaces/${workspaceId}/transactions?period=${period}`,
         transactionListResponseSchema,
       ),
   });
@@ -38,7 +38,7 @@ export function useCreateTransaction(workspaceId: string) {
   const onSuccess = useInvalidateTransactions(workspaceId);
   return useMutation({
     mutationFn: (input: CreateTransactionInput) =>
-      apiPost(`/workspaces/${workspaceId}/transactions`, input, transactionSchema),
+      apiPost(`/api/workspaces/${workspaceId}/transactions`, input, transactionSchema),
     onSuccess,
   });
 }
@@ -47,7 +47,7 @@ export function useUpdateTransaction(workspaceId: string) {
   const onSuccess = useInvalidateTransactions(workspaceId);
   return useMutation({
     mutationFn: ({ id, ...input }: UpdateTransactionInput & { id: string }) =>
-      apiPatch(`/workspaces/${workspaceId}/transactions/${id}`, input, transactionSchema),
+      apiPatch(`/api/workspaces/${workspaceId}/transactions/${id}`, input, transactionSchema),
     onSuccess,
   });
 }
@@ -56,7 +56,7 @@ export function useDeleteTransaction(workspaceId: string) {
   const onSuccess = useInvalidateTransactions(workspaceId);
   return useMutation({
     mutationFn: (transactionId: string) =>
-      apiDelete(`/workspaces/${workspaceId}/transactions/${transactionId}`),
+      apiDelete(`/api/workspaces/${workspaceId}/transactions/${transactionId}`),
     onSuccess,
   });
 }

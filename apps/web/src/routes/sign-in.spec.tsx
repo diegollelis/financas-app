@@ -12,7 +12,7 @@ async function fillAndSubmit(email: string, password: string) {
 
 describe('SignInPage', () => {
   it('sends visitors without a session to the sign-in page', async () => {
-    mockApi({ 'GET /me': noSession });
+    mockApi({ 'GET /api/me': noSession });
 
     const { router } = renderApp('/');
 
@@ -22,10 +22,10 @@ describe('SignInPage', () => {
 
   it('signs in and goes to the home page', async () => {
     const fetchMock = mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/sign-in/email': { body: { token: 'fake', user: fakeUser } },
-      'GET /health': healthy,
-      'GET /workspaces': { body: [personalWorkspace] },
+      'GET /api/health': healthy,
+      'GET /api/workspaces': { body: [personalWorkspace] },
     });
     renderApp('/entrar');
 
@@ -44,7 +44,7 @@ describe('SignInPage', () => {
 
   it('shows a message when the e-mail or password is wrong', async () => {
     mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/sign-in/email': {
         status: 401,
         body: { code: 'INVALID_EMAIL_OR_PASSWORD', message: 'Invalid email or password' },
@@ -58,7 +58,7 @@ describe('SignInPage', () => {
   });
 
   it('validates the form before calling the API', async () => {
-    const fetchMock = mockApi({ 'GET /me': noSession });
+    const fetchMock = mockApi({ 'GET /api/me': noSession });
     renderApp('/entrar');
 
     await fillAndSubmit('maria', '');
@@ -66,14 +66,14 @@ describe('SignInPage', () => {
     expect(await screen.findByText('Informe um e-mail válido.')).toBeInTheDocument();
     expect(screen.getByText('Informe sua senha.')).toBeInTheDocument();
     expect(screen.getByLabelText('E-mail')).toHaveAttribute('aria-invalid', 'true');
-    expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /me
+    expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /api/me
   });
 
   it('sends visitors who already have a session to the home page', async () => {
     mockApi({
-      'GET /me': { body: fakeUser },
-      'GET /health': healthy,
-      'GET /workspaces': { body: [personalWorkspace] },
+      'GET /api/me': { body: fakeUser },
+      'GET /api/health': healthy,
+      'GET /api/workspaces': { body: [personalWorkspace] },
     });
 
     const { router } = renderApp('/entrar');
@@ -86,7 +86,7 @@ describe('SignInPage', () => {
 describe('SignInPage when rate-limited', () => {
   it('tells how long to wait, read from the X-Retry-After header', async () => {
     mockApi({
-      'GET /me': noSession,
+      'GET /api/me': noSession,
       'POST /api/auth/sign-in/email': {
         status: 429,
         body: { message: 'Too many requests. Please try again later.' },

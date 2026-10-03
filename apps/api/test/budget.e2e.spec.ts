@@ -18,8 +18,8 @@ const september = {
 };
 
 const budgetRoutes: WorkspaceRoute[] = [
-  { method: 'get', path: (id) => `/workspaces/${id}/budget/2026-10` },
-  { method: 'put', path: (id) => `/workspaces/${id}/budget/2026-10`, body: september },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/budget/2026-10` },
+  { method: 'put', path: (id) => `/api/workspaces/${id}/budget/2026-10`, body: september },
 ];
 
 describe('budget', () => {
@@ -40,13 +40,15 @@ describe('budget', () => {
   type Browser = ReturnType<typeof t.http>;
 
   async function get(browser: Browser, workspaceId: string, period: string) {
-    const response = await browser.get(`/workspaces/${workspaceId}/budget/${period}`).expect(200);
+    const response = await browser
+      .get(`/api/workspaces/${workspaceId}/budget/${period}`)
+      .expect(200);
     return budgetSchema.parse(response.body);
   }
 
   async function save(browser: Browser, workspaceId: string, period: string, input: object) {
     const response = await browser
-      .put(`/workspaces/${workspaceId}/budget/${period}`)
+      .put(`/api/workspaces/${workspaceId}/budget/${period}`)
       .send(input)
       .expect(200);
     return budgetSchema.parse(response.body);
@@ -117,7 +119,7 @@ describe('budget', () => {
     const { browser, personalWorkspaceId: id } = await t.signUp(maria);
 
     const response = await browser
-      .put(`/workspaces/${id}/budget/2026-10`)
+      .put(`/api/workspaces/${id}/budget/2026-10`)
       .send({ ...september, travelBp: 1_001 })
       .expect(400);
 
@@ -130,7 +132,7 @@ describe('budget', () => {
   it('refuses an invalid competência in the address', async () => {
     const { browser, personalWorkspaceId: id } = await t.signUp(maria);
 
-    const response = await browser.get(`/workspaces/${id}/budget/2026-13`).expect(400);
+    const response = await browser.get(`/api/workspaces/${id}/budget/2026-13`).expect(400);
 
     expect(response.body).toMatchObject({ message: 'Use uma competência no formato AAAA-MM.' });
   });
@@ -147,7 +149,7 @@ describe('budget', () => {
 
   it('a VIEWER reads but cannot save', async () => {
     const owner = await t.signUp(maria);
-    const created = await owner.browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+    const created = await owner.browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
     const workspaceId = workspaceSchema.parse(created.body).id;
     await save(owner.browser, workspaceId, '2026-10', september);
     const viewer = await t.signUp(joao);
@@ -155,7 +157,7 @@ describe('budget', () => {
 
     expect(await get(viewer.browser, workspaceId, '2026-10')).toMatchObject({ source: 'SAVED' });
     await viewer.browser
-      .put(`/workspaces/${workspaceId}/budget/2026-10`)
+      .put(`/api/workspaces/${workspaceId}/budget/2026-10`)
       .send(september)
       .expect(403);
   });

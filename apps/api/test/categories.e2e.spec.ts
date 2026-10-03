@@ -13,18 +13,18 @@ const joao = { name: 'João Exemplo', email: 'joao@example.com', password: 'senh
 const SOME_ID = '01920000-0000-7000-8000-000000000000';
 
 const categoryRoutes: WorkspaceRoute[] = [
-  { method: 'get', path: (id) => `/workspaces/${id}/categories` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/categories` },
   {
     method: 'post',
-    path: (id) => `/workspaces/${id}/categories`,
+    path: (id) => `/api/workspaces/${id}/categories`,
     body: { name: 'Intrusa', type: 'DEBIT' },
   },
   {
     method: 'patch',
-    path: (id) => `/workspaces/${id}/categories/${SOME_ID}`,
+    path: (id) => `/api/workspaces/${id}/categories/${SOME_ID}`,
     body: { archived: true },
   },
-  { method: 'delete', path: (id) => `/workspaces/${id}/categories/${SOME_ID}` },
+  { method: 'delete', path: (id) => `/api/workspaces/${id}/categories/${SOME_ID}` },
 ];
 
 const defaultCount = DEFAULT_CATEGORIES.CREDIT.length + DEFAULT_CATEGORIES.DEBIT.length;
@@ -45,7 +45,7 @@ describe('categories', () => {
   });
 
   async function list(browser: ReturnType<typeof t.http>, workspaceId: string) {
-    const response = await browser.get(`/workspaces/${workspaceId}/categories`).expect(200);
+    const response = await browser.get(`/api/workspaces/${workspaceId}/categories`).expect(200);
     return categoryListResponseSchema.parse(response.body);
   }
 
@@ -55,7 +55,7 @@ describe('categories', () => {
     body: { name: string; type: 'CREDIT' | 'DEBIT' },
   ) {
     const response = await browser
-      .post(`/workspaces/${workspaceId}/categories`)
+      .post(`/api/workspaces/${workspaceId}/categories`)
       .send(body)
       .expect(201);
     return categorySchema.parse(response.body);
@@ -78,7 +78,7 @@ describe('categories', () => {
 
     it('come with a new shared workspace too', async () => {
       const { browser } = await t.signUp(maria);
-      const created = await browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const created = await browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
 
       const categories = await list(browser, workspaceSchema.parse(created.body).id);
 
@@ -100,7 +100,7 @@ describe('categories', () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);
 
       const response = await browser
-        .post(`/workspaces/${personalWorkspaceId}/categories`)
+        .post(`/api/workspaces/${personalWorkspaceId}/categories`)
         .send({ name: 'mercado', type: 'DEBIT' })
         .expect(409);
 
@@ -117,7 +117,7 @@ describe('categories', () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);
 
       const response = await browser
-        .post(`/workspaces/${personalWorkspaceId}/categories`)
+        .post(`/api/workspaces/${personalWorkspaceId}/categories`)
         .send({ name: '', type: 'DEBIT' })
         .expect(400);
 
@@ -132,7 +132,7 @@ describe('categories', () => {
     it('renames, archives and reactivates', async () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);
       const pet = await create(browser, personalWorkspaceId, { name: 'Pet', type: 'DEBIT' });
-      const path = `/workspaces/${personalWorkspaceId}/categories/${pet.id}`;
+      const path = `/api/workspaces/${personalWorkspaceId}/categories/${pet.id}`;
 
       const renamed = await browser.patch(path).send({ name: 'Animais' }).expect(200);
       expect(renamed.body).toEqual({ ...pet, name: 'Animais' });
@@ -149,7 +149,7 @@ describe('categories', () => {
       const pet = await create(browser, personalWorkspaceId, { name: 'Pet', type: 'DEBIT' });
 
       const response = await browser
-        .patch(`/workspaces/${personalWorkspaceId}/categories/${pet.id}`)
+        .patch(`/api/workspaces/${personalWorkspaceId}/categories/${pet.id}`)
         .send({ name: 'Pet', type: 'CREDIT' })
         .expect(200);
 
@@ -161,7 +161,7 @@ describe('categories', () => {
       const pet = await create(browser, personalWorkspaceId, { name: 'Pet', type: 'DEBIT' });
 
       const response = await browser
-        .patch(`/workspaces/${personalWorkspaceId}/categories/${pet.id}`)
+        .patch(`/api/workspaces/${personalWorkspaceId}/categories/${pet.id}`)
         .send({ name: 'LAZER' })
         .expect(409);
 
@@ -170,7 +170,7 @@ describe('categories', () => {
 
     it('answers 404 for an unknown or malformed id', async () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);
-      const base = `/workspaces/${personalWorkspaceId}/categories`;
+      const base = `/api/workspaces/${personalWorkspaceId}/categories`;
 
       await browser.patch(`${base}/${SOME_ID}`).send({ archived: true }).expect(404);
       await browser.patch(`${base}/not-a-uuid`).send({ archived: true }).expect(404);
@@ -181,7 +181,7 @@ describe('categories', () => {
     it('removes the category', async () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);
       const pet = await create(browser, personalWorkspaceId, { name: 'Pet', type: 'DEBIT' });
-      const path = `/workspaces/${personalWorkspaceId}/categories/${pet.id}`;
+      const path = `/api/workspaces/${personalWorkspaceId}/categories/${pet.id}`;
 
       await browser.delete(path).expect(204);
 
@@ -193,14 +193,17 @@ describe('categories', () => {
   describe('roles', () => {
     it('a VIEWER reads but cannot change anything', async () => {
       const owner = await t.signUp(maria);
-      const created = await owner.browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const created = await owner.browser
+        .post('/api/workspaces')
+        .send({ name: 'Casa' })
+        .expect(201);
       const workspaceId = workspaceSchema.parse(created.body).id;
       const viewer = await t.signUp(joao);
       await t.prisma.member.create({
         data: { workspaceId, userId: viewer.userId, role: 'VIEWER' },
       });
       const [first] = await list(viewer.browser, workspaceId);
-      const base = `/workspaces/${workspaceId}/categories`;
+      const base = `/api/workspaces/${workspaceId}/categories`;
 
       await viewer.browser.post(base).send({ name: 'Pet', type: 'DEBIT' }).expect(403);
       await viewer.browser.patch(`${base}/${first?.id}`).send({ archived: true }).expect(403);
@@ -217,10 +220,10 @@ describe('categories', () => {
 
     it("a member of two workspaces cannot reach one workspace's category through the other", async () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);
-      const created = await browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+      const created = await browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
       const houseId = workspaceSchema.parse(created.body).id;
       const pet = await create(browser, houseId, { name: 'Pet', type: 'DEBIT' });
-      const wrongPath = `/workspaces/${personalWorkspaceId}/categories/${pet.id}`;
+      const wrongPath = `/api/workspaces/${personalWorkspaceId}/categories/${pet.id}`;
 
       await browser.patch(wrongPath).send({ name: 'Roubada' }).expect(404);
       await browser.delete(wrongPath).expect(404);

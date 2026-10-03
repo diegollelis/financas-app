@@ -17,7 +17,7 @@ const maria = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'se
 const joao = { name: 'João Exemplo', email: 'joao@example.com', password: 'senha-de-teste-456' };
 
 const summaryRoutes: WorkspaceRoute[] = [
-  { method: 'get', path: (id) => `/workspaces/${id}/summary/2026-10` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/summary/2026-10` },
 ];
 
 describe('summary', () => {
@@ -38,7 +38,7 @@ describe('summary', () => {
   type Browser = ReturnType<typeof t.http>;
 
   async function categoryIds(browser: Browser, workspaceId: string) {
-    const response = await browser.get(`/workspaces/${workspaceId}/categories`).expect(200);
+    const response = await browser.get(`/api/workspaces/${workspaceId}/categories`).expect(200);
     const categories = categoryListResponseSchema.parse(response.body);
     return (name: string, type: TransactionType) => {
       const found = categories.find((category) => category.name === name && category.type === type);
@@ -48,11 +48,13 @@ describe('summary', () => {
   }
 
   async function create(browser: Browser, workspaceId: string, input: CreateTransactionInput) {
-    await browser.post(`/workspaces/${workspaceId}/transactions`).send(input).expect(201);
+    await browser.post(`/api/workspaces/${workspaceId}/transactions`).send(input).expect(201);
   }
 
   async function summary(browser: Browser, workspaceId: string, period: string) {
-    const response = await browser.get(`/workspaces/${workspaceId}/summary/${period}`).expect(200);
+    const response = await browser
+      .get(`/api/workspaces/${workspaceId}/summary/${period}`)
+      .expect(200);
     return summarySchema.parse(response.body);
   }
 
@@ -60,7 +62,7 @@ describe('summary', () => {
     const { browser, personalWorkspaceId: id } = await t.signUp(maria);
     const categoryId = await categoryIds(browser, id);
     await browser
-      .put(`/workspaces/${id}/budget/2026-10`)
+      .put(`/api/workspaces/${id}/budget/2026-10`)
       .send({
         netIncomeCents: 500_000,
         grossIncomeCents: null,
@@ -122,7 +124,7 @@ describe('summary', () => {
 
   it('a VIEWER sees the dashboard', async () => {
     const owner = await t.signUp(maria);
-    const created = await owner.browser.post('/workspaces').send({ name: 'Casa' }).expect(201);
+    const created = await owner.browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
     const workspaceId = workspaceSchema.parse(created.body).id;
     const viewer = await t.signUp(joao);
     await t.prisma.member.create({ data: { workspaceId, userId: viewer.userId, role: 'VIEWER' } });
@@ -135,7 +137,7 @@ describe('summary', () => {
   it('refuses an invalid competência in the address', async () => {
     const { browser, personalWorkspaceId: id } = await t.signUp(maria);
 
-    const response = await browser.get(`/workspaces/${id}/summary/2026-13`).expect(400);
+    const response = await browser.get(`/api/workspaces/${id}/summary/2026-13`).expect(400);
 
     expect(response.body).toMatchObject({ message: 'Use uma competência no formato AAAA-MM.' });
   });

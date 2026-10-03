@@ -16,7 +16,7 @@ const categoriesKey = (workspaceId: string) =>
 export function useCategories(workspaceId: string) {
   return useQuery({
     queryKey: categoriesKey(workspaceId),
-    queryFn: () => apiGet(`/workspaces/${workspaceId}/categories`, categoryListResponseSchema),
+    queryFn: () => apiGet(`/api/workspaces/${workspaceId}/categories`, categoryListResponseSchema),
   });
 }
 
@@ -30,7 +30,7 @@ export function useCreateCategory(workspaceId: string) {
   const onSuccess = useInvalidateCategories(workspaceId);
   return useMutation({
     mutationFn: (input: CreateCategoryInput) =>
-      apiPost(`/workspaces/${workspaceId}/categories`, input, categorySchema),
+      apiPost(`/api/workspaces/${workspaceId}/categories`, input, categorySchema),
     onSuccess,
   });
 }
@@ -39,7 +39,7 @@ export function useUpdateCategory(workspaceId: string) {
   const onSuccess = useInvalidateCategories(workspaceId);
   return useMutation({
     mutationFn: ({ id, ...input }: UpdateCategoryInput & { id: string }) =>
-      apiPatch(`/workspaces/${workspaceId}/categories/${id}`, input, categorySchema),
+      apiPatch(`/api/workspaces/${workspaceId}/categories/${id}`, input, categorySchema),
     onSuccess,
   });
 }
@@ -48,7 +48,7 @@ export function useDeleteCategory(workspaceId: string) {
   const onSuccess = useInvalidateCategories(workspaceId);
   return useMutation({
     mutationFn: (categoryId: string) =>
-      apiDelete(`/workspaces/${workspaceId}/categories/${categoryId}`),
+      apiDelete(`/api/workspaces/${workspaceId}/categories/${categoryId}`),
     onSuccess,
   });
 }

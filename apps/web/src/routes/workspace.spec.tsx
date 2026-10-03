@@ -24,10 +24,10 @@ const pendingInvitation = {
 
 function mockHouse(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
-    'GET /me': { body: fakeUser },
-    [`GET /workspaces/${houseId}`]: { body: house },
-    [`GET /workspaces/${houseId}/members`]: { body: members },
-    [`GET /workspaces/${houseId}/invitations`]: { body: [pendingInvitation] },
+    'GET /api/me': { body: fakeUser },
+    [`GET /api/workspaces/${houseId}`]: { body: house },
+    [`GET /api/workspaces/${houseId}/members`]: { body: members },
+    [`GET /api/workspaces/${houseId}/invitations`]: { body: [pendingInvitation] },
     ...overrides,
   });
 }
@@ -49,7 +49,7 @@ describe('WorkspacePage', () => {
 
   it('invites someone with the chosen access', async () => {
     const fetchMock = mockHouse({
-      [`POST /workspaces/${houseId}/invitations`]: {
+      [`POST /api/workspaces/${houseId}/invitations`]: {
         body: { ...pendingInvitation, email: 'pedro@example.com', role: 'VIEWER' },
       },
     });
@@ -63,7 +63,7 @@ describe('WorkspacePage', () => {
       'Convite enviado para pedro@example.com.',
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL(`/workspaces/${houseId}/invitations`, 'http://api.test'),
+      new URL(`/api/workspaces/${houseId}/invitations`, 'http://api.test'),
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ email: 'pedro@example.com', role: 'VIEWER' }),
@@ -73,7 +73,7 @@ describe('WorkspacePage', () => {
 
   it('shows the API reason when an invitation is refused', async () => {
     mockHouse({
-      [`POST /workspaces/${houseId}/invitations`]: {
+      [`POST /api/workspaces/${houseId}/invitations`]: {
         status: 409,
         body: { code: 'ALREADY_MEMBER', message: 'Essa pessoa já é membro do espaço.' },
       },
@@ -90,7 +90,7 @@ describe('WorkspacePage', () => {
 
   it('cancels a pending invitation', async () => {
     const fetchMock = mockHouse({
-      [`DELETE /workspaces/${houseId}/invitations/${pendingInvitation.id}`]: {
+      [`DELETE /api/workspaces/${houseId}/invitations/${pendingInvitation.id}`]: {
         status: 204,
         body: null,
       },
@@ -103,14 +103,17 @@ describe('WorkspacePage', () => {
 
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        new URL(`/workspaces/${houseId}/invitations/${pendingInvitation.id}`, 'http://api.test'),
+        new URL(
+          `/api/workspaces/${houseId}/invitations/${pendingInvitation.id}`,
+          'http://api.test',
+        ),
         expect.objectContaining({ method: 'DELETE' }),
       ),
     );
   });
 
   it('does not offer invitations to members who are not the OWNER', async () => {
-    mockHouse({ [`GET /workspaces/${houseId}`]: { body: { ...house, role: 'EDITOR' } } });
+    mockHouse({ [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'EDITOR' } } });
 
     renderApp(`/espacos/${houseId}`);
 
@@ -120,9 +123,9 @@ describe('WorkspacePage', () => {
 
   it('explains that the personal workspace is not shared', async () => {
     mockApi({
-      'GET /me': { body: fakeUser },
-      [`GET /workspaces/${personalWorkspace.id}`]: { body: personalWorkspace },
-      [`GET /workspaces/${personalWorkspace.id}/members`]: { body: [members[0]] },
+      'GET /api/me': { body: fakeUser },
+      [`GET /api/workspaces/${personalWorkspace.id}`]: { body: personalWorkspace },
+      [`GET /api/workspaces/${personalWorkspace.id}/members`]: { body: [members[0]] },
     });
 
     renderApp(`/espacos/${personalWorkspace.id}`);
@@ -133,8 +136,8 @@ describe('WorkspacePage', () => {
 
   it('answers "not found" for a workspace that is not yours', async () => {
     mockApi({
-      'GET /me': { body: fakeUser },
-      [`GET /workspaces/${houseId}`]: { status: 404, body: { message: 'Not Found' } },
+      'GET /api/me': { body: fakeUser },
+      [`GET /api/workspaces/${houseId}`]: { status: 404, body: { message: 'Not Found' } },
     });
 
     renderApp(`/espacos/${houseId}`);
@@ -146,10 +149,10 @@ describe('WorkspacePage', () => {
 describe('creating a workspace on the home page', () => {
   it('creates it and keeps the form ready for another one', async () => {
     const fetchMock = mockApi({
-      'GET /me': { body: fakeUser },
-      'GET /health': { body: { status: 'ok', database: 'up' } },
-      'GET /workspaces': { body: [personalWorkspace] },
-      'POST /workspaces': { body: house },
+      'GET /api/me': { body: fakeUser },
+      'GET /api/health': { body: { status: 'ok', database: 'up' } },
+      'GET /api/workspaces': { body: [personalWorkspace] },
+      'POST /api/workspaces': { body: house },
     });
     renderApp('/');
 
@@ -159,7 +162,7 @@ describe('creating a workspace on the home page', () => {
 
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        new URL('/workspaces', 'http://api.test'),
+        new URL('/api/workspaces', 'http://api.test'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'Casa' }) }),
       ),
     );

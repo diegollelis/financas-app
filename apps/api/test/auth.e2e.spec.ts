@@ -82,11 +82,11 @@ describe('authentication (e-mail and password)', () => {
       .expect(401);
   });
 
-  it('returns 401 on GET /me without a session', async () => {
-    await http().get('/me').expect(401);
+  it('returns 401 on GET /api/me without a session', async () => {
+    await http().get('/api/me').expect(401);
   });
 
-  it('signs in and returns the user on GET /me, honoring the shared contract', async () => {
+  it('signs in and returns the user on GET /api/me, honoring the shared contract', async () => {
     await http().post('/api/auth/sign-up/email').send(user).expect(200);
     const agent = http();
 
@@ -94,7 +94,7 @@ describe('authentication (e-mail and password)', () => {
       .post('/api/auth/sign-in/email')
       .send({ email: user.email, password: user.password })
       .expect(200);
-    const response = await agent.get('/me').expect(200);
+    const response = await agent.get('/api/me').expect(200);
 
     expect(meResponseSchema.strict().parse(response.body)).toMatchObject({
       name: user.name,
@@ -106,11 +106,11 @@ describe('authentication (e-mail and password)', () => {
   it('signs out and invalidates the session', async () => {
     const agent = http();
     await agent.post('/api/auth/sign-up/email').send(user).expect(200);
-    await agent.get('/me').expect(200);
+    await agent.get('/api/me').expect(200);
 
     await agent.post('/api/auth/sign-out').expect(200);
 
-    await agent.get('/me').expect(401);
+    await agent.get('/api/me').expect(401);
     expect(await t.prisma.session.count()).toBe(0);
   });
 });

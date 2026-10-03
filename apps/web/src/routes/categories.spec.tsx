@@ -7,7 +7,7 @@ import { renderApp } from '@/test/render';
 // Fictitious data (ADR 0019).
 const houseId = '01920000-0000-7000-8000-000000000002';
 const house = { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' };
-const base = `/workspaces/${houseId}/categories`;
+const base = `/api/workspaces/${houseId}/categories`;
 
 const category = (n: number, name: string, type: 'CREDIT' | 'DEBIT', archived = false) => ({
   id: `01920000-0000-7000-8000-0000000001${String(n).padStart(2, '0')}`,
@@ -24,8 +24,8 @@ const categories = [consorcioCredit, salario, consorcioDebit, ipva, mercado];
 
 function mockCategories(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
-    'GET /me': { body: fakeUser },
-    [`GET /workspaces/${houseId}`]: { body: house },
+    'GET /api/me': { body: fakeUser },
+    [`GET /api/workspaces/${houseId}`]: { body: house },
     [`GET ${base}`]: { body: categories },
     ...overrides,
   });
@@ -177,7 +177,7 @@ describe('CategoriesPage', () => {
   });
 
   it('is read-only for a VIEWER', async () => {
-    mockCategories({ [`GET /workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
+    mockCategories({ [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
 
     renderApp(`/espacos/${houseId}/categorias`);
 
@@ -189,8 +189,8 @@ describe('CategoriesPage', () => {
 
   it('answers "not found" for a workspace that is not yours', async () => {
     mockApi({
-      'GET /me': { body: fakeUser },
-      [`GET /workspaces/${houseId}`]: { status: 404, body: { message: 'Not Found' } },
+      'GET /api/me': { body: fakeUser },
+      [`GET /api/workspaces/${houseId}`]: { status: 404, body: { message: 'Not Found' } },
       [`GET ${base}`]: { status: 404, body: { message: 'Not Found' } },
     });
 
@@ -201,7 +201,7 @@ describe('CategoriesPage', () => {
 
   it('is reached from the workspace page', async () => {
     mockCategories({
-      [`GET /workspaces/${houseId}/members`]: { body: [] },
+      [`GET /api/workspaces/${houseId}/members`]: { body: [] },
     });
     const { router } = renderApp(`/espacos/${houseId}`);
 
