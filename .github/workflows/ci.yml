@@ -81,3 +81,16 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  # O Render constrói a API a partir deste Dockerfile (ADR 0033). Construir aqui pega um Dockerfile
+  # quebrado no PR, antes de ele chegar à main e falhar no deploy.
+  docker:
+    name: Imagem Docker da API
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - run: docker build -f apps/api/Dockerfile -t financas-api .

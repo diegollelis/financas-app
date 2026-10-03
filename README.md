@@ -4,7 +4,7 @@
 
 Aplicação web multiusuário para controle financeiro mensal: créditos, débitos, orçamento por percentual e saldo. Nasce de uma planilha Excel pessoal e é desenvolvida como **laboratório de estudo full stack**, com cada decisão de arquitetura registrada em [ADRs](docs/adr/README.md).
 
-> **Status:** fase 1 concluída (fundação do código). A API e o front estão no ar localmente e se comunicam; autenticação e espaços vêm na [fase 2](docs/roadmap.md#fase-2--autenticação-e-espaços).
+> **Status:** fases 1 a 3 concluídas (fundação, autenticação e espaços, núcleo financeiro). A [fase 4](docs/roadmap.md#fase-4--deploy) (deploy) está em andamento; o roteiro fica em [docs/deploy.md](docs/deploy.md).
 
 ## Stack
 
@@ -85,6 +85,7 @@ Este repositório é público. Ele nunca contém credenciais, a planilha origina
 
 - [Decisões de arquitetura (ADRs)](docs/adr/README.md)
 - [Roadmap](docs/roadmap.md)
+- [Deploy em produção](docs/deploy.md)
 - Domínio: [planilha de origem](docs/dominio/planilha-origem.md) · [modelo](docs/dominio/modelo.md) · [glossário](docs/dominio/glossario.md)
 
 ## Licença

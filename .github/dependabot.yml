@@ -14,3 +14,9 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+
+  # Imagem base do Dockerfile da API (node:26-slim).
+  - package-ecosystem: docker
+    directory: /apps/api
+    schedule:
+      interval: weekly
