@@ -1,0 +1,15 @@
+# What never goes into a Docker build context: installed or built files (the image builds its
+# own) and anything private (ADR 0012).
+**/node_modules
+**/dist
+**/coverage
+**/src/generated
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+.git
+*.xlsx
+*.xls
+*.csv
+*.dump
