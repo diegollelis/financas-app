@@ -90,9 +90,57 @@ Sem domínio próprio, o Resend só entrega no e-mail da sua conta ([ADR 0022](a
 
 O endereço do Render não é usado pelo navegador. Ele é só o destino do proxy (variável `API_ORIGIN` do Pages, no próximo passo). Quando a API fica ociosa, ela dorme e leva cerca de 1 min para acordar.
 
+## 4. Cloudflare Pages (front e proxy)
+
+1. Crie a conta em <https://dash.cloudflare.com/sign-up>.
+2. Em **Workers & Pages → Create application**, o Cloudflare mostra primeiro as opções de **Worker**. Ignore-as e clique em **Continue to Pages**, no rodapé. Depois escolha **Import an existing Git repository** e dê acesso **só** ao `financas-app`.
+
+   > **Para saber se está no lugar certo:** a tela do Pages tem _Framework preset_ e _Build output directory_. Se aparecerem _Deploy command_ e _Preview command_, é a de um Worker: volte sem salvar. Um Worker não executa a pasta `functions/` do jeito que o proxy espera.
+
+3. Configuração do build:
+
+   | Campo                  | Valor                                                                                       |
+   | ---------------------- | ------------------------------------------------------------------------------------------- |
+   | Project name           | `financas-app`. Se o nome estiver ocupado, o Cloudflare acrescenta um sufixo na URL.        |
+   | Production branch      | `main`                                                                                      |
+   | Framework preset       | None                                                                                        |
+   | Root directory         | `apps/web`                                                                                  |
+   | Build command          | `pnpm install --frozen-lockfile --ignore-scripts --filter "@financas/web..." && pnpm build` |
+   | Build output directory | `dist`                                                                                      |
+
+   O Cloudflare instala sozinho o pnpm do campo `packageManager` do `package.json`. Não ponha `npm install -g pnpm` no comando: o build falha com `EEXIST`. O `npm install` automático não entende o `workspace:*` do pnpm, por isso é desligado com a variável abaixo.
+
+4. Variáveis (**Settings → Variables and Secrets**):
+
+   | Variável                  | Valor                                                                 |
+   | ------------------------- | --------------------------------------------------------------------- |
+   | `SKIP_DEPENDENCY_INSTALL` | `1`                                                                   |
+   | `NODE_VERSION`            | `26` (mesma versão do `.nvmrc`)                                       |
+   | `VITE_API_URL`            | a URL do próprio Pages, sem barra no fim. O valor é gravado no build. |
+   | `API_ORIGIN`              | a URL do serviço no Render, **sem** `/api`                            |
+   | `PROXY_SECRET`            | o mesmo valor do Render, do tipo _Secret_                             |
+
+5. **Save and Deploy.** Se a URL final for diferente da prevista, acerte `VITE_API_URL` aqui e faça **Retry deployment**, porque o valor só muda com um build novo. No Render, acerte também `WEB_ORIGIN` e `BETTER_AUTH_URL`.
+6. Em **Settings → Builds → Branch control**, coloque **Preview branch: None**. Os _previews_ teriam outra origem, que a API recusa, e gastariam a cota de builds.
+7. **Teste de ponta a ponta:**
+   - a primeira resposta pode levar até 1 min, porque a API e o banco acordam;
+   - cadastre-se com o e-mail da conta Resend. A verificação chega, possivelmente no spam;
+   - entre de novo, crie um lançamento e abra o painel;
+   - no **SQL Editor** do Neon, confira que o rate limit recebeu o IP real:
+
+     ```sql
+     SELECT split_part(key, '|', 2) AS rota, key LIKE 'no-trusted-ip%' AS sem_ip FROM rate_limits;
+     ```
+
+     `sem_ip` deve ser `false` em todas as linhas.
+
+## Produção atual
+
+- Front: <https://financas-app-t2l.pages.dev>
+- API: `https://financas-api-qioy.onrender.com`. Só a Function a chama; `/api/health` responde direto.
+
 ## Próximos passos
 
-- Cloudflare Pages: front e Function do proxy (`API_ORIGIN`, `PROXY_SECRET`).
 - Google OAuth de produção.
 - Sentry.
 - Backup do banco.

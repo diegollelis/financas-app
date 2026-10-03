@@ -59,10 +59,10 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 - [x] Conferir limites atuais dos planos gratuitos e definir a topologia ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
 - [x] Proxy `/api/*` numa Pages Function: front e API no mesmo site, cookie `Lax` ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
-- [x] IP real do cliente para o rate limit: `CF-Connecting-IP` repassado pela Function com um segredo ([ADR 0023](adr/0023-rate-limit-autenticacao.md)); conferir `rate_limits` após o deploy
+- [x] IP real do cliente para o rate limit: `CF-Connecting-IP` repassado pela Function com um segredo ([ADR 0023](adr/0023-rate-limit-autenticacao.md)), conferido em produção
 - [x] Imagem Docker da API com migrações ao iniciar o container (o Render free não tem _pre-deploy_), construída no CI
-- [ ] Neon (produção, PostgreSQL 18+: as migrações usam `uuidv7()`), Resend e API no Render, seguindo [docs/deploy.md](deploy.md)
-- [ ] Front e Function no Cloudflare Pages
+- [x] Neon (produção, PostgreSQL 18+: as migrações usam `uuidv7()`), Resend e API no Render, seguindo [docs/deploy.md](deploy.md)
+- [x] Front e Function no Cloudflare Pages (<https://financas-app-t2l.pages.dev>)
 - [ ] Google OAuth de produção: URI de retorno, origens e tela de consentimento publicada ([ADR 0026](adr/0026-login-com-google.md))
 - [ ] Sentry no front e na API (sem dados pessoais)
 - [ ] Backup periódico do banco via GitHub Actions (dump criptografado: artefatos são públicos aqui) + teste de restauração
