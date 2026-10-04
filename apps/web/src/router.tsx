@@ -7,6 +7,7 @@ import { DashboardPage } from '@/routes/dashboard';
 import { ForgotPasswordPage } from '@/routes/forgot-password';
 import { HomePage } from '@/routes/home';
 import { InvitationPage } from '@/routes/invitation';
+import { PrivacyPage } from '@/routes/privacy';
 import { ResetPasswordPage } from '@/routes/reset-password';
 import { SignInPage } from '@/routes/sign-in';
 import { SignUpPage } from '@/routes/sign-up';
@@ -38,6 +39,8 @@ export const routes: RouteObject[] = [
   // Outside the guards: the e-mail link works whether or not someone is signed in here.
   { path: RESET_PASSWORD_PATH, element: <ResetPasswordPage /> },
   { path: `${INVITATION_PATH}/:token`, element: <InvitationPage /> },
+  // Public: Google's consent screen links here (ADR 0026).
+  { path: '/privacidade', element: <PrivacyPage /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ];
 

@@ -73,5 +73,5 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Rateio de lançamentos (ADR próprio)
 - [ ] Comparativos entre meses e gastos por categoria ao longo do tempo
 - [ ] Importação do `.xlsx` (com relatório de inconsistências)
-- [ ] LGPD: política de privacidade, termos, exportação e exclusão de conta
+- [ ] LGPD: termos com aceite no cadastro, exportação e exclusão de conta (a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
 - [ ] Domínio próprio (`app.` e `api.`)
