@@ -28,3 +28,7 @@ A aplicação pública vai armazenar dados financeiros pessoais de terceiros, o 
 
 - Coleta mínima: só o necessário (nome, e-mail, dados financeiros que o próprio usuário lança).
 - Criptografia de campos específicos (ex.: observações) pode ser avaliada depois, em novo ADR.
+
+## Nota (fase 4, 2026-10-04)
+
+O Google exige uma política de privacidade para publicar a tela de consentimento do login ([ADR 0026](0026-login-com-google.md)). Por isso ela foi antecipada: é a página pública `/privacidade` do front (`apps/web/src/routes/privacy.tsx`), com o contato `financas.app.contato@gmail.com`. O texto descreve só o que o app guarda hoje e deve mudar junto com ele. Enquanto exportação e exclusão de conta não existem no app (fase 5), os pedidos do titular chegam por esse e-mail. Os termos de uso, o aceite no cadastro e uma revisão jurídica continuam na fase 5.

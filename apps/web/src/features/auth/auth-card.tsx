@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import {
   Card,
   CardContent,
@@ -8,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
-/** Frame shared by the sign-in and sign-up pages. */
+/** Frame shared by the sign-in and sign-up pages, with the privacy policy link Google asks for. */
 export function AuthCard({
   title,
   description,
@@ -21,7 +22,7 @@ export function AuthCard({
   children: ReactNode;
 }) {
   return (
-    <main className="flex min-h-svh items-center justify-center p-6">
+    <main className="flex min-h-svh flex-col items-center justify-center gap-4 p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>
@@ -32,6 +33,12 @@ export function AuthCard({
         <CardContent>{children}</CardContent>
         <CardFooter className="text-muted-foreground justify-center text-sm">{footer}</CardFooter>
       </Card>
+      <Link
+        to="/privacidade"
+        className="text-muted-foreground text-xs underline-offset-4 hover:underline"
+      >
+        Política de privacidade
+      </Link>
     </main>
   );
 }
