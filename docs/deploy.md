@@ -149,6 +149,43 @@ Um cliente OAuth próprio de produção, no mesmo projeto do Google Cloud do des
 4. No Render, adicione `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` do cliente de produção. As duas vão juntas. O `.env` local continua com as credenciais de desenvolvimento.
 5. Teste: **Continuar com Google** com um e-mail que já tem conta. O Google é vinculado à conta (ADR 0026), e a senha continua valendo.
 
+## 6. Sentry (relatório de erros)
+
+O app já vem preparado ([ADR 0034](adr/0034-relatorio-de-erros-com-sentry.md)): basta criar os projetos e informar as DSNs.
+
+1. Crie a conta em <https://sentry.io> (plano _Developer_, gratuito). Na criação da organização, escolha a região de dados **United States**, a mesma dos outros serviços citados na política de privacidade.
+2. Crie dois projetos, um para cada lado, para separar os alertas:
+   - plataforma **NestJS**, nome `financas-api`;
+   - plataforma **React**, nome `financas-web`.
+
+   No assistente de cada projeto, **desmarque** _Tracing_, _Session Replay_ e _Logs_. O app só envia erros, e o _Replay_ gravaria a tela com valores. Ignore os trechos de código que o assistente mostra: eles já estão no app.
+
+3. Copie a **DSN** de cada projeto (**Project Settings → Client Keys (DSN)**). A DSN não é um segredo forte, porque só permite enviar eventos, e a do front fica visível no JavaScript do site.
+4. Em **Organization Settings → Security & Privacy**, ligue **Prevent Storing of IP Addresses** e confira que **Data Scrubber** e **Use Default Scrubbers** estão ligados. É uma terceira barreira, depois das duas do app.
+5. No **Render**, adicione `SENTRY_DSN` com a DSN do `financas-api`. A API reinicia sozinha.
+6. No **Cloudflare Pages**, adicione `VITE_SENTRY_DSN` com a DSN do `financas-web` e faça **Retry deployment**, porque a variável é gravada no build.
+7. **Teste do front:** abra o site, pressione F12 e, na aba **Console**, rode:
+
+   ```js
+   setTimeout(() => {
+     throw new Error('Teste do Sentry (front)');
+   });
+   ```
+
+   O erro deve aparecer em **Issues** do `financas-web` em até um minuto. O `setTimeout` é necessário: um erro lançado direto no console não passa pelo app.
+
+8. **Teste da API:** na raiz do repositório, rode no PowerShell, trocando pela DSN do `financas-api`:
+
+   ```powershell
+   $env:SENTRY_DSN = "<DSN do financas-api>"
+   pnpm --filter @financas/api exec node -e "const S=require('@sentry/nestjs');S.init({dsn:process.env.SENTRY_DSN});S.captureMessage('Teste do Sentry (API)');S.flush(5000).then(()=>console.log('enviado'))"
+   Remove-Item Env:SENTRY_DSN
+   ```
+
+   A mensagem deve aparecer no `financas-api`. Esse teste confere a DSN e o projeto. A ligação com o app é coberta pelos testes automáticos (`apps/api/test/error-reporting.e2e.spec.ts`).
+
+9. Em cada evento de teste, confira que não aparecem cookies, cabeçalhos, IP nem dados de usuário. Depois, resolva as duas _issues_ (**Resolve**).
+
 ## Produção atual
 
 - Front: <https://financas-app-t2l.pages.dev>
@@ -156,5 +193,4 @@ Um cliente OAuth próprio de produção, no mesmo projeto do Google Cloud do des
 
 ## Próximos passos
 
-- Sentry.
 - Backup do banco.

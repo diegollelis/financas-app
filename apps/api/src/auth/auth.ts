@@ -9,8 +9,10 @@ import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
+import * as Sentry from '@sentry/nestjs';
 import type { z } from 'zod';
 import { CLIENT_IP_HEADER } from '../common/client-ip.js';
+import { redactPrismaError } from '../common/error-reporting.js';
 import type { Env } from '../config/env.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Mailer, MailMessage } from '../mail/mailer.js';
@@ -62,6 +64,7 @@ export function createAuth(
   function deliver(kind: string, message: MailMessage): Promise<void> {
     mailer.send(message).catch((error: unknown) => {
       logger.error(`Could not send the ${kind} e-mail: ${(error as Error).message}`);
+      Sentry.captureException(error);
     });
     return Promise.resolve();
   }
@@ -176,7 +179,9 @@ export function createAuth(
           // already sign in, and listing workspaces creates the missing personal one.
           after: (user) =>
             onUserCreated(user.id).catch((error: unknown) => {
+              redactPrismaError(error);
               logger.error(`Could not create the personal workspace: ${(error as Error).message}`);
+              Sentry.captureException(error);
             }),
         },
       },
@@ -202,6 +207,17 @@ export function createAuth(
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
       // false: Better Auth leaves the id to Prisma, which generates UUIDv7 (ADR 0017).
       database: { generateId: false },
+    },
+    // Better Auth answers its own routes, outside Nest's exception filter, and calls this for
+    // every error, expected ones included (wrong password, no session). Only unexpected errors go
+    // to Sentry (ADR 0034); the log keeps just the error's name, never a message that may hold data.
+    onAPIError: {
+      onError: (error) => {
+        if (error instanceof APIError && error.status !== 'INTERNAL_SERVER_ERROR') return;
+        redactPrismaError(error);
+        logger.error(`Unexpected auth error: ${(error as Error).name}`);
+        Sentry.captureException(error);
+      },
     },
     telemetry: { enabled: false },
   });

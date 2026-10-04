@@ -1,3 +1,5 @@
+// First: starts Sentry (ADR 0034). The container also preloads it with --import.
+import './instrument.js';
 import 'reflect-metadata';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';

@@ -44,4 +44,6 @@ USER node
 # Render's free plan has no pre-deploy command (ADR 0033): migrations run on every start, as the
 # owner (MIGRATION_DATABASE_URL); then the API takes over the process, as the financas_app role
 # (DATABASE_URL). `migrate deploy` only applies pending migrations, so a restart is cheap.
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && exec node dist/main.js"]
+# --enable-source-maps: stack traces (logs and Sentry) point at the TypeScript lines; --import
+# starts Sentry before the app loads (ADR 0034).
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && exec node --enable-source-maps --import ./dist/instrument.js dist/main.js"]
