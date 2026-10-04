@@ -1,0 +1,80 @@
+# Backup do banco de produção (ADR 0035). Este workflow não roda sozinho: ele é chamado pelo
+# repositório privado financas-backup, que define o horário e guarda os secrets. Assim a lógica
+# fica versionada e revisada aqui, mas os artefatos e o agendamento ficam num repositório privado
+# (artefatos de um repositório público podem ser baixados por qualquer pessoa, e o GitHub desliga
+# agendamentos de repositórios públicos após 60 dias sem atividade). Passo a passo: docs/backup.md.
+name: Backup do banco
+
+on:
+  workflow_call:
+    inputs:
+      age-recipient:
+        description: Chave pública age (age1...). Só quem tem a chave privada abre o backup.
+        type: string
+        required: true
+      retention-days:
+        description: Quantos dias cada backup fica guardado.
+        type: number
+        default: 30
+    secrets:
+      DATABASE_URL:
+        description: Conexão direta (sem pooler) do dono das tabelas, que não é filtrado pelo RLS.
+        required: true
+      SENTRY_CRON_URL:
+        description: URL de check-in do monitor de cron do Sentry, sem o ?status=. Opcional.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Dump criptografado
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SENTRY_CRON_URL: ${{ secrets.SENTRY_CRON_URL }}
+    steps:
+      # O monitor do Sentry avisa se o backup falhar ou deixar de rodar no horário.
+      - name: Avisa o Sentry que o backup começou
+        if: env.SENTRY_CRON_URL != ''
+        run: curl -fsS -o /dev/null "${SENTRY_CRON_URL}?status=in_progress"
+
+      - name: Instala o age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+
+      # pg_dump da mesma imagem do docker-compose.yml (Postgres 18, fixada pelo digest): ele precisa
+      # ser da versão do servidor ou mais novo. O dump é criptografado ainda no pipe, então nunca
+      # existe em claro no disco do runner.
+      - name: Faz o dump e criptografa
+        id: dump
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AGE_RECIPIENT: ${{ inputs.age-recipient }}
+        run: |
+          set -euo pipefail
+          name="financas-$(date -u +%Y%m%dT%H%M%SZ)"
+          docker run --rm -e DATABASE_URL \
+            postgres@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873 \
+            sh -c 'pg_dump --format=custom "$DATABASE_URL"' \
+            | age --encrypt --recipient "$AGE_RECIPIENT" > "$name.dump.age"
+          test -s "$name.dump.age"
+          echo "Backup: $name.dump.age ($(du -h "$name.dump.age" | cut -f1))"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.dump.outputs.name }}
+          path: ${{ steps.dump.outputs.name }}.dump.age
+          retention-days: ${{ inputs.retention-days }}
+          if-no-files-found: error
+          # Já criptografado: comprimir de novo não ganha nada.
+          compression-level: 0
+
+      - name: Avisa o Sentry que deu certo
+        if: success() && env.SENTRY_CRON_URL != ''
+        run: curl -fsS -o /dev/null "${SENTRY_CRON_URL}?status=ok"
+
+      - name: Avisa o Sentry que falhou
+        if: failure() && env.SENTRY_CRON_URL != ''
+        run: curl -fsS -o /dev/null "${SENTRY_CRON_URL}?status=error"
