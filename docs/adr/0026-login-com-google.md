@@ -35,5 +35,5 @@ O Better Auth 1.7 evita isso por padrão com `requireLocalEmailVerified`: ele **
 ## Consequências
 
 - Quem tinha criado senha sem confirmar o e-mail e entra com o Google perde a senha. Pode continuar pelo Google ou criar uma nova senha em "Esqueci minha senha".
-- **Deploy (fase 4):** cadastrar no Google Cloud Console o URI de retorno de produção (`https://<api>/api/auth/callback/google`) e as origens; publicar a tela de consentimento (no modo "teste", só os e-mails cadastrados conseguem entrar). As credenciais de produção ficam só no painel do Render.
+- **Deploy (fase 4):** cadastrar no Google Cloud Console o URI de retorno de produção (`https://<api>/api/auth/callback/google`) e as origens; publicar a tela de consentimento (no modo "teste", só os e-mails cadastrados conseguem entrar). As credenciais de produção ficam só no painel do Render. **Feito em 2026-10-04**, com uma diferença: por causa do proxy ([ADR 0033](0033-topologia-e-limites-do-deploy.md)), o URI de retorno é o do front (`https://<pages>/api/auth/callback/google`), não o da API. Produção usa um cliente OAuth próprio, e a publicação exigiu a política de privacidade ([ADR 0012](0012-privacidade-lgpd.md)). Passo a passo em [docs/deploy.md](../deploy.md).
 - Quando a confirmação de e-mail passar a ser obrigatória ([ADR 0022](0022-envio-de-email.md)), o _hook_ continua útil e inofensivo.

@@ -134,6 +134,21 @@ O endereço do Render não é usado pelo navegador. Ele é só o destino do prox
 
      `sem_ip` deve ser `false` em todas as linhas.
 
+## 5. Google (login)
+
+Um cliente OAuth próprio de produção, no mesmo projeto do Google Cloud do desenvolvimento. Assim cada ambiente tem o seu segredo, e revogar um não quebra o outro.
+
+1. Em <https://console.cloud.google.com>, abra **Google Auth Platform → Clients → Create client** e escolha _Web application_:
+   - **Authorized JavaScript origins:** a URL do Pages
+   - **Authorized redirect URIs:** a URL do Pages + `/api/auth/callback/google`. O Google volta pelo Pages, porque `BETTER_AUTH_URL` é a URL do Pages, e a Function repassa à API.
+
+   Copie o Client ID e o Client secret na hora: o _secret_ completo só aparece na criação.
+
+2. Em **Branding**, preencha o nome do app (`Finanças`), o e-mail de suporte, a página inicial (URL do Pages), a política de privacidade (URL do Pages + `/privacidade`) e o domínio autorizado (o host do Pages). Não envie logo: com logo, o Google exige a verificação manual da marca.
+3. Em **Audience**, clique em **Publish app**. Em modo _Testing_, só os usuários de teste entram. Os escopos são básicos (nome, e-mail e foto), então a publicação sai sem análise. O botão fica desabilitado até o _Branding_ estar completo.
+4. No Render, adicione `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` do cliente de produção. As duas vão juntas. O `.env` local continua com as credenciais de desenvolvimento.
+5. Teste: **Continuar com Google** com um e-mail que já tem conta. O Google é vinculado à conta (ADR 0026), e a senha continua valendo.
+
 ## Produção atual
 
 - Front: <https://financas-app-t2l.pages.dev>
@@ -141,6 +156,5 @@ O endereço do Render não é usado pelo navegador. Ele é só o destino do prox
 
 ## Próximos passos
 
-- Google OAuth de produção.
 - Sentry.
 - Backup do banco.
