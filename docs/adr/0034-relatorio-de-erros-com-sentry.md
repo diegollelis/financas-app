@@ -54,3 +54,7 @@ No front:
 - **Cota gratuita:** 5 mil erros por mês e 1 usuário. Um erro em laço pode esgotá-la. Se acontecer, avaliar uma taxa de amostragem.
 - **Revisar** ao adicionar integrações do SDK (_tracing_, _replay_, IA), porque cada uma tem coleta própria, e ao mudar rotas que levam tokens: a lista fica em `TOKEN_SEGMENTS`.
 - O _cron monitor_ do Sentry fica disponível para o backup agendado (próximo item).
+
+## Nota (produção, 2026-10-04)
+
+Configurado e testado em produção: um erro do front e uma mensagem da API chegaram sem cookies, cabeçalhos, IP nem usuário. O teste revelou uma quarta fonte de dado pessoal, que vem do próprio Sentry: mesmo com **Prevent Storing of IP Addresses** ligado, ele calcula a localização aproximada a partir do IP da conexão e a grava em `user.geo` ([issue #92201](https://github.com/getsentry/sentry/issues/92201)). Uma regra de _Advanced Data Scrubbing_ da organização a remove (`Remove` / `Anything` / `$user.geo.**`, _dataset_ _Errors_). Passo a passo em [docs/deploy.md](../deploy.md). Ao ligar outro tipo de dado no Sentry (_Transactions_, _Logs_), repetir a regra para ele.
