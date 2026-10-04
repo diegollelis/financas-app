@@ -22,7 +22,10 @@ const envSchema = z
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     // Shared with the web app's proxy (ADR 0033): only a request carrying it may tell the client IP.
     // Optional outside production, where there is no proxy.
-    PROXY_SECRET: z.string().min(32).optional(),
+    PROXY_SECRET: z.union([z.string().min(32), z.literal('')]).optional(),
+    // Error reporting (ADR 0034). Read by instrument.ts before Nest starts; validated here too, so
+    // a malformed value stops the boot. Optional: without it, nothing is reported.
+    SENTRY_DSN: z.union([z.url(), z.literal('')]).optional(),
   })
   .superRefine((env, ctx) => {
     if (!env.GOOGLE_CLIENT_ID !== !env.GOOGLE_CLIENT_SECRET) {

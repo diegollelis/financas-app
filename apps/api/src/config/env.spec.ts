@@ -40,6 +40,13 @@ describe('validateEnv', () => {
     ).toThrow(/BETTER_AUTH_URL/);
   });
 
+  it('treats the empty values of .env.example as unset', () => {
+    expect(validateEnv({ ...base, PROXY_SECRET: '', SENTRY_DSN: '' })).toMatchObject({
+      PROXY_SECRET: '',
+      SENTRY_DSN: '',
+    });
+  });
+
   it('refuses a short auth secret', () => {
     expect(() => validateEnv({ ...base, BETTER_AUTH_SECRET: 'curto' })).toThrow(
       /BETTER_AUTH_SECRET/,

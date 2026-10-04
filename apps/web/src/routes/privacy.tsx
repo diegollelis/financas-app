@@ -84,8 +84,9 @@ export function PrivacyPage() {
         </p>
         <p>
           Para funcionar, o app usa estes fornecedores, que processam dados apenas em nosso nome:
-          Cloudflare (site), Render (servidor), Neon (banco de dados), Resend (envio de e-mails) e
-          Google (login, se você escolher essa opção). Os servidores ficam nos Estados Unidos, o que
+          Cloudflare (site), Render (servidor), Neon (banco de dados), Resend (envio de e-mails),
+          Sentry (relatórios de erro técnico, sem dados financeiros, de conta ou de sessão) e Google
+          (login, se você escolher essa opção). Os servidores ficam nos Estados Unidos, o que
           caracteriza transferência internacional de dados, feita para a execução do serviço que
           você contratou.
         </p>
