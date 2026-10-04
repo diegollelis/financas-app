@@ -162,6 +162,18 @@ O app já vem preparado ([ADR 0034](adr/0034-relatorio-de-erros-com-sentry.md)):
 
 3. Copie a **DSN** de cada projeto (**Project Settings → Client Keys (DSN)**). A DSN não é um segredo forte, porque só permite enviar eventos, e a do front fica visível no JavaScript do site.
 4. Em **Organization Settings → Security & Privacy**, ligue **Prevent Storing of IP Addresses** e confira que **Data Scrubber** e **Use Default Scrubbers** estão ligados. É uma terceira barreira, depois das duas do app.
+
+   Ainda na mesma página, em **Advanced Data Scrubbing → Add Rule**, crie a regra abaixo. Sem ela, o Sentry descarta o IP, mas guarda a localização aproximada (cidade, região, país) que calcula a partir dele ([issue #92201](https://github.com/getsentry/sentry/issues/92201)):
+
+   | Campo     | Valor                                                               |
+   | --------- | ------------------------------------------------------------------- |
+   | Dataset   | Errors (o único tipo que o app envia e o único que aceita _Source_) |
+   | Method    | Remove                                                              |
+   | Data Type | Anything                                                            |
+   | Source    | `$user.geo.**`                                                      |
+
+   A regra vale só para eventos novos. No teste da etapa 7, confira que o evento não tem a seção **User → Geography**.
+
 5. No **Render**, adicione `SENTRY_DSN` com a DSN do `financas-api`. A API reinicia sozinha.
 6. No **Cloudflare Pages**, adicione `VITE_SENTRY_DSN` com a DSN do `financas-web` e faça **Retry deployment**, porque a variável é gravada no build.
 7. **Teste do front:** abra o site, pressione F12 e, na aba **Console**, rode:

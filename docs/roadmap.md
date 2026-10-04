@@ -64,7 +64,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Neon (produção, PostgreSQL 18+: as migrações usam `uuidv7()`), Resend e API no Render, seguindo [docs/deploy.md](deploy.md)
 - [x] Front e Function no Cloudflare Pages (<https://financas-app-t2l.pages.dev>)
 - [x] Google OAuth de produção: URI de retorno, origens e tela de consentimento publicada ([ADR 0026](adr/0026-login-com-google.md)), com a política de privacidade em `/privacidade`
-- [ ] Sentry no front e na API, sem dados pessoais ([ADR 0034](adr/0034-relatorio-de-erros-com-sentry.md)): código pronto; falta criar os projetos e informar as DSNs ([docs/deploy.md](deploy.md))
+- [x] Sentry no front e na API, sem dados pessoais ([ADR 0034](adr/0034-relatorio-de-erros-com-sentry.md)), testado em produção
 - [ ] Backup periódico do banco via GitHub Actions (dump criptografado: artefatos são públicos aqui) + teste de restauração
 
 ## Fase 5 — Evolução e abertura ao público
