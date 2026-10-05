@@ -34,8 +34,9 @@ export type TransactionFormValues = z.output<typeof transactionFormSchema>;
 /** 15990 → "159,90": the amount as the person would type it. */
 const amountText = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 });
 
+// Same box as Input (44px below md) until the shadcn Select replaces it (ADR 0036).
 const selectClassName =
-  'border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs';
+  'border-input h-11 w-full rounded-lg border bg-transparent px-3 text-base md:h-8 md:px-2.5 md:text-sm';
 
 export function TransactionForm({
   idPrefix,

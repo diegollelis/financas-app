@@ -151,7 +151,7 @@ export function BudgetForm({
               >
                 <Input inputMode="decimal" autoComplete="off" {...register(key)} />
               </FormField>
-              <span className="text-muted-foreground h-9 py-2 tabular-nums">
+              <span className="text-muted-foreground flex h-11 items-center tabular-nums md:h-8">
                 {netIncome !== null && share != null
                   ? formatCents(shareOfIncome(netIncome, share))
                   : '—'}
