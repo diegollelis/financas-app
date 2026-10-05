@@ -68,21 +68,34 @@ financas-backup (privado)                    financas-app (público)
 
 ## 3. Monitor no Sentry (uma vez)
 
-O monitor avisa por e-mail se o backup falhar ou deixar de rodar.
+O monitor funciona como um relógio de ponto: a cada execução, o backup visita a URL do monitor. Se o ponto não for batido no horário (com 30 minutos de tolerância), ou se o backup avisar que falhou, o Sentry manda um e-mail.
 
-1. No Sentry, abra **Crons** (no menu **Insights**, ou procure "Crons") e clique em **Add Monitor**.
-2. Preencha:
-   - **Name:** `financas-backup`
-   - **Project:** `financas-api`
-   - **Schedule:** _crontab_ `17 6 * * *`, fuso **UTC**, o mesmo do workflow
-   - **Grace period:** 30 minutos. **Max runtime:** 15 minutos.
-3. Nas instruções do monitor, aba **cURL** (ou _HTTP_), há uma URL como `https://o123.ingest.us.sentry.io/api/456/cron/financas-backup/abc.../?status=ok`. Copie-a **sem** o `?status=ok` e grave como o secret `SENTRY_CRON_URL` do passo 2.
+O monitor é criado pelo **primeiro ponto**, e não pela tela. Ao criar pela tela, o Sentry gerou um _slug_ provisório (ex.: `new-monitor-sf`) que não pôde ser editado depois, e o _slug_ é a parte da URL que identifica o monitor. Pela [API de check-in](https://docs.sentry.io/product/crons/getting-started/http/), um ponto numa URL com um _slug_ ainda inexistente, levando a configuração junto, cria o monitor com esse _slug_. O plano gratuito permite 1 monitor: se já existir outro, apague-o antes (**⋯ → Delete**).
+
+1. Monte a URL a partir da DSN do projeto `financas-api` (**Settings → Projects → financas-api → Client Keys (DSN)**), no PowerShell:
+
+   ```powershell
+   $dsn = "<DSN do financas-api>"
+   $u = [Uri]$dsn
+   $url = "https://$($u.Host)/api$($u.AbsolutePath)/cron/financas-backup/$($u.UserInfo)/"; $url
+   ```
+
+2. Bata o primeiro ponto com a configuração: o mesmo horário do workflow, em UTC, 30 minutos de tolerância e 15 de duração máxima. O `Invoke-RestMethod` evita o `curl.exe`, porque o PowerShell 5.1 estraga as aspas do JSON:
+
+   ```powershell
+   $body = @{ status = 'ok'; monitor_config = @{ schedule = @{ type = 'crontab'; value = '17 6 * * *' }; timezone = 'UTC'; checkin_margin = 30; max_runtime = 15 } } | ConvertTo-Json -Depth 5
+   Invoke-RestMethod -Method Post -Uri $url -ContentType 'application/json' -Body $body
+   ```
+
+   Em **Crons**, o monitor aparece com um _check-in_ OK. Em **Details**, confira **Monitor slug: `financas-backup`**.
+
+3. Grave a URL do passo 1 (terminando em `/`, sem `?status=`) como o secret `SENTRY_CRON_URL` do passo 2 e limpe o terminal com `Remove-Variable dsn, u, url, body`.
 
 ## 4. Primeira execução
 
 1. No `financas-backup`, abra **Actions → Backup → Run workflow**.
 2. Ao terminar, a execução mostra em **Artifacts** um arquivo `financas-AAAAMMDDTHHMMSSZ`. O log mostra o tamanho.
-3. Se o monitor estiver configurado, ele aparece como **OK** no Sentry.
+3. Se o monitor estiver configurado, os passos "Avisa o Sentry..." do job ficam verdes (o de falha fica pulado), e o monitor mostra um novo _check-in_ OK. Sem o secret `SENTRY_CRON_URL`, esses passos são pulados e o backup roda normalmente.
 
 ## 5. Teste de restauração
 
@@ -108,7 +121,7 @@ Um backup só vale se a restauração funcionar. Faça este teste depois da prim
 
    `--no-owner` e `--no-privileges` ignoram os papéis do Neon, que não existem localmente. Numa restauração real no Neon, eles não são usados.
 
-4. Compare as contagens. Rode a consulta abaixo no banco restaurado e a mesma no **SQL Editor** do Neon. Os números devem bater, salvo o que mudou desde o horário do backup:
+4. Compare as contagens. Rode a consulta abaixo no banco restaurado e a mesma no **SQL Editor** do Neon. Os números devem bater, salvo o que mudou desde o horário do backup. O SQL Editor do Neon mostra um número de linha antes das colunas, que não faz parte do resultado:
 
    ```powershell
    docker compose exec -T postgres psql -U financas -d financas_restore -c "SELECT (SELECT count(*) FROM users) AS usuarios, (SELECT count(*) FROM workspaces) AS espacos, (SELECT count(*) FROM transactions) AS lancamentos, (SELECT count(*) FROM categories) AS categorias, (SELECT count(*) FROM budget_configs) AS orcamentos, (SELECT count(*) FROM pg_policies) AS politicas_rls"

@@ -4,7 +4,7 @@
 
 Aplicação web multiusuário para controle financeiro mensal: créditos, débitos, orçamento por percentual e saldo. Nasce de uma planilha Excel pessoal e é desenvolvida como **laboratório de estudo full stack**, com cada decisão de arquitetura registrada em [ADRs](docs/adr/README.md).
 
-> **Status:** fases 1 a 3 concluídas. A [fase 4](docs/roadmap.md#fase-4--deploy) (deploy) está em andamento, e o app já está no ar em <https://financas-app-t2l.pages.dev>. O roteiro fica em [docs/deploy.md](docs/deploy.md).
+> **Status:** fases 1 a 4 concluídas. O app está no ar em <https://financas-app-t2l.pages.dev>, com relatório de erros e backup diário. Próximo: a [fase 5](docs/roadmap.md#fase-5--evolução-e-abertura-ao-público). Roteiros: [deploy](docs/deploy.md) e [backup](docs/backup.md).
 
 ## Stack
 
