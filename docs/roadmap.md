@@ -55,7 +55,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Tela do painel (`/espacos/:workspaceId/painel?competencia=AAAA-MM`), gráfico sem biblioteca ([ADR 0032](adr/0032-graficos-sem-biblioteca.md))
 - [x] Navegação entre competências (anterior, próxima e mês atual nas telas de lançamentos, orçamento e painel)
 
-## Fase 4 — Deploy
+## Fase 4 — Deploy ✅
 
 - [x] Conferir limites atuais dos planos gratuitos e definir a topologia ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
 - [x] Proxy `/api/*` numa Pages Function: front e API no mesmo site, cookie `Lax` ([ADR 0033](adr/0033-topologia-e-limites-do-deploy.md))
@@ -65,7 +65,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Front e Function no Cloudflare Pages (<https://financas-app-t2l.pages.dev>)
 - [x] Google OAuth de produção: URI de retorno, origens e tela de consentimento publicada ([ADR 0026](adr/0026-login-com-google.md)), com a política de privacidade em `/privacidade`
 - [x] Sentry no front e na API, sem dados pessoais ([ADR 0034](adr/0034-relatorio-de-erros-com-sentry.md)), testado em produção
-- [ ] Backup diário do banco, criptografado, num repositório privado ([ADR 0035](adr/0035-backup-do-banco.md)): workflow pronto; falta criar o repositório, rodar a primeira vez e testar a restauração ([docs/backup.md](backup.md))
+- [x] Backup diário do banco, criptografado, num repositório privado ([ADR 0035](adr/0035-backup-do-banco.md)), com restauração testada e monitor no Sentry ([docs/backup.md](backup.md))
 
 ## Fase 5 — Evolução e abertura ao público
 
