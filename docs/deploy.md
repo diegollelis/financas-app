@@ -205,4 +205,4 @@ O app já vem preparado ([ADR 0034](adr/0034-relatorio-de-erros-com-sentry.md)):
 
 ## Próximos passos
 
-- Backup do banco.
+- Backup do banco: [docs/backup.md](backup.md).
