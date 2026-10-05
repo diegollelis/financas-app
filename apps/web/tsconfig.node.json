@@ -5,11 +5,13 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "types": ["node"],
+    // scripts/screenshots.ts runs code in the browser through page.evaluate.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
     "moduleDetection": "force",
     "noEmit": true
   },
-  "include": ["vite.config.ts", "vitest.config.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "scripts"]
 }

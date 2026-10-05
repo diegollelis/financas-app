@@ -71,7 +71,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 - [ ] Reforma do front mobile first ([ADR 0036](adr/0036-design-mobile-first.md))
   - [x] Skills: plugin `frontend-design` e a skill do projeto `financas-ui`
-  - [ ] Fundação visual: cor de marca, tokens semânticos, toques de 44 px, componentes do shadcn, `theme-color` e manifesto
+  - [x] Fundação visual: cor de marca (índigo), tokens semânticos, toques de 44 px, componentes do shadcn, ícones e manifesto, script de capturas
   - [ ] Layout dos espaços: barra inferior no celular, menu lateral no desktop, `PeriodNav` em botões e estados de carregando, vazio e erro
   - [ ] Lançamentos: cartões, ações num menu, formulário em gaveta, confirmação ao excluir e toasts
   - [ ] Painel: indicadores responsivos e destinos em cartões no celular

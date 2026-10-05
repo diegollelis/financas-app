@@ -4,6 +4,8 @@ dist/
 build/
 .turbo/
 coverage/
+# Capturas de tela da revisão de interface (apps/web/scripts/screenshots.ts): vão nos PRs, não no git
+.screenshots/
 *.tsbuildinfo
 # Client do Prisma: gerado a partir do schema (pnpm db:generate)
 **/src/generated/

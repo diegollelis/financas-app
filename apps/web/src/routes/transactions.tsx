@@ -41,9 +41,7 @@ function StatusBadge({ transaction, today }: { transaction: Transaction; today: 
   const status: TransactionStatus = transactionStatus(transaction, today);
   if (status === 'SETTLED') {
     return (
-      <Badge variant="success">
-        Efetivado em {formatIsoDate(transaction.settledAt ?? '')}
-      </Badge>
+      <Badge variant="success">Efetivado em {formatIsoDate(transaction.settledAt ?? '')}</Badge>
     );
   }
   if (status === 'OVERDUE') return <Badge variant="destructive">Vencido</Badge>;
