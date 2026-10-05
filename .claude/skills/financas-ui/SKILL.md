@@ -68,7 +68,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 ## Review checklist (before calling a UI change done)
 
 1. `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
-2. Screenshots at **360×800, 768×1024 and 1280×800** of each changed page, with the API and web dev servers running. Check: no horizontal scroll, 44 px targets on mobile, nothing hidden behind the tab bar, dark mode legible if touched.
+2. Screenshots at **360×800, 768×1024 and 1280×800** of each changed page: with `pnpm db:up` and the API and web dev servers running, `pnpm --filter @financas/web screenshots [page]` writes them to `apps/web/.screenshots/` and lists horizontal scroll and touch targets under 44px at phone width. Look at the images too. Check: no horizontal scroll, 44 px targets on mobile, nothing hidden behind the tab bar, dark mode legible if touched.
 3. Keyboard pass: Tab through the page, open and close every dialog, focus is always visible.
 4. No template tells from the list above; one brand color; semantic colors only from tokens.
 5. Copy is pt-BR, consistent verbs between button and toast.

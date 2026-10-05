@@ -59,3 +59,12 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **Verificação de PRs de interface:** além do CI, capturas em 360, 768 e 1280 px de largura.
 - **Plugin de terceiros:** ele vem da Anthropic, e o `.claude/settings.json` registra só que ele está habilitado. A versão fica no cache de cada máquina, então atualizações do plugin podem mudar a orientação estética. A skill do projeto é a parte estável.
 - **Revisar** se o app ganhar outra plataforma (app nativo ou PWA completo) ou se a direção visual mudar.
+
+## Nota (fundação visual, 2026-10-05)
+
+- **Cor de marca: índigo** (`#3f47c4` no tema claro, `#8f96f2` no escuro), escolhido entre índigo, petróleo e ameixa numa comparação aplicada à tela de lançamentos. O azul-marinho foi descartado por se confundir com o azul dos gráficos. Contraste do texto sobre a cor: 7,2:1 no claro e 7,4:1 no escuro.
+- **Tokens semânticos** `success` e `warning`, cada um com uma versão `-muted` para fundos e com variante escura. Todas as combinações de texto têm 5,8:1 ou mais. O `Badge` ganhou as variantes `success` e `warning`.
+- **44 px abaixo de `md`** em `Button`, `Input`, `Select` e nos itens de `DropdownMenu`. Os tamanhos compactos do shadcn valem a partir de `md`.
+- **Componentes do shadcn adicionados:** `sheet`, `dialog`, `alert-dialog`, `sonner`, `skeleton`, `select`, `radio-group` e `dropdown-menu`. O CLI tenta sobrescrever o `button.tsx`; a resposta deve ser "não".
+- **Ícones:** favicon em índigo, `apple-touch-icon` e ícones de 192 e 512 px gerados a partir dele, mais `manifest.webmanifest` e `theme-color`.
+- **Capturas e checagens:** `pnpm --filter @financas/web screenshots` (`apps/web/scripts/screenshots.ts`, com Playwright) fotografa as telas em 360, 768 e 1280 px com um usuário fictício local e aponta rolagem horizontal e alvos de toque menores que 44 px no celular.
