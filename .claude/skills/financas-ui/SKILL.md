@@ -32,10 +32,10 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 ## Components (shadcn/ui on Radix, `apps/web/src/components/ui/`)
 
 - Use shadcn components before writing new ones. Add with `pnpm dlx shadcn@latest add <name>` from `apps/web`, then `pnpm format`.
-- **Forms:** React Hook Form + `zodResolver` with the shared schema, and `FormField` (`components/form-field.tsx`). Inside a `Sheet` (side `bottom`) below `md` and a `Dialog` from `md`. Use shadcn `Select` and `RadioGroup`, not native ones.
+- **Forms:** React Hook Form + `zodResolver` with the shared schema, and `FormField` (`components/form-field.tsx`). Inside `ResponsiveDialog` (`components/responsive-dialog.tsx`): a bottom `Sheet` below `md`, a `Dialog` from `md`. A dialog opened from a menu item or an outside button passes `returnFocusTo`, and is remounted (`key`) on each opening so no old error remains. Use shadcn `Select` and `RadioGroup`, not native ones.
 - **Destructive actions:** `AlertDialog` with the item named ("Excluir Aluguel?"). Never one-click delete.
 - **Row actions:** at most one inline action (e.g. "Efetivar"); the rest in a `DropdownMenu` (`⋯`) with an `aria-label` that names the item.
-- **Feedback:** a `sonner` toast after every mutation, worded with the same verb as the button ("Lançamento excluído").
+- **Feedback:** a `sonner` toast after every mutation, worded with the same verb as the button ("Lançamento excluído"). The `Toaster` is mounted once in `components/root-layout.tsx`. When the component may unmount on success (a deleted row), use `mutateAsync().then(...)`: `mutate`'s per-call callbacks are skipped after unmount.
 - **Class merging:** `cn` from `lib/utils.ts`. Pass conflicting Tailwind classes only if `cn` resolves them (tailwind-merge).
 
 ## States (every query-driven view)
