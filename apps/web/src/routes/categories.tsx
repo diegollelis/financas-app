@@ -7,11 +7,11 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useParams } from 'react-router';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
+import { PageHeader } from '@/components/page-header';
+import { QueryState } from '@/components/query-state';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   useCategories,
@@ -19,8 +19,7 @@ import {
   useDeleteCategory,
   useUpdateCategory,
 } from '@/features/categories/use-categories';
-import { useWorkspace } from '@/features/workspaces/use-workspace';
-import { ApiError } from '@/lib/api';
+import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /** Only the name is typed in the forms; the type comes from the section. */
@@ -261,54 +260,26 @@ function CategorySection({
 }
 
 export function CategoriesPage() {
-  const { workspaceId = '' } = useParams();
-  const workspace = useWorkspace(workspaceId);
-  const categories = useCategories(workspaceId);
-  const error = workspace.error ?? categories.error;
+  const workspace = useCurrentWorkspace();
+  const categories = useCategories(workspace.id);
 
   return (
-    <main className="flex min-h-svh justify-center p-6">
-      <Card className="w-full max-w-lg self-start">
-        <CardHeader>
-          <Link
-            to={`/espacos/${workspaceId}`}
-            className="text-muted-foreground text-sm hover:underline"
-          >
-            ← {workspace.data?.name ?? 'Espaço'}
-          </Link>
-          <CardTitle>
-            <h1>Categorias</h1>
-          </CardTitle>
-          <CardDescription>
-            Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-6 text-sm">
-          {(workspace.isPending || categories.isPending) && !error && (
-            <p className="text-muted-foreground">Carregando…</p>
-          )}
-          {error &&
-            (error instanceof ApiError && error.status === 404 ? (
-              // Same answer for "does not exist" and "not yours" (ADR 0025).
-              <p role="alert">Espaço não encontrado.</p>
-            ) : (
-              <p role="alert" className="text-destructive">
-                {apiErrorMessage(error)}
-              </p>
-            ))}
-          {workspace.isSuccess &&
-            categories.isSuccess &&
-            sections.map((section) => (
-              <CategorySection
-                key={section.type}
-                {...section}
-                workspaceId={workspaceId}
-                categories={categories.data.filter((category) => category.type === section.type)}
-                canEdit={hasRole(workspace.data.role, 'EDITOR')}
-              />
-            ))}
-        </CardContent>
-      </Card>
-    </main>
+    <>
+      <PageHeader
+        title="Categorias"
+        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada."
+      />
+      <QueryState queries={[categories]} />
+      {categories.isSuccess &&
+        sections.map((section) => (
+          <CategorySection
+            key={section.type}
+            {...section}
+            workspaceId={workspace.id}
+            categories={categories.data.filter((category) => category.type === section.type)}
+            canEdit={hasRole(workspace.role, 'EDITOR')}
+          />
+        ))}
+    </>
   );
 }

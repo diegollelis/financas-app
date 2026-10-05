@@ -38,9 +38,10 @@ describe('WorkspacePage', () => {
 
     renderApp(`/espacos/${houseId}`);
 
-    expect(await screen.findByRole('heading', { name: 'Casa' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Membros' })).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).getByText('Casa')).toBeInTheDocument();
     expect(screen.getByText('Seu acesso: Dono')).toBeInTheDocument();
-    const memberList = await screen.findByRole('list');
+    const memberList = await screen.findByRole('list', { name: 'Membros do espaço' });
     expect(memberList).toHaveTextContent('João Exemplo (joao@example.com)');
     expect(memberList).toHaveTextContent('Leitor');
     expect(await screen.findByText('ana@example.com')).toBeInTheDocument();

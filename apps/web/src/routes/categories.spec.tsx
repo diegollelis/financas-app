@@ -58,10 +58,6 @@ describe('CategoriesPage', () => {
     expect(within(debits).getByRole('heading', { name: 'Arquivadas' })).toBeInTheDocument();
     expect(within(debits).getByRole('button', { name: 'Reativar IPVA' })).toBeInTheDocument();
     expect(within(debits).getByRole('button', { name: 'Arquivar Mercado' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '← Casa' })).toHaveAttribute(
-      'href',
-      `/espacos/${houseId}`,
-    );
   });
 
   it('adds a category to the right type', async () => {
@@ -183,7 +179,7 @@ describe('CategoriesPage', () => {
 
     const debits = await section('Débitos');
     expect(within(debits).getByText('Mercado')).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Nova categoria/)).not.toBeInTheDocument();
   });
 
@@ -199,13 +195,13 @@ describe('CategoriesPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Espaço não encontrado.');
   });
 
-  it('is reached from the workspace page', async () => {
+  it('is reached from the sections of the workspace', async () => {
     mockCategories({
       [`GET /api/workspaces/${houseId}/members`]: { body: [] },
     });
     const { router } = renderApp(`/espacos/${houseId}`);
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Categorias →' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Categorias' }));
 
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/categorias`);
     expect(await screen.findByRole('heading', { name: 'Categorias' })).toBeInTheDocument();

@@ -1,17 +1,17 @@
 import { formatBasisPoints, formatCents, formatPeriod, type Summary } from '@financas/shared';
 import { TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Link } from 'react-router';
+import { PageHeader } from '@/components/page-header';
+import { QueryState } from '@/components/query-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { shareLabels } from '@/features/budget/share-labels';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import { CreditsBar } from '@/features/summary/credits-bar';
 import { ExpensesMeter } from '@/features/summary/expenses-meter';
 import { useSummary } from '@/features/summary/use-summary';
-import { useWorkspace } from '@/features/workspaces/use-workspace';
-import { ApiError } from '@/lib/api';
-import { apiErrorMessage } from '@/lib/error-message';
+import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { cn } from '@/lib/utils';
 
 /** Colored by sign, as in the spreadsheet; the minus sign keeps it readable without color. */
@@ -172,48 +172,37 @@ function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
   );
 }
 
+function DashboardSkeleton() {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} className="h-20" />
+        ))}
+      </div>
+      <Skeleton className="h-24" />
+      <Skeleton className="h-40" />
+    </>
+  );
+}
+
 export function DashboardPage() {
-  const { workspaceId = '' } = useParams();
+  const workspace = useCurrentWorkspace();
   const period = usePeriod();
-  const workspace = useWorkspace(workspaceId);
-  const summary = useSummary(workspaceId, period);
-  const error = workspace.error ?? summary.error;
-  const ready = workspace.isSuccess && summary.isSuccess;
+  const summary = useSummary(workspace.id, period);
   // The other pages of the same competência.
   const links: PageLinks = {
-    transactions: `/espacos/${workspaceId}/lancamentos?competencia=${period}`,
-    budget: `/espacos/${workspaceId}/orcamento?competencia=${period}`,
+    transactions: `/espacos/${workspace.id}/lancamentos?competencia=${period}`,
+    budget: `/espacos/${workspace.id}/orcamento?competencia=${period}`,
   };
 
   return (
-    <main className="flex min-h-svh justify-center p-6">
-      <Card className="w-full max-w-2xl self-start">
-        <CardHeader>
-          <Link
-            to={`/espacos/${workspaceId}`}
-            className="text-muted-foreground text-sm hover:underline"
-          >
-            ← {workspace.data?.name ?? 'Espaço'}
-          </Link>
-          <CardTitle>
-            <h1>Painel</h1>
-          </CardTitle>
-          <PeriodNav period={period} />
-        </CardHeader>
-        <CardContent className="grid gap-6 text-sm">
-          {!ready && !error && <p className="text-muted-foreground">Carregando…</p>}
-          {error &&
-            (error instanceof ApiError && error.status === 404 ? (
-              // Same answer for "does not exist" and "not yours" (ADR 0025).
-              <p role="alert">Espaço não encontrado.</p>
-            ) : (
-              <p role="alert" className="text-destructive">
-                {apiErrorMessage(error)}
-              </p>
-            ))}
-          {ready && <Dashboard summary={summary.data} links={links} />}
-        </CardContent>
-      </Card>
-    </main>
+    <>
+      <PageHeader title="Painel">
+        <PeriodNav period={period} />
+      </PageHeader>
+      <QueryState queries={[summary]} skeleton={<DashboardSkeleton />} />
+      {summary.isSuccess && <Dashboard summary={summary.data} links={links} />}
+    </>
   );
 }

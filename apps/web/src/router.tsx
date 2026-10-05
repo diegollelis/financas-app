@@ -1,6 +1,7 @@
 import { INVITATION_PATH, RESET_PASSWORD_PATH } from '@financas/shared';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
+import { WorkspaceLayout } from '@/features/workspaces/workspace-layout';
 import { BudgetPage } from '@/routes/budget';
 import { CategoriesPage } from '@/routes/categories';
 import { DashboardPage } from '@/routes/dashboard';
@@ -28,12 +29,19 @@ export const routes: RouteObject[] = [
     element: <RequireAuth />,
     children: [
       { path: '/', element: <HomePage /> },
-      { path: '/espacos/:workspaceId', element: <WorkspacePage /> },
-      { path: '/espacos/:workspaceId/categorias', element: <CategoriesPage /> },
-      // The competência travels as ?competencia=YYYY-MM (default: this month).
-      { path: '/espacos/:workspaceId/lancamentos', element: <TransactionsPage /> },
-      { path: '/espacos/:workspaceId/orcamento', element: <BudgetPage /> },
-      { path: '/espacos/:workspaceId/painel', element: <DashboardPage /> },
+      {
+        // Header, sections nav and the workspace loaded once for every page below (ADR 0036).
+        path: '/espacos/:workspaceId',
+        element: <WorkspaceLayout />,
+        children: [
+          { index: true, element: <WorkspacePage /> },
+          { path: 'categorias', element: <CategoriesPage /> },
+          // The competência travels as ?competencia=YYYY-MM (default: this month).
+          { path: 'lancamentos', element: <TransactionsPage /> },
+          { path: 'orcamento', element: <BudgetPage /> },
+          { path: 'painel', element: <DashboardPage /> },
+        ],
+      },
     ],
   },
   // Outside the guards: the e-mail link works whether or not someone is signed in here.
