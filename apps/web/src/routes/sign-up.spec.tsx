@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { fakeUser, healthy, mockApi, noSession, personalWorkspace } from '@/test/mock-api';
+import { fakeUser, mockApi, noSession, personalWorkspace } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 const maria = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
@@ -18,7 +18,6 @@ describe('SignUpPage', () => {
     mockApi({
       'GET /api/me': noSession,
       'POST /api/auth/sign-up/email': { body: { token: 'fake', user: fakeUser } },
-      'GET /api/health': healthy,
       'GET /api/workspaces': { body: [personalWorkspace] },
     });
     renderApp('/cadastro');

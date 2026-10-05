@@ -80,3 +80,20 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **`QueryState`** (`components/query-state.tsx`) mostra o _skeleton_, o aviso de "Acordando o servidor…" depois de 3 s, "Espaço não encontrado." com o caminho de volta, ou o erro com "Tentar de novo". Substituiu o bloco repetido nas cinco páginas.
 - **`PeriodNav`** virou botões de 44 px (anterior, próxima e "Mês atual"), ainda como links, porque navegam.
 - **A página `/espacos/:workspaceId`** deixou de ser um índice de links e passou a ser "Membros". A lista de espaços da página inicial abre direto o Painel.
+
+## Nota (página inicial e tema, 2026-10-05)
+
+- **Tema Sistema, Claro ou Escuro**, escolhido no menu da conta. O padrão é **Sistema**, que segue o aparelho e muda sozinho quando o celular entra no modo noturno.
+  - A escolha fica só neste navegador (`localStorage`, chave `financas-tema`) e não vai para a API.
+  - Sem armazenamento disponível, vale Sistema.
+  - O código fica em `apps/web/src/lib/theme.ts` (`useTheme`).
+- **Sem clarão branco ao abrir:** `public/theme-init.js` roda no `<head>`, antes do CSS e do JavaScript do app, e aplica a classe `.dark`, o `color-scheme` e o `theme-color` (`#ffffff` ou `#0a0a0a`).
+  - É um arquivo externo, e não um script _inline_, para não exigir exceção numa futura CSP.
+  - Ele repete o mínimo de `theme.ts`; os dois precisam andar juntos.
+- **Cabeçalho comum** (`features/shell/`): `AppHeader`, `AccountMenu` e `SkipLink`, usados pelo layout dos espaços e pela página inicial.
+- **Página inicial no padrão novo:**
+  - mesmo cabeçalho e margens, sem as abas, porque nenhum espaço foi escolhido ainda;
+  - os espaços aparecem como linhas tocáveis que abrem o Painel;
+  - "Sair" fica no menu da conta.
+  - O selo "Status da API" saiu, e o aviso de _cold start_ do `QueryState` ocupa o lugar dele.
+- **Capturas:** o script também fotografa o tema escuro a 360 e 1280 px (`*-escuro.png`).

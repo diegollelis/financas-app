@@ -2,7 +2,6 @@ import { periodSchema } from '@financas/shared';
 import {
   ArrowLeftRight,
   ChartPie,
-  CircleUser,
   Ellipsis,
   LayoutDashboard,
   LayoutGrid,
@@ -11,17 +10,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Link, NavLink, Outlet, useLocation, useParams, useSearchParams } from 'react-router';
+import { NavLink, Outlet, useLocation, useParams, useSearchParams } from 'react-router';
 import { ListSkeleton, QueryState } from '@/components/query-state';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetClose,
@@ -32,8 +22,8 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSignOut } from '@/features/auth/use-auth-mutations';
 import { useCurrentUser } from '@/features/auth/use-me';
+import { AppHeader, SkipLink } from '@/features/shell/app-header';
 import { cn } from '@/lib/utils';
 import { CurrentWorkspaceContext } from './current-workspace';
 import { useWorkspace } from './use-workspace';
@@ -139,32 +129,6 @@ function SectionNav({ workspaceId }: { workspaceId: string }) {
   );
 }
 
-function AccountMenu({ signOut }: { signOut: ReturnType<typeof useSignOut> }) {
-  const user = useCurrentUser();
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Menu da conta">
-          <CircleUser aria-hidden className="size-5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="grid font-normal">
-          <span className="text-foreground truncate font-medium">{user.name}</span>
-          <span className="truncate">{user.email}</span>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/">Seus espaços</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={signOut.isPending} onSelect={() => signOut.mutate()}>
-          Sair
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 /**
  * Layout route of every page of a workspace (ADR 0036): header, the sections as a bottom tab bar
  * on the phone and a sidebar from md, and the workspace loaded once for the pages under it.
@@ -174,34 +138,19 @@ export function WorkspaceLayout() {
   const { workspaceId = '' } = useParams();
   const user = useCurrentUser();
   const workspace = useWorkspace(workspaceId);
-  const signOut = useSignOut();
 
   return (
     <div className="min-h-svh">
-      <a
-        href="#conteudo"
-        className="bg-background focus-visible:ring-ring/50 sr-only z-50 rounded-lg px-3 py-2 font-medium focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus-visible:ring-3"
-      >
-        Pular para o conteúdo
-      </a>
-      <header className="bg-background/95 sticky top-0 z-40 border-b pt-[env(safe-area-inset-top)] backdrop-blur">
-        <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
-          <img src="/favicon.svg" alt="" className="size-7 shrink-0" />
-          <div className="min-w-0 flex-1">
-            {workspace.isSuccess ? (
-              <p className="truncate font-semibold">{workspace.data.name}</p>
-            ) : (
-              workspace.isPending && <Skeleton className="h-5 w-32" />
-            )}
-          </div>
-          <AccountMenu signOut={signOut} />
-        </div>
-        {signOut.isError && (
-          <p role="alert" className="text-destructive border-t px-4 py-2 sm:px-6">
-            Não foi possível sair agora. Tente de novo.
-          </p>
-        )}
-      </header>
+      <SkipLink />
+      <AppHeader
+        title={
+          workspace.isSuccess ? (
+            <p className="truncate font-semibold">{workspace.data.name}</p>
+          ) : (
+            workspace.isPending && <Skeleton className="h-5 w-32" />
+          )
+        }
+      />
       <div className="md:flex">
         {!workspace.isError && <SectionNav workspaceId={workspaceId} />}
         <main

@@ -6,12 +6,14 @@ import {
   OctagonXIcon,
   Loader2Icon,
 } from 'lucide-react';
+import { useTheme } from '@/lib/theme';
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { resolved } = useTheme();
   return (
     <Sonner
-      // The app has no dark mode switch yet (ADR 0036): the colors come from the theme tokens below.
-      theme="light"
+      // The theme chosen in the account menu (ADR 0036); the colors come from the tokens below.
+      theme={resolved}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

@@ -15,6 +15,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 
 - **Sober, with one brand color** (the `--primary` token) for primary actions, the active nav item and key highlights. Everything else is neutral.
 - **Semantic colors are tokens**, never raw Tailwind palette classes: `--success` (settled), `--warning` (due soon or overdue), `--destructive` (delete, negative balance). Each has a `.dark` variant in `apps/web/src/index.css`. No `bg-green-100`-style hardcoded colors.
+- **Two themes:** the person picks Sistema, Claro or Escuro in the account menu (`useTheme` from `lib/theme.ts`; `.dark` on `<html>`). Every color comes from a token that has a `.dark` value; never `bg-white`, `text-black` or other fixed colors. Check every change in both themes.
 - Charts use the validated `--chart-1..3` palette (ADR 0032); never add series colors ad hoc.
 - **Avoid template tells** (see `frontend-design`): no `→` appended to links or buttons, no `A · B · C` middle-dot strings, no all-caps eyebrow labels, no identical-card-everything layouts, no decorative gradients, no motion that is not a response to the user.
 - **Amounts:** `tabular-nums`, right-aligned in lists, the largest text in their block. Debits and credits are told apart by sign and label, never by color alone.
@@ -68,7 +69,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 ## Review checklist (before calling a UI change done)
 
 1. `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
-2. Screenshots at **360×800, 768×1024 and 1280×800** of each changed page: with `pnpm db:up` and the API and web dev servers running, `pnpm --filter @financas/web screenshots [page]` writes them to `apps/web/.screenshots/` and lists horizontal scroll and touch targets under 44px at phone width. Look at the images too. Check: no horizontal scroll, 44 px targets on mobile, nothing hidden behind the tab bar, dark mode legible if touched.
+2. Screenshots at **360×800, 768×1024 and 1280×800** of each changed page: with `pnpm db:up` and the API and web dev servers running, `pnpm --filter @financas/web screenshots [page]` writes them to `apps/web/.screenshots/` and lists horizontal scroll and touch targets under 44px at phone width, and also captures the dark theme (`*-escuro.png`). Look at the images too, in both themes. Check: no horizontal scroll, 44 px targets on mobile, nothing hidden behind the tab bar, dark mode legible if touched.
 3. Keyboard pass: Tab through the page, open and close every dialog, focus is always visible.
 4. No template tells from the list above; one brand color; semantic colors only from tokens.
 5. Copy is pt-BR, consistent verbs between button and toast.

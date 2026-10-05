@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { fakeUser, healthy, mockApi, noSession, personalWorkspace } from '@/test/mock-api';
+import { fakeUser, mockApi, noSession, personalWorkspace } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 async function fillAndSubmit(email: string, password: string) {
@@ -24,7 +24,6 @@ describe('SignInPage', () => {
     const fetchMock = mockApi({
       'GET /api/me': noSession,
       'POST /api/auth/sign-in/email': { body: { token: 'fake', user: fakeUser } },
-      'GET /api/health': healthy,
       'GET /api/workspaces': { body: [personalWorkspace] },
     });
     renderApp('/entrar');
@@ -72,7 +71,6 @@ describe('SignInPage', () => {
   it('sends visitors who already have a session to the home page', async () => {
     mockApi({
       'GET /api/me': { body: fakeUser },
-      'GET /api/health': healthy,
       'GET /api/workspaces': { body: [personalWorkspace] },
     });
 

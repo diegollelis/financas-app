@@ -151,7 +151,6 @@ describe('creating a workspace on the home page', () => {
   it('creates it and keeps the form ready for another one', async () => {
     const fetchMock = mockApi({
       'GET /api/me': { body: fakeUser },
-      'GET /api/health': { body: { status: 'ok', database: 'up' } },
       'GET /api/workspaces': { body: [personalWorkspace] },
       'POST /api/workspaces': { body: house },
     });
