@@ -8,16 +8,14 @@ import {
   shareOfIncome,
   type Budget,
 } from '@financas/shared';
-import { Link, useParams } from 'react-router';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/page-header';
+import { ListSkeleton, QueryState } from '@/components/query-state';
 import { BudgetForm } from '@/features/budget/budget-form';
 import { shareLabels } from '@/features/budget/share-labels';
 import { useBudget, useSaveBudget } from '@/features/budget/use-budget';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
-import { useWorkspace } from '@/features/workspaces/use-workspace';
-import { ApiError } from '@/lib/api';
-import { apiErrorMessage } from '@/lib/error-message';
+import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 
 /** Where the configuration shown came from (ADR 0030), and what saving it does. */
 function SourceNotice({ budget, canEdit }: { budget: Budget; canEdit: boolean }) {
@@ -91,58 +89,33 @@ function BudgetEditor({ workspaceId, budget }: { workspaceId: string; budget: Bu
 }
 
 export function BudgetPage() {
-  const { workspaceId = '' } = useParams();
+  const workspace = useCurrentWorkspace();
+  const canEdit = hasRole(workspace.role, 'EDITOR');
   const period = usePeriod();
-  const workspace = useWorkspace(workspaceId);
-  const budget = useBudget(workspaceId, period);
-  const error = workspace.error ?? budget.error;
-  const ready = workspace.isSuccess && budget.isSuccess;
-  const canEdit = ready && hasRole(workspace.data.role, 'EDITOR');
+  const budget = useBudget(workspace.id, period);
 
   return (
-    <main className="flex min-h-svh justify-center p-6">
-      <Card className="w-full max-w-2xl self-start">
-        <CardHeader>
-          <Link
-            to={`/espacos/${workspaceId}`}
-            className="text-muted-foreground text-sm hover:underline"
-          >
-            ← {workspace.data?.name ?? 'Espaço'}
-          </Link>
-          <CardTitle>
-            <h1>Orçamento</h1>
-          </CardTitle>
-          <PeriodNav period={period} />
-        </CardHeader>
-        <CardContent className="grid gap-6 text-sm">
-          {!ready && !error && <p className="text-muted-foreground">Carregando…</p>}
-          {error &&
-            (error instanceof ApiError && error.status === 404 ? (
-              // Same answer for "does not exist" and "not yours" (ADR 0025).
-              <p role="alert">Espaço não encontrado.</p>
-            ) : (
-              <p role="alert" className="text-destructive">
-                {apiErrorMessage(error)}
-              </p>
-            ))}
-          {ready && (
-            <>
-              <SourceNotice budget={budget.data} canEdit={canEdit} />
-              {canEdit ? (
-                <BudgetEditor
-                  // Another competência starts fresh: its own values, no "saved" or error left
-                  // over from the month seen before.
-                  key={period}
-                  workspaceId={workspaceId}
-                  budget={budget.data}
-                />
-              ) : (
-                <BudgetSummary budget={budget.data} />
-              )}
-            </>
+    <>
+      <PageHeader title="Orçamento">
+        <PeriodNav period={period} />
+      </PageHeader>
+      <QueryState queries={[budget]} skeleton={<ListSkeleton rows={6} />} />
+      {budget.isSuccess && (
+        <>
+          <SourceNotice budget={budget.data} canEdit={canEdit} />
+          {canEdit ? (
+            <BudgetEditor
+              // Another competência starts fresh: its own values, no "saved" or error left
+              // over from the month seen before.
+              key={period}
+              workspaceId={workspace.id}
+              budget={budget.data}
+            />
+          ) : (
+            <BudgetSummary budget={budget.data} />
           )}
-        </CardContent>
-      </Card>
-    </main>
+        </>
+      )}
+    </>
   );
 }

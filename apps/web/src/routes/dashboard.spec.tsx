@@ -61,7 +61,7 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    expect(await screen.findByText('Competência: outubro de 2026')).toBeInTheDocument();
+    expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
     await section('Saldo e resultado');
     expect(tile('Saldo previsto')).toHaveTextContent('R$ 3.490,10');
     expect(tile('Saldo efetivado')).toHaveTextContent('R$ 4.650,00');
@@ -123,7 +123,7 @@ describe('DashboardPage', () => {
     );
   });
 
-  it('is reached from the workspace page, on this month', async () => {
+  it('is reached from the sections of the workspace, on this month', async () => {
     // Only Date is faked: "today" is Oct 15th, 2026 in São Paulo; timers stay real.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-15T12:00:00-03:00'));
@@ -138,10 +138,10 @@ describe('DashboardPage', () => {
     const { router } = renderApp(`/espacos/${houseId}`);
 
     try {
-      await userEvent.click(await screen.findByRole('link', { name: 'Painel →' }));
+      await userEvent.click(await screen.findByRole('link', { name: 'Painel' }));
 
       expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);
-      expect(await screen.findByText('Competência: outubro de 2026')).toBeInTheDocument();
+      expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
       expect(await section('Saldo e resultado')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -168,13 +168,13 @@ describe('DashboardPage', () => {
         await screen.findByRole('link', { name: 'Próxima competência: janeiro de 2027' }),
       );
       expect(router.state.location.search).toBe('?competencia=2027-01');
-      expect(await screen.findByText('Competência: janeiro de 2027')).toBeInTheDocument();
+      expect(await screen.findByText('janeiro de 2027')).toBeInTheDocument();
       expect(
         screen.getByRole('link', { name: 'Competência anterior: dezembro de 2026' }),
       ).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('link', { name: 'Mês atual' }));
-      expect(await screen.findByText('Competência: outubro de 2026')).toBeInTheDocument();
+      expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
       // Already on this month: no link to it.
       expect(screen.queryByRole('link', { name: 'Mês atual' })).not.toBeInTheDocument();
       expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);

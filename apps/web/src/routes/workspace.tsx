@@ -5,22 +5,21 @@ import {
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Link, useParams } from 'react-router';
 import type { z } from 'zod';
 import { FormField } from '@/components/form-field';
+import { PageHeader } from '@/components/page-header';
+import { ListSkeleton, QueryState } from '@/components/query-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { roleLabels } from '@/features/workspaces/roles';
 import {
   useCreateInvitation,
   useInvitations,
   useMembers,
   useRevokeInvitation,
-  useWorkspace,
 } from '@/features/workspaces/use-workspace';
-import { ApiError } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/error-message';
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR');
@@ -29,14 +28,10 @@ function Members({ workspaceId }: { workspaceId: string }) {
   const members = useMembers(workspaceId);
 
   return (
-    <section aria-labelledby="members-title" className="grid gap-2">
-      <h2 id="members-title" className="font-medium">
-        Membros
-      </h2>
-      {members.isPending && <p className="text-muted-foreground">Carregando…</p>}
-      {members.isError && <p className="text-destructive">{apiErrorMessage(members.error)}</p>}
+    <>
+      <QueryState queries={[members]} skeleton={<ListSkeleton rows={2} />} />
       {members.isSuccess && (
-        <ul className="grid gap-1">
+        <ul aria-label="Membros do espaço" className="grid gap-1">
           {members.data.map((member) => (
             <li key={member.userId} className="flex items-center justify-between gap-2">
               <span className="min-w-0">
@@ -47,7 +42,7 @@ function Members({ workspaceId }: { workspaceId: string }) {
           ))}
         </ul>
       )}
-    </section>
+    </>
   );
 }
 
@@ -135,7 +130,7 @@ function Sharing({ workspace }: { workspace: Workspace }) {
     return (
       <p className="text-muted-foreground">
         Este é o seu espaço pessoal: só você tem acesso. Para dividir finanças com alguém, crie um
-        espaço compartilhado na página inicial.
+        espaço compartilhado em Seus espaços.
       </p>
     );
   }
@@ -152,67 +147,13 @@ function Sharing({ workspace }: { workspace: Workspace }) {
 }
 
 export function WorkspacePage() {
-  const { workspaceId = '' } = useParams();
-  const workspace = useWorkspace(workspaceId);
+  const workspace = useCurrentWorkspace();
 
   return (
-    <main className="flex min-h-svh justify-center p-6">
-      <Card className="w-full max-w-lg self-start">
-        <CardHeader>
-          <Link to="/" className="text-muted-foreground text-sm hover:underline">
-            ← Início
-          </Link>
-          {workspace.isSuccess && (
-            <>
-              <CardTitle>
-                <h1>{workspace.data.name}</h1>
-              </CardTitle>
-              <CardDescription>Seu acesso: {roleLabels[workspace.data.role]}</CardDescription>
-            </>
-          )}
-        </CardHeader>
-        <CardContent className="grid gap-6 text-sm">
-          {workspace.isPending && <p className="text-muted-foreground">Carregando…</p>}
-          {workspace.isError &&
-            (workspace.error instanceof ApiError && workspace.error.status === 404 ? (
-              // Same answer for "does not exist" and "not yours" (ADR 0025).
-              <p role="alert">Espaço não encontrado.</p>
-            ) : (
-              <p role="alert" className="text-destructive">
-                {apiErrorMessage(workspace.error)}
-              </p>
-            ))}
-          {workspace.isSuccess && (
-            <>
-              <nav aria-label="Cadastros do espaço" className="flex flex-wrap gap-4">
-                <Link to={`/espacos/${workspaceId}/painel`} className="font-medium hover:underline">
-                  Painel →
-                </Link>
-                <Link
-                  to={`/espacos/${workspaceId}/lancamentos`}
-                  className="font-medium hover:underline"
-                >
-                  Lançamentos →
-                </Link>
-                <Link
-                  to={`/espacos/${workspaceId}/orcamento`}
-                  className="font-medium hover:underline"
-                >
-                  Orçamento →
-                </Link>
-                <Link
-                  to={`/espacos/${workspaceId}/categorias`}
-                  className="font-medium hover:underline"
-                >
-                  Categorias →
-                </Link>
-              </nav>
-              <Members workspaceId={workspaceId} />
-              <Sharing workspace={workspace.data} />
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+    <>
+      <PageHeader title="Membros" description={`Seu acesso: ${roleLabels[workspace.role]}`} />
+      <Members workspaceId={workspace.id} />
+      <Sharing workspace={workspace} />
+    </>
   );
 }

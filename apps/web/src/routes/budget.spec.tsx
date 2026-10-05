@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeUser, mockApi } from '@/test/mock-api';
@@ -46,7 +46,7 @@ describe('BudgetPage', () => {
 
     renderApp(`/espacos/${houseId}/orcamento`);
 
-    expect(await screen.findByText('Competência: outubro de 2026')).toBeInTheDocument();
+    expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
     expect(
       await screen.findByText(
         'Herdado de setembro de 2026. Ao salvar, outubro de 2026 passa a ter o seu próprio orçamento.',
@@ -176,14 +176,14 @@ describe('BudgetPage', () => {
     expect(await screen.findByText('Herdado de setembro de 2026.')).toBeInTheDocument();
     expect(screen.getByText('Reserva de emergência').nextSibling).toHaveTextContent('15%');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('is reached from the workspace page', async () => {
+  it('is reached from the sections of the workspace', async () => {
     mockBudget({ [`GET /api/workspaces/${houseId}/members`]: { body: [] } });
     const { router } = renderApp(`/espacos/${houseId}`);
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Orçamento →' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Orçamento' }));
 
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/orcamento`);
     expect(await screen.findByRole('heading', { name: 'Orçamento' })).toBeInTheDocument();

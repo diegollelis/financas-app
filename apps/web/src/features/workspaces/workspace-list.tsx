@@ -58,7 +58,7 @@ export function WorkspaceList() {
           {workspaces.data.map((workspace) => (
             <li key={workspace.id} className="flex items-center justify-between">
               <Link
-                to={`/espacos/${workspace.id}`}
+                to={`/espacos/${workspace.id}/painel`}
                 className="text-primary underline-offset-4 hover:underline"
               >
                 {workspace.name}

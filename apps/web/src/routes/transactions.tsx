@@ -10,10 +10,10 @@ import {
   type TransactionType,
 } from '@financas/shared';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { PageHeader } from '@/components/page-header';
+import { QueryState } from '@/components/query-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCategories } from '@/features/categories/use-categories';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
@@ -27,8 +27,7 @@ import {
   useTransactions,
   useUpdateTransaction,
 } from '@/features/transactions/use-transactions';
-import { useWorkspace } from '@/features/workspaces/use-workspace';
-import { ApiError } from '@/lib/api';
+import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
 const sections: { type: TransactionType; title: string }[] = [
@@ -231,89 +230,67 @@ function NewTransaction({
 }
 
 export function TransactionsPage() {
-  const { workspaceId = '' } = useParams();
+  const workspace = useCurrentWorkspace();
+  const workspaceId = workspace.id;
+  const canEdit = hasRole(workspace.role, 'EDITOR');
   const period = usePeriod();
   const today = todayIso();
-  const workspace = useWorkspace(workspaceId);
   const categories = useCategories(workspaceId);
   const transactions = useTransactions(workspaceId, period);
-  const error = workspace.error ?? categories.error ?? transactions.error;
-  const ready = workspace.isSuccess && categories.isSuccess && transactions.isSuccess;
+  const ready = categories.isSuccess && transactions.isSuccess;
 
   return (
-    <main className="flex min-h-svh justify-center p-6">
-      <Card className="w-full max-w-2xl self-start">
-        <CardHeader>
-          <Link
-            to={`/espacos/${workspaceId}`}
-            className="text-muted-foreground text-sm hover:underline"
-          >
-            ← {workspace.data?.name ?? 'Espaço'}
-          </Link>
-          <CardTitle>
-            <h1>Lançamentos</h1>
-          </CardTitle>
-          <PeriodNav period={period} />
-        </CardHeader>
-        <CardContent className="grid gap-6 text-sm">
-          {!ready && !error && <p className="text-muted-foreground">Carregando…</p>}
-          {error &&
-            (error instanceof ApiError && error.status === 404 ? (
-              // Same answer for "does not exist" and "not yours" (ADR 0025).
-              <p role="alert">Espaço não encontrado.</p>
-            ) : (
-              <p role="alert" className="text-destructive">
-                {apiErrorMessage(error)}
-              </p>
-            ))}
-          {ready && (
-            <>
-              {sections.map(({ type, title }) => {
-                const items = transactions.data.filter((item) => item.type === type);
-                const total = items.reduce((sum, item) => sum + item.amountCents, 0);
-                const titleId = `transactions-${type}`;
-                return (
-                  <section key={type} aria-labelledby={titleId} className="grid gap-2">
-                    <div className="flex items-baseline justify-between">
-                      <h2 id={titleId} className="font-medium">
-                        {title}
-                      </h2>
-                      <span className="text-muted-foreground tabular-nums">
-                        Total: {formatCents(total)}
-                      </span>
-                    </div>
-                    {items.length === 0 ? (
-                      <p className="text-muted-foreground">Nenhum lançamento.</p>
-                    ) : (
-                      <ul>
-                        {items.map((transaction) => (
-                          <TransactionItem
-                            key={transaction.id}
-                            workspaceId={workspaceId}
-                            transaction={transaction}
-                            categories={categories.data}
-                            canEdit={hasRole(workspace.data.role, 'EDITOR')}
-                            today={today}
-                          />
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-                );
-              })}
-              {hasRole(workspace.data.role, 'EDITOR') && (
-                <NewTransaction
-                  // Another competência starts with an empty form and no error left over.
-                  key={period}
-                  workspaceId={workspaceId}
-                  period={period}
-                  categories={categories.data}
-                />
-              )}
-            </>
+    <>
+      <PageHeader title="Lançamentos">
+        <PeriodNav period={period} />
+      </PageHeader>
+      <QueryState queries={[categories, transactions]} />
+      {ready && (
+        <>
+          {sections.map(({ type, title }) => {
+            const items = transactions.data.filter((item) => item.type === type);
+            const total = items.reduce((sum, item) => sum + item.amountCents, 0);
+            const titleId = `transactions-${type}`;
+            return (
+              <section key={type} aria-labelledby={titleId} className="grid gap-2">
+                <div className="flex items-baseline justify-between">
+                  <h2 id={titleId} className="font-medium">
+                    {title}
+                  </h2>
+                  <span className="text-muted-foreground tabular-nums">
+                    Total: {formatCents(total)}
+                  </span>
+                </div>
+                {items.length === 0 ? (
+                  <p className="text-muted-foreground">Nenhum lançamento.</p>
+                ) : (
+                  <ul>
+                    {items.map((transaction) => (
+                      <TransactionItem
+                        key={transaction.id}
+                        workspaceId={workspaceId}
+                        transaction={transaction}
+                        categories={categories.data}
+                        canEdit={canEdit}
+                        today={today}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+          {canEdit && (
+            <NewTransaction
+              // Another competência starts with an empty form and no error left over.
+              key={period}
+              workspaceId={workspaceId}
+              period={period}
+              categories={categories.data}
+            />
           )}
-        </CardContent>
-      </Card>
-    </main>
+        </>
+      )}
+    </>
   );
 }

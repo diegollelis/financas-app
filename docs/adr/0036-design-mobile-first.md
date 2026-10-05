@@ -68,3 +68,15 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **Componentes do shadcn adicionados:** `sheet`, `dialog`, `alert-dialog`, `sonner`, `skeleton`, `select`, `radio-group` e `dropdown-menu`. O CLI tenta sobrescrever o `button.tsx`; a resposta deve ser "não".
 - **Ícones:** favicon em índigo, `apple-touch-icon` e ícones de 192 e 512 px gerados a partir dele, mais `manifest.webmanifest` e `theme-color`.
 - **Capturas e checagens:** `pnpm --filter @financas/web screenshots` (`apps/web/scripts/screenshots.ts`, com Playwright) fotografa as telas em 360, 768 e 1280 px com um usuário fictício local e aponta rolagem horizontal e alvos de toque menores que 44 px no celular.
+
+## Nota (layout dos espaços, 2026-10-05)
+
+- **Rota de layout `WorkspaceLayout`** (`features/workspaces/workspace-layout.tsx`) envolve todas as páginas de `/espacos/:workspaceId`. Ela tem:
+  - o cabeçalho com o nome do espaço e o menu da conta ("Seus espaços" e "Sair");
+  - as seções numa barra inferior abaixo de `md` (Painel, Lançamentos, Orçamento e "Mais", que abre uma gaveta com Categorias, Membros e Seus espaços) e num menu lateral a partir de `md`. É um único `<nav>` que muda de forma com o tamanho da tela;
+  - o _skip link_ "Pular para o conteúdo" e o `<main id="conteudo">`.
+- **O espaço é carregado uma vez, no layout.** Carregando, com 404 ou com erro, o próprio layout mostra o estado; as páginas só aparecem com o espaço carregado e o leem com `useCurrentWorkspace()`. Custo: as consultas da página começam depois da do espaço (uma ida e volta a mais), o que é aceitável perto do _cold start_.
+- **Trocar de seção mantém a competência** (`?competencia=`) entre Painel, Lançamentos e Orçamento.
+- **`QueryState`** (`components/query-state.tsx`) mostra o _skeleton_, o aviso de "Acordando o servidor…" depois de 3 s, "Espaço não encontrado." com o caminho de volta, ou o erro com "Tentar de novo". Substituiu o bloco repetido nas cinco páginas.
+- **`PeriodNav`** virou botões de 44 px (anterior, próxima e "Mês atual"), ainda como links, porque navegam.
+- **A página `/espacos/:workspaceId`** deixou de ser um índice de links e passou a ser "Membros". A lista de espaços da página inicial abre direto o Painel.

@@ -97,7 +97,7 @@ describe('TransactionsPage', () => {
 
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    expect(await screen.findByText('Competência: outubro de 2026')).toBeInTheDocument();
+    expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
     await expectCall(fetchMock, `${base}?period=2026-10`, {});
     const credits = await section('Créditos');
     expect(credits).toHaveTextContent('Total: R$ 5.000,00');
@@ -117,7 +117,7 @@ describe('TransactionsPage', () => {
 
     renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-11`);
 
-    expect(await screen.findByText('Competência: novembro de 2026')).toBeInTheDocument();
+    expect(await screen.findByText('novembro de 2026')).toBeInTheDocument();
     await expectCall(fetchMock, `${base}?period=2026-11`, {});
     expect(await section('Débitos')).toHaveTextContent('Nenhum lançamento.');
   });
@@ -253,15 +253,15 @@ describe('TransactionsPage', () => {
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     expect(await section('Débitos')).toHaveTextContent('Conta de luz');
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Novo lançamento' })).not.toBeInTheDocument();
   });
 
-  it('is reached from the workspace page', async () => {
+  it('is reached from the sections of the workspace', async () => {
     mockTransactions({ [`GET /api/workspaces/${houseId}/members`]: { body: [] } });
     const { router } = renderApp(`/espacos/${houseId}`);
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Lançamentos →' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Lançamentos' }));
 
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/lancamentos`);
     expect(await screen.findByRole('heading', { name: 'Lançamentos' })).toBeInTheDocument();

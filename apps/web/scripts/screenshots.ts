@@ -127,7 +127,8 @@ async function phoneChecks(page: Page): Promise<string[]> {
     );
     for (const el of controls) {
       const box = el.getBoundingClientRect();
-      if (box.width === 0 || box.height === 0) continue;
+      // Visually hidden (e.g. the skip link until focused): not a target anyone taps.
+      if (box.width === 0 || box.height === 0 || el.matches('.sr-only')) continue;
       if (box.height < min || box.width < min) {
         const name = (el.getAttribute('aria-label') ?? el.textContent ?? el.tagName)
           .trim()
