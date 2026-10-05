@@ -43,3 +43,13 @@ Duas restrições vieram da conferência dos limites:
 - **Repositório privado gasta minutos:** cerca de 1 por dia, dos 2.000 gratuitos por mês. Artefatos de cerca de 30 dias contam no armazenamento privado de 500 MB. O dump atual tem dezenas de KB.
 - **O _workflow_ chamado é o da `main`** (`@main`): uma mudança aqui vale no próximo backup. Como a `main` é protegida e passa pelo CI, isso é aceitável.
 - **Restauração real:** um banco novo no Neon e `pg_restore` com a conexão do dono. Antes, conferir se a restauração de até 6 horas do próprio Neon resolve.
+
+## Nota (produção, 2026-10-05)
+
+Validado em produção:
+
+- **Primeira execução:** o repositório privado `financas-backup` chamou o _workflow_ e gerou o artefato criptografado.
+- **Restauração:** o artefato foi decifrado com a chave privada e restaurado num banco local temporário. As contagens bateram com o Neon: usuários, espaços, lançamentos, categorias, orçamentos e as 3 políticas de RLS.
+- **Monitor:** o de _cron_ do Sentry recebe os _check-ins_ de início e de sucesso.
+
+O monitor foi criado pelo primeiro _check-in_, que leva a configuração junto (`monitor_config`). Pela tela, o Sentry gerou um _slug_ provisório que não pôde ser editado. O passo a passo está em [docs/backup.md](../backup.md).
