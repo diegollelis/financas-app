@@ -1,50 +1,31 @@
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSignOut } from '@/features/auth/use-auth-mutations';
+import { PageHeader } from '@/components/page-header';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { VerifyEmailBanner } from '@/features/auth/verify-email-banner';
-import { useHealth } from '@/features/health/use-health';
+import { AppHeader, SkipLink } from '@/features/shell/app-header';
 import { WorkspaceList } from '@/features/workspaces/workspace-list';
 
+/**
+ * Where a signed-in person picks a workspace. Same header and margins as the workspace pages
+ * (ADR 0036), without the sections: no workspace is chosen yet.
+ */
 export function HomePage() {
   const user = useCurrentUser();
-  const signOut = useSignOut();
-  const health = useHealth();
 
   return (
-    <main className="flex min-h-svh items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>
-            <h1>Olá, {user.name}</h1>
-          </CardTitle>
-          <CardDescription>Controle financeiro mensal</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 text-sm">
+    <div className="min-h-svh">
+      <SkipLink />
+      <AppHeader title={<p className="truncate font-semibold">Finanças</p>} />
+      <main
+        id="conteudo"
+        tabIndex={-1}
+        className="px-4 pt-5 pb-12 text-base outline-none sm:px-6 md:pt-8 md:text-sm"
+      >
+        <div className="mx-auto grid max-w-3xl gap-6">
+          <PageHeader title={`Olá, ${user.name}`} description="Escolha um espaço para ver o mês." />
           {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
           <WorkspaceList />
-          <div className="flex items-center justify-between">
-            <span>Status da API</span>
-            {health.isPending && <Badge variant="secondary">Verificando…</Badge>}
-            {health.isError && <Badge variant="destructive">Indisponível</Badge>}
-            {health.isSuccess &&
-              (health.data.status === 'ok' ? (
-                <Badge>Online</Badge>
-              ) : (
-                <Badge variant="outline">Sem banco de dados</Badge>
-              ))}
-          </div>
-          {signOut.isError && (
-            <p role="alert" className="text-destructive">
-              Não foi possível sair agora. Tente de novo.
-            </p>
-          )}
-          <Button variant="outline" onClick={() => signOut.mutate()} disabled={signOut.isPending}>
-            Sair
-          </Button>
-        </CardContent>
-      </Card>
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }

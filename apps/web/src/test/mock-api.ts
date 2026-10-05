@@ -28,7 +28,6 @@ export const fakeUser = {
 };
 
 export const noSession = { status: 401, body: { message: 'Unauthorized', statusCode: 401 } };
-export const healthy = { body: { status: 'ok', database: 'up' } };
 
 export const personalWorkspace = {
   id: '01920000-0000-7000-8000-000000000001',
@@ -37,9 +36,8 @@ export const personalWorkspace = {
   role: 'OWNER',
 };
 
-/** What every page behind RequireAuth loads on the home page: user, health and workspaces. */
+/** What the home page loads: the user and the workspaces. */
 export const signedInHome = {
   'GET /api/me': { body: fakeUser },
-  'GET /api/health': healthy,
   'GET /api/workspaces': { body: [personalWorkspace] },
 };

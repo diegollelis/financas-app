@@ -103,7 +103,6 @@ describe('coming back after signing in', () => {
   it('ignores a ?voltar= pointing to another site', async () => {
     mockApi({
       'GET /api/me': { body: fakeUser },
-      'GET /api/health': { body: { status: 'ok', database: 'up' } },
       'GET /api/workspaces': { body: [] },
     });
 

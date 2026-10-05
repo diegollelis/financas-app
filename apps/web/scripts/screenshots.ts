@@ -166,24 +166,37 @@ async function main() {
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
   ].filter((p) => !filter || p.name.includes(filter));
 
+  // Light at every width; dark (the device's preference, theme "Sistema") at phone and desktop.
+  // The phone checks run once, in light: sizes do not change with the theme.
+  const passes = [
+    ...viewports.map((viewport) => ({ viewport, dark: false })),
+    ...viewports
+      .filter((viewport) => viewport.name !== 'tablet')
+      .map((viewport) => ({ viewport, dark: true })),
+  ];
+
   let problemCount = 0;
-  for (const viewport of viewports) {
+  for (const { viewport, dark } of passes) {
+    const colorScheme = dark ? 'dark' : 'light';
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       deviceScaleFactor: viewport.width < 768 ? 2 : 1,
       storageState,
       locale: 'pt-BR',
       timezoneId: 'America/Sao_Paulo',
+      colorScheme,
     });
     const guest = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
+      colorScheme,
     });
     for (const target of pages) {
       const page = await (target.signedIn ? context : guest).newPage();
       await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
-      const file = new URL(`${target.name}-${viewport.name}.png`, OUT);
+      const suffix = dark ? '-escuro' : '';
+      const file = new URL(`${target.name}-${viewport.name}${suffix}.png`, OUT);
       await page.screenshot({ path: fileURLToPath(file), fullPage: true });
-      if (viewport.width < 768) {
+      if (viewport.width < 768 && !dark) {
         const problems = await phoneChecks(page);
         problemCount += problems.length;
         for (const problem of problems)
