@@ -75,7 +75,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Layout dos espaços: barra inferior no celular, menu lateral no desktop, `PeriodNav` em botões e estados de carregando, vazio e erro
   - [x] Página inicial no padrão novo e seletor de tema (Sistema, Claro, Escuro)
   - [x] Lançamentos: cartões, ações num menu, formulário em gaveta, confirmação ao excluir e toasts
-  - [ ] Painel: indicadores responsivos e destinos em cartões no celular
+  - [x] Painel: indicadores responsivos e destinos em cartões no celular
   - [ ] Orçamento, Categorias, Membros e telas de login
 - [ ] Recorrências e parcelamentos
 - [ ] Rateio de lançamentos (ADR próprio)

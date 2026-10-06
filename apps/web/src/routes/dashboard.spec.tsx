@@ -2,6 +2,7 @@ import { DEFAULT_BUDGET_SHARES, summarizePeriod, type Budget } from '@financas/s
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { stubPrefersDark } from '@/test/match-media';
 import { fakeUser, mockApi } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
@@ -47,11 +48,12 @@ function mockDashboard(summary: object, period = '2026-10') {
 }
 
 const section = (name: string) => screen.findByRole('region', { name });
-// A stat tile, in the "Saldo e resultado" section (the chart legend also says "Saldo previsto").
+// An indicator's value: the <dd> after its <dt>, in the "Saldo e resultado" section (the chart
+// legend also says "Saldo previsto").
 const tile = (label: string) =>
-  within(screen.getByRole('region', { name: 'Saldo e resultado' }))
-    .getByText(label)
-    .closest('div');
+  within(screen.getByRole('region', { name: 'Saldo e resultado' })).getByText(label, {
+    selector: 'dt',
+  }).nextElementSibling;
 // Intl separates "R$" from the number with a non-breaking space.
 const nbsp = (text: string | null | undefined) => text?.replace(/\u00a0/g, ' ');
 
@@ -67,7 +69,9 @@ describe('DashboardPage', () => {
     expect(tile('Saldo efetivado')).toHaveTextContent('R$ 4.650,00');
     expect(tile('Resultado previsto')).toHaveTextContent('R$ 1.090,10');
     expect(tile('Resultado efetivado')).toHaveTextContent('R$ 2.650,00');
-    expect(screen.getByRole('status')).toHaveTextContent('1 lançamento vencido (R$ 159,90).');
+    expect(nbsp(screen.getByRole('status').textContent)).toContain(
+      '1 lançamento vencido (R$ 159,90).',
+    );
     expect(screen.getByRole('link', { name: 'Ver lançamentos' })).toHaveAttribute(
       'href',
       `/espacos/${houseId}/lancamentos?competencia=2026-10`,
@@ -88,6 +92,23 @@ describe('DashboardPage', () => {
     expect(goal).toHaveTextContent('Folga de R$ 490,10.');
     const destinations = await section('Orçamento por destino');
     expect(destinations).toHaveTextContent('Orçamento herdado de setembro de 2026.');
+    // On the phone, a card per destination: the table's five columns do not fit.
+    const investments = within(destinations)
+      .getAllByRole('listitem')
+      .find((item) => item.textContent?.startsWith('Investimentos'));
+    expect(nbsp(investments?.textContent)).toBe(
+      'Investimentos20%MetaR$ 1.000,00PrevistoR$ 1.200,00EfetivadoR$ 1.000,00',
+    );
+    expect(within(destinations).queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('shows the destinations as a table from md', async () => {
+    stubPrefersDark(false, { desktop: true });
+    mockDashboard(summarizePeriod(october, budget, today));
+
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    const destinations = await section('Orçamento por destino');
     const investments = within(destinations).getByRole('row', { name: /Investimentos/ });
     expect(investments).toHaveTextContent('20%R$ 1.000,00R$ 1.200,00R$ 1.000,00');
   });
