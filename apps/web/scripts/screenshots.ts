@@ -207,6 +207,14 @@ async function main() {
       opens: 'dialog' as const,
       phoneOnly: true,
     },
+    {
+      // The largest category, open month by month.
+      name: 'analise-categoria',
+      path: `/espacos/${workspaceId}/analise`,
+      signedIn: true,
+      open: /do total/,
+      opens: 'dialog' as const,
+    },
   ].filter((p) => !filter || p.name.includes(filter));
 
   // Light at every width; dark (the device's preference, theme "Sistema") at phone and desktop.
@@ -238,7 +246,7 @@ async function main() {
       const page = await (target.signedIn ? context : guest).newPage();
       await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
       if (target.open && target.opens) {
-        await page.getByRole('button', { name: target.open }).click();
+        await page.getByRole('button', { name: target.open }).first().click();
         await page.getByRole(target.opens).waitFor();
         // Lets the opening animation finish.
         await page.waitForTimeout(400);

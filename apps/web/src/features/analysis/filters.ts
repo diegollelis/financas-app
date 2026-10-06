@@ -10,8 +10,9 @@ import { useSearchParams } from 'react-router';
 /**
  * The analysis filters live in the address (ADR 0037), in pt-BR like the page URLs (ADR 0021):
  * ?periodo=3|6|12|ano, or ?de=AAAA-MM&ate=AAAA-MM for a range of one's own; ?visao=efetivado;
- * ?tipo=creditos|debitos; ?categorias=id,id. A link can be shared, and the browser's back button
- * undoes a change. Anything invalid falls back to the default: the last 6 months, planned, all.
+ * ?tipo=creditos|debitos; ?categorias=id,id; ?categoria=id, the one open in detail. A link can
+ * be shared, and the browser's back button undoes a change (or closes the category). Anything
+ * invalid falls back to the default: the last 6 months, planned, all.
  */
 export const periodPresets = [
   { value: '3', label: 'Últimos 3 meses' },
@@ -35,6 +36,8 @@ export interface AnalysisSettings extends AnalysisFilters {
   preset: PeriodPreset;
   from: string;
   to: string;
+  /** The category open in detail (?categoria=), or null. */
+  categoryId: string | null;
 }
 
 function readSettings(params: URLSearchParams): AnalysisSettings {
@@ -55,6 +58,7 @@ function readSettings(params: URLSearchParams): AnalysisSettings {
     view: params.get('visao') === 'efetivado' ? 'SETTLED' : 'PLANNED',
     type: type === 'creditos' ? 'CREDIT' : type === 'debitos' ? 'DEBIT' : 'BOTH',
     categoryIds: (params.get('categorias') ?? '').split(',').filter(Boolean),
+    categoryId: params.get('categoria'),
   };
 }
 
@@ -70,6 +74,7 @@ function writeSettings(settings: AnalysisSettings): URLSearchParams {
   if (settings.type !== 'BOTH')
     params.set('tipo', settings.type === 'CREDIT' ? 'creditos' : 'debitos');
   if (settings.categoryIds.length > 0) params.set('categorias', settings.categoryIds.join(','));
+  if (settings.categoryId) params.set('categoria', settings.categoryId);
   return params;
 }
 
