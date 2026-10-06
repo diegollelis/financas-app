@@ -34,9 +34,12 @@ function columnPath(x: number, y: number, width: number, height: number) {
 export function MonthlyChart({
   series,
   type,
+  reference,
 }: {
   series: MonthlyPoint[];
   type: AnalysisFilters['type'];
+  /** A dashed line across the months, e.g. the monthly average of one category. */
+  reference?: { cents: number; label: string };
 }) {
   const { ref, width: boxWidth } = useElementWidth<HTMLDivElement>(640);
   const [active, setActive] = useState<number | null>(null);
@@ -48,7 +51,10 @@ export function MonthlyChart({
   const plotHeight = HEIGHT - MARGIN.top - MARGIN.bottom;
   const band = plotWidth / series.length;
 
-  const values = series.flatMap((point) => keys.map((key) => valueOf(point, key)));
+  const values = [
+    ...series.flatMap((point) => keys.map((key) => valueOf(point, key))),
+    ...(reference ? [reference.cents] : []),
+  ];
   const step = niceStep(Math.max(...values, 0) - Math.min(...values, 0) || 100_00);
   const top = Math.ceil(Math.max(...values, 1) / step) * step;
   const bottom = Math.floor(Math.min(...values, 0) / step) * step;
@@ -134,6 +140,27 @@ export function MonthlyChart({
               )}
             </g>
           ))}
+          {reference && (
+            // Recessive on purpose: a guide to read the columns against, in text colors.
+            <g>
+              <line
+                x1={MARGIN.left}
+                x2={width - MARGIN.right}
+                y1={y(reference.cents)}
+                y2={y(reference.cents)}
+                strokeDasharray="4 4"
+                className="stroke-muted-foreground"
+              />
+              <text
+                x={width - MARGIN.right}
+                y={y(reference.cents) - 6}
+                textAnchor="end"
+                className="fill-muted-foreground text-[11px]"
+              >
+                {reference.label}
+              </text>
+            </g>
+          )}
           {keys.includes('balance') && (
             <>
               <polyline

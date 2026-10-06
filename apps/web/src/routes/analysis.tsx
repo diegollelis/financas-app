@@ -3,6 +3,7 @@ import {
   formatPeriod,
   monthlySeries,
   seriesTotals,
+  type Analysis,
   type AnalysisFilters,
   type Category,
 } from '@financas/shared';
@@ -18,6 +19,7 @@ import {
   useAnalysisSettings,
   type AnalysisSettings,
 } from '@/features/analysis/filters';
+import { CategoryRanking } from '@/features/analysis/category-ranking';
 import { FiltersPanel } from '@/features/analysis/filters-panel';
 import { MonthlyChart, MonthlyTable } from '@/features/analysis/monthly-chart';
 import { seriesStyles, visibleSeries } from '@/features/analysis/series';
@@ -186,6 +188,8 @@ export function AnalysisPage() {
           <Results
             analysis={analysis.data}
             settings={settings}
+            categories={categories.data}
+            onChange={update}
             asTable={asTable}
             onToggle={() => setAsTable((value) => !value)}
           />
@@ -197,11 +201,15 @@ export function AnalysisPage() {
 function Results({
   analysis,
   settings,
+  categories,
+  onChange,
   asTable,
   onToggle,
 }: {
-  analysis: Parameters<typeof monthlySeries>[0];
+  analysis: Analysis;
   settings: AnalysisSettings;
+  categories: Category[];
+  onChange: (change: Partial<AnalysisSettings>) => void;
   asTable: boolean;
   onToggle: () => void;
 }) {
@@ -228,6 +236,12 @@ function Results({
           </>
         )}
       </section>
+      <CategoryRanking
+        analysis={analysis}
+        settings={settings}
+        categories={categories}
+        onChange={onChange}
+      />
     </>
   );
 }

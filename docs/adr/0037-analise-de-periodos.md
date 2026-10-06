@@ -66,3 +66,13 @@ O [ADR 0032](0032-graficos-sem-biblioteca.md) desenhou os gráficos do Painel em
   - com meses demais para a tela (menos de 44 px por mês), rola dentro da própria caixa;
   - "Ver como tabela" mostra os mesmos números.
 - **_Tooltip_:** segue o mouse; no toque, abre e fecha a cada toque no mês. Tratar os dois do mesmo jeito fazia o _tooltip_ abrir e fechar no mesmo toque: o evento de "entrar" abria e o "clique" fechava, e um dedo "sai" do elemento logo depois de tocar.
+
+## Nota (gastos por categoria, 2026-10-06)
+
+- **"Gastos por categoria"** (`features/analysis/category-ranking.tsx`): as categorias de débito do período, da maior para a menor. Com o filtro de tipo em créditos, a seção vira "Recebidos por categoria".
+  - Cada linha tem o total, uma barra proporcional à maior categoria, a participação no total e a média por mês (sobre todos os meses do intervalo).
+  - Acima de 8 categorias, as menores viram "Outras N categorias", com o botão "Ver todas", para não passar de 8 classes (skill `dataviz`).
+- **Categoria mês a mês:** tocar numa categoria abre a gaveta (celular) ou o diálogo (desktop) com o total, a média, o gráfico de colunas com a média como linha tracejada de referência e a tabela com os mesmos números.
+  - A categoria aberta fica no endereço (`?categoria=id`), então o botão "voltar" do navegador fecha a gaveta.
+  - Ao fechar, o foco volta à linha que a abriu.
+- O gráfico mês a mês ganhou a linha de referência opcional (`reference`), reaproveitada aqui em vez de um segundo componente de gráfico.

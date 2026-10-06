@@ -190,6 +190,83 @@ describe('AnalysisPage', () => {
     expect(screen.queryByRole('button', { name: 'Filtros' })).not.toBeInTheDocument();
   });
 
+  it('ranks where the money went, with share and monthly average', async () => {
+    mockAnalysis('2026-05', '2026-10');
+    renderApp(`/espacos/${houseId}/analise`);
+
+    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
+    const rows = within(ranking)
+      .getAllByRole('button')
+      .map((button) => nbsp(button.textContent));
+    expect(rows).toEqual([
+      'AluguelR$ 3.600,0073,47% do totalmédia de R$ 600,00 por mês',
+      'MercadoR$ 1.300,0026,53% do totalmédia de R$ 216,67 por mês',
+    ]);
+  });
+
+  it('ranks the credits when the type filter asks for them', async () => {
+    mockAnalysis('2026-05', '2026-10');
+    renderApp(`/espacos/${houseId}/analise?tipo=creditos`);
+
+    const ranking = await screen.findByRole('region', { name: 'Recebidos por categoria' });
+    expect(within(ranking).getByRole('button', { name: /^Salário/ })).toBeInTheDocument();
+  });
+
+  it('opens a category month by month, in the address, and closes back to it', async () => {
+    mockAnalysis('2026-05', '2026-10');
+    const { router } = renderApp(`/espacos/${houseId}/analise`);
+
+    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
+    const mercadoRow = within(ranking).getByRole('button', { name: /^Mercado/ });
+    await userEvent.click(mercadoRow);
+
+    expect(router.state.location.search).toBe(`?categoria=${mercado.id}`);
+    const detail = await screen.findByRole('dialog', { name: 'Mercado' });
+    expect(detail).toHaveTextContent('Últimos 6 meses, previsto.');
+    expect(nbsp(within(detail).getByText('Média por mês').nextElementSibling?.textContent)).toBe(
+      'R$ 216,67',
+    );
+    const lastMonth = within(detail).getAllByRole('row').at(-1);
+    expect(nbsp(lastMonth?.textContent)).toBe('outubro de 2026R$ 700,00');
+
+    await userEvent.keyboard('{Escape}');
+    await vi.waitFor(() => expect(router.state.location.search).toBe(''));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /^Mercado/ })).toHaveFocus());
+  });
+
+  it('folds the smallest categories into "Outras", and shows them all on request', async () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({
+      id: `01920000-0000-7000-8000-0000000003${String(i).padStart(2, '0')}`,
+      name: `Despesa ${i + 1}`,
+      type: 'DEBIT',
+      archived: false,
+    }));
+    mockApi({
+      'GET /api/me': { body: verifiedUser },
+      'GET /api/workspaces': { body: [house] },
+      [`GET ${base}`]: { body: house },
+      [`GET ${base}/categories`]: { body: many },
+      [`GET ${base}/analysis`]: {
+        body: {
+          from: '2026-05',
+          to: '2026-10',
+          rows: many.map((category, i) => row('2026-10', 'DEBIT', category.id, (10 - i) * 10_000)),
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/analise`);
+
+    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
+    expect(within(ranking).getAllByRole('button', { name: /^Despesa/ })).toHaveLength(7);
+    expect(within(ranking).getByText('Outras 3 categorias')).toBeInTheDocument();
+    await userEvent.click(
+      within(ranking).getByRole('button', { name: 'Ver todas as 10 categorias' }),
+    );
+
+    expect(within(ranking).getAllByRole('button', { name: /^Despesa/ })).toHaveLength(10);
+    expect(within(ranking).queryByText('Outras 3 categorias')).not.toBeInTheDocument();
+  });
+
   it('is under "Mais" on the phone', async () => {
     mockApi({
       'GET /api/me': { body: verifiedUser },
