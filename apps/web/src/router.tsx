@@ -4,6 +4,7 @@ import { RootLayout } from '@/components/root-layout';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
 import { WorkspaceLayout } from '@/features/workspaces/workspace-layout';
 import { AnalysisPage } from '@/routes/analysis';
+import { RecurrencesPage } from '@/routes/recurrences';
 import { BudgetPage } from '@/routes/budget';
 import { CategoriesPage } from '@/routes/categories';
 import { DashboardPage } from '@/routes/dashboard';
@@ -48,6 +49,8 @@ export const routes: RouteObject[] = [
               { path: 'painel', element: <DashboardPage /> },
               // The range and filters travel in the address (ADR 0037).
               { path: 'analise', element: <AnalysisPage /> },
+              // Recurrences and installment plans (ADR 0038).
+              { path: 'recorrencias', element: <RecurrencesPage /> },
             ],
           },
         ],

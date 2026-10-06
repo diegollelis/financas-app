@@ -105,3 +105,13 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
   - "Encerrar parcelamento", com confirmação; reaproveita o diálogo de "Encerrar recorrência", agora genérico;
   - "Excluir só esta parcela", que avisa que as outras continuam.
 - **Editar uma parcela avisa** que a mudança vale só para ela.
+
+## Nota (tela "Recorrências", 2026-10-06)
+
+- **Página `/espacos/:workspaceId/recorrencias`, no "Mais"** (na barra lateral a partir de md). Duas seções:
+  - "Todo mês": as recorrências ativas, e as encerradas abaixo, em "Encerradas";
+  - "Parcelamentos": os em andamento, e abaixo, em "Encerrados e quitados", os encerrados e os com todas as parcelas pagas.
+- **Cada linha mostra** tipo, categoria, dia de vencimento e desde quando (ou até quando) a recorrência vale. Num parcelamento, mostra quantas parcelas foram pagas e o mês da última. O valor fica à direita; uma recorrência variável traz "Varia todo mês".
+- **Editar uma recorrência** (descrição, categoria, Fixo | Variável, valor, dia, observações) **envia só os campos que mudaram.** A API copia cada campo recebido para os pendentes deste mês em diante. Mandar um campo igual desfaria um mês ajustado à mão, por exemplo uma observação ou um valor corrigido. Sem mudança, o formulário fecha sem chamar a API.
+- **Encerrar** pede confirmação, nas recorrências e nos parcelamentos, com o mesmo texto do menu de Lançamentos. O que é histórico (encerrado ou quitado) não tem menu, e VIEWERs só leem.
+- **Parcelamentos não se editam:** as parcelas já existem. Para mudar uma, edita-se a parcela em Lançamentos; para quitar antes, encerra-se o parcelamento.

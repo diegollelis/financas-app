@@ -114,7 +114,7 @@ function installmentsPreview(
 }
 
 /** The category picker; FormField hands it the id and error wiring for its trigger. */
-function CategorySelect({
+export function CategorySelect({
   id,
   value,
   onChange,

@@ -2,9 +2,10 @@ import {
   recurrenceListResponseSchema,
   recurrenceSchema,
   type CreateRecurrenceInput,
+  type UpdateRecurrenceInput,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiDelete, apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { useInvalidateTransactions } from '@/features/transactions/use-transactions';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
@@ -47,6 +48,19 @@ export function useEndRecurrence(workspaceId: string) {
   return useMutation({
     mutationFn: (recurrenceId: string) =>
       apiDelete(`/api/workspaces/${workspaceId}/recurrences/${recurrenceId}`),
+    onSuccess,
+  });
+}
+
+/**
+ * Changes it, and its pending transactions from this month on (ADR 0038). Send only what
+ * changed: every field sent is copied to those transactions, undoing a month adjusted by hand.
+ */
+export function useUpdateRecurrence(workspaceId: string) {
+  const onSuccess = useInvalidateRecurrences(workspaceId);
+  return useMutation({
+    mutationFn: ({ id, ...input }: UpdateRecurrenceInput & { id: string }) =>
+      apiPatch(`/api/workspaces/${workspaceId}/recurrences/${id}`, input, recurrenceSchema),
     onSuccess,
   });
 }

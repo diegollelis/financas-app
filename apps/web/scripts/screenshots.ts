@@ -125,6 +125,50 @@ async function seed(api: APIRequestContext, workspaceId: string, period: string,
   }
 }
 
+/**
+ * A monthly bill and an installment purchase for the "Recorrências" page (ADR 0038), once:
+ * created only when the workspace has none.
+ */
+async function seedSeries(api: APIRequestContext, workspaceId: string, period: string) {
+  const base = `${API}/api/workspaces/${workspaceId}`;
+  const headers = { Origin: WEB };
+  const recurrences = (await (await api.get(`${base}/recurrences`)).json()) as unknown[];
+  const plans = (await (await api.get(`${base}/installments`)).json()) as unknown[];
+  const categories = (await (await api.get(`${base}/categories`)).json()) as Category[];
+  const debit = (index: number) =>
+    categories.filter((c) => c.type === 'DEBIT' && !c.archived)[index]!.id;
+  if (recurrences.length === 0) {
+    const created = await api.post(`${base}/recurrences`, {
+      headers,
+      data: {
+        type: 'DEBIT',
+        description: 'Internet',
+        categoryId: debit(2),
+        amountCents: 9990,
+        dueDay: 15,
+        startPeriod: period,
+      },
+    });
+    if (!created.ok()) throw new Error(`Could not create a sample recurrence: ${created.status()}`);
+  }
+  if (plans.length === 0) {
+    const created = await api.post(`${base}/installments`, {
+      headers,
+      data: {
+        type: 'DEBIT',
+        description: 'Notebook',
+        categoryId: debit(1),
+        installments: 12,
+        amountCents: 360000,
+        amountIs: 'TOTAL',
+        firstPeriod: monthsBefore(period, 2),
+        dueDay: 20,
+      },
+    });
+    if (!created.ok()) throw new Error(`Could not create a sample plan: ${created.status()}`);
+  }
+}
+
 /** Problems a phone user would hit: sideways scrolling and controls too small for a finger. */
 async function phoneChecks(page: Page): Promise<string[]> {
   return page.evaluate((min) => {
@@ -171,6 +215,7 @@ async function main() {
   for (let monthsAgo = 0; monthsAgo < 6; monthsAgo++) {
     await seed(auth.request, workspaceId, monthsBefore(period, monthsAgo), monthsAgo);
   }
+  await seedSeries(auth.request, workspaceId, period);
   const storageState = await auth.storageState();
   await auth.close();
 
@@ -205,6 +250,7 @@ async function main() {
     },
     { name: 'orcamento', path: `/espacos/${workspaceId}/orcamento`, signedIn: true },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
+    { name: 'recorrencias', path: `/espacos/${workspaceId}/recorrencias`, signedIn: true },
     { name: 'analise', path: `/espacos/${workspaceId}/analise`, signedIn: true },
     {
       // On the phone the filters are behind a button; from md they are on the page.
