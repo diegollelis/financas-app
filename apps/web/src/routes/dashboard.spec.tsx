@@ -194,10 +194,17 @@ describe('DashboardPage', () => {
         screen.getByRole('link', { name: 'Competência anterior: dezembro de 2026' }),
       ).toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole('link', { name: 'Mês atual' }));
+      await userEvent.click(screen.getByRole('button', { name: /^Escolher competência/ }));
+      await userEvent.click(await screen.findByRole('link', { name: 'Ir para o mês atual' }));
       expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
-      // Already on this month: no link to it.
-      expect(screen.queryByRole('link', { name: 'Mês atual' })).not.toBeInTheDocument();
+      // Already on this month: the picker offers no way to it.
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Escolher competência (atual: outubro de 2026)' }),
+      );
+      expect(
+        await screen.findByRole('dialog', { name: 'Escolher competência' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Ir para o mês atual' })).not.toBeInTheDocument();
       expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);
       await vi.waitFor(() =>
         expect(fetchMock).toHaveBeenCalledWith(

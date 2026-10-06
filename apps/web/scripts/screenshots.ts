@@ -195,6 +195,14 @@ async function main() {
       open: /^Novo lançamento$/,
       opens: 'dialog' as const,
     },
+    {
+      // The month picker, opened away from this month (the dot shows beside the name).
+      name: 'competencia-seletor',
+      path: `/espacos/${workspaceId}/lancamentos?competencia=${monthsBefore(period, 14)}`,
+      signedIn: true,
+      open: /^Escolher competência/,
+      opens: 'dialog' as const,
+    },
     { name: 'orcamento', path: `/espacos/${workspaceId}/orcamento`, signedIn: true },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
     { name: 'analise', path: `/espacos/${workspaceId}/analise`, signedIn: true },

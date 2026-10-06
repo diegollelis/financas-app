@@ -343,7 +343,12 @@ describe('TransactionsPage', () => {
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     expect(await section('Débitos')).toHaveTextContent('Conta de luz');
-    expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument();
+    // Only the competência picker, which navigates; nothing that edits.
+    expect(
+      within(screen.getByRole('main'))
+        .getAllByRole('button')
+        .map((button) => button.getAttribute('aria-label')),
+    ).toEqual([expect.stringMatching(/^Escolher competência/)]);
   });
 
   it('is reached from the sections of the workspace', async () => {
