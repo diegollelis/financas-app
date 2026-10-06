@@ -151,3 +151,9 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
   - O redirecionamento repassa a _query string_, porque o link de confirmação de e-mail volta com `?error=`.
 - **O aviso de confirmar o e-mail** aparece no topo de todas as páginas do espaço até a confirmação. "Seus espaços" saiu do menu da conta e da gaveta "Mais".
 - **Estado vazio que não repete a ação:** em Lançamentos, o mês vazio diz o que falta e aponta "Novo lançamento", que já está na tela, em vez de mostrar um segundo botão ("cada elemento faz um trabalho", da skill `frontend-design`). A regra entrou na skill `financas-ui`.
+
+## Nota (gaveta acima do teclado, 2026-10-06)
+
+- **Problema:** no celular, o teclado virtual cobria o campo da gaveta, como em "Novo espaço compartilhado". O Chrome no Android (desde a versão 108) e o Safari no iOS encolhem só a _visual viewport_ quando o teclado abre, e um elemento `position: fixed; bottom: 0` continua no fundo da tela, atrás do teclado.
+- **Solução:** `useKeyboardInset` (`lib/use-keyboard-inset.ts`) lê a `window.visualViewport` e informa quanto da tela o teclado cobre. A gaveta do `ResponsiveDialog` usa esse valor como `bottom` e limita a própria altura ao que sobra visível. Quando o teclado abre, o campo em foco rola para dentro da área visível.
+- **Por que não `interactive-widget=resizes-content`:** essa opção da _meta viewport_ faria a barra de abas subir junto com o teclado em todo formulário, e não vale no iOS. A barra continua atrás do teclado, como nos apps nativos.
