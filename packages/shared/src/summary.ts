@@ -53,11 +53,18 @@ export const summarySchema = z.object({
   expensesLeftCents: z.number().int(),
   /** What is left after the debits and after setting aside every other destination. */
   result: twoViewsSchema,
+  /**
+   * Of the pending amounts, how much is still an estimate of a variable recurrence (ADR 0038):
+   * the planned view counts it, so the dashboard says so.
+   */
+  estimatedCents: z.number().int().default(0),
 });
 
 export type Summary = z.infer<typeof summarySchema>;
 
-type SummaryTransaction = Pick<Transaction, 'type' | 'amountCents' | 'dueDate' | 'settledAt'>;
+type SummaryTransaction = Pick<Transaction, 'type' | 'amountCents' | 'dueDate' | 'settledAt'> & {
+  amountEstimated?: boolean;
+};
 
 function side(transactions: SummaryTransaction[], today: string): Summary['credits'] {
   const totals = { totalCents: 0, settledCents: 0, pendingCents: 0, overdueCents: 0 };
@@ -128,5 +135,8 @@ export function summarizePeriod(
         debits.settledCents -
         setAside.reduce((sum, share) => sum + share.settledCents, 0),
     },
+    estimatedCents: transactions
+      .filter((transaction) => transaction.amountEstimated && !transaction.settledAt)
+      .reduce((sum, transaction) => sum + transaction.amountCents, 0),
   };
 }

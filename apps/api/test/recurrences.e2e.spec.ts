@@ -255,6 +255,97 @@ describe('recurrences', () => {
     await viewer.browser.post(`/api/workspaces/${workspaceId}/recurrences`).send({}).expect(403);
   });
 
+  describe('variable amount (energy, water)', () => {
+    it('starts each month from the average of the last settled, as an estimate', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const settle = async (period: string, amountCents: number) => {
+        const [transaction] = await transactionsOf(period);
+        const response = await browser
+          .patch(`${base}/transactions/${transaction?.id}`)
+          .send({ amountCents, settledAt: `${period}-05` })
+          .expect(200);
+        return response.body as { amountEstimated: boolean };
+      };
+      await create(energy({ variableAmount: true, startPeriod: month(-2) }));
+
+      // No history yet: the amount typed, as an estimate.
+      expect((await transactionsOf(month(-2)))[0]).toMatchObject({
+        amountCents: 18_000,
+        amountEstimated: true,
+      });
+      expect(await settle(month(-2), 20_000)).toMatchObject({ amountEstimated: false });
+      expect((await transactionsOf(month(-1)))[0]).toMatchObject({
+        amountCents: 20_000,
+        amountEstimated: true,
+      });
+      await settle(month(-1), 22_000);
+
+      // The average of the settled months before each one.
+      expect((await transactionsOf(thisMonth))[0]).toMatchObject({ amountCents: 21_000 });
+      expect((await transactionsOf(month(1)))[0]).toMatchObject({ amountCents: 21_000 });
+    });
+
+    it('confirms the amount when it is given or settled, and never goes back to estimate', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      await create(energy({ variableAmount: true }));
+      const [now] = await transactionsOf(thisMonth);
+      const [next] = await transactionsOf(month(1));
+
+      const settled = await browser
+        .patch(`${base}/transactions/${now?.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+      expect(settled.body).toMatchObject({ amountEstimated: false });
+      const undone = await browser
+        .patch(`${base}/transactions/${now?.id}`)
+        .send({ settledAt: null })
+        .expect(200);
+      expect(undone.body).toMatchObject({ amountEstimated: false });
+      const typed = await browser
+        .patch(`${base}/transactions/${next?.id}`)
+        .send({ amountCents: 19_500 })
+        .expect(200);
+      expect(typed.body).toMatchObject({ amountCents: 19_500, amountEstimated: false });
+    });
+
+    it('a new amount reaches only the months still estimated', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const recurrence = await create(energy({ variableAmount: true }));
+      const [now] = await transactionsOf(thisMonth);
+      await transactionsOf(month(1));
+      await browser
+        .patch(`${base}/transactions/${now?.id}`)
+        .send({ amountCents: 19_500 })
+        .expect(200);
+
+      await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ amountCents: 25_000 })
+        .expect(200);
+
+      expect((await transactionsOf(thisMonth))[0]).toMatchObject({ amountCents: 19_500 });
+      expect((await transactionsOf(month(1)))[0]).toMatchObject({
+        amountCents: 25_000,
+        amountEstimated: true,
+      });
+    });
+
+    it('tells the dashboard how much is an estimate; a fixed one never is', async () => {
+      const { create, energy, categoryId, transactionsOf, base, browser } = await setUp();
+      await create(energy({ variableAmount: true }));
+      await create(
+        energy({ description: 'Internet', categoryId: categoryId('Internet', 'DEBIT') }),
+      );
+
+      const transactions = await transactionsOf(thisMonth);
+      expect(transactions.find((t) => t.description === 'Internet')).toMatchObject({
+        amountEstimated: false,
+      });
+      const summary = await browser.get(`${base}/summary/${thisMonth}`).expect(200);
+      expect(summary.body).toMatchObject({ estimatedCents: 18_000 });
+    });
+  });
+
   describe('isolation', () => {
     it('hides the routes from non-members', async () => {
       const { personalWorkspaceId } = await t.signUp(maria);

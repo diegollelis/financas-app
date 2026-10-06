@@ -21,6 +21,11 @@ export const createRecurrenceInputSchema = z.object({
   categoryId: z.uuid('Escolha uma categoria.'),
   amountCents: amountCentsSchema,
   dueDay: dueDaySchema.nullable().optional(),
+  /**
+   * The amount changes every month (energy, water): each month starts from the average of the
+   * last 3 settled, and stays an estimate until the real one is given. Otherwise it is fixed.
+   */
+  variableAmount: z.boolean().optional(),
   /** The first competência; its transaction is created right away. */
   startPeriod: periodSchema,
 });
@@ -44,6 +49,7 @@ export const recurrenceSchema = z.object({
   notes: z.string().nullable(),
   categoryId: z.uuid(),
   amountCents: z.number().int(),
+  variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
   startPeriod: periodSchema,
   /** The last competência it generated; null while active. */
@@ -54,6 +60,20 @@ export type Recurrence = z.infer<typeof recurrenceSchema>;
 
 /** Active ones first, then by description. */
 export const recurrenceListResponseSchema = z.array(recurrenceSchema);
+
+/** How many settled months the estimate of a variable recurrence looks back on. */
+export const ESTIMATE_MONTHS = 3;
+
+/**
+ * The amount of a new month of a variable recurrence (ADR 0038): the average of its last
+ * settled amounts (newest first, at most ESTIMATE_MONTHS of them), rounded to the cent; with no
+ * history yet, the amount typed. An average weighs an unusual month less than repeating the last.
+ */
+export function estimateAmount(settledNewestFirst: number[], fallbackCents: number): number {
+  const recent = settledNewestFirst.slice(0, ESTIMATE_MONTHS);
+  if (recent.length === 0) return fallbackCents;
+  return Math.round(recent.reduce((sum, cents) => sum + cents, 0) / recent.length);
+}
 
 /**
  * The due date in a competência: `dueDateIn('2026-02', 31)` → '2026-02-28'. Integer math on the
