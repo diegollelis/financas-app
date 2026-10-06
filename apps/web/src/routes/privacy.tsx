@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
+import { TextLink } from '@/components/text-link';
 
 /** Where data subjects send their requests (LGPD, art. 18). Public on purpose (ADR 0012). */
 const PRIVACY_CONTACT_EMAIL = 'financas.app.contato@gmail.com';
@@ -125,9 +125,7 @@ export function PrivacyPage() {
       </Section>
 
       <footer>
-        <Link to="/" className="text-primary underline-offset-4 hover:underline">
-          Voltar para o Finanças
-        </Link>
+        <TextLink to="/">Voltar para o Finanças</TextLink>
       </footer>
     </main>
   );

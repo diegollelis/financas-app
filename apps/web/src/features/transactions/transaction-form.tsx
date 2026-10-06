@@ -7,10 +7,10 @@ import {
   type TransactionType,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { RadioGroup as RadioGroupPrimitive } from 'radix-ui';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
+import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -43,11 +43,10 @@ export type TransactionFormValues = z.output<typeof transactionFormSchema>;
 /** 15990 → "159,90": the amount as the person would type it. */
 const amountText = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 });
 
-const typeLabels: Record<TransactionType, string> = { DEBIT: 'Débito', CREDIT: 'Crédito' };
-
-function isTransactionType(value: string): value is TransactionType {
-  return value === 'DEBIT' || value === 'CREDIT';
-}
+const typeOptions: readonly { value: TransactionType; label: string }[] = [
+  { value: 'DEBIT', label: 'Débito' },
+  { value: 'CREDIT', label: 'Crédito' },
+];
 
 /** The category picker; FormField hands it the id and error wiring for its trigger. */
 function CategorySelect({
@@ -131,32 +130,20 @@ export function TransactionForm({
       className="grid gap-4"
       onSubmit={(event) => void handleSubmit(onSubmit)(event)}
     >
-      {/* Two large segments instead of small radio dots: 44px targets on the phone. */}
       <Controller
         control={control}
         name="type"
         render={({ field }) => (
-          <RadioGroupPrimitive.Root
-            aria-label="Tipo"
+          <SegmentedControl
+            label="Tipo"
+            options={typeOptions}
             value={field.value}
-            onValueChange={(value) => {
-              if (!isTransactionType(value)) return;
+            onChange={(value) => {
               field.onChange(value);
               // The category belongs to one type: changing the type asks for a new one.
               setValue('categoryId', '');
             }}
-            className="bg-muted grid grid-cols-2 gap-1 rounded-lg p-1"
-          >
-            {(['DEBIT', 'CREDIT'] as const).map((value) => (
-              <RadioGroupPrimitive.Item
-                key={value}
-                value={value}
-                className="text-muted-foreground focus-visible:ring-ring/50 data-[state=checked]:bg-background data-[state=checked]:text-foreground h-11 rounded-md font-medium outline-none focus-visible:ring-3 data-[state=checked]:shadow-sm md:h-8"
-              >
-                {typeLabels[value]}
-              </RadioGroupPrimitive.Item>
-            ))}
-          </RadioGroupPrimitive.Root>
+          />
         )}
       />
       <FormField

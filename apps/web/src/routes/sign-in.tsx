@@ -1,9 +1,10 @@
 import { signInInputSchema, type SignInInput } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useSearchParams } from 'react-router';
+import { useLocation, useSearchParams } from 'react-router';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
+import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
@@ -35,12 +36,7 @@ export function SignInPage() {
       footer={
         <span>
           Ainda não tem conta?{' '}
-          <Link
-            to={withReturnTo('/cadastro', returnTo)}
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Cadastre-se
-          </Link>
+          <TextLink to={withReturnTo('/cadastro', returnTo)}>Cadastre-se</TextLink>
         </span>
       }
     >
@@ -65,12 +61,9 @@ export function SignInPage() {
         <FormField id="password" label="Senha" error={formState.errors.password?.message}>
           <Input type="password" autoComplete="current-password" {...register('password')} />
         </FormField>
-        <Link
-          to="/esqueci-senha"
-          className="text-primary -mt-2 justify-self-end text-sm underline-offset-4 hover:underline"
-        >
+        <TextLink to="/esqueci-senha" className="-my-2 justify-self-end text-sm">
           Esqueci minha senha
-        </Link>
+        </TextLink>
         {signIn.isError && (
           <p role="alert" className="text-destructive text-sm">
             {authErrorMessage(signIn.error)}

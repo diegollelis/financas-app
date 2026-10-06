@@ -42,7 +42,8 @@ describe('WorkspacePage', () => {
     expect(within(screen.getByRole('banner')).getByText('Casa')).toBeInTheDocument();
     expect(screen.getByText('Seu acesso: Dono')).toBeInTheDocument();
     const memberList = await screen.findByRole('list', { name: 'Membros do espaço' });
-    expect(memberList).toHaveTextContent('João Exemplo (joao@example.com)');
+    expect(within(memberList).getByText('João Exemplo')).toBeInTheDocument();
+    expect(within(memberList).getByText('joao@example.com')).toBeInTheDocument();
     expect(memberList).toHaveTextContent('Leitor');
     expect(await screen.findByText('ana@example.com')).toBeInTheDocument();
     expect(screen.getByText(/Editor, vale até 09\/10\/2026/)).toBeInTheDocument();
@@ -57,12 +58,13 @@ describe('WorkspacePage', () => {
     renderApp(`/espacos/${houseId}`);
 
     await userEvent.type(await screen.findByLabelText('E-mail da pessoa'), 'Pedro@Example.com');
-    await userEvent.click(screen.getByLabelText('Só visualizar'));
+    const access = screen.getByRole('radiogroup', { name: 'Acesso' });
+    expect(within(access).getByRole('radio', { name: 'Pode editar' })).toBeChecked();
+    await userEvent.click(within(access).getByRole('radio', { name: 'Só visualizar' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Convite enviado para pedro@example.com.',
-    );
+    expect(await screen.findByText('Convite enviado para pedro@example.com')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByLabelText('E-mail da pessoa')).toHaveValue(''));
     expect(fetchMock).toHaveBeenCalledWith(
       new URL(`/api/workspaces/${houseId}/invitations`, 'http://api.test'),
       expect.objectContaining({
@@ -101,6 +103,29 @@ describe('WorkspacePage', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Cancelar convite de ana@example.com' }),
     );
+    // Asks first: the link in the e-mail stops working.
+    let confirm = await screen.findByRole('alertdialog', {
+      name: 'Cancelar o convite de ana@example.com?',
+    });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Manter convite' }));
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    await vi.waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Cancelar convite de ana@example.com' }),
+      ).toHaveFocus(),
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Cancelar convite de ana@example.com' }),
+    );
+    confirm = await screen.findByRole('alertdialog', {
+      name: 'Cancelar o convite de ana@example.com?',
+    });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar convite' }));
+    expect(await screen.findByText('Convite cancelado')).toBeInTheDocument();
 
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(

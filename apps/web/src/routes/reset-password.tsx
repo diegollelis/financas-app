@@ -5,19 +5,16 @@ import {
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { FormField } from '@/components/form-field';
+import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
 import { useResetPassword } from '@/features/auth/use-auth-mutations';
 
-const requestNewLink = (
-  <Link to="/esqueci-senha" className="text-primary underline-offset-4 hover:underline">
-    Pedir um novo link
-  </Link>
-);
+const requestNewLink = <TextLink to="/esqueci-senha">Pedir um novo link</TextLink>;
 
 /**
  * Opened from the e-mail: the API checks the token and redirects here with `?token=` (or with

@@ -1,8 +1,8 @@
 import { forgotPasswordInputSchema, type ForgotPasswordInput } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Link } from 'react-router';
 import { FormField } from '@/components/form-field';
+import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
@@ -20,11 +20,7 @@ export function ForgotPasswordPage() {
     <AuthCard
       title="Esqueci minha senha"
       description="Enviaremos um link para você criar uma nova senha."
-      footer={
-        <Link to="/entrar" className="text-primary underline-offset-4 hover:underline">
-          Voltar para o login
-        </Link>
-      }
+      footer={<TextLink to="/entrar">Voltar para o login</TextLink>}
     >
       {requestReset.isSuccess ? (
         // The same answer whether or not the e-mail has an account (no account enumeration).

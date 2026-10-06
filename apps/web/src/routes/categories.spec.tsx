@@ -42,6 +42,26 @@ function expectCall(fetchMock: ReturnType<typeof mockApi>, path: string, init: o
   );
 }
 
+async function openActions(name: string) {
+  await userEvent.click(await screen.findByRole('button', { name: `Ações de ${name}` }));
+  return screen.findByRole('menu');
+}
+
+/** The items of a category's menu, closing it afterwards. */
+async function menuOf(name: string) {
+  const menu = await openActions(name);
+  const items = within(menu)
+    .getAllByRole('menuitem')
+    .map((item) => item.textContent);
+  await userEvent.keyboard('{Escape}');
+  return items;
+}
+
+async function choose(name: string, action: string) {
+  const menu = await openActions(name);
+  await userEvent.click(within(menu).getByRole('menuitem', { name: action }));
+}
+
 describe('CategoriesPage', () => {
   it('lists credits and debits apart, with the archived ones separated', async () => {
     mockCategories();
@@ -56,8 +76,10 @@ describe('CategoriesPage', () => {
     ).toEqual([expect.stringContaining('Consórcio'), expect.stringContaining('Salário')]);
     const debits = await section('Débitos');
     expect(within(debits).getByRole('heading', { name: 'Arquivadas' })).toBeInTheDocument();
-    expect(within(debits).getByRole('button', { name: 'Reativar IPVA' })).toBeInTheDocument();
-    expect(within(debits).getByRole('button', { name: 'Arquivar Mercado' })).toBeInTheDocument();
+    // Each category has its actions in a menu: active ones are renamed or archived...
+    expect(await menuOf('Mercado')).toEqual(['Renomear', 'Arquivar']);
+    // ...archived ones are reactivated or deleted.
+    expect(await menuOf('IPVA')).toEqual(['Reativar', 'Excluir']);
   });
 
   it('adds a category to the right type', async () => {
@@ -120,20 +142,20 @@ describe('CategoriesPage', () => {
     });
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const debits = await section('Débitos');
-    await userEvent.click(within(debits).getByRole('button', { name: 'Renomear Mercado' }));
-    const input = within(debits).getByLabelText('Novo nome para Mercado');
+    await choose('Mercado', 'Renomear');
+    const dialog = await screen.findByRole('dialog', { name: 'Renomear categoria' });
+    const input = within(dialog).getByLabelText('Novo nome para Mercado');
+    expect(input).toHaveValue('Mercado');
     await userEvent.clear(input);
     await userEvent.type(input, 'Supermercado');
-    await userEvent.click(within(debits).getByRole('button', { name: 'Salvar' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
 
     await expectCall(fetchMock, `${base}/${mercado.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ name: 'Supermercado' }),
     });
-    await vi.waitFor(() =>
-      expect(within(debits).queryByLabelText('Novo nome para Mercado')).not.toBeInTheDocument(),
-    );
+    expect(await screen.findByText('Categoria renomeada')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('archives an active category and reactivates an archived one', async () => {
@@ -143,33 +165,58 @@ describe('CategoriesPage', () => {
     });
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const debits = await section('Débitos');
-    await userEvent.click(within(debits).getByRole('button', { name: 'Arquivar Mercado' }));
-    await userEvent.click(within(debits).getByRole('button', { name: 'Reativar IPVA' }));
-
+    await choose('Mercado', 'Arquivar');
     await expectCall(fetchMock, `${base}/${mercado.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ archived: true }),
     });
+    expect(await screen.findByText('Categoria arquivada')).toBeInTheDocument();
+
+    await choose('IPVA', 'Reativar');
     await expectCall(fetchMock, `${base}/${ipva.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ archived: false }),
     });
+    expect(await screen.findByText('Categoria reativada')).toBeInTheDocument();
   });
 
-  it('offers deleting only for archived categories', async () => {
+  it('asks for confirmation, naming the category, before deleting an archived one', async () => {
     const fetchMock = mockCategories({
       [`DELETE ${base}/${ipva.id}`]: { status: 204, body: null },
     });
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const debits = await section('Débitos');
-    expect(
-      within(debits).queryByRole('button', { name: 'Excluir Mercado' }),
-    ).not.toBeInTheDocument();
-    await userEvent.click(within(debits).getByRole('button', { name: 'Excluir IPVA' }));
+    await choose('IPVA', 'Excluir');
+    const confirm = await screen.findByRole('alertdialog', { name: 'Excluir IPVA?' });
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      new URL(`${base}/${ipva.id}`, 'http://api.test'),
+      expect.anything(),
+    );
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Excluir' }));
 
     await expectCall(fetchMock, `${base}/${ipva.id}`, { method: 'DELETE' });
+    expect(await screen.findByText('Categoria excluída')).toBeInTheDocument();
+  });
+
+  it('tells why a category in use cannot be deleted', async () => {
+    mockCategories({
+      [`DELETE ${base}/${ipva.id}`]: {
+        status: 409,
+        body: {
+          code: 'CATEGORY_IN_USE',
+          message: 'Esta categoria tem lançamentos: arquive-a em vez de excluir.',
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    await choose('IPVA', 'Excluir');
+    const confirm = await screen.findByRole('alertdialog', { name: 'Excluir IPVA?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Excluir' }));
+
+    expect(
+      await screen.findByText('Esta categoria tem lançamentos: arquive-a em vez de excluir.'),
+    ).toBeInTheDocument();
   });
 
   it('is read-only for a VIEWER', async () => {

@@ -98,7 +98,7 @@ describe('BudgetPage', () => {
     const travel = screen.getByLabelText('Viagens (%)');
     await userEvent.clear(travel);
     await userEvent.type(travel, '2,5');
-    expect(screen.getByText('Soma: 97,5% · sem destino: 2,5%')).toBeInTheDocument();
+    expect(screen.getByText('Soma: 97,5%. Sem destino: 2,5%')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Salvar para outubro de 2026' }));
 
     await vi.waitFor(() =>
@@ -117,7 +117,7 @@ describe('BudgetPage', () => {
         }),
       ),
     );
-    expect(await screen.findByRole('status')).toHaveTextContent('Orçamento salvo.');
+    expect(await screen.findByText('Orçamento salvo')).toBeInTheDocument();
   });
 
   it('refuses percentages adding up to more than 100% before calling the API', async () => {
@@ -139,7 +139,7 @@ describe('BudgetPage', () => {
     );
   });
 
-  it('another competência starts fresh, without the "saved" of the previous one', async () => {
+  it('another competência starts fresh, with its own values', async () => {
     mockBudget({
       [`PUT ${base}/2026-10`]: { body: { ...inherited, source: 'SAVED', inheritedFrom: null } },
       [`GET ${base}/2026-11`]: {
@@ -156,7 +156,7 @@ describe('BudgetPage', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Salvar para outubro de 2026' }),
     );
-    expect(await screen.findByRole('status')).toHaveTextContent('Orçamento salvo.');
+    expect(await screen.findByText('Orçamento salvo')).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('link', { name: 'Próxima competência: novembro de 2026' }),
     );
@@ -165,7 +165,6 @@ describe('BudgetPage', () => {
     expect(
       screen.getByRole('button', { name: 'Salvar para novembro de 2026' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('is read-only for a VIEWER', async () => {

@@ -1,8 +1,8 @@
 import { PASSWORD_MIN_LENGTH, signUpInputSchema, type SignUpInput } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Link } from 'react-router';
 import { FormField } from '@/components/form-field';
+import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
@@ -25,13 +25,7 @@ export function SignUpPage() {
       description="Comece a organizar o seu mês."
       footer={
         <span>
-          Já tem conta?{' '}
-          <Link
-            to={withReturnTo('/entrar', returnTo)}
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Entrar
-          </Link>
+          Já tem conta? <TextLink to={withReturnTo('/entrar', returnTo)}>Entrar</TextLink>
         </span>
       }
     >

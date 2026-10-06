@@ -1,5 +1,6 @@
 import type { InvitationPreview } from '@financas/shared';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { TextLink } from '@/components/text-link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/auth-card';
 import { withReturnTo } from '@/features/auth/return-to';
@@ -8,11 +9,7 @@ import { useMe } from '@/features/auth/use-me';
 import { useAcceptInvitation, useInvitationPreview } from '@/features/invitations/use-invitation';
 import { apiErrorMessage } from '@/lib/error-message';
 
-const homeLink = (
-  <Link to="/" className="text-primary underline-offset-4 hover:underline">
-    Ir para o início
-  </Link>
-);
+const homeLink = <TextLink to="/">Ir para o início</TextLink>;
 
 function describe(invitation: InvitationPreview) {
   const access = invitation.role === 'EDITOR' ? 'ver e editar' : 'ver';
