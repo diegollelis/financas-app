@@ -83,7 +83,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Recorrências e parcelamentos ([ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
   - [x] API de recorrências: gerar ao abrir o mês, mudar e encerrar só os pendentes do mês atual em diante
   - [ ] API de parcelamentos
-  - [ ] "Repetir" no "Novo lançamento" e selos nas linhas
+  - [x] "Repetir" (Todo mês) no "Novo lançamento", selo nas linhas e "Encerrar recorrência" no menu
+  - [ ] "Parcelado" no "Novo lançamento"
   - [ ] Tela "Recorrências" no Mais
 - [ ] Rateio de lançamentos (ADR próprio)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))

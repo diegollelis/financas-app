@@ -154,6 +154,98 @@ describe('TransactionsPage', () => {
     );
   });
 
+  it('repeats it every month: creates a recurrence starting in this competência', async () => {
+    const recurrenceId = '01920000-0000-7000-8000-000000000301';
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/recurrences`]: {
+        status: 201,
+        body: {
+          id: recurrenceId,
+          type: 'DEBIT',
+          description: 'Internet',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 9_990,
+          dueDay: 20,
+          startPeriod: '2026-10',
+          endPeriod: null,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    expect(within(form).getByRole('radio', { name: 'Não repetir' })).toBeChecked();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Internet');
+    await chooseCategory(form, 'Energia');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '99,90');
+    await userEvent.type(within(form).getByLabelText('Vencimento (opcional)'), '2026-10-20');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo mês' }));
+    expect(within(form).getByText(/Um lançamento pendente em cada mês/)).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Internet',
+        notes: null,
+        categoryId: energyCategory.id,
+        amountCents: 9_990,
+        dueDay: 20,
+        startPeriod: '2026-10',
+      }),
+    });
+    expect(
+      await screen.findByText('Lançamento adicionado, repetindo todo mês'),
+    ).toBeInTheDocument();
+  });
+
+  it('marks a generated transaction and ends its recurrence from the menu', async () => {
+    const recurrenceId = '01920000-0000-7000-8000-000000000301';
+    const fetchMock = mockTransactions({
+      [`GET ${base}`]: { body: [salary, { ...light, recurrenceId }, shopping] },
+      [`DELETE /api/workspaces/${houseId}/recurrences/${recurrenceId}`]: {
+        status: 204,
+        body: null,
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Débitos');
+    expect(row(debits, 'Conta de luz')).toHaveTextContent('Todo mês');
+    expect(row(debits, 'Compras da semana')).not.toHaveTextContent('Todo mês');
+
+    const menu = await openActions('Conta de luz');
+    expect(within(menu).getByRole('menuitem', { name: 'Excluir só este mês' })).toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Encerrar recorrência' }));
+    const confirm = await screen.findByRole('alertdialog', {
+      name: 'Encerrar a recorrência Conta de luz?',
+    });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Encerrar recorrência' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences/${recurrenceId}`, {
+      method: 'DELETE',
+    });
+    expect(await screen.findByText('Recorrência encerrada')).toBeInTheDocument();
+  });
+
+  it('says that editing a generated month changes only that month', async () => {
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [{ ...light, recurrenceId: '01920000-0000-7000-8000-000000000301' }],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+
+    const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    expect(form).toHaveTextContent('esta mudança vale só para este mês');
+    expect(within(form).queryByRole('radiogroup', { name: 'Repetir' })).not.toBeInTheDocument();
+  });
+
   it('creates a transaction in the competência, closes the form and confirms', async () => {
     const fetchMock = mockTransactions({ [`POST ${base}`]: { status: 201, body: light } });
     renderApp(`/espacos/${houseId}/lancamentos`);

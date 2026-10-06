@@ -50,3 +50,15 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
 - **Uma categoria usada por uma recorrência não pode ser excluída,** só arquivada, como uma categoria com lançamentos.
 - **O teste `rls-coverage`** passou a exigir RLS e política em toda tabela com `workspace_id`, para nenhuma tabela nova sair sem elas.
 - **Revisar** se um dia houver rotina agendada (plano pago) ou recorrências com outra frequência (semanal, anual).
+
+## Nota ("Repetir" no "Novo lançamento", 2026-10-06)
+
+- **O formulário de "Novo lançamento" ganhou "Repetir"** (`SegmentedControl` Não repetir | Todo mês). Com "Todo mês", ele cria uma recorrência que começa na competência na tela, em vez de um lançamento avulso. O dia do vencimento vem do dia da data informada. A API já cria o lançamento deste mês.
+  - Toast: "Lançamento adicionado, repetindo todo mês".
+  - "Repetir" só aparece ao criar; ao editar, não.
+- **Selo "Todo mês"** nas linhas geradas por uma recorrência (o lançamento traz `recurrenceId`).
+- **No menu "⋯" de um lançamento gerado:**
+  - "Encerrar recorrência", com confirmação. Os pendentes deste mês em diante saem; os anteriores e os efetivados ficam.
+  - "Excluir só este mês", e a confirmação avisa que esse mês não volta a ser gerado.
+- **Editar um mês gerado avisa** que a mudança vale só para aquele mês; a recorrência não muda.
+- "Parcelado" entra no mesmo campo quando a API de parcelamentos existir.
