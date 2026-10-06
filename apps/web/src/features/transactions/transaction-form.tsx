@@ -1,5 +1,9 @@
 import {
   createTransactionInputSchema,
+  formatCents,
+  installmentCountSchema,
+  parseReais,
+  splitInstallments,
   isoDateSchema,
   reaisInputSchema,
   type Category,
@@ -35,10 +39,28 @@ const transactionFormSchema = createTransactionInputSchema
       .string()
       .transform((date) => date || null)
       .pipe(isoDateSchema.nullable()),
-    /** Only when creating: once, or every month from this competência on (ADR 0038). */
-    repeat: z.enum(['NONE', 'MONTHLY']),
+    /**
+     * Only when creating: once, every month from this competência on, or in installments
+     * (ADR 0038).
+     */
+    repeat: z.enum(['NONE', 'MONTHLY', 'INSTALLMENTS']),
     /** Of a monthly one: the same every month, or changing (energy, water), ADR 0038. */
     amountKind: z.enum(['FIXED', 'VARIABLE']),
+    /** Of installments: how many, as typed. */
+    installments: z.string(),
+    /** Of installments: whether the amount typed is the whole purchase or each installment. */
+    amountIs: z.enum(['TOTAL', 'INSTALLMENT']),
+  })
+  .superRefine((values, ctx) => {
+    if (values.repeat !== 'INSTALLMENTS') return;
+    const count = installmentCountSchema.safeParse(Number(values.installments));
+    if (!count.success) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['installments'],
+        message: count.error.issues[0]?.message ?? 'Informe o número de parcelas.',
+      });
+    }
   });
 
 type FormInput = z.input<typeof transactionFormSchema>;
@@ -60,7 +82,36 @@ const amountKindOptions = [
 const repeatOptions = [
   { value: 'NONE', label: 'Não repetir' },
   { value: 'MONTHLY', label: 'Todo mês' },
+  { value: 'INSTALLMENTS', label: 'Parcelado' },
 ] as const;
+
+const amountIsOptions = [
+  { value: 'TOTAL', label: 'Total' },
+  { value: 'INSTALLMENT', label: 'Da parcela' },
+] as const;
+
+/**
+ * "10 parcelas de R$ 35,00, total R$ 350,00", or, when cents are left over, "3 parcelas:
+ * 2 de R$ 333,33 e a última de R$ 333,34": what will be created, before it is.
+ */
+function installmentsPreview(
+  amountText: string,
+  countText: string,
+  amountIs: 'TOTAL' | 'INSTALLMENT',
+) {
+  const cents = parseReais(amountText);
+  const count = installmentCountSchema.safeParse(Number(countText));
+  if (cents === null || cents <= 0 || !count.success) return null;
+  const total = amountIs === 'TOTAL' ? cents : cents * count.data;
+  if (amountIs === 'TOTAL' && total < count.data) return null;
+  const parts = splitInstallments(total, count.data);
+  const first = parts[0] ?? 0;
+  const last = parts.at(-1) ?? 0;
+  if (first === last) {
+    return `${count.data} parcelas de ${formatCents(first)}, total ${formatCents(total)}.`;
+  }
+  return `${count.data} parcelas: ${count.data - 1} de ${formatCents(first)} e a última de ${formatCents(last)}, total ${formatCents(total)}.`;
+}
 
 /** The category picker; FormField hands it the id and error wiring for its trigger. */
 function CategorySelect({
@@ -132,13 +183,29 @@ export function TransactionForm({
       dueDate: initial?.dueDate ?? '',
       repeat: 'NONE',
       amountKind: 'FIXED',
+      installments: '',
+      amountIs: 'TOTAL',
     },
   });
   // useWatch rather than watch(): the hook form is safe for the React Compiler.
   const type = useWatch({ control, name: 'type' });
   const repeat = useWatch({ control, name: 'repeat' });
   const amountKind = useWatch({ control, name: 'amountKind' });
+  const amountIs = useWatch({ control, name: 'amountIs' });
+  const typedAmount = useWatch({ control, name: 'amount' });
+  const typedInstallments = useWatch({ control, name: 'installments' });
   const variable = repeat === 'MONTHLY' && amountKind === 'VARIABLE';
+  const installments = repeat === 'INSTALLMENTS';
+  const amountLabel = variable
+    ? 'Valor estimado (R$)'
+    : installments
+      ? amountIs === 'TOTAL'
+        ? 'Valor total (R$)'
+        : 'Valor da parcela (R$)'
+      : 'Valor (R$)';
+  const preview = installments
+    ? installmentsPreview(typedAmount ?? '', typedInstallments ?? '', amountIs ?? 'TOTAL')
+    : null;
   // Only categories of the chosen type; an archived one only if it is already the current one.
   const options = categories.filter(
     (category) =>
@@ -186,11 +253,7 @@ export function TransactionForm({
       />
       {/* One column on the phone, two from sm. */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField
-          id={id('amount')}
-          label={variable ? 'Valor estimado (R$)' : 'Valor (R$)'}
-          error={formState.errors.amount?.message}
-        >
+        <FormField id={id('amount')} label={amountLabel} error={formState.errors.amount?.message}>
           <Input
             inputMode="decimal"
             autoComplete="off"
@@ -260,6 +323,44 @@ export function TransactionForm({
             {variable
               ? 'Para contas que mudam todo mês, como energia e água. Cada mês começa com a média dos 3 últimos pagos; ao efetivar, você informa o valor da fatura.'
               : 'O mesmo valor todo mês, como internet e aluguel.'}
+          </p>
+        </div>
+      )}
+      {allowRepeat && installments && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            id={id('installments')}
+            label="Parcelas"
+            error={formState.errors.installments?.message}
+          >
+            <Input
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="Ex.: 10"
+              className="tabular-nums"
+              {...register('installments')}
+            />
+          </FormField>
+          <div className="grid gap-2">
+            <p aria-hidden className="text-sm font-medium">
+              O valor digitado é
+            </p>
+            <Controller
+              control={control}
+              name="amountIs"
+              render={({ field }) => (
+                <SegmentedControl
+                  label="O valor digitado é"
+                  options={amountIsOptions}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+          </div>
+          <p aria-live="polite" className="text-muted-foreground text-sm sm:col-span-2">
+            {preview ??
+              'Uma parcela por mês, a partir deste, todas pendentes. Com o total, os centavos que sobram vão para a última.'}
           </p>
         </div>
       )}

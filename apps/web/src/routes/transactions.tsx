@@ -9,7 +9,7 @@ import {
   type Transaction,
   type TransactionType,
 } from '@financas/shared';
-import { Ellipsis, Plus, Repeat } from 'lucide-react';
+import { CreditCard, Ellipsis, Plus, Repeat } from 'lucide-react';
 import { useRef, useState, type RefObject } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
@@ -34,6 +34,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCategories } from '@/features/categories/use-categories';
+import {
+  useCreateInstallmentPlan,
+  useEndInstallmentPlan,
+} from '@/features/installments/use-installments';
 import { useCreateRecurrence, useEndRecurrence } from '@/features/recurrences/use-recurrences';
 import { SettleWithAmount } from '@/features/transactions/settle-with-amount';
 import { PeriodNav } from '@/features/periods/period-nav';
@@ -112,6 +116,7 @@ function DeleteDialog({
             possível desfazer.
             {transaction.recurrenceId &&
               ' A recorrência continua nos outros meses, e este mês não volta a ser gerado.'}
+            {transaction.installment && ' As outras parcelas continuam.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -129,7 +134,7 @@ function DeleteDialog({
  * Asks before ending the recurrence that generated this transaction (ADR 0038): its pending
  * transactions from this month on go, the earlier and settled ones stay.
  */
-function EndRecurrenceDialog({
+function EndSeriesDialog({
   workspaceId,
   transaction,
   open,
@@ -142,11 +147,31 @@ function EndRecurrenceDialog({
   onOpenChange: (open: boolean) => void;
   returnFocusTo: RefObject<HTMLButtonElement | null>;
 }) {
-  const end = useEndRecurrence(workspaceId);
-  // mutateAsync: this row may leave the list when its recurrence ends.
+  const endRecurrence = useEndRecurrence(workspaceId);
+  const endPlan = useEndInstallmentPlan(workspaceId);
+  const plan = transaction.installment;
+  const text = plan
+    ? {
+        title: `Encerrar o parcelamento ${transaction.description}?`,
+        description:
+          'As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada.',
+        action: 'Encerrar parcelamento',
+        done: 'Parcelamento encerrado',
+      }
+    : {
+        title: `Encerrar a recorrência ${transaction.description}?`,
+        description:
+          'Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já efetivados ficam.',
+        action: 'Encerrar recorrência',
+        done: 'Recorrência encerrada',
+      };
+  // mutateAsync: this row may leave the list when its series ends.
   const confirmEnd = () =>
-    end.mutateAsync(transaction.recurrenceId ?? '').then(() => {
-      toast.success('Recorrência encerrada');
+    (plan
+      ? endPlan.mutateAsync(plan.planId)
+      : endRecurrence.mutateAsync(transaction.recurrenceId ?? '')
+    ).then(() => {
+      toast.success(text.done);
       document.getElementById(sectionTitleId(transaction.type))?.focus();
     }, showError);
 
@@ -159,16 +184,13 @@ function EndRecurrenceDialog({
         }}
       >
         <AlertDialogHeader>
-          <AlertDialogTitle>Encerrar a recorrência {transaction.description}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os
-            já efetivados ficam.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{text.title}</AlertDialogTitle>
+          <AlertDialogDescription>{text.description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction variant="destructive" onClick={() => void confirmEnd()}>
-            Encerrar recorrência
+            {text.action}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -204,6 +226,8 @@ function TransactionItem({
   const { description } = transaction;
   // Still an estimate of a variable bill (ADR 0038): settling asks for the bill's amount.
   const estimated = transaction.amountEstimated && !transaction.settledAt;
+  // Part of a recurrence or of an installment plan, which can be ended from here (ADR 0038).
+  const inSeries = Boolean(transaction.recurrenceId ?? transaction.installment);
   const settle = (settledAt: string | null, message: string) =>
     update.mutate(
       { id: transaction.id, settledAt },
@@ -237,6 +261,12 @@ function TransactionItem({
             <Badge variant="secondary">
               <Repeat aria-hidden />
               Todo mês
+            </Badge>
+          )}
+          {transaction.installment && (
+            <Badge variant="secondary">
+              <CreditCard aria-hidden />
+              Parcela {transaction.installment.number}/{transaction.installment.count}
             </Badge>
           )}
         </span>
@@ -301,13 +331,17 @@ function TransactionItem({
                     Desfazer efetivação
                   </DropdownMenuItem>
                 )}
-                {transaction.recurrenceId && (
+                {inSeries && (
                   <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
-                    Encerrar recorrência
+                    {transaction.installment ? 'Encerrar parcelamento' : 'Encerrar recorrência'}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
-                  {transaction.recurrenceId ? 'Excluir só este mês' : 'Excluir'}
+                  {transaction.installment
+                    ? 'Excluir só esta parcela'
+                    : transaction.recurrenceId
+                      ? 'Excluir só este mês'
+                      : 'Excluir'}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -318,8 +352,8 @@ function TransactionItem({
               onOpenChange={setConfirmingDelete}
               returnFocusTo={actionsRef}
             />
-            {transaction.recurrenceId && (
-              <EndRecurrenceDialog
+            {inSeries && (
+              <EndSeriesDialog
                 workspaceId={workspaceId}
                 transaction={transaction}
                 open={confirmingEnd}
@@ -356,9 +390,17 @@ function TransactionDialog({
 }) {
   const create = useCreateTransaction(workspaceId);
   const createRecurrence = useCreateRecurrence(workspaceId);
+  const createPlan = useCreateInstallmentPlan(workspaceId);
   const update = useUpdateTransaction(workspaceId);
-  const [repeating, setRepeating] = useState(false);
-  const mutation = editing ? update : repeating ? createRecurrence : create;
+  // Which kind of creation was last submitted: its pending state and error are the form's.
+  const [repeat, setRepeat] = useState<TransactionFormValues['repeat']>('NONE');
+  const mutation = editing
+    ? update
+    : repeat === 'MONTHLY'
+      ? createRecurrence
+      : repeat === 'INSTALLMENTS'
+        ? createPlan
+        : create;
   const done = (message: string) => () => {
     toast.success(message);
     onOpenChange(false);
@@ -376,9 +418,27 @@ function TransactionDialog({
         { id: editing.id, ...fields, dueDate: values.dueDate },
         { onSuccess: done('Lançamento salvo') },
       );
+    } else if (values.repeat === 'INSTALLMENTS') {
+      // All installments at once, one per month from this one (ADR 0038).
+      setRepeat('INSTALLMENTS');
+      const installments = Number(values.installments);
+      createPlan.mutate(
+        {
+          type: fields.type,
+          description: fields.description,
+          notes: fields.notes,
+          categoryId: fields.categoryId,
+          installments,
+          amountCents: fields.amountCents,
+          amountIs: values.amountIs,
+          firstPeriod: period,
+          dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
+        },
+        { onSuccess: done(`Parcelamento adicionado: ${installments} parcelas`) },
+      );
     } else if (values.repeat === 'MONTHLY') {
       // Every month from this one, due on the same day (ADR 0038).
-      setRepeating(true);
+      setRepeat('MONTHLY');
       createRecurrence.mutate(
         {
           ...fields,
@@ -389,7 +449,7 @@ function TransactionDialog({
         { onSuccess: done('Lançamento adicionado, repetindo todo mês') },
       );
     } else {
-      setRepeating(false);
+      setRepeat('NONE');
       create.mutate(
         { ...fields, dueDate: values.dueDate, period },
         { onSuccess: done('Lançamento adicionado') },
@@ -404,10 +464,12 @@ function TransactionDialog({
       returnFocusTo={returnFocusTo}
       title={editing ? 'Editar lançamento' : 'Novo lançamento'}
       description={
+        // Editing one generated month or one installment changes only it (ADR 0038).
         editing?.recurrenceId
-          ? // Editing one generated month does not change the recurrence (ADR 0038).
-            `Competência de ${formatPeriod(editing.period)}. Repete todo mês: esta mudança vale só para este mês.`
-          : `Competência de ${formatPeriod(editing?.period ?? period)}.`
+          ? `Competência de ${formatPeriod(editing.period)}. Repete todo mês: esta mudança vale só para este mês.`
+          : editing?.installment
+            ? `Competência de ${formatPeriod(editing.period)}. Parcela ${editing.installment.number} de ${editing.installment.count}: esta mudança vale só para esta parcela.`
+            : `Competência de ${formatPeriod(editing?.period ?? period)}.`
       }
     >
       <TransactionForm
