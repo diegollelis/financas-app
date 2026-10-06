@@ -1,6 +1,7 @@
 import { periodSchema } from '@financas/shared';
 import {
   ArrowLeftRight,
+  ChartColumn,
   ChartPie,
   Ellipsis,
   LayoutDashboard,
@@ -44,6 +45,7 @@ const sections: Section[] = [
   { path: 'painel', label: 'Painel', icon: LayoutDashboard, byPeriod: true },
   { path: 'lancamentos', label: 'Lançamentos', icon: ArrowLeftRight, byPeriod: true },
   { path: 'orcamento', label: 'Orçamento', icon: ChartPie, byPeriod: true },
+  { path: 'analise', label: 'Análise', icon: ChartColumn, more: true },
   { path: 'categorias', label: 'Categorias', icon: Tags, more: true },
   { path: '', label: 'Membros', icon: Users, more: true },
 ];

@@ -57,8 +57,21 @@ async function signIn(api: APIRequestContext) {
   if (!signedUp.ok()) throw new Error(`Could not sign in or sign up: ${signedUp.status()}`);
 }
 
-async function seed(api: APIRequestContext, workspaceId: string, period: string) {
+/** The competência `months` before `period` ('2026-01', 1 → '2025-12'). */
+function monthsBefore(period: string, months: number): string {
+  const [year, month] = period.split('-').map(Number);
+  const index = year! * 12 + month! - 1 - months;
+  return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Sample transactions for one competência, if it has none. Past months are all settled, and
+ * the variable debits change a little from month to month, so the analysis chart has a shape.
+ */
+async function seed(api: APIRequestContext, workspaceId: string, period: string, monthsAgo = 0) {
   const base = `${API}/api/workspaces/${workspaceId}`;
+  const vary = (cents: number) => Math.round(cents * (1 + (((monthsAgo * 7) % 5) - 2) / 10));
+  const pending = (date: string) => (monthsAgo > 0 ? date : null);
   const existing = (await (
     await api.get(`${base}/transactions?period=${period}`)
   ).json()) as unknown[];
@@ -83,13 +96,13 @@ async function seed(api: APIRequestContext, workspaceId: string, period: string)
       categoryId: pick('DEBIT', 0),
       amountCents: 180000,
       dueDate: day(10),
-      settledAt: null,
+      settledAt: pending(day(10)),
     },
     {
       type: 'DEBIT',
       description: 'Mercado',
       categoryId: pick('DEBIT', 1),
-      amountCents: 64035,
+      amountCents: vary(64035),
       dueDate: day(3),
       settledAt: day(3),
     },
@@ -97,9 +110,9 @@ async function seed(api: APIRequestContext, workspaceId: string, period: string)
       type: 'DEBIT',
       description: 'Energia elétrica',
       categoryId: pick('DEBIT', 2),
-      amountCents: 18990,
+      amountCents: vary(18990),
       dueDate: day(1),
-      settledAt: null,
+      settledAt: pending(day(1)),
     },
   ];
   for (const data of samples) {
@@ -154,7 +167,10 @@ async function main() {
     await auth.request.get(`${API}/api/workspaces`)
   ).json()) as Workspace[];
   const workspaceId = workspaces.find((w) => w.isPersonal)!.id;
-  await seed(auth.request, workspaceId, period);
+  // This month and the five before it: the analysis page shows the last 6 months.
+  for (let monthsAgo = 0; monthsAgo < 6; monthsAgo++) {
+    await seed(auth.request, workspaceId, monthsBefore(period, monthsAgo), monthsAgo);
+  }
   const storageState = await auth.storageState();
   await auth.close();
 
@@ -181,6 +197,16 @@ async function main() {
     },
     { name: 'orcamento', path: `/espacos/${workspaceId}/orcamento`, signedIn: true },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
+    { name: 'analise', path: `/espacos/${workspaceId}/analise`, signedIn: true },
+    {
+      // On the phone the filters are behind a button; from md they are on the page.
+      name: 'analise-filtros',
+      path: `/espacos/${workspaceId}/analise`,
+      signedIn: true,
+      open: /^Filtros$/,
+      opens: 'dialog' as const,
+      phoneOnly: true,
+    },
   ].filter((p) => !filter || p.name.includes(filter));
 
   // Light at every width; dark (the device's preference, theme "Sistema") at phone and desktop.
@@ -208,6 +234,7 @@ async function main() {
       colorScheme,
     });
     for (const target of pages) {
+      if (target.phoneOnly && viewport.width >= 768) continue;
       const page = await (target.signedIn ? context : guest).newPage();
       await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
       if (target.open && target.opens) {

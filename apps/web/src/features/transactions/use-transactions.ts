@@ -6,6 +6,7 @@ import {
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { analysisKey } from '@/features/analysis/use-analysis';
 import { summaryKey } from '@/features/summary/use-summary';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
@@ -29,8 +30,9 @@ function useInvalidateTransactions(workspaceId: string) {
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: transactionsKey(workspaceId) }),
-      // The month's dashboard is computed from the transactions.
+      // The month's dashboard and the analysis are computed from the transactions.
       queryClient.invalidateQueries({ queryKey: summaryKey(workspaceId) }),
+      queryClient.invalidateQueries({ queryKey: analysisKey(workspaceId) }),
     ]);
 }
 

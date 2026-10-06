@@ -83,7 +83,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Rateio de lançamentos (ADR próprio)
 - [ ] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
-  - [ ] Página "Análise": período, filtros e evolução mês a mês
+  - [x] Página "Análise": período, filtros e evolução mês a mês
   - [ ] Gastos por categoria e categoria ao longo do tempo
 - [ ] Importação do `.xlsx` (com relatório de inconsistências)
 - [ ] LGPD: termos com aceite no cadastro, exportação e exclusão de conta (a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
