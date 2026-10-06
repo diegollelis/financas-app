@@ -9,7 +9,7 @@ import {
   type Transaction,
   type TransactionType,
 } from '@financas/shared';
-import { Ellipsis, Plus } from 'lucide-react';
+import { Ellipsis, Plus, Repeat } from 'lucide-react';
 import { useRef, useState, type RefObject } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCategories } from '@/features/categories/use-categories';
+import { useCreateRecurrence, useEndRecurrence } from '@/features/recurrences/use-recurrences';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import {
@@ -108,12 +109,65 @@ function DeleteDialog({
           <AlertDialogDescription>
             O lançamento de {formatCents(transaction.amountCents)} sai desta competência. Não é
             possível desfazer.
+            {transaction.recurrenceId &&
+              ' A recorrência continua nos outros meses, e este mês não volta a ser gerado.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction variant="destructive" onClick={() => void confirmDelete()}>
             Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/**
+ * Asks before ending the recurrence that generated this transaction (ADR 0038): its pending
+ * transactions from this month on go, the earlier and settled ones stay.
+ */
+function EndRecurrenceDialog({
+  workspaceId,
+  transaction,
+  open,
+  onOpenChange,
+  returnFocusTo,
+}: {
+  workspaceId: string;
+  transaction: Transaction;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  returnFocusTo: RefObject<HTMLButtonElement | null>;
+}) {
+  const end = useEndRecurrence(workspaceId);
+  // mutateAsync: this row may leave the list when its recurrence ends.
+  const confirmEnd = () =>
+    end.mutateAsync(transaction.recurrenceId ?? '').then(() => {
+      toast.success('Recorrência encerrada');
+      document.getElementById(sectionTitleId(transaction.type))?.focus();
+    }, showError);
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocusTo.current?.focus();
+        }}
+      >
+        <AlertDialogHeader>
+          <AlertDialogTitle>Encerrar a recorrência {transaction.description}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os
+            já efetivados ficam.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => void confirmEnd()}>
+            Encerrar recorrência
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -141,6 +195,7 @@ function TransactionItem({
   onEdit: (transaction: Transaction, returnFocusTo: HTMLElement | null) => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateTransaction(workspaceId);
   const { description } = transaction;
@@ -161,7 +216,15 @@ function TransactionItem({
         {transaction.notes && (
           <p className="text-muted-foreground text-sm break-words">{transaction.notes}</p>
         )}
-        <StatusBadge transaction={transaction} today={today} />
+        <span className="flex flex-wrap gap-1.5">
+          <StatusBadge transaction={transaction} today={today} />
+          {transaction.recurrenceId && (
+            <Badge variant="secondary">
+              <Repeat aria-hidden />
+              Todo mês
+            </Badge>
+          )}
+        </span>
       </div>
       <div className="grid shrink-0 justify-items-end gap-2">
         <span className="text-base font-semibold tabular-nums">
@@ -204,8 +267,13 @@ function TransactionItem({
                     Desfazer efetivação
                   </DropdownMenuItem>
                 )}
+                {transaction.recurrenceId && (
+                  <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
+                    Encerrar recorrência
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
-                  Excluir
+                  {transaction.recurrenceId ? 'Excluir só este mês' : 'Excluir'}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -216,6 +284,15 @@ function TransactionItem({
               onOpenChange={setConfirmingDelete}
               returnFocusTo={actionsRef}
             />
+            {transaction.recurrenceId && (
+              <EndRecurrenceDialog
+                workspaceId={workspaceId}
+                transaction={transaction}
+                open={confirmingEnd}
+                onOpenChange={setConfirmingEnd}
+                returnFocusTo={actionsRef}
+              />
+            )}
           </div>
         )}
       </div>
@@ -244,8 +321,10 @@ function TransactionDialog({
   returnFocusTo: HTMLElement | null;
 }) {
   const create = useCreateTransaction(workspaceId);
+  const createRecurrence = useCreateRecurrence(workspaceId);
   const update = useUpdateTransaction(workspaceId);
-  const mutation = editing ? update : create;
+  const [repeating, setRepeating] = useState(false);
+  const mutation = editing ? update : repeating ? createRecurrence : create;
   const done = (message: string) => () => {
     toast.success(message);
     onOpenChange(false);
@@ -257,12 +336,29 @@ function TransactionDialog({
       notes: values.notes ?? null,
       categoryId: values.categoryId,
       amountCents: values.amount,
-      dueDate: values.dueDate,
     };
     if (editing) {
-      update.mutate({ id: editing.id, ...fields }, { onSuccess: done('Lançamento salvo') });
+      update.mutate(
+        { id: editing.id, ...fields, dueDate: values.dueDate },
+        { onSuccess: done('Lançamento salvo') },
+      );
+    } else if (values.repeat === 'MONTHLY') {
+      // Every month from this one, due on the same day (ADR 0038).
+      setRepeating(true);
+      createRecurrence.mutate(
+        {
+          ...fields,
+          dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
+          startPeriod: period,
+        },
+        { onSuccess: done('Lançamento adicionado, repetindo todo mês') },
+      );
     } else {
-      create.mutate({ ...fields, period }, { onSuccess: done('Lançamento adicionado') });
+      setRepeating(false);
+      create.mutate(
+        { ...fields, dueDate: values.dueDate, period },
+        { onSuccess: done('Lançamento adicionado') },
+      );
     }
   };
 
@@ -272,7 +368,12 @@ function TransactionDialog({
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
       title={editing ? 'Editar lançamento' : 'Novo lançamento'}
-      description={`Competência de ${formatPeriod(editing?.period ?? period)}.`}
+      description={
+        editing?.recurrenceId
+          ? // Editing one generated month does not change the recurrence (ADR 0038).
+            `Competência de ${formatPeriod(editing.period)}. Repete todo mês: esta mudança vale só para este mês.`
+          : `Competência de ${formatPeriod(editing?.period ?? period)}.`
+      }
     >
       <TransactionForm
         // A new form each time: empty for a new one, the values of the one being edited.
@@ -285,7 +386,7 @@ function TransactionDialog({
             ? update.isPending
               ? 'Salvando…'
               : 'Salvar'
-            : create.isPending
+            : mutation.isPending
               ? 'Adicionando…'
               : 'Adicionar'
         }
@@ -293,6 +394,7 @@ function TransactionDialog({
         error={mutation.error}
         onSubmit={submit}
         onCancel={() => onOpenChange(false)}
+        allowRepeat={!editing}
       />
     </ResponsiveDialog>
   );

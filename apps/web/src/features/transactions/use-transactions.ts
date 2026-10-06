@@ -25,7 +25,8 @@ export function useTransactions(workspaceId: string, period: string) {
   });
 }
 
-function useInvalidateTransactions(workspaceId: string) {
+/** Everything derived from the transactions: also used when recurrences create or remove them. */
+export function useInvalidateTransactions(workspaceId: string) {
   const queryClient = useQueryClient();
   return () =>
     Promise.all([

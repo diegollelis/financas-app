@@ -35,6 +35,8 @@ const transactionFormSchema = createTransactionInputSchema
       .string()
       .transform((date) => date || null)
       .pipe(isoDateSchema.nullable()),
+    /** Only when creating: once, or every month from this competência on (ADR 0038). */
+    repeat: z.enum(['NONE', 'MONTHLY']),
   });
 
 type FormInput = z.input<typeof transactionFormSchema>;
@@ -47,6 +49,11 @@ const typeOptions: readonly { value: TransactionType; label: string }[] = [
   { value: 'DEBIT', label: 'Débito' },
   { value: 'CREDIT', label: 'Crédito' },
 ];
+
+const repeatOptions = [
+  { value: 'NONE', label: 'Não repetir' },
+  { value: 'MONTHLY', label: 'Todo mês' },
+] as const;
 
 /** The category picker; FormField hands it the id and error wiring for its trigger. */
 function CategorySelect({
@@ -89,6 +96,7 @@ export function TransactionForm({
   error,
   onSubmit,
   onCancel,
+  allowRepeat = false,
 }: {
   /** Keeps the field ids unique when several forms are on the page. */
   idPrefix: string;
@@ -99,6 +107,8 @@ export function TransactionForm({
   error: unknown;
   onSubmit: (values: TransactionFormValues) => void;
   onCancel?: () => void;
+  /** Offers "Repetir": only for a new transaction. */
+  allowRepeat?: boolean;
 }) {
   const { register, handleSubmit, formState, control, setValue } = useForm<
     FormInput,
@@ -113,10 +123,12 @@ export function TransactionForm({
       categoryId: initial?.categoryId ?? '',
       amount: initial ? amountText.format(initial.amountCents / 100) : '',
       dueDate: initial?.dueDate ?? '',
+      repeat: 'NONE',
     },
   });
   // useWatch rather than watch(): the hook form is safe for the React Compiler.
   const type = useWatch({ control, name: 'type' });
+  const repeat = useWatch({ control, name: 'repeat' });
   // Only categories of the chosen type; an archived one only if it is already the current one.
   const options = categories.filter(
     (category) =>
@@ -188,6 +200,31 @@ export function TransactionForm({
       >
         <Input autoComplete="off" {...register('notes')} />
       </FormField>
+      {allowRepeat && (
+        <div className="grid gap-2">
+          <p aria-hidden className="text-sm font-medium">
+            Repetir
+          </p>
+          <Controller
+            control={control}
+            name="repeat"
+            render={({ field }) => (
+              <SegmentedControl
+                label="Repetir"
+                options={repeatOptions}
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )}
+          />
+          {repeat === 'MONTHLY' && (
+            <p className="text-muted-foreground text-sm">
+              Um lançamento pendente em cada mês, a partir deste, com este valor e o mesmo dia de
+              vencimento. Para parar, use "Encerrar recorrência" no menu do lançamento.
+            </p>
+          )}
+        </div>
+      )}
       {Boolean(error) && (
         <p role="alert" className="text-destructive">
           {apiErrorMessage(error)}
