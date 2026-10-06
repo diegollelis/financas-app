@@ -157,3 +157,14 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **Problema:** no celular, o teclado virtual cobria o campo da gaveta, como em "Novo espaço compartilhado". O Chrome no Android (desde a versão 108) e o Safari no iOS encolhem só a _visual viewport_ quando o teclado abre, e um elemento `position: fixed; bottom: 0` continua no fundo da tela, atrás do teclado.
 - **Solução:** `useKeyboardInset` (`lib/use-keyboard-inset.ts`) lê a `window.visualViewport` e informa quanto da tela o teclado cobre. A gaveta do `ResponsiveDialog` usa esse valor como `bottom` e limita a própria altura ao que sobra visível. Quando o teclado abre, o campo em foco rola para dentro da área visível.
 - **Por que não `interactive-widget=resizes-content`:** essa opção da _meta viewport_ faria a barra de abas subir junto com o teclado em todo formulário, e não vale no iOS. A barra continua atrás do teclado, como nos apps nativos.
+
+## Nota (seletor de competência, 2026-10-06)
+
+- **A linha de navegação nunca muda de forma:** `‹  [Outubro de 2026 ▾]  ›`. Antes, o botão "Mês atual" aparecia no fim da linha quando a competência não era a de hoje e encolhia o nome do mês no celular.
+- **Tocar no mês abre o seletor** (`features/periods/period-picker.tsx`):
+  - o ano tem as próprias setas, e trocá-lo não navega;
+  - os 12 meses aparecem numa grade de 44 px, cada um um link para `?competencia=`, então o "voltar" do navegador funciona;
+  - o mês aberto aparece preenchido, e o mês de hoje, com borda;
+  - **"Ir para o mês atual" fica dentro do seletor,** e só fora do mês atual.
+  - O seletor abre numa **gaveta no celular** (`ResponsiveDialog`) e num **balão no desktop** (`Popover` do shadcn, sem escurecer a tela).
+- **Fora do mês atual,** um pequeno ponto ao lado do nome avisa que você não está no mês de hoje. O mesmo aviso vai no nome acessível do botão ("…, fora do mês atual"), para não depender só do visual.

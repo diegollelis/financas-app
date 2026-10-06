@@ -175,7 +175,12 @@ describe('BudgetPage', () => {
     expect(await screen.findByText('Herdado de setembro de 2026.')).toBeInTheDocument();
     expect(screen.getByText('Reserva de emergência').nextSibling).toHaveTextContent('15%');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument();
+    // Only the competência picker, which navigates; nothing that edits.
+    expect(
+      within(screen.getByRole('main'))
+        .getAllByRole('button')
+        .map((button) => button.getAttribute('aria-label')),
+    ).toEqual([expect.stringMatching(/^Escolher competência/)]);
   });
 
   it('is reached from the sections of the workspace', async () => {
