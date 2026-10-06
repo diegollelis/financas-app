@@ -5,6 +5,7 @@ import {
   ChartPie,
   Ellipsis,
   LayoutDashboard,
+  Repeat,
   Tags,
   Users,
   type LucideIcon,
@@ -46,6 +47,7 @@ const sections: Section[] = [
   { path: 'lancamentos', label: 'Lançamentos', icon: ArrowLeftRight, byPeriod: true },
   { path: 'orcamento', label: 'Orçamento', icon: ChartPie, byPeriod: true },
   { path: 'analise', label: 'Análise', icon: ChartColumn, more: true },
+  { path: 'recorrencias', label: 'Recorrências', icon: Repeat, more: true },
   { path: 'categorias', label: 'Categorias', icon: Tags, more: true },
   { path: '', label: 'Membros', icon: Users, more: true },
 ];

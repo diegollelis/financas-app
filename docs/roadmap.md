@@ -80,14 +80,14 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Seletor de espaço no cabeçalho (toda tela com o menu) e estado vazio sem ação repetida
   - [x] Gaveta acima do teclado virtual no celular
   - [x] Seletor de mês e ano na navegação de competência ("Mês atual" dentro dele)
-- [ ] Recorrências e parcelamentos ([ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
+- [x] Recorrências e parcelamentos ([ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
   - [x] API de recorrências: gerar ao abrir o mês, mudar e encerrar só os pendentes do mês atual em diante
   - [x] API de parcelamentos: todas as parcelas de uma vez, total ou valor da parcela, centavos na última, encerrar
   - [x] "Repetir" (Todo mês) no "Novo lançamento", selo nas linhas e "Encerrar recorrência" no menu
   - [x] API de valor variável: média dos 3 últimos efetivados, "estimado" até confirmar, total estimado no Painel
   - [x] Tela de valor variável: "Fixo | Variável", aviso "Estimado" e "Efetivar" pedindo o valor
   - [x] "Parcelado" no "Novo lançamento", selo "Parcela n/N" e "Encerrar parcelamento" no menu
-  - [ ] Tela "Recorrências" no Mais
+  - [x] Tela "Recorrências" no Mais: listar, editar (só o que mudou) e encerrar
 - [ ] Rateio de lançamentos (ADR próprio)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
