@@ -113,3 +113,13 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **Toasts** (`sonner`, no topo, montados em `components/root-layout.tsx`) depois de cada mudança: "Lançamento adicionado", "salvo", "efetivado", "excluído" e "Efetivação desfeita". As falhas também aparecem num toast.
 - **Exclusão com `mutateAsync`:** os _callbacks_ de `mutate()` não rodam se o componente for desmontado antes, e a linha some justamente quando a exclusão dá certo.
 - **Testes:** o `mockApi` responde 204 sem corpo, porque `Response.json` falha nesse caso. O _setup_ ganhou os _stubs_ que o Radix precisa no jsdom (`ResizeObserver` e captura de ponteiro), e o `matchMedia` falso responde "celular" para consultas de largura.
+
+## Nota (Painel, 2026-10-05)
+
+- **Um número em destaque:** o **saldo previsto** abre o mês em tamanho grande (36 px no celular, 48 px a partir de `sm`), como recomenda a skill `dataviz` (um destaque por tela).
+  - Saldo efetivado, resultado previsto e resultado efetivado vêm abaixo, como linhas no celular e em três blocos a partir de `sm`.
+  - Os valores isolados usam algarismos proporcionais; `tabular-nums` fica só onde os números se alinham em coluna.
+- **Vencidos** num aviso com a cor semântica de alerta (`warning`), ícone e texto, e o botão "Ver lançamentos" com 44 px.
+- **Orçamento por destino:** um cartão por destino no celular, já que as cinco colunas da tabela não cabem em 360 px, e a tabela a partir de `md`. A escolha usa o `useMediaQuery`, não `hidden`/`md:table`, para que o leitor de tela e os testes encontrem uma só versão.
+- **Créditos e débitos** em linhas "rótulo e valor", em duas colunas a partir de `sm`.
+- **Testes:** `stubPrefersDark(dark, { desktop: true })` simula uma tela de `md` em diante.

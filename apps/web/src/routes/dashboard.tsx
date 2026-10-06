@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { shareLabels } from '@/features/budget/share-labels';
 import { PeriodNav } from '@/features/periods/period-nav';
@@ -12,6 +13,7 @@ import { CreditsBar } from '@/features/summary/credits-bar';
 import { ExpensesMeter } from '@/features/summary/expenses-meter';
 import { useSummary } from '@/features/summary/use-summary';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
+import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 
 /** Colored by sign, as in the spreadsheet; the minus sign keeps it readable without color. */
@@ -19,9 +21,13 @@ function SignedCents({ cents }: { cents: number }) {
   return <span className={cn(cents < 0 && 'text-destructive')}>{formatCents(cents)}</span>;
 }
 
+/**
+ * A secondary indicator: a row (label left, value right) on the phone, a tile from sm. Values
+ * use proportional figures: they stand alone, not in a column (dataviz skill).
+ */
 function StatTile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-1 rounded-md border p-3">
+    <div className="flex items-baseline justify-between gap-3 border-b py-2 last:border-b-0 sm:grid sm:justify-start sm:gap-1 sm:rounded-xl sm:border sm:p-4 sm:last:border-b">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="text-lg font-semibold">{children}</dd>
     </div>
@@ -52,16 +58,19 @@ function OverdueNotice({
   if (count === 0) return null;
   const cents = summary.credits.overdueCents + summary.debits.overdueCents;
   return (
-    <p role="status" className="text-destructive flex items-center gap-2">
-      <TriangleAlert aria-hidden className="size-4 shrink-0" />
-      <span>
+    <div
+      role="status"
+      className="bg-warning-muted text-warning grid gap-2 rounded-xl p-4 sm:flex sm:items-center sm:justify-between"
+    >
+      <p className="flex items-center gap-2 font-medium">
+        <TriangleAlert aria-hidden className="size-5 shrink-0" />
         {count === 1 ? '1 lançamento vencido' : `${count} lançamentos vencidos`} (
-        {formatCents(cents)}).{' '}
-        <Link to={transactionsLink} className="underline">
-          Ver lançamentos
-        </Link>
-      </span>
-    </p>
+        {formatCents(cents)}).
+      </p>
+      <Button asChild variant="outline" className="justify-self-start">
+        <Link to={transactionsLink}>Ver lançamentos</Link>
+      </Button>
+    </div>
   );
 }
 
@@ -74,28 +83,105 @@ function budgetOrigin(summary: Summary) {
   return 'Percentuais padrão: nenhum orçamento salvo até aqui.';
 }
 
+/** Each destination as a card on the phone: a five-column table does not fit in 360px. */
+function DestinationCards({ summary }: { summary: Summary }) {
+  return (
+    <ul className="grid gap-3">
+      {summary.shares.map((share) => (
+        <li key={share.key} className="grid gap-2 rounded-xl border p-4">
+          <p className="flex items-baseline justify-between gap-3">
+            <span className="font-medium">{shareLabels[share.key]}</span>
+            <span className="text-muted-foreground">{formatBasisPoints(share.basisPoints)}</span>
+          </p>
+          <dl className="grid grid-cols-3 gap-2 text-sm tabular-nums">
+            {(
+              [
+                ['Meta', share.targetCents],
+                ['Previsto', share.plannedCents],
+                ['Efetivado', share.settledCents],
+              ] as const
+            ).map(([label, cents]) => (
+              <div key={label} className="grid gap-0.5">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd>{formatCents(cents)}</dd>
+              </div>
+            ))}
+          </dl>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** From md, where the columns fit: the same numbers, compared down each column. */
+function DestinationTable({ summary }: { summary: Summary }) {
+  return (
+    <table className="w-full tabular-nums">
+      <thead className="text-muted-foreground">
+        <tr className="border-b">
+          <th scope="col" className="py-2 text-left font-normal">
+            Destino
+          </th>
+          <th scope="col" className="py-2 text-right font-normal">
+            %
+          </th>
+          <th scope="col" className="py-2 text-right font-normal">
+            Meta
+          </th>
+          <th scope="col" className="py-2 text-right font-normal">
+            Previsto
+          </th>
+          <th scope="col" className="py-2 text-right font-normal">
+            Efetivado
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {summary.shares.map((share) => (
+          <tr key={share.key} className="border-b last:border-b-0">
+            <th scope="row" className="py-2 text-left font-normal">
+              {shareLabels[share.key]}
+            </th>
+            <td className="py-2 text-right">{formatBasisPoints(share.basisPoints)}</td>
+            <td className="py-2 text-right">{formatCents(share.targetCents)}</td>
+            <td className="py-2 text-right">{formatCents(share.plannedCents)}</td>
+            <td className="py-2 text-right">{formatCents(share.settledCents)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 type PageLinks = { transactions: string; budget: string };
 
 function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
   const { credits, debits } = summary;
+  const desktop = useMediaQuery(DESKTOP_QUERY);
   return (
     <>
       <OverdueNotice summary={summary} transactionsLink={links.transactions} />
       <Section title="Saldo e resultado">
         {/* Planned: as if everything were settled. Settled: only what happened (ADR 0031). */}
-        <dl className="grid grid-cols-2 gap-3 tabular-nums">
-          <StatTile label="Saldo previsto">
-            <SignedCents cents={summary.balance.plannedCents} />
-          </StatTile>
-          <StatTile label="Saldo efetivado">
-            <SignedCents cents={summary.balance.settledCents} />
-          </StatTile>
-          <StatTile label="Resultado previsto">
-            <SignedCents cents={summary.result.plannedCents} />
-          </StatTile>
-          <StatTile label="Resultado efetivado">
-            <SignedCents cents={summary.result.settledCents} />
-          </StatTile>
+        <dl className="grid gap-4">
+          {/* The one number the month leads with (dataviz skill: one hero per view). */}
+          <div className="grid gap-1">
+            <dt className="text-muted-foreground">Saldo previsto</dt>
+            <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
+              <SignedCents cents={summary.balance.plannedCents} />
+            </dd>
+          </div>
+          <div className="grid sm:grid-cols-3 sm:gap-3">
+            <StatTile label="Saldo efetivado">
+              <SignedCents cents={summary.balance.settledCents} />
+            </StatTile>
+            <StatTile label="Resultado previsto">
+              <SignedCents cents={summary.result.plannedCents} />
+            </StatTile>
+            <StatTile label="Resultado efetivado">
+              <SignedCents cents={summary.result.settledCents} />
+            </StatTile>
+          </div>
         </dl>
         <p className="text-muted-foreground">
           Previsto: como se tudo fosse efetivado. Efetivado: só o que já foi recebido ou pago.
@@ -103,15 +189,20 @@ function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
         </p>
       </Section>
       <Section title="Créditos e débitos">
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums sm:grid-cols-4">
-          <dt className="text-muted-foreground">Recebidos</dt>
-          <dd>{formatCents(credits.settledCents)}</dd>
-          <dt className="text-muted-foreground">A receber</dt>
-          <dd>{formatCents(credits.pendingCents)}</dd>
-          <dt className="text-muted-foreground">Pagos</dt>
-          <dd>{formatCents(debits.settledCents)}</dd>
-          <dt className="text-muted-foreground">A pagar</dt>
-          <dd>{formatCents(debits.pendingCents)}</dd>
+        <dl className="grid tabular-nums sm:grid-cols-2 sm:gap-x-8">
+          {(
+            [
+              ['Recebidos', credits.settledCents],
+              ['A receber', credits.pendingCents],
+              ['Pagos', debits.settledCents],
+              ['A pagar', debits.pendingCents],
+            ] as const
+          ).map(([label, cents]) => (
+            <div key={label} className="flex justify-between gap-3 border-b py-2">
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd>{formatCents(cents)}</dd>
+            </div>
+          ))}
         </dl>
       </Section>
       <Section title="Para onde vão os créditos">
@@ -121,48 +212,13 @@ function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
         <ExpensesMeter summary={summary} />
       </Section>
       <Section title="Orçamento por destino">
-        <p className="text-muted-foreground">
-          {budgetOrigin(summary)}{' '}
-          <Link to={links.budget} className="underline">
-            Ver orçamento
-          </Link>
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full tabular-nums">
-            <thead className="text-muted-foreground">
-              <tr className="border-b">
-                <th scope="col" className="py-1 text-left font-normal">
-                  Destino
-                </th>
-                <th scope="col" className="py-1 text-right font-normal">
-                  %
-                </th>
-                <th scope="col" className="py-1 text-right font-normal">
-                  Meta
-                </th>
-                <th scope="col" className="py-1 text-right font-normal">
-                  Previsto
-                </th>
-                <th scope="col" className="py-1 text-right font-normal">
-                  Efetivado
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.shares.map((share) => (
-                <tr key={share.key} className="border-b last:border-b-0">
-                  <th scope="row" className="py-1 text-left font-normal">
-                    {shareLabels[share.key]}
-                  </th>
-                  <td className="py-1 text-right">{formatBasisPoints(share.basisPoints)}</td>
-                  <td className="py-1 text-right">{formatCents(share.targetCents)}</td>
-                  <td className="py-1 text-right">{formatCents(share.plannedCents)}</td>
-                  <td className="py-1 text-right">{formatCents(share.settledCents)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid justify-items-start gap-1">
+          <p className="text-muted-foreground">{budgetOrigin(summary)}</p>
+          <Button asChild variant="link" className="px-0 md:px-0">
+            <Link to={links.budget}>Ver orçamento</Link>
+          </Button>
         </div>
+        {desktop ? <DestinationTable summary={summary} /> : <DestinationCards summary={summary} />}
         <p className="text-muted-foreground">
           Meta: sobre a renda líquida. Previsto: sobre todos os créditos. Efetivado: sobre os
           créditos recebidos.
@@ -175,9 +231,13 @@ function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
 function DashboardSkeleton() {
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        {Array.from({ length: 4 }, (_, index) => (
-          <Skeleton key={index} className="h-20" />
+      <div className="grid gap-2">
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="h-12 w-56" />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Skeleton key={index} className="h-12 sm:h-20" />
         ))}
       </div>
       <Skeleton className="h-24" />

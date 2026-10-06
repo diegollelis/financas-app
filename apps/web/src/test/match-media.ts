@@ -1,17 +1,21 @@
 import { vi } from 'vitest';
 
 /**
- * jsdom has no matchMedia. This one answers whether the device prefers the dark theme; every
- * other query (e.g. `(min-width: 768px)`) is false, so tests see the phone layout.
+ * jsdom has no matchMedia. This one answers whether the device prefers the dark theme and, with
+ * `desktop`, whether the screen is at least md (768px); any other query is false. By default
+ * tests see a light phone.
  */
-export function stubPrefersDark(dark: boolean) {
+export function stubPrefersDark(dark: boolean, { desktop = false }: { desktop?: boolean } = {}) {
   const listeners = new Set<() => void>();
-  const darkQuery = '(prefers-color-scheme: dark)';
+  const answers: Record<string, () => boolean> = {
+    '(prefers-color-scheme: dark)': () => dark,
+    '(min-width: 768px)': () => desktop,
+  };
   vi.stubGlobal(
     'matchMedia',
     vi.fn((query: string) => ({
       get matches() {
-        return query === darkQuery && dark;
+        return answers[query]?.() ?? false;
       },
       media: query,
       addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
