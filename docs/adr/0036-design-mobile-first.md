@@ -123,3 +123,19 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **Orçamento por destino:** um cartão por destino no celular, já que as cinco colunas da tabela não cabem em 360 px, e a tabela a partir de `md`. A escolha usa o `useMediaQuery`, não `hidden`/`md:table`, para que o leitor de tela e os testes encontrem uma só versão.
 - **Créditos e débitos** em linhas "rótulo e valor", em duas colunas a partir de `sm`.
 - **Testes:** `stubPrefersDark(dark, { desktop: true })` simula uma tela de `md` em diante.
+
+## Nota (Orçamento, Categorias, Membros e login, 2026-10-05)
+
+- **Login, cadastro, senha e convite** (`AuthCard`): no celular, a tela inteira é o formulário, sem cartão em volta; a partir de `sm`, um cartão centralizado. O ícone e o nome "Finanças" aparecem no topo.
+- **`TextLink`** (`components/text-link.tsx`): link com cara de texto ("Cadastre-se", "Esqueci minha senha") e 44 px de altura no celular.
+- **`SegmentedControl`** (`components/segmented-control.tsx`): escolha entre poucas opções em segmentos grandes (`RadioGroup` do Radix). Usado no tipo do lançamento e no acesso do convite ("Pode editar" ou "Só visualizar").
+- **Orçamento:** campos em uma coluna no celular, "Orçamento salvo" em toast e o `·` trocado por uma frase ("Soma: 97,5%. Sem destino: 2,5%").
+- **Categorias:** cada categoria tem um menu "⋯": Renomear e Arquivar quando ativa, Reativar e Excluir quando arquivada.
+  - Renomear abre a gaveta ou o diálogo.
+  - Excluir pede confirmação, e a recusa da API (categoria em uso) aparece num toast.
+  - Toda ação usa `mutateAsync`, porque arquivar, reativar e excluir tiram a linha da lista.
+- **Membros:** linhas com nome e e-mail.
+  - Cancelar um convite pede confirmação ("Manter convite" ou "Cancelar convite"), já que o link do e-mail deixa de funcionar.
+  - "Convite enviado" e "Convite cancelado" aparecem em toasts.
+- **Testes:** o _setup_ chama `toast.dismiss()` depois de cada teste, porque o `sonner` guarda os toasts num estado global e o toast de um teste aparecia no seguinte.
+- **Resultado:** a checagem de celular das capturas não aponta mais nenhum alvo menor que 44 px nem rolagem horizontal, em nenhuma tela.

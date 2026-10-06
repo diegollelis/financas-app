@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -35,14 +35,17 @@ export function ResponsiveDialog({
    * Where focus goes on close. Radix returns it to a Trigger; a dialog opened from a menu item
    * or a button outside it has none, and focus would fall to the page.
    */
-  returnFocusTo?: HTMLElement | null;
+  returnFocusTo?: HTMLElement | null | RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const onCloseAutoFocus = (event: Event) => {
-    if (!returnFocusTo?.isConnected) return;
+    // Read on close, not on render: a ref is filled after the first render.
+    const target =
+      returnFocusTo && 'current' in returnFocusTo ? returnFocusTo.current : returnFocusTo;
+    if (!target?.isConnected) return;
     event.preventDefault();
-    returnFocusTo.focus();
+    target.focus();
   };
 
   if (desktop) {

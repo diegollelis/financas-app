@@ -65,15 +65,12 @@ export function BudgetForm({
   submitLabel,
   pending,
   error,
-  saved,
   onSubmit,
 }: {
   initial: Budget;
   submitLabel: string;
   pending: boolean;
   error: unknown;
-  /** Shows "Orçamento salvo." until the next change. */
-  saved: boolean;
   /** Rejects when saving fails; the page shows that through `error`. */
   onSubmit: (input: BudgetInput) => Promise<unknown>;
 }) {
@@ -103,7 +100,7 @@ export function BudgetForm({
   const submit = async (input: BudgetInput) => {
     try {
       await onSubmit(input);
-      // What was saved becomes the baseline: editing again hides "Orçamento salvo.".
+      // What was saved becomes the baseline of the form.
       reset(getValues());
     } catch {
       // Shown through `error`.
@@ -112,7 +109,7 @@ export function BudgetForm({
 
   return (
     <form noValidate className="grid gap-4" onSubmit={(event) => void handleSubmit(submit)(event)}>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <FormField
           id="net-income"
           label="Renda líquida (R$)"
@@ -167,7 +164,7 @@ export function BudgetForm({
           >
             Soma: {formatBasisPoints(total)}
             {total < FULL_BASIS_POINTS &&
-              ` · sem destino: ${formatBasisPoints(FULL_BASIS_POINTS - total)}`}
+              `. Sem destino: ${formatBasisPoints(FULL_BASIS_POINTS - total)}`}
           </p>
         )}
       </fieldset>
@@ -176,7 +173,6 @@ export function BudgetForm({
           {apiErrorMessage(error)}
         </p>
       )}
-      {saved && !formState.isDirty && <p role="status">Orçamento salvo.</p>}
       <div>
         <Button type="submit" disabled={pending}>
           {submitLabel}

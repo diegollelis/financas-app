@@ -8,6 +8,7 @@ import {
   shareOfIncome,
   type Budget,
 } from '@financas/shared';
+import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
 import { ListSkeleton, QueryState } from '@/components/query-state';
 import { BudgetForm } from '@/features/budget/budget-form';
@@ -82,8 +83,7 @@ function BudgetEditor({ workspaceId, budget }: { workspaceId: string; budget: Bu
       submitLabel={save.isPending ? 'Salvando…' : `Salvar para ${formatPeriod(budget.period)}`}
       pending={save.isPending}
       error={save.error}
-      saved={save.isSuccess}
-      onSubmit={(input) => save.mutateAsync(input)}
+      onSubmit={(input) => save.mutateAsync(input).then(() => toast.success('Orçamento salvo'))}
     />
   );
 }
@@ -105,7 +105,7 @@ export function BudgetPage() {
           <SourceNotice budget={budget.data} canEdit={canEdit} />
           {canEdit ? (
             <BudgetEditor
-              // Another competência starts fresh: its own values, no "saved" or error left
+              // Another competência starts fresh: its own values, no error left
               // over from the month seen before.
               key={period}
               workspaceId={workspace.id}

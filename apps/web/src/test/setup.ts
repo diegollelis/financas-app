@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { resetThemeStore } from '@/lib/theme';
 import { stubPrefersDark } from './match-media';
@@ -29,6 +30,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  // Sonner keeps its toasts in a module-level store: without this, one test's toast shows up
+  // in the next.
+  toast.dismiss();
   vi.unstubAllGlobals();
   if (!inBrowser) return;
   window.localStorage.clear();

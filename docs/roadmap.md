@@ -69,14 +69,14 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 ## Fase 5 — Evolução e abertura ao público
 
-- [ ] Reforma do front mobile first ([ADR 0036](adr/0036-design-mobile-first.md))
+- [x] Reforma do front mobile first ([ADR 0036](adr/0036-design-mobile-first.md))
   - [x] Skills: plugin `frontend-design` e a skill do projeto `financas-ui`
   - [x] Fundação visual: cor de marca (índigo), tokens semânticos, toques de 44 px, componentes do shadcn, ícones e manifesto, script de capturas
   - [x] Layout dos espaços: barra inferior no celular, menu lateral no desktop, `PeriodNav` em botões e estados de carregando, vazio e erro
   - [x] Página inicial no padrão novo e seletor de tema (Sistema, Claro, Escuro)
   - [x] Lançamentos: cartões, ações num menu, formulário em gaveta, confirmação ao excluir e toasts
   - [x] Painel: indicadores responsivos e destinos em cartões no celular
-  - [ ] Orçamento, Categorias, Membros e telas de login
+  - [x] Orçamento, Categorias, Membros e telas de login
 - [ ] Recorrências e parcelamentos
 - [ ] Rateio de lançamentos (ADR próprio)
 - [ ] Comparativos entre meses e gastos por categoria ao longo do tempo
