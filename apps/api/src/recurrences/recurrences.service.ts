@@ -1,6 +1,7 @@
 import {
   currentPeriod,
   dueDateIn,
+  estimateAmount,
   shiftPeriod,
   type CreateRecurrenceInput,
   type Recurrence,
@@ -21,6 +22,7 @@ function toResponse(recurrence: RecurrenceRow): Recurrence {
     notes: recurrence.notes,
     categoryId: recurrence.categoryId,
     amountCents: recurrence.amountCents,
+    variableAmount: recurrence.variableAmount,
     dueDay: recurrence.dueDay,
     startPeriod: recurrence.startPeriod,
     endPeriod: recurrence.endPeriod,
@@ -63,6 +65,7 @@ export class RecurrencesService {
         notes: input.notes ?? null,
         categoryId: input.categoryId,
         amountCents: input.amountCents,
+        variableAmount: input.variableAmount ?? false,
         dueDay: input.dueDay ?? null,
         startPeriod: input.startPeriod,
       },
@@ -92,22 +95,27 @@ export class RecurrencesService {
         notes: input.notes,
         categoryId: input.categoryId,
         amountCents: input.amountCents,
+        variableAmount: input.variableAmount,
         dueDay: input.dueDay,
       },
     });
 
     const pending = await db.transaction.findMany({
       where: this.pendingFromThisMonth(workspaceId, recurrenceId),
-      select: { id: true, period: true },
+      select: { id: true, period: true, amountEstimated: true },
     });
     for (const transaction of pending) {
+      // A variable one whose real amount was already given keeps it: only estimates follow.
+      const keepsAmount = recurrence.variableAmount && !transaction.amountEstimated;
       await db.transaction.update({
         where: { id: transaction.id, workspaceId },
         data: {
           description: input.description,
           notes: input.notes,
           categoryId: input.categoryId,
-          amountCents: input.amountCents,
+          amountCents: keepsAmount ? undefined : input.amountCents,
+          // Turned fixed: what was an estimate becomes the amount.
+          amountEstimated: input.variableAmount === false ? false : undefined,
           // Only when the day changed: each month has its own date.
           dueDate:
             input.dueDay === undefined ? undefined : dueDateFor(transaction.period, input.dueDay),
@@ -171,7 +179,27 @@ export class RecurrencesService {
           period >= recurrence.startPeriod &&
           (recurrence.endPeriod === null || period <= recurrence.endPeriod),
       );
+      if (missing.length === 0) continue;
+      // A variable one starts each month from its settled history (ADR 0038).
+      const settled = recurrence.variableAmount
+        ? await db.transaction.findMany({
+            where: {
+              workspaceId,
+              settledAt: { not: null },
+              occurrence: { is: { recurrenceId: recurrence.id } },
+            },
+            orderBy: { period: 'desc' },
+            select: { period: true, amountCents: true },
+          })
+        : [];
       for (const period of missing) {
+        const amountCents = recurrence.variableAmount
+          ? estimateAmount(
+              // Only months before this one: an estimate never looks at its own future.
+              settled.filter((row) => row.period < period).map((row) => row.amountCents),
+              recurrence.amountCents,
+            )
+          : recurrence.amountCents;
         try {
           await db.transaction.create({
             data: {
@@ -180,7 +208,8 @@ export class RecurrencesService {
               description: recurrence.description,
               notes: recurrence.notes,
               categoryId: recurrence.categoryId,
-              amountCents: recurrence.amountCents,
+              amountCents,
+              amountEstimated: recurrence.variableAmount,
               period,
               dueDate: dueDateFor(period, recurrence.dueDay),
               occurrence: { create: { recurrenceId: recurrence.id, period, workspaceId } },

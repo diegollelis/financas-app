@@ -84,6 +84,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] API de recorrências: gerar ao abrir o mês, mudar e encerrar só os pendentes do mês atual em diante
   - [ ] API de parcelamentos
   - [x] "Repetir" (Todo mês) no "Novo lançamento", selo nas linhas e "Encerrar recorrência" no menu
+  - [x] API de valor variável: média dos 3 últimos efetivados, "estimado" até confirmar, total estimado no Painel
+  - [ ] Tela de valor variável: "Fixo | Variável", aviso "Estimado" e "Efetivar" pedindo o valor
   - [ ] "Parcelado" no "Novo lançamento"
   - [ ] Tela "Recorrências" no Mais
 - [ ] Rateio de lançamentos (ADR próprio)

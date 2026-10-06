@@ -62,3 +62,15 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
   - "Excluir só este mês", e a confirmação avisa que esse mês não volta a ser gerado.
 - **Editar um mês gerado avisa** que a mudança vale só para aquele mês; a recorrência não muda.
 - "Parcelado" entra no mesmo campo quando a API de parcelamentos existir.
+
+## Nota (valor variável, 2026-10-06)
+
+- **Contas que variam** (energia, água, gás): a recorrência ganha `variable_amount`. Cada mês novo nasce com a **média dos últimos 3 lançamentos efetivados dela em meses anteriores** (`estimateAmount` em `packages/shared`). Sem histórico, vale o valor digitado.
+  - Usamos a média, e não o último valor, porque um mês atípico (um verão com ar-condicionado) pesa menos na estimativa do seguinte.
+- **O lançamento gerado nasce como estimativa** (`transactions.amount_estimated`). Ele deixa de ser estimativa quando o valor é informado (`PATCH` com `amountCents`) ou quando é efetivado. Desfazer a efetivação não volta a estimar.
+- **Mudar o valor da recorrência** alcança só os meses ainda estimados; um mês cujo valor real já foi informado fica com ele. Tornar a recorrência fixa transforma em valor as estimativas pendentes.
+- **Painel:** o resumo traz `estimatedCents`, a soma dos pendentes ainda estimados, para dizer quanto do previsto é estimativa.
+- **Tela** (próximo PR):
+  - "Valor: Fixo | Variável" no "Repetir: Todo mês";
+  - o aviso "Estimado" na linha;
+  - "Efetivar" pede o valor da fatura nas contas estimadas.

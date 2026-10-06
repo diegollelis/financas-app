@@ -102,4 +102,15 @@ describe('summarizePeriod', () => {
     expect(summary.result).toEqual({ plannedCents: 0, settledCents: 0 });
     expect(summary.expensesLeftCents).toBe(0);
   });
+
+  it('says how much of the pending amounts is still an estimate (ADR 0038)', () => {
+    const energy = { ...debit(18_990, '2026-10-20'), amountEstimated: true };
+    const settledEstimate = { ...debit(20_000, null, '2026-10-02'), amountEstimated: true };
+
+    expect(summarizePeriod(month, budget, today).estimatedCents).toBe(0);
+    // A settled one is no longer pending, whatever its flag says.
+    expect(summarizePeriod([...month, energy, settledEstimate], budget, today).estimatedCents).toBe(
+      18_990,
+    );
+  });
 });

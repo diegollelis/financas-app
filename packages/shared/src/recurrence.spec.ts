@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createRecurrenceInputSchema,
   dueDateIn,
+  estimateAmount,
   updateRecurrenceInputSchema,
 } from './recurrence.ts';
 
@@ -15,6 +16,20 @@ describe('dueDateIn', () => {
     expect(dueDateIn('2026-02', 31)).toBe('2026-02-28');
     expect(dueDateIn('2028-02', 30)).toBe('2028-02-29');
     expect(dueDateIn('2026-04', 31)).toBe('2026-04-30');
+  });
+});
+
+describe('estimateAmount', () => {
+  it('uses the amount typed while there is no settled month yet', () => {
+    expect(estimateAmount([], 18_000)).toBe(18_000);
+  });
+
+  it('averages the settled months it has, up to the last three, to the cent', () => {
+    expect(estimateAmount([20_000], 18_000)).toBe(20_000);
+    expect(estimateAmount([20_000, 15_001], 18_000)).toBe(17_501);
+    // Newest first: only the three most recent count.
+    expect(estimateAmount([21_000, 19_000, 20_000, 99_000], 18_000)).toBe(20_000);
+    expect(estimateAmount([10_000, 10_000, 10_001], 0)).toBe(10_000);
   });
 });
 

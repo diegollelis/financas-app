@@ -166,6 +166,7 @@ describe('TransactionsPage', () => {
           notes: null,
           categoryId: energyCategory.id,
           amountCents: 9_990,
+          variableAmount: false,
           dueDay: 20,
           startPeriod: '2026-10',
           endPeriod: null,

@@ -24,6 +24,7 @@ function toResponse(transaction: TransactionRow): Transaction {
     dueDate: transaction.dueDate && toIsoDate(transaction.dueDate),
     settledAt: transaction.settledAt && toIsoDate(transaction.settledAt),
     recurrenceId: transaction.occurrence?.recurrenceId ?? null,
+    amountEstimated: transaction.amountEstimated,
   };
 }
 
@@ -98,6 +99,12 @@ export class TransactionsService {
           period: input.period,
           dueDate: optionalDate(input.dueDate),
           settledAt: optionalDate(input.settledAt),
+          // Giving the amount, or settling, confirms an estimate (ADR 0038). Undoing a settlement
+          // does not make it an estimate again.
+          amountEstimated:
+            input.amountCents !== undefined || (input.settledAt ?? null) !== null
+              ? false
+              : undefined,
         },
         include: withRecurrence,
       });
