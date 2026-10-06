@@ -71,6 +71,11 @@ function mockTransactions(overrides: Record<string, { status?: number; body: unk
 
 const section = (name: 'Créditos' | 'Débitos') => screen.findByRole('region', { name });
 
+// Intl separates "R$" from the number with a non-breaking space.
+function nbsp(text: string | null | undefined) {
+  return text?.replaceAll(String.fromCharCode(0xa0), ' ');
+}
+
 /** The card of one transaction in a section, found by its description. */
 function row(container: HTMLElement, description: string) {
   const item = within(container)
@@ -310,6 +315,104 @@ describe('TransactionsPage', () => {
     });
     expect(await screen.findByText('Lançamento efetivado')).toBeInTheDocument();
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('splits a purchase in installments, showing what will be created', async () => {
+    const planId = '01920000-0000-7000-8000-000000000401';
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/installments`]: {
+        status: 201,
+        body: {
+          id: planId,
+          type: 'DEBIT',
+          description: 'Geladeira',
+          notes: null,
+          categoryId: marketCategory.id,
+          totalCents: 100_000,
+          installments: 3,
+          firstPeriod: '2026-10',
+          dueDay: null,
+          endedAt: null,
+          settledCount: 0,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Geladeira');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Parcelado' }));
+    expect(within(form).getByRole('radio', { name: 'Total' })).toBeChecked();
+    await userEvent.type(within(form).getByLabelText('Valor total (R$)'), '1.000');
+    await userEvent.type(within(form).getByLabelText('Parcelas'), '3');
+    expect(nbsp(within(form).getByText(/3 parcelas: 2 de/).textContent)).toBe(
+      '3 parcelas: 2 de R$ 333,33 e a última de R$ 333,34, total R$ 1.000,00.',
+    );
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/installments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Geladeira',
+        notes: null,
+        categoryId: marketCategory.id,
+        installments: 3,
+        amountCents: 100_000,
+        amountIs: 'TOTAL',
+        firstPeriod: '2026-10',
+        dueDay: null,
+      }),
+    });
+    expect(await screen.findByText('Parcelamento adicionado: 3 parcelas')).toBeInTheDocument();
+  });
+
+  it('takes the amount of each installment, and checks the count', async () => {
+    mockTransactions();
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.click(within(form).getByRole('radio', { name: 'Parcelado' }));
+    await userEvent.click(within(form).getByRole('radio', { name: 'Da parcela' }));
+    await userEvent.type(within(form).getByLabelText('Valor da parcela (R$)'), '99,90');
+    await userEvent.type(within(form).getByLabelText('Parcelas'), '10');
+    expect(nbsp(within(form).getByText(/10 parcelas de/).textContent)).toBe(
+      '10 parcelas de R$ 99,90, total R$ 999,00.',
+    );
+
+    await userEvent.clear(within(form).getByLabelText('Parcelas'));
+    await userEvent.type(within(form).getByLabelText('Parcelas'), '1');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+    expect(await within(form).findByText('Use de 2 a 72 parcelas.')).toBeInTheDocument();
+  });
+
+  it('marks an installment and ends its plan from the menu', async () => {
+    const planId = '01920000-0000-7000-8000-000000000401';
+    const fetchMock = mockTransactions({
+      [`GET ${base}`]: {
+        body: [{ ...shopping, installment: { planId, number: 3, count: 10 } }],
+      },
+      [`DELETE /api/workspaces/${houseId}/installments/${planId}`]: { status: 204, body: null },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Débitos');
+    expect(row(debits, 'Compras da semana')).toHaveTextContent('Parcela 3/10');
+    const menu = await openActions('Compras da semana');
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Excluir só esta parcela' }),
+    ).toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Encerrar parcelamento' }));
+    const confirm = await screen.findByRole('alertdialog', {
+      name: 'Encerrar o parcelamento Compras da semana?',
+    });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Encerrar parcelamento' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/installments/${planId}`, {
+      method: 'DELETE',
+    });
+    expect(await screen.findByText('Parcelamento encerrado')).toBeInTheDocument();
   });
 
   it('says that editing a generated month changes only that month', async () => {

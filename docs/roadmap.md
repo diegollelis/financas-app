@@ -86,7 +86,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] "Repetir" (Todo mês) no "Novo lançamento", selo nas linhas e "Encerrar recorrência" no menu
   - [x] API de valor variável: média dos 3 últimos efetivados, "estimado" até confirmar, total estimado no Painel
   - [x] Tela de valor variável: "Fixo | Variável", aviso "Estimado" e "Efetivar" pedindo o valor
-  - [ ] "Parcelado" no "Novo lançamento"
+  - [x] "Parcelado" no "Novo lançamento", selo "Parcela n/N" e "Encerrar parcelamento" no menu
   - [ ] Tela "Recorrências" no Mais
 - [ ] Rateio de lançamentos (ADR próprio)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))

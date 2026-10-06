@@ -92,3 +92,16 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
   - `splitInstallments` divide o total em partes iguais e põe na última os centavos que sobram (R$ 1.000,00 em 3 = 333,33 + 333,33 + 333,34). A soma sempre fecha.
 - **A descrição de cada parcela é a da compra.** O "3/10" vem de `installment: { planId, number, count }` na resposta do lançamento. Assim, renomear uma parcela não quebra a numeração.
 - **Encerrar** (`DELETE`) remove as parcelas pendentes do mês atual em diante e marca `ended_at`. As efetivadas e as de meses passados ficam. A lista traz `settledCount`, quantas já foram pagas.
+
+## Nota (parcelado na tela, 2026-10-06)
+
+- **"Repetir" ganhou "Parcelado"** (Não repetir | Todo mês | Parcelado). Com ele aparecem:
+  - o campo "Parcelas" (2 a 72);
+  - "O valor digitado é: Total | Da parcela", e o rótulo do valor acompanha a escolha;
+  - uma prévia do que será criado, calculada com o mesmo `splitInstallments` da API ("3 parcelas: 2 de R$ 333,33 e a última de R$ 333,34, total R$ 1.000,00."). Assim, a pessoa vê os centavos da última antes de salvar.
+- **A primeira parcela fica na competência da tela,** e o dia de vencimento vem da data informada, como na recorrência.
+- **Selo "Parcela n/N"** nas linhas de um parcelamento.
+- **Menu "⋯" de uma parcela:**
+  - "Encerrar parcelamento", com confirmação; reaproveita o diálogo de "Encerrar recorrência", agora genérico;
+  - "Excluir só esta parcela", que avisa que as outras continuam.
+- **Editar uma parcela avisa** que a mudança vale só para ela.
