@@ -97,6 +97,6 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] LGPD: termos com aceite no cadastro, exportação e exclusão de conta (a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
 - [ ] Domínio próprio, `financas.codelelis.com` ([ADR 0039](adr/0039-dominio-proprio.md))
   - [x] Redirecionar o endereço antigo e roteiro no deploy.md
-  - [ ] DNS no Cloudflare, domínio no Pages e variáveis de produção
+  - [x] DNS no Cloudflare, domínio no Pages e variáveis de produção
   - [ ] E-mail com o domínio verificado no Resend
   - [ ] Exigir a verificação de e-mail no cadastro
