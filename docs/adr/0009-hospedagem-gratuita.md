@@ -31,3 +31,4 @@ Projeto de estudo, sem receita, que será aberto ao público. Custo zero é requ
 - O backup do plano gratuito do Neon é limitado: dumps periódicos via GitHub Actions ([0012](0012-privacidade-lgpd.md)).
 - Ambientes: `local` (Docker) e `produção`; um ambiente de homologação pode usar um branch do Neon.
 - Limites conferidos em 2026-10-03 e topologia de produção (front e API no mesmo site via proxy): [ADR 0033](0033-topologia-e-limites-do-deploy.md).
+- **Revisão (2026-10-06):** o domínio é `codelelis.com`, comprado na Spaceship, com o DNS no Cloudflare. O app fica em `financas.codelelis.com`, e a API continua atrás do proxy, sem `api.` ([ADR 0039](0039-dominio-proprio.md)).

@@ -45,5 +45,6 @@ Também era preciso decidir como desenvolver e testar sem mandar e-mails de verd
 
 - `pnpm db:up` agora sobe também o Mailpit.
 - **Até haver domínio próprio**, os e-mails de produção só chegam ao dono da conta Resend. Ao configurar o domínio (fase 5): verificar o domínio no Resend, trocar `MAIL_FROM_EMAIL` e ligar `requireEmailVerification`. Revisar então a mensagem de "e-mail já cadastrado" do cadastro ([ADR 0021](0021-sessao-e-formularios-no-front.md)).
+- **Domínio (2026-10-06):** o domínio verificado no Resend é `codelelis.com`, e o remetente `nao-responda@codelelis.com` ([ADR 0039](0039-dominio-proprio.md)). Exigir a verificação de e-mail fica para um PR próprio.
 - As rotas que enviam e-mail podem ser usadas para incomodar terceiros (pedidos em massa). O rate limit, próximo item do roadmap, deve cobri-las.
 - Se o envio falhar, o usuário não fica sabendo na hora. Ele pode pedir de novo ("Reenviar e-mail" ou um novo pedido de redefinição).
