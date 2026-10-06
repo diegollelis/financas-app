@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeUser, mockApi } from '@/test/mock-api';
+import { verifiedUser, mockApi } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019).
@@ -59,7 +59,7 @@ const shopping = transaction(3, {
 
 function mockTransactions(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
-    'GET /api/me': { body: fakeUser },
+    'GET /api/me': { body: verifiedUser },
     [`GET /api/workspaces/${houseId}`]: { body: house },
     [`GET /api/workspaces/${houseId}/categories`]: {
       body: [salaryCategory, energyCategory, marketCategory],
@@ -136,14 +136,19 @@ describe('TransactionsPage', () => {
     expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
   });
 
-  it('opens the competência of the address, and invites to add when it is empty', async () => {
+  it('opens the competência of the address, and points to Novo lançamento when it is empty', async () => {
     const fetchMock = mockTransactions({ [`GET ${base}`]: { body: [] } });
 
     renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-11`);
 
     expect(await screen.findByText('Nenhum lançamento em novembro de 2026.')).toBeInTheDocument();
     await expectCall(fetchMock, `${base}?period=2026-11`, {});
-    await userEvent.click(screen.getByRole('button', { name: 'Adicionar lançamento' }));
+    // Points to the page's main action instead of repeating it.
+    expect(screen.getByText('Use Novo lançamento para adicionar o primeiro.')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('main')).getAllByRole('button', { name: /lançamento/i }),
+    ).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Novo lançamento' }));
     expect(await screen.findByRole('dialog', { name: 'Novo lançamento' })).toHaveTextContent(
       'Competência de novembro de 2026.',
     );

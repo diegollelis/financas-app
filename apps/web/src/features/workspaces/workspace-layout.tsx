@@ -4,12 +4,11 @@ import {
   ChartPie,
   Ellipsis,
   LayoutDashboard,
-  LayoutGrid,
   Tags,
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useParams, useSearchParams } from 'react-router';
 import { ListSkeleton, QueryState } from '@/components/query-state';
 import {
@@ -23,10 +22,13 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/features/auth/use-me';
+import { VerifyEmailBanner } from '@/features/auth/verify-email-banner';
 import { AppHeader, SkipLink } from '@/features/shell/app-header';
 import { cn } from '@/lib/utils';
 import { CurrentWorkspaceContext } from './current-workspace';
+import { rememberLastWorkspace } from './last-workspace';
 import { useWorkspace } from './use-workspace';
+import { WorkspaceSwitcher } from './workspace-switcher';
 
 type Section = {
   path: string;
@@ -82,10 +84,10 @@ function MoreSheet({ links }: { links: ReturnType<typeof useSectionLinks> }) {
       <SheetContent side="bottom" className="pb-[env(safe-area-inset-bottom)]">
         <SheetHeader>
           <SheetTitle>Mais</SheetTitle>
-          <SheetDescription className="sr-only">Outras seções e espaços</SheetDescription>
+          <SheetDescription className="sr-only">Outras seções do espaço</SheetDescription>
         </SheetHeader>
         <ul className="grid gap-1 px-4 pb-4">
-          {[...more, { to: '/', label: 'Seus espaços', icon: LayoutGrid }].map((link) => (
+          {more.map((link) => (
             <li key={link.to}>
               <SheetClose asChild>
                 <NavLink
@@ -138,6 +140,11 @@ export function WorkspaceLayout() {
   const { workspaceId = '' } = useParams();
   const user = useCurrentUser();
   const workspace = useWorkspace(workspaceId);
+  const opened = workspace.isSuccess ? workspace.data.id : null;
+  useEffect(() => {
+    // Only a workspace that loaded: a 404 must not become where "/" goes next time.
+    if (opened) rememberLastWorkspace(opened);
+  }, [opened]);
 
   return (
     <div className="min-h-svh">
@@ -145,7 +152,7 @@ export function WorkspaceLayout() {
       <AppHeader
         title={
           workspace.isSuccess ? (
-            <p className="truncate font-semibold">{workspace.data.name}</p>
+            <WorkspaceSwitcher current={workspace.data} />
           ) : (
             workspace.isPending && <Skeleton className="h-5 w-32" />
           )
@@ -159,6 +166,8 @@ export function WorkspaceLayout() {
           className="min-w-0 flex-1 px-4 pt-5 pb-[calc(5rem+env(safe-area-inset-bottom))] text-base outline-none sm:px-6 md:pt-8 md:pb-12 md:text-sm"
         >
           <div className="grid max-w-3xl gap-6">
+            {/* On every page until confirmed; not blocking (ADR 0022). */}
+            {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
             {workspace.isSuccess ? (
               <CurrentWorkspaceContext value={workspace.data}>
                 {/* Pages read the user with useCurrentUser(), as under RequireAuth. */}

@@ -1,5 +1,4 @@
 import { CircleUser } from 'lucide-react';
-import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -26,7 +25,7 @@ function isThemePreference(value: string): value is ThemePreference {
   return themeOptions.some((option) => option.value === value);
 }
 
-/** Who is signed in, the way back to the workspaces, the theme and sign-out. */
+/** Who is signed in, the theme and sign-out. (Workspaces are switched in the header.) */
 export function AccountMenu({ signOut }: { signOut: ReturnType<typeof useSignOut> }) {
   const user = useCurrentUser();
   const theme = useTheme();
@@ -42,10 +41,6 @@ export function AccountMenu({ signOut }: { signOut: ReturnType<typeof useSignOut
           <span className="text-foreground truncate font-medium">{user.name}</span>
           <span className="truncate">{user.email}</span>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/">Seus espaços</Link>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuLabel>Tema</DropdownMenuLabel>

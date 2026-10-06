@@ -341,12 +341,14 @@ export function TransactionsPage() {
       <QueryState queries={[categories, transactions]} />
       {ready &&
         (transactions.data.length === 0 ? (
-          <div className="grid justify-items-start gap-3 rounded-xl border border-dashed p-5">
+          // Says what is missing and points to the page's main action, already on screen; it
+          // does not repeat the button (ADR 0036).
+          <div className="grid gap-1 rounded-xl border border-dashed p-5">
             <p>Nenhum lançamento em {formatPeriod(period)}.</p>
             {canEdit && (
-              <Button variant="outline" onClick={(event) => openForm(null, event.currentTarget)}>
-                Adicionar lançamento
-              </Button>
+              <p className="text-muted-foreground">
+                Use Novo lançamento para adicionar o primeiro.
+              </p>
             )}
           </div>
         ) : (

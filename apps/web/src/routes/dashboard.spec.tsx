@@ -3,7 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { stubPrefersDark } from '@/test/match-media';
-import { fakeUser, mockApi } from '@/test/mock-api';
+import { verifiedUser, mockApi } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019). The API's answer is built with the same shared function it uses.
@@ -41,7 +41,7 @@ const october = [
 
 function mockDashboard(summary: object, period = '2026-10') {
   return mockApi({
-    'GET /api/me': { body: fakeUser },
+    'GET /api/me': { body: verifiedUser },
     [`GET /api/workspaces/${houseId}`]: { body: house },
     [`GET /api/workspaces/${houseId}/summary/${period}`]: { body: summary },
   });
@@ -149,7 +149,7 @@ describe('DashboardPage', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-15T12:00:00-03:00'));
     mockApi({
-      'GET /api/me': { body: fakeUser },
+      'GET /api/me': { body: verifiedUser },
       [`GET /api/workspaces/${houseId}`]: { body: house },
       [`GET /api/workspaces/${houseId}/members`]: { body: [] },
       [`GET /api/workspaces/${houseId}/summary/2026-10`]: {
@@ -176,7 +176,7 @@ describe('DashboardPage', () => {
       body: summarizePeriod([], { ...budget, period }, today),
     });
     const fetchMock = mockApi({
-      'GET /api/me': { body: fakeUser },
+      'GET /api/me': { body: verifiedUser },
       [`GET /api/workspaces/${houseId}`]: { body: house },
       [`GET /api/workspaces/${houseId}/summary/2026-12`]: summaryOf('2026-12'),
       [`GET /api/workspaces/${houseId}/summary/2027-01`]: summaryOf('2027-01'),

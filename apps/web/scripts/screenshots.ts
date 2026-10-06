@@ -160,7 +160,14 @@ async function main() {
 
   const pages = [
     { name: 'entrar', path: '/entrar', signedIn: false },
-    { name: 'inicio', path: '/', signedIn: true },
+    // "/" is not a page: it opens the last workspace used (ADR 0036). The switcher is captured open.
+    {
+      name: 'seletor-espaco',
+      path: `/espacos/${workspaceId}/painel`,
+      signedIn: true,
+      open: /^Trocar de espaço/,
+      opens: 'menu' as const,
+    },
     { name: 'espaco', path: `/espacos/${workspaceId}`, signedIn: true },
     { name: 'painel', path: `/espacos/${workspaceId}/painel`, signedIn: true },
     { name: 'lancamentos', path: `/espacos/${workspaceId}/lancamentos`, signedIn: true },
@@ -169,7 +176,8 @@ async function main() {
       name: 'lancamentos-novo',
       path: `/espacos/${workspaceId}/lancamentos`,
       signedIn: true,
-      open: 'Novo lançamento',
+      open: /^Novo lançamento$/,
+      opens: 'dialog' as const,
     },
     { name: 'orcamento', path: `/espacos/${workspaceId}/orcamento`, signedIn: true },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
@@ -202,16 +210,16 @@ async function main() {
     for (const target of pages) {
       const page = await (target.signedIn ? context : guest).newPage();
       await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
-      if ('open' in target) {
-        await page.getByRole('button', { name: target.open, exact: true }).click();
-        await page.getByRole('dialog').waitFor();
+      if (target.open && target.opens) {
+        await page.getByRole('button', { name: target.open }).click();
+        await page.getByRole(target.opens).waitFor();
         // Lets the opening animation finish.
         await page.waitForTimeout(400);
       }
       const suffix = dark ? '-escuro' : '';
       const file = new URL(`${target.name}-${viewport.name}${suffix}.png`, OUT);
       // An open dialog is fixed to the screen: capture the viewport, not the whole page.
-      await page.screenshot({ path: fileURLToPath(file), fullPage: !('open' in target) });
+      await page.screenshot({ path: fileURLToPath(file), fullPage: !target.open });
       if (viewport.width < 768 && !dark) {
         const problems = await phoneChecks(page);
         problemCount += problems.length;

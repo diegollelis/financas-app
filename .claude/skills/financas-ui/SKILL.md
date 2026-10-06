@@ -25,7 +25,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 - Write the base classes for a **360 px** wide screen, then add `sm:` (640), `md:` (768) and `lg:` (1024). Never design desktop first and squeeze it down.
 - **No horizontal scroll** at 360 px. Tables become stacked rows or cards below `md`. Forms are one column below `sm`.
 - Page gutters `px-4`, then `sm:px-6`. Do not wrap whole pages in a `Card`. Content max width around `max-w-3xl` on desktop, left-aligned in the main column.
-- **App shell** (workspace pages): a header with the workspace name and the account menu; a **bottom tab bar** below `md` (Painel, Lançamentos, Orçamento, Mais) with safe-area padding; a **sidebar** from `md`. The active item has `aria-current="page"`. Leave bottom padding so content never hides behind the bar.
+- **App shell** (workspace pages): a header with the **workspace switcher** (the workspace name: switch or create a workspace; switching keeps the section and `?competencia=`) and the account menu; a **bottom tab bar** below `md` (Painel, Lançamentos, Orçamento, Mais) with safe-area padding; a **sidebar** from `md`. The active item has `aria-current="page"`. Leave bottom padding so content never hides behind the bar. There is no page outside a workspace: "/" opens the last workspace used.
 - **Touch targets of 44 px or more** below `md` (`h-11` / `size-11`), with at least 8 px between neighbors. Compact sizes only from `md`.
 - The main action of a page stays reachable: a fixed "Novo lançamento" button above the tab bar on mobile, a normal button on desktop.
 
@@ -42,7 +42,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 ## States (every query-driven view)
 
 - **Loading:** `Skeleton` shaped like the content. After about 3 s, add "Acordando o servidor… isso pode levar até um minuto." (the API sleeps on Render's free plan, ADR 0033).
-- **Empty:** say what is missing and offer the action ("Nenhum lançamento em outubro. Adicionar lançamento").
+- **Empty:** say what is missing and how to act ("Nenhum lançamento em outubro."). When the page already shows a persistent main action (e.g. "Novo lançamento"), point to it in words; never repeat the button. Otherwise, offer the action in the empty state.
 - **Error:** say what failed and how to fix it, plus a "Tentar de novo" button (`refetch`). Errors from our routes go through `apiErrorMessage` (`lib/error-message.ts`). Errors never apologize.
 - **404 of a workspace:** "Espaço não encontrado." with a way back.
 

@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeUser, mockApi } from '@/test/mock-api';
+import { verifiedUser, mockApi } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019).
@@ -23,7 +23,7 @@ const inherited = {
 
 function mockBudget(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
-    'GET /api/me': { body: fakeUser },
+    'GET /api/me': { body: verifiedUser },
     [`GET /api/workspaces/${houseId}`]: { body: house },
     [`GET ${base}/2026-10`]: { body: inherited },
     ...overrides,

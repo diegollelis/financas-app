@@ -77,6 +77,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Lançamentos: cartões, ações num menu, formulário em gaveta, confirmação ao excluir e toasts
   - [x] Painel: indicadores responsivos e destinos em cartões no celular
   - [x] Orçamento, Categorias, Membros e telas de login
+  - [x] Seletor de espaço no cabeçalho (toda tela com o menu) e estado vazio sem ação repetida
 - [ ] Recorrências e parcelamentos
 - [ ] Rateio de lançamentos (ADR próprio)
 - [ ] Comparativos entre meses e gastos por categoria ao longo do tempo
