@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { RootLayout } from '@/components/root-layout';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
 import { WorkspaceLayout } from '@/features/workspaces/workspace-layout';
+import { AnalysisPage } from '@/routes/analysis';
 import { BudgetPage } from '@/routes/budget';
 import { CategoriesPage } from '@/routes/categories';
 import { DashboardPage } from '@/routes/dashboard';
@@ -45,6 +46,8 @@ export const routes: RouteObject[] = [
               { path: 'lancamentos', element: <TransactionsPage /> },
               { path: 'orcamento', element: <BudgetPage /> },
               { path: 'painel', element: <DashboardPage /> },
+              // The range and filters travel in the address (ADR 0037).
+              { path: 'analise', element: <AnalysisPage /> },
             ],
           },
         ],

@@ -50,3 +50,19 @@ O [ADR 0032](0032-graficos-sem-biblioteca.md) desenhou os gráficos do Painel em
 - O ADR 0032 continua valendo para o Painel. As séries temporais seguem este ADR.
 - Uma visão nova (por exemplo, recebidos por categoria em gráfico próprio) é mais uma função pura sobre as mesmas linhas, sem rota nova.
 - Se um dia os gráficos precisarem de zoom ou de muitas séries, rever a opção do Recharts.
+
+## Nota (página "Análise", 2026-10-06)
+
+- **Rota `/espacos/:id/analise`**, no "Mais" do celular e no menu lateral.
+- **Filtros no endereço** (`features/analysis/filters.ts`): `?periodo=3|6|12|ano` ou `?de=AAAA-MM&ate=AAAA-MM`, mais `visao=efetivado`, `tipo=creditos|debitos` e `categorias=id,id`.
+  - O padrão é "últimos 6 meses, previsto".
+  - Um valor inválido volta ao padrão.
+  - No intervalo personalizado, a outra ponta se ajusta para manter a ordem e o limite de 24 meses.
+- **Filtros na tela:** atrás do botão "Filtros" (gaveta) no celular e num quadro acima dos resultados a partir de `md`. Uma linha sob o título resume o que está ativo.
+- **Totais do período:** o saldo em destaque quando os dois tipos estão na tela; com um tipo só, "Recebido no período" ou "Gasto no período".
+- **Gráfico mês a mês** (`features/analysis/monthly-chart.tsx`):
+  - colunas de créditos e débitos e a linha do saldo, num eixo em reais com rótulos compactos ("R$ 4 mil");
+  - desenhado na largura real do container (`useElementWidth`), sem esticar o SVG;
+  - com meses demais para a tela (menos de 44 px por mês), rola dentro da própria caixa;
+  - "Ver como tabela" mostra os mesmos números.
+- **_Tooltip_:** segue o mouse; no toque, abre e fecha a cada toque no mês. Tratar os dois do mesmo jeito fazia o _tooltip_ abrir e fechar no mesmo toque: o evento de "entrar" abria e o "clique" fechava, e um dedo "sai" do elemento logo depois de tocar.
