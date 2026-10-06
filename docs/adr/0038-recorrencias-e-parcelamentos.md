@@ -74,3 +74,10 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
   - "Valor: Fixo | Variável" no "Repetir: Todo mês";
   - o aviso "Estimado" na linha;
   - "Efetivar" pede o valor da fatura nas contas estimadas.
+
+## Nota (valor variável na tela, 2026-10-06)
+
+- **No "Novo lançamento" com "Todo mês",** aparece "Valor: Fixo | Variável". Com "Variável", o campo vira "Valor estimado (R$)" e um aviso explica a média dos 3 últimos pagos.
+- **Na linha,** um lançamento estimado mostra "Estimado" em texto discreto sob o valor. É texto, não um selo colorido, porque estimativa não é um status do lançamento.
+- **"Efetivar" de uma conta estimada** abre a gaveta "Efetivar …" (`features/transactions/settle-with-amount.tsx`) com "Valor da fatura (R$)" já preenchido pela estimativa. Valor e data vão juntos num `PATCH`. As contas fixas continuam efetivando com um toque.
+- **No Painel,** quando há estimativas pendentes, aparece "Inclui R$ X em valores estimados, de contas que variam." abaixo dos indicadores.

@@ -183,6 +183,12 @@ function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
             </StatTile>
           </div>
         </dl>
+        {summary.estimatedCents > 0 && (
+          // The planned view counts estimates of variable bills (ADR 0038): say how much.
+          <p>
+            Inclui {formatCents(summary.estimatedCents)} em valores estimados, de contas que variam.
+          </p>
+        )}
         <p className="text-muted-foreground">
           Previsto: como se tudo fosse efetivado. Efetivado: só o que já foi recebido ou pago.
           Resultado: o saldo depois de separar investimentos, reserva e viagens.

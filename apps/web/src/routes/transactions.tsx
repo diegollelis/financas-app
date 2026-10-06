@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useCategories } from '@/features/categories/use-categories';
 import { useCreateRecurrence, useEndRecurrence } from '@/features/recurrences/use-recurrences';
+import { SettleWithAmount } from '@/features/transactions/settle-with-amount';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import {
@@ -196,13 +197,27 @@ function TransactionItem({
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [askingAmount, setAskingAmount] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
+  const settleRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateTransaction(workspaceId);
   const { description } = transaction;
+  // Still an estimate of a variable bill (ADR 0038): settling asks for the bill's amount.
+  const estimated = transaction.amountEstimated && !transaction.settledAt;
   const settle = (settledAt: string | null, message: string) =>
     update.mutate(
       { id: transaction.id, settledAt },
       { onSuccess: () => toast.success(message), onError: showError },
+    );
+  const settleWithAmount = (amountCents: number) =>
+    update.mutate(
+      { id: transaction.id, amountCents, settledAt: today },
+      {
+        onSuccess: () => {
+          setAskingAmount(false);
+          toast.success('Lançamento efetivado');
+        },
+      },
     );
 
   return (
@@ -227,22 +242,41 @@ function TransactionItem({
         </span>
       </div>
       <div className="grid shrink-0 justify-items-end gap-2">
-        <span className="text-base font-semibold tabular-nums">
-          {formatCents(transaction.amountCents)}
+        <span className="grid justify-items-end">
+          <span className="text-base font-semibold tabular-nums">
+            {formatCents(transaction.amountCents)}
+          </span>
+          {/* In words, in text colors: an estimate is not a status of its own (ADR 0038). */}
+          {estimated && <span className="text-muted-foreground text-xs">Estimado</span>}
         </span>
         {canEdit && (
           <div className="flex items-center gap-2 md:gap-1">
             {!transaction.settledAt && (
-              // One tap: settled today. The date can be fixed later by editing.
+              // One tap: settled today; an estimate first asks for the bill's amount. The date
+              // can be fixed later by editing.
               <Button
+                ref={settleRef}
                 variant="secondary"
                 size="sm"
                 aria-label={`Efetivar ${description}`}
                 disabled={update.isPending}
-                onClick={() => settle(today, 'Lançamento efetivado')}
+                onClick={() =>
+                  estimated ? setAskingAmount(true) : settle(today, 'Lançamento efetivado')
+                }
               >
                 Efetivar
               </Button>
+            )}
+            {estimated && (
+              <SettleWithAmount
+                transaction={transaction}
+                open={askingAmount}
+                onOpenChange={setAskingAmount}
+                returnFocusTo={settleRef}
+                pending={update.isPending}
+                error={update.error}
+                onSettle={settleWithAmount}
+              />
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -350,6 +384,7 @@ function TransactionDialog({
           ...fields,
           dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
           startPeriod: period,
+          variableAmount: values.amountKind === 'VARIABLE',
         },
         { onSuccess: done('Lançamento adicionado, repetindo todo mês') },
       );
