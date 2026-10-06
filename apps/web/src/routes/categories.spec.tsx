@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { fakeUser, mockApi } from '@/test/mock-api';
+import { verifiedUser, mockApi } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019).
@@ -24,7 +24,7 @@ const categories = [consorcioCredit, salario, consorcioDebit, ipva, mercado];
 
 function mockCategories(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
-    'GET /api/me': { body: fakeUser },
+    'GET /api/me': { body: verifiedUser },
     [`GET /api/workspaces/${houseId}`]: { body: house },
     [`GET ${base}`]: { body: categories },
     ...overrides,
@@ -232,7 +232,7 @@ describe('CategoriesPage', () => {
 
   it('answers "not found" for a workspace that is not yours', async () => {
     mockApi({
-      'GET /api/me': { body: fakeUser },
+      'GET /api/me': { body: verifiedUser },
       [`GET /api/workspaces/${houseId}`]: { status: 404, body: { message: 'Not Found' } },
       [`GET ${base}`]: { status: 404, body: { message: 'Not Found' } },
     });

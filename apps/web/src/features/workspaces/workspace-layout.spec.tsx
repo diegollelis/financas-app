@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
-import { fakeUser, mockApi } from '@/test/mock-api';
+import { describe, expect, it, vi } from 'vitest';
+import { fakeUser, mockApi, personalWorkspace } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019).
@@ -12,6 +12,7 @@ const base = `/api/workspaces/${houseId}`;
 function mockHouse(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   const routes: Record<string, { status?: number; body: unknown }> = {
     'GET /api/me': { body: fakeUser },
+    'GET /api/workspaces': { body: [personalWorkspace, house] },
     [`GET ${base}`]: { body: house },
     [`GET ${base}/members`]: { body: [] },
     [`GET ${base}/invitations`]: { body: [] },
@@ -24,6 +25,80 @@ function mockHouse(overrides: Record<string, { status?: number; body: unknown }>
 }
 
 const sectionsNav = () => screen.findByRole('navigation', { name: 'Seções do espaço' });
+
+async function openSwitcher(current: string) {
+  await userEvent.click(
+    await screen.findByRole('button', { name: `Trocar de espaço (atual: ${current})` }),
+  );
+  return screen.findByRole('menu');
+}
+
+describe('WorkspaceSwitcher', () => {
+  it('lists the workspaces, the current one checked', async () => {
+    mockHouse();
+    renderApp(`/espacos/${houseId}/painel`);
+
+    const menu = await openSwitcher('Casa');
+
+    expect(await within(menu).findByRole('menuitemradio', { name: /Pessoal/ })).not.toBeChecked();
+    expect(within(menu).getByRole('menuitemradio', { name: /Casa/ })).toBeChecked();
+    expect(within(menu).getByRole('menuitemradio', { name: /Pessoal/ })).toHaveTextContent(
+      'Só seu',
+    );
+  });
+
+  it('switches workspace keeping the section and the competência', async () => {
+    mockHouse({
+      [`GET /api/workspaces/${personalWorkspace.id}`]: { body: personalWorkspace },
+      [`GET /api/workspaces/${personalWorkspace.id}/categories`]: { body: [] },
+      [`GET /api/workspaces/${personalWorkspace.id}/transactions`]: { body: [] },
+    });
+    const { router } = renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-11`);
+
+    const menu = await openSwitcher('Casa');
+    await userEvent.click(await within(menu).findByRole('menuitemradio', { name: /Pessoal/ }));
+
+    expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/lancamentos`);
+    expect(router.state.location.search).toBe('?competencia=2026-11');
+    expect(
+      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Pessoal)' }),
+    ).toBeInTheDocument();
+    // Remembered: "/" opens it next time.
+    expect(window.localStorage.getItem('financas-ultimo-espaco')).toBe(personalWorkspace.id);
+  });
+
+  it('creates a shared workspace and opens it', async () => {
+    const created = {
+      id: '01920000-0000-7000-8000-000000000009',
+      name: 'Viagem',
+      isPersonal: false,
+      role: 'OWNER',
+    };
+    mockHouse({
+      'POST /api/workspaces': { body: created },
+      [`GET /api/workspaces/${created.id}`]: { body: created },
+    });
+    const { router } = renderApp(`/espacos/${houseId}`);
+
+    const menu = await openSwitcher('Casa');
+    await userEvent.click(
+      within(menu).getByRole('menuitem', { name: 'Novo espaço compartilhado' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Novo espaço compartilhado' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar espaço' }));
+    expect(await within(dialog).findByText('Dê um nome ao espaço.')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Nome do espaço'), 'Viagem');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Criar espaço' }));
+
+    expect(await screen.findByText('Espaço criado')).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/espacos/${created.id}/painel`),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Viagem)' }),
+    ).toBeInTheDocument();
+  });
+});
 
 describe('WorkspaceLayout', () => {
   it('shows the workspace in the header and marks the section of the page', async () => {
@@ -66,7 +141,11 @@ describe('WorkspaceLayout', () => {
 
     await userEvent.click(within(await sectionsNav()).getByRole('button', { name: 'Mais' }));
     const sheet = await screen.findByRole('dialog', { name: 'Mais' });
-    expect(within(sheet).getByRole('link', { name: 'Seus espaços' })).toHaveAttribute('href', '/');
+    expect(
+      within(sheet)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Categorias', 'Membros']);
     await userEvent.click(within(sheet).getByRole('link', { name: 'Categorias' }));
 
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/categorias`);
@@ -92,7 +171,7 @@ describe('WorkspaceLayout', () => {
     renderApp(`/espacos/${houseId}/painel`);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Espaço não encontrado.');
-    expect(screen.getByRole('link', { name: 'Ver seus espaços' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Ir para o meu espaço' })).toHaveAttribute('href', '/');
     expect(screen.queryByRole('navigation', { name: 'Seções do espaço' })).not.toBeInTheDocument();
   });
 

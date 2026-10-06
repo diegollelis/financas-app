@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { fakeUser, mockApi, noSession, personalWorkspace } from '@/test/mock-api';
+import { fakeUser, landingRoutes, mockApi, noSession, personalWorkspace } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 async function fillAndSubmit(email: string, password: string) {
@@ -20,17 +20,17 @@ describe('SignInPage', () => {
     expect(router.state.location.pathname).toBe('/entrar');
   });
 
-  it('signs in and goes to the home page', async () => {
+  it('signs in and opens the dashboard of the personal workspace', async () => {
     const fetchMock = mockApi({
       'GET /api/me': noSession,
       'POST /api/auth/sign-in/email': { body: { token: 'fake', user: fakeUser } },
-      'GET /api/workspaces': { body: [personalWorkspace] },
+      ...landingRoutes,
     });
     renderApp('/entrar');
 
     await fillAndSubmit('maria@example.com', 'senha-de-teste-123');
 
-    expect(await screen.findByRole('heading', { name: 'Olá, Maria Exemplo' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Painel' })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       new URL('/api/auth/sign-in/email', 'http://api.test'),
       expect.objectContaining({
@@ -68,16 +68,16 @@ describe('SignInPage', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /api/me
   });
 
-  it('sends visitors who already have a session to the home page', async () => {
+  it('sends visitors who already have a session to their dashboard', async () => {
     mockApi({
       'GET /api/me': { body: fakeUser },
-      'GET /api/workspaces': { body: [personalWorkspace] },
+      ...landingRoutes,
     });
 
     const { router } = renderApp('/entrar');
 
-    expect(await screen.findByRole('heading', { name: 'Olá, Maria Exemplo' })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/');
+    expect(await screen.findByRole('heading', { name: 'Painel' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/painel`);
   });
 });
 

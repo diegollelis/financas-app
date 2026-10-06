@@ -77,7 +77,7 @@ export function ErrorState({
       <div role="alert" className="grid justify-items-start gap-3">
         <p>Espaço não encontrado.</p>
         <Button asChild variant="outline">
-          <Link to="/">Ver seus espaços</Link>
+          <Link to="/">Ir para o meu espaço</Link>
         </Button>
       </div>
     );

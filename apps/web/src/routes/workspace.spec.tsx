@@ -171,28 +171,3 @@ describe('WorkspacePage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Espaço não encontrado.');
   });
 });
-
-describe('creating a workspace on the home page', () => {
-  it('creates it and keeps the form ready for another one', async () => {
-    const fetchMock = mockApi({
-      'GET /api/me': { body: fakeUser },
-      'GET /api/workspaces': { body: [personalWorkspace] },
-      'POST /api/workspaces': { body: house },
-    });
-    renderApp('/');
-
-    const section = await screen.findByRole('region', { name: 'Seus espaços' });
-    await userEvent.type(within(section).getByLabelText('Novo espaço compartilhado'), 'Casa');
-    await userEvent.click(within(section).getByRole('button', { name: 'Criar espaço' }));
-
-    await vi.waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        new URL('/api/workspaces', 'http://api.test'),
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'Casa' }) }),
-      ),
-    );
-    await vi.waitFor(() =>
-      expect(within(section).getByLabelText('Novo espaço compartilhado')).toHaveValue(''),
-    );
-  });
-});

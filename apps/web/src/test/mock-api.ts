@@ -1,3 +1,4 @@
+import { currentPeriod, DEFAULT_BUDGET_SHARES, summarizePeriod, todayIso } from '@financas/shared';
 import { vi } from 'vitest';
 
 type MockResponse = { status?: number; body: unknown; headers?: Record<string, string> };
@@ -29,6 +30,12 @@ export const fakeUser = {
   emailVerified: false,
 };
 
+/**
+ * The same person after confirming the e-mail: no confirmation notice on the workspace pages, for
+ * tests about something else (the notice shows on every page until then).
+ */
+export const verifiedUser = { ...fakeUser, emailVerified: true };
+
 export const noSession = { status: 401, body: { message: 'Unauthorized', statusCode: 401 } };
 
 export const personalWorkspace = {
@@ -38,8 +45,27 @@ export const personalWorkspace = {
   role: 'OWNER',
 };
 
-/** What the home page loads: the user and the workspaces. */
-export const signedInHome = {
-  'GET /api/me': { body: fakeUser },
+/** An empty month of the personal workspace, for the dashboard that "/" opens. */
+const thisMonth = currentPeriod();
+const emptyDashboard = summarizePeriod(
+  [],
+  {
+    period: thisMonth,
+    netIncomeCents: 0,
+    grossIncomeCents: null,
+    ...DEFAULT_BUDGET_SHARES,
+    source: 'DEFAULT',
+    inheritedFrom: null,
+  },
+  todayIso(),
+);
+
+/** The rest of a signed-in landing: the workspaces, and "/" opens the personal one's dashboard. */
+export const landingRoutes = {
   'GET /api/workspaces': { body: [personalWorkspace] },
+  [`GET /api/workspaces/${personalWorkspace.id}`]: { body: personalWorkspace },
+  [`GET /api/workspaces/${personalWorkspace.id}/summary/${thisMonth}`]: { body: emptyDashboard },
 };
+
+/** What a signed-in person loads on arrival: the user, the workspaces and that dashboard. */
+export const signedInHome = { 'GET /api/me': { body: fakeUser }, ...landingRoutes };

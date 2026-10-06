@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { fakeUser, mockApi, noSession, personalWorkspace } from '@/test/mock-api';
+import { fakeUser, landingRoutes, mockApi, noSession } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 const maria = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
@@ -14,17 +14,17 @@ async function fillAndSubmit({ name, email, password }: typeof maria) {
 }
 
 describe('SignUpPage', () => {
-  it('creates the account and goes to the home page', async () => {
+  it('creates the account and opens the dashboard of the personal workspace', async () => {
     mockApi({
       'GET /api/me': noSession,
       'POST /api/auth/sign-up/email': { body: { token: 'fake', user: fakeUser } },
-      'GET /api/workspaces': { body: [personalWorkspace] },
+      ...landingRoutes,
     });
     renderApp('/cadastro');
 
     await fillAndSubmit(maria);
 
-    expect(await screen.findByRole('heading', { name: 'Olá, Maria Exemplo' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Painel' })).toBeInTheDocument();
   });
 
   it('shows the password rule before calling the API', async () => {

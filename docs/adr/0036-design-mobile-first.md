@@ -139,3 +139,15 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
   - "Convite enviado" e "Convite cancelado" aparecem em toasts.
 - **Testes:** o _setup_ chama `toast.dismiss()` depois de cada teste, porque o `sonner` guarda os toasts num estado global e o toast de um teste aparecia no seguinte.
 - **Resultado:** a checagem de celular das capturas não aponta mais nenhum alvo menor que 44 px nem rolagem horizontal, em nenhuma tela.
+
+## Nota (seletor de espaço, 2026-10-05)
+
+- **A página de espaços saiu.** Ela era a única tela sem o menu, porque as seções pertencem a um espaço e ali nenhum estava escolhido.
+  - Agora o nome do espaço no cabeçalho é um **seletor** (`features/workspaces/workspace-switcher.tsx`): lista os espaços com o atual marcado e cria um novo ("Novo espaço compartilhado", em `ResponsiveDialog`).
+  - É o padrão de apps com vários espaços de trabalho.
+- **Trocar de espaço mantém a seção e a competência:** de `/espacos/A/lancamentos?competencia=…` vai para `/espacos/B/lancamentos?competencia=…`.
+- **`/` não é mais uma página:** abre o Painel do último espaço usado neste navegador (`localStorage`, chave `financas-ultimo-espaco`) ou, sem ele, o espaço pessoal.
+  - Só um espaço que carregou é guardado, para que um 404 não vire o destino.
+  - O redirecionamento repassa a _query string_, porque o link de confirmação de e-mail volta com `?error=`.
+- **O aviso de confirmar o e-mail** aparece no topo de todas as páginas do espaço até a confirmação. "Seus espaços" saiu do menu da conta e da gaveta "Mais".
+- **Estado vazio que não repete a ação:** em Lançamentos, o mês vazio diz o que falta e aponta "Novo lançamento", que já está na tela, em vez de mostrar um segundo botão ("cada elemento faz um trabalho", da skill `frontend-design`). A regra entrou na skill `financas-ui`.
