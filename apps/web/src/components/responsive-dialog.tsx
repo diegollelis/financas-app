@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useKeyboardInset } from '@/lib/use-keyboard-inset';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 
 /**
@@ -39,6 +40,17 @@ export function ResponsiveDialog({
   children: ReactNode;
 }) {
   const desktop = useMediaQuery(DESKTOP_QUERY);
+  const keyboard = useKeyboardInset();
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Once the keyboard has opened (or grown), keep the field being typed in visible: a long
+    // form may not fit in what is left of the screen.
+    if (keyboard.inset === 0) return;
+    const field = document.activeElement;
+    if (field instanceof HTMLElement && sheetRef.current?.contains(field)) {
+      field.scrollIntoView({ block: 'nearest' });
+    }
+  }, [keyboard.inset]);
   const onCloseAutoFocus = (event: Event) => {
     // Read on close, not on render: a ref is filled after the first render.
     const target =
@@ -67,9 +79,16 @@ export function ResponsiveDialog({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
+        ref={sheetRef}
         side="bottom"
         onCloseAutoFocus={onCloseAutoFocus}
         className="max-h-[92svh] overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+        // Above the keyboard, and no taller than what it leaves visible (see useKeyboardInset).
+        style={
+          keyboard.inset > 0
+            ? { bottom: keyboard.inset, maxHeight: keyboard.visibleHeight - 16 }
+            : undefined
+        }
       >
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
