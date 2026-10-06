@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { fakeUser, landingRoutes, mockApi, noSession } from '@/test/mock-api';
+import { fakeUser, mockApi, noSession } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 const maria = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
@@ -14,17 +14,68 @@ async function fillAndSubmit({ name, email, password }: typeof maria) {
 }
 
 describe('SignUpPage', () => {
-  it('creates the account and opens the dashboard of the personal workspace', async () => {
-    mockApi({
+  it('creates the account and asks to confirm the e-mail before entering', async () => {
+    const fetchMock = mockApi({
       'GET /api/me': noSession,
-      'POST /api/auth/sign-up/email': { body: { token: 'fake', user: fakeUser } },
-      ...landingRoutes,
+      'POST /api/auth/sign-up/email': { body: { token: null, user: fakeUser } },
     });
-    renderApp('/cadastro');
+    const { router } = renderApp('/cadastro');
 
     await fillAndSubmit(maria);
 
-    expect(await screen.findByRole('heading', { name: 'Painel' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Confira seu e-mail' })).toBeInTheDocument();
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent(
+      'Enviamos um link de confirmação para maria@example.com.',
+    );
+    // No session yet: still on the sign-up page.
+    expect(router.state.location.pathname).toBe('/cadastro');
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL('/api/auth/sign-up/email', 'http://api.test'),
+      expect.objectContaining({ body: JSON.stringify({ ...maria, callbackURL: '/' }) }),
+    );
+  });
+
+  it('brings the person back to the invitation through the e-mailed link', async () => {
+    const fetchMock = mockApi({
+      'GET /api/me': noSession,
+      'POST /api/auth/sign-up/email': { body: { token: null, user: fakeUser } },
+    });
+    renderApp('/cadastro?voltar=%2Fconvites%2Fabc');
+
+    await fillAndSubmit(maria);
+
+    await screen.findByRole('heading', { name: 'Confira seu e-mail' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL('/api/auth/sign-up/email', 'http://api.test'),
+      expect.objectContaining({
+        body: JSON.stringify({ ...maria, callbackURL: '/convites/abc' }),
+      }),
+    );
+  });
+
+  it('resends the link, or goes back to fix the e-mail', async () => {
+    const fetchMock = mockApi({
+      'GET /api/me': noSession,
+      'POST /api/auth/sign-up/email': { body: { token: null, user: fakeUser } },
+      'POST /api/auth/send-verification-email': { body: { status: true } },
+    });
+    renderApp('/cadastro');
+    await fillAndSubmit(maria);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Reenviar e-mail' }));
+
+    expect(await screen.findByText('Enviamos um novo link.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL('/api/auth/send-verification-email', 'http://api.test'),
+      expect.objectContaining({
+        body: JSON.stringify({ email: maria.email, callbackURL: '/' }),
+      }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Usar outro e-mail' }));
+
+    expect(await screen.findByRole('heading', { name: 'Criar conta' })).toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail')).toHaveValue(maria.email);
   });
 
   it('shows the password rule before calling the API', async () => {
@@ -39,21 +90,21 @@ describe('SignUpPage', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /api/me
   });
 
-  it('tells when the e-mail is already registered', async () => {
+  it('keeps the form and explains when the API refuses (too many attempts)', async () => {
     mockApi({
       'GET /api/me': noSession,
       'POST /api/auth/sign-up/email': {
-        status: 422,
-        body: { code: 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', message: 'User already exists.' },
+        status: 429,
+        headers: { 'X-Retry-After': '40' },
+        body: { message: 'Too many requests' },
       },
     });
     renderApp('/cadastro');
 
     await fillAndSubmit(maria);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Já existe uma conta com este e-mail.',
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Muitas tentativas.');
+    expect(screen.getByRole('heading', { name: 'Criar conta' })).toBeInTheDocument();
   });
 
   it('links to the sign-in page', async () => {

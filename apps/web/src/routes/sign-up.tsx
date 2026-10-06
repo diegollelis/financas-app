@@ -6,6 +6,7 @@ import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
+import { CheckEmail } from '@/features/auth/check-email';
 import { GoogleButton } from '@/features/auth/google-button';
 import { useReturnTo, withReturnTo } from '@/features/auth/return-to';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
@@ -13,22 +14,33 @@ import { useSignUp } from '@/features/auth/use-auth-mutations';
 
 export function SignUpPage() {
   const returnTo = useReturnTo();
-  const signUp = useSignUp();
+  const signUp = useSignUp(returnTo);
   const { register, handleSubmit, formState } = useForm<SignUpInput>({
     resolver: zodResolver(signUpInputSchema),
     defaultValues: { name: '', email: '', password: '' },
   });
+  const footer = (
+    <span>
+      Já tem conta? <TextLink to={withReturnTo('/entrar', returnTo)}>Entrar</TextLink>
+    </span>
+  );
+
+  // No session yet: the account waits for the e-mail to be verified (ADR 0022).
+  if (signUp.isSuccess) {
+    return (
+      <AuthCard title="Confira seu e-mail" footer={footer}>
+        <CheckEmail
+          email={signUp.variables.email}
+          returnTo={returnTo}
+          // Back to the form, as it was filled in, to fix a mistyped e-mail.
+          onChangeEmail={() => signUp.reset()}
+        />
+      </AuthCard>
+    );
+  }
 
   return (
-    <AuthCard
-      title="Criar conta"
-      description="Comece a organizar o seu mês."
-      footer={
-        <span>
-          Já tem conta? <TextLink to={withReturnTo('/entrar', returnTo)}>Entrar</TextLink>
-        </span>
-      }
-    >
+    <AuthCard title="Criar conta" description="Comece a organizar o seu mês." footer={footer}>
       <form
         noValidate
         className="grid gap-4"

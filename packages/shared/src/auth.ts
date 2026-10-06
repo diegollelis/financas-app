@@ -4,8 +4,22 @@ import { z } from 'zod';
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
+/** Web pages the API links to in e-mails (and the router mounts). */
+export const SIGN_IN_PATH = '/entrar';
+export const FORGOT_PASSWORD_PATH = '/esqueci-senha';
+
 /** Web page that receives the password reset link (the API builds the e-mail link to it). */
 export const RESET_PASSWORD_PATH = '/redefinir-senha';
+
+/**
+ * A path inside the web app, or '/' (ADR 0027): where to go after signing in or verifying the
+ * e-mail. "//site.com" or "/\site.com" would make the browser leave for another site (open
+ * redirect), a classic trick in phishing links. The API applies it to the links it e-mails too.
+ */
+export function safeReturnTo(value: string | null | undefined): string {
+  if (!value?.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return '/';
+  return value;
+}
 
 /** Matches the `users.name` column (varchar 100). */
 export const NAME_MAX_LENGTH = 100;

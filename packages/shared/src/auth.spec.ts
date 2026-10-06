@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   meResponseSchema,
   resetPasswordFormSchema,
+  safeReturnTo,
   signInInputSchema,
   signUpInputSchema,
 } from './auth.ts';
@@ -94,5 +95,20 @@ describe('resetPasswordFormSchema', () => {
       path: ['confirmPassword'],
       message: 'As senhas não conferem.',
     });
+  });
+});
+
+describe('safeReturnTo', () => {
+  it.each([
+    ['/convites/abc', '/convites/abc'],
+    ['/espacos/1?aba=membros', '/espacos/1?aba=membros'],
+    [null, '/'],
+    ['', '/'],
+    ['https://site-malicioso.com', '/'],
+    ['//site-malicioso.com', '/'],
+    ['/\\site-malicioso.com', '/'],
+    ['javascript:alert(1)', '/'],
+  ])('%s -> %s', (value, expected) => {
+    expect(safeReturnTo(value)).toBe(expected);
   });
 });

@@ -1,8 +1,11 @@
 import {
+  FORGOT_PASSWORD_PATH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   RESET_PASSWORD_PATH,
   resetPasswordInputSchema,
+  safeReturnTo,
+  SIGN_IN_PATH,
   signUpInputSchema,
 } from '@financas/shared';
 import { Logger } from '@nestjs/common';
@@ -16,7 +19,7 @@ import { redactPrismaError } from '../common/error-reporting.js';
 import type { Env } from '../config/env.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Mailer, MailMessage } from '../mail/mailer.js';
-import { resetPasswordEmail, verificationEmail } from '../mail/templates.js';
+import { existingAccountEmail, resetPasswordEmail, verificationEmail } from '../mail/templates.js';
 
 /** Every Better Auth route lives under this prefix (sign-up, sign-in, sign-out, get-session...). */
 export const AUTH_BASE_PATH = '/api/auth';
@@ -77,8 +80,21 @@ export function createAuth(
   }
 
   /**
-   * Account pre-hijacking protection (ADR 0026). E-mail verification is not required yet, so
-   * anyone can sign up with someone else's e-mail and a password of their own. When the real
+   * The verification link goes back to the page the person was heading to (an invitation, ADR
+   * 0027), sent as `callbackURL` by the sign-up or sign-in form. Only a path inside the web app:
+   * anything else becomes the home page (open redirect).
+   */
+  function verificationLink(url: string): string {
+    return withCallback(url, safeReturnTo(new URL(url).searchParams.get('callbackURL')));
+  }
+
+  /** A page of the web app, for links in e-mails. */
+  const webPage = (path: string) => new URL(path, env.WEB_ORIGIN).toString();
+
+  /**
+   * Account pre-hijacking protection (ADR 0026). Anyone can still sign up with someone else's
+   * e-mail and a password of their own: the account just stays unverified, so the password does
+   * not sign in (ADR 0022). When the real
    * owner later signs in with Google, Better Auth links the accounts and marks the e-mail as
    * verified, and the intruder's password would keep working. So, when an external account is
    * linked to a user whose e-mail was never verified, that password and every open session go.
@@ -106,11 +122,29 @@ export function createAuth(
       enabled: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,
       maxPasswordLength: PASSWORD_MAX_LENGTH,
-      // Not yet: without our own domain, Resend only delivers to the account owner (ADR 0022).
-      requireEmailVerification: false,
+      // Signing in with a password needs a verified e-mail (ADR 0022). Signing up creates no
+      // session, and a repeated e-mail gets the same answer as a new one (Better Auth hashes a
+      // password anyway, so not even the timing tells them apart).
+      requireEmailVerification: true,
+      // The owner of that repeated e-mail hears it instead, with the way in.
+      onExistingUserSignUp: ({ user }) =>
+        deliver(
+          'existing account',
+          existingAccountEmail(user.email, user.name, {
+            signIn: webPage(SIGN_IN_PATH),
+            resetPassword: webPage(FORGOT_PASSWORD_PATH),
+          }),
+        ),
       resetPasswordTokenExpiresIn: 60 * 60,
       // Whoever had the old password (maybe an attacker) is signed out everywhere.
       revokeSessionsOnPasswordReset: true,
+      // The reset link went to the e-mail, so whoever opened it owns it: verified, without a
+      // second e-mail on the next sign-in. Any password set before (ADR 0026) is already gone.
+      onPasswordReset: async ({ user }) => {
+        if (!user.emailVerified) {
+          await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+        }
+      },
       sendResetPassword: ({ user, url }) =>
         deliver(
           'password reset',
@@ -138,10 +172,13 @@ export function createAuth(
         : {},
     emailVerification: {
       sendOnSignUp: true,
+      // A sign-in with the right password but an unverified e-mail sends a new link: the way
+      // back for whoever lost the first one.
+      sendOnSignIn: true,
       autoSignInAfterVerification: true,
       expiresIn: 60 * 60,
       sendVerificationEmail: ({ user, url }) =>
-        deliver('verification', verificationEmail(user.email, user.name, withCallback(url, '/'))),
+        deliver('verification', verificationEmail(user.email, user.name, verificationLink(url))),
     },
     // Brute force and e-mail flooding protection (ADR 0023): per client IP and route. A blocked
     // request gets 429 with an X-Retry-After header (seconds).
@@ -219,6 +256,10 @@ export function createAuth(
         Sentry.captureException(error);
       },
     },
+    // Better Auth logs some events at "info" with the e-mail in the message (a sign-up with an
+    // existing e-mail, for one). Pinned at its default "warn", so an upgrade that changes the
+    // default cannot start logging e-mails (ADR 0012).
+    logger: { level: 'warn' },
     telemetry: { enabled: false },
   });
 }

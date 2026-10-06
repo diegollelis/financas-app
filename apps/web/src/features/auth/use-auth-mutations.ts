@@ -15,20 +15,24 @@ import { meQueryKey } from './use-me';
 // Better Auth routes (ADR 0020). On success the session cookie is set by the API; here we only
 // update the cached user, and the route guards redirect on their own.
 
-export function useSignUp() {
-  const queryClient = useQueryClient();
+/**
+ * Creates the account and e-mails the verification link, without signing in (ADR 0022): a
+ * password needs a verified e-mail. An e-mail that already has an account gets the same answer,
+ * so the page always says "check your e-mail". The link brings the person back to `returnTo`.
+ */
+export function useSignUp(returnTo = '/') {
   return useMutation({
     mutationFn: (input: SignUpInput) =>
-      apiPost('/api/auth/sign-up/email', input, authResponseSchema),
-    onSuccess: ({ user }) => queryClient.setQueryData(meQueryKey, user),
+      apiPost('/api/auth/sign-up/email', { ...input, callbackURL: returnTo }, authResponseSchema),
   });
 }
 
-export function useSignIn() {
+/** With an unverified e-mail the API answers 403 and e-mails a new link back to `returnTo`. */
+export function useSignIn(returnTo = '/') {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: SignInInput) =>
-      apiPost('/api/auth/sign-in/email', input, authResponseSchema),
+      apiPost('/api/auth/sign-in/email', { ...input, callbackURL: returnTo }, authResponseSchema),
     onSuccess: ({ user }) => queryClient.setQueryData(meQueryKey, user),
   });
 }
@@ -63,10 +67,15 @@ export function useResetPassword() {
   });
 }
 
-export function useResendVerification() {
+/** Always "succeeds": the API does not reveal whether the e-mail has an unverified account. */
+export function useResendVerification(returnTo = '/') {
   return useMutation({
     mutationFn: (email: string) =>
-      apiPost('/api/auth/send-verification-email', { email }, statusResponseSchema),
+      apiPost(
+        '/api/auth/send-verification-email',
+        { email, callbackURL: returnTo },
+        statusResponseSchema,
+      ),
   });
 }
 

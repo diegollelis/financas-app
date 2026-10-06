@@ -54,11 +54,22 @@ export async function createTestApp() {
     prisma,
     /** A cookie-keeping client: each call is a new "browser". */
     http,
-    /** Signs up and returns a browser holding the new user's session, plus ids. */
+    /**
+     * Signs up, verifies the e-mail and signs in (a password needs a verified e-mail, ADR 0022),
+     * returning a browser holding the new user's session, plus ids. The verification itself is
+     * tested through the e-mailed link in the auth tests; here it is just marked.
+     */
     async signUp(user: { name: string; email: string; password: string }) {
       const browser = http();
       await browser.post('/api/auth/sign-up/email').send(user).expect(200);
-      const { id: userId } = await prisma.user.findUniqueOrThrow({ where: { email: user.email } });
+      const { id: userId } = await prisma.user.update({
+        where: { email: user.email },
+        data: { emailVerified: true },
+      });
+      await browser
+        .post('/api/auth/sign-in/email')
+        .send({ email: user.email, password: user.password })
+        .expect(200);
       const personal = await prisma.member.findFirstOrThrow({
         where: { userId, workspace: { isPersonal: true } },
       });

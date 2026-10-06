@@ -90,14 +90,31 @@ describe('Google sign-in', () => {
 
   it('removes the password and sessions of an unverified account taken over by Google (pre-hijacking)', async () => {
     // Someone signs up with Maria's e-mail and a password of their own, without verifying it.
-    const intruder = await t.signUp({ ...maria, password: 'senha-de-teste-000' });
+    // That password does not sign in (ADR 0022), but it would once the e-mail became verified.
+    await t
+      .http()
+      .post('/api/auth/sign-up/email')
+      .send({ ...maria, password: 'senha-de-teste-000' })
+      .expect(200);
+    // A session from before verification was required (ADR 0022) is still valid until it expires.
+    const { id: intruderId } = await t.prisma.user.findUniqueOrThrow({
+      where: { email: maria.email },
+    });
+    await t.prisma.session.create({
+      data: {
+        userId: intruderId,
+        token: 'sessao-do-intruso',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
 
     const { browser } = await signInWithGoogle(mariaOnGoogle);
 
-    // Maria gets in through Google...
-    await browser.get('/api/me').expect(200);
+    // Maria gets in through Google, now verified by it...
+    const me = await browser.get('/api/me').expect(200);
+    expect(me.body).toMatchObject({ emailVerified: true });
     // ...and the intruder is out: the old session is gone and the password no longer works.
-    await intruder.browser.get('/api/me').expect(401);
+    expect(await t.prisma.session.count({ where: { token: 'sessao-do-intruso' } })).toBe(0);
     await t
       .http()
       .post('/api/auth/sign-in/email')

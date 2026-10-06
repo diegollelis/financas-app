@@ -48,3 +48,17 @@ Também era preciso decidir como desenvolver e testar sem mandar e-mails de verd
 - **Domínio (2026-10-06):** o domínio verificado no Resend é `codelelis.com`, e o remetente `nao-responda@codelelis.com` ([ADR 0039](0039-dominio-proprio.md)). Exigir a verificação de e-mail fica para um PR próprio.
 - As rotas que enviam e-mail podem ser usadas para incomodar terceiros (pedidos em massa). O rate limit, próximo item do roadmap, deve cobri-las.
 - Se o envio falhar, o usuário não fica sabendo na hora. Ele pode pedir de novo ("Reenviar e-mail" ou um novo pedido de redefinição).
+
+## Nota (verificação obrigatória, 2026-10-06)
+
+Com o domínio verificado no Resend ([ADR 0039](0039-dominio-proprio.md)), os e-mails chegam a todos, e a verificação passou a ser obrigatória (`requireEmailVerification`).
+
+- **O cadastro não abre sessão.** A tela troca o formulário por "Confira seu e-mail", com "Reenviar e-mail" e "Usar outro e-mail". O link de confirmação entra na conta (`autoSignInAfterVerification`).
+- **Cadastro com um e-mail que já tem conta:** a resposta é igual à de um cadastro novo, no formato e no tempo; o Better Auth calcula o hash de uma senha mesmo assim. A mensagem "Já existe uma conta com este e-mail", que revelava quais e-mails têm conta, deixou de existir.
+  - O dono da conta recebe "Você já tem uma conta no Finanças", com links para entrar e para redefinir a senha (`onExistingUserSignUp`).
+  - Esse e-mail não verifica nada nem abre sessão.
+- **Login com a senha certa e o e-mail não verificado:** responde 403 `EMAIL_NOT_VERIFIED` e envia um link novo (`sendOnSignIn`). É o caminho de quem perdeu o primeiro e-mail. Com a senha errada, responde 401 e não envia nada: a senha é conferida antes.
+- **Redefinir a senha verifica o e-mail** (`onPasswordReset`): o link foi para aquele endereço, então quem o abriu é o dono, e não precisa de um segundo e-mail.
+- **O link volta à página de onde a pessoa veio.** O formulário envia o `?voltar=` como `callbackURL`, por exemplo `/convites/:token`. A API só aceita um caminho interno (`safeReturnTo`, agora em `packages/shared`); qualquer outro vira `/`.
+- **Sessões abertas antes da mudança** continuam valendo até expirar, e o aviso "Confirme seu e-mail" continua para elas. No próximo login por senha, a confirmação é exigida.
+- **Log:** o Better Auth registra em nível `info` o e-mail de um cadastro repetido. O nível ficou fixado em `warn`, o padrão dele, para uma atualização não passar a gravar e-mails ([ADR 0012](0012-privacidade-lgpd.md)).

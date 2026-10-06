@@ -22,7 +22,7 @@ export function SignInPage() {
   // The API sends the browser back here with ?error= when the Google sign-in fails (ADR 0026).
   const [searchParams] = useSearchParams();
   const googleFailed = searchParams.has('error');
-  const signIn = useSignIn();
+  const signIn = useSignIn(returnTo);
   const { register, handleSubmit, formState } = useForm<SignInInput>({
     // The same shared schema the API uses (ADR 0006): invalid input never leaves the browser.
     resolver: zodResolver(signInInputSchema),

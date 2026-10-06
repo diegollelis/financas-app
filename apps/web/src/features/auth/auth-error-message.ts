@@ -12,9 +12,9 @@ function waitMessage(seconds?: number): string {
 export function authErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     switch (error.code) {
-      case 'USER_ALREADY_EXISTS':
-      case 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL':
-        return 'Já existe uma conta com este e-mail.';
+      // Right password, e-mail not verified yet: the API has just e-mailed a new link (ADR 0022).
+      case 'EMAIL_NOT_VERIFIED':
+        return 'Confirme seu e-mail para entrar. Enviamos um novo link; confira também a caixa de spam.';
       case 'INVALID_EMAIL_OR_PASSWORD':
         return 'E-mail ou senha incorretos.';
       case 'PROVIDER_NOT_FOUND':
