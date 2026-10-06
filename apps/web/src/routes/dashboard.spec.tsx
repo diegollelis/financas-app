@@ -58,6 +58,18 @@ const tile = (label: string) =>
 const nbsp = (text: string | null | undefined) => text?.replace(/\u00a0/g, ' ');
 
 describe('DashboardPage', () => {
+  it('says how much of the planned view is an estimate of bills that vary', async () => {
+    const energy = { ...debit(18_990, '2026-10-25'), amountEstimated: true };
+    mockDashboard(summarizePeriod([...october, energy], budget, today));
+
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    const balance = await section('Saldo e resultado');
+    expect(nbsp(balance.textContent)).toContain(
+      'Inclui R$ 189,90 em valores estimados, de contas que variam.',
+    );
+  });
+
   it('shows the balance and the result in both views, and what is overdue', async () => {
     mockDashboard(summarizePeriod(october, budget, today));
 

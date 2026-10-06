@@ -37,6 +37,8 @@ const transactionFormSchema = createTransactionInputSchema
       .pipe(isoDateSchema.nullable()),
     /** Only when creating: once, or every month from this competência on (ADR 0038). */
     repeat: z.enum(['NONE', 'MONTHLY']),
+    /** Of a monthly one: the same every month, or changing (energy, water), ADR 0038. */
+    amountKind: z.enum(['FIXED', 'VARIABLE']),
   });
 
 type FormInput = z.input<typeof transactionFormSchema>;
@@ -49,6 +51,11 @@ const typeOptions: readonly { value: TransactionType; label: string }[] = [
   { value: 'DEBIT', label: 'Débito' },
   { value: 'CREDIT', label: 'Crédito' },
 ];
+
+const amountKindOptions = [
+  { value: 'FIXED', label: 'Fixo' },
+  { value: 'VARIABLE', label: 'Variável' },
+] as const;
 
 const repeatOptions = [
   { value: 'NONE', label: 'Não repetir' },
@@ -124,11 +131,14 @@ export function TransactionForm({
       amount: initial ? amountText.format(initial.amountCents / 100) : '',
       dueDate: initial?.dueDate ?? '',
       repeat: 'NONE',
+      amountKind: 'FIXED',
     },
   });
   // useWatch rather than watch(): the hook form is safe for the React Compiler.
   const type = useWatch({ control, name: 'type' });
   const repeat = useWatch({ control, name: 'repeat' });
+  const amountKind = useWatch({ control, name: 'amountKind' });
+  const variable = repeat === 'MONTHLY' && amountKind === 'VARIABLE';
   // Only categories of the chosen type; an archived one only if it is already the current one.
   const options = categories.filter(
     (category) =>
@@ -176,7 +186,11 @@ export function TransactionForm({
       />
       {/* One column on the phone, two from sm. */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField id={id('amount')} label="Valor (R$)" error={formState.errors.amount?.message}>
+        <FormField
+          id={id('amount')}
+          label={variable ? 'Valor estimado (R$)' : 'Valor (R$)'}
+          error={formState.errors.amount?.message}
+        >
           <Input
             inputMode="decimal"
             autoComplete="off"
@@ -219,10 +233,34 @@ export function TransactionForm({
           />
           {repeat === 'MONTHLY' && (
             <p className="text-muted-foreground text-sm">
-              Um lançamento pendente em cada mês, a partir deste, com este valor e o mesmo dia de
-              vencimento. Para parar, use "Encerrar recorrência" no menu do lançamento.
+              Um lançamento pendente em cada mês, a partir deste, no mesmo dia de vencimento. Para
+              parar, use "Encerrar recorrência" no menu do lançamento.
             </p>
           )}
+        </div>
+      )}
+      {allowRepeat && repeat === 'MONTHLY' && (
+        <div className="grid gap-2">
+          <p aria-hidden className="text-sm font-medium">
+            Valor
+          </p>
+          <Controller
+            control={control}
+            name="amountKind"
+            render={({ field }) => (
+              <SegmentedControl
+                label="Valor"
+                options={amountKindOptions}
+                value={field.value}
+                onChange={field.onChange}
+              />
+            )}
+          />
+          <p className="text-muted-foreground text-sm">
+            {variable
+              ? 'Para contas que mudam todo mês, como energia e água. Cada mês começa com a média dos 3 últimos pagos; ao efetivar, você informa o valor da fatura.'
+              : 'O mesmo valor todo mês, como internet e aluguel.'}
+          </p>
         </div>
       )}
       {Boolean(error) && (

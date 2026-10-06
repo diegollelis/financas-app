@@ -195,6 +195,7 @@ describe('TransactionsPage', () => {
         amountCents: 9_990,
         dueDay: 20,
         startPeriod: '2026-10',
+        variableAmount: false,
       }),
     });
     expect(
@@ -229,6 +230,86 @@ describe('TransactionsPage', () => {
       method: 'DELETE',
     });
     expect(await screen.findByText('Recorrência encerrada')).toBeInTheDocument();
+  });
+
+  it('repeats a bill whose amount changes, estimating it', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/recurrences`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000302',
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 18_000,
+          variableAmount: true,
+          dueDay: null,
+          startPeriod: '2026-10',
+          endPeriod: null,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    // "Valor" only matters for a monthly one.
+    expect(within(form).queryByRole('radiogroup', { name: 'Valor' })).not.toBeInTheDocument();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Conta de luz');
+    await chooseCategory(form, 'Energia');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo mês' }));
+    expect(within(form).getByRole('radio', { name: 'Fixo' })).toBeChecked();
+    await userEvent.click(within(form).getByRole('radio', { name: 'Variável' }));
+    await userEvent.type(within(form).getByLabelText('Valor estimado (R$)'), '180');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Conta de luz',
+        notes: null,
+        categoryId: energyCategory.id,
+        amountCents: 18_000,
+        dueDay: null,
+        startPeriod: '2026-10',
+        variableAmount: true,
+      }),
+    });
+  });
+
+  it('asks for the bill amount when settling an estimate; a fixed one settles in one tap', async () => {
+    const estimate = {
+      ...light,
+      recurrenceId: '01920000-0000-7000-8000-000000000302',
+      amountEstimated: true,
+    };
+    const fetchMock = mockTransactions({
+      [`GET ${base}`]: { body: [estimate, shopping] },
+      [`PATCH ${base}/${light.id}`]: {
+        body: { ...estimate, amountCents: 17_250, settledAt: '2026-10-15', amountEstimated: false },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Débitos');
+    expect(row(debits, 'Conta de luz')).toHaveTextContent('Estimado');
+    expect(row(debits, 'Compras da semana')).not.toHaveTextContent('Estimado');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Efetivar Conta de luz' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Efetivar Conta de luz' });
+    const amount = within(dialog).getByLabelText('Valor da fatura (R$)');
+    expect(amount).toHaveValue('159,90');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '172,50');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Efetivar' }));
+
+    await expectCall(fetchMock, `${base}/${light.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ amountCents: 17_250, settledAt: '2026-10-15' }),
+    });
+    expect(await screen.findByText('Lançamento efetivado')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('says that editing a generated month changes only that month', async () => {
