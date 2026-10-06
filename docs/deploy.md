@@ -120,6 +120,8 @@ O endereço do Render não é usado pelo navegador. Ele é só o destino do prox
    | `API_ORIGIN`              | a URL do serviço no Render, **sem** `/api`                            |
    | `PROXY_SECRET`            | o mesmo valor do Render, do tipo _Secret_                             |
 
+   **Digite o nome de cada variável, sem copiar e colar.** Um espaço no fim do nome não aparece no painel nem no log do build, mas o build descarta a variável sem aviso. Foi o que aconteceu com `VITE_CANONICAL_ORIGIN` na troca de domínio (7.2). Para conferir se uma variável `VITE_` entrou no build, veja se o nome do `dist/assets/index-….js` no log mudou.
+
 5. **Save and Deploy.** Se a URL final for diferente da prevista, acerte `VITE_API_URL` aqui e faça **Retry deployment**, porque o valor só muda com um build novo. No Render, acerte também `WEB_ORIGIN` e `BETTER_AUTH_URL`.
 6. Em **Settings → Builds → Branch control**, coloque **Preview branch: None**. Os _previews_ teriam outra origem, que a API recusa, e gastariam a cota de builds.
 7. **Teste de ponta a ponta:**
@@ -204,11 +206,14 @@ Decisão no [ADR 0039](adr/0039-dominio-proprio.md): o app em `financas.codeleli
 
 ### 7.1 DNS no Cloudflare e domínio no Pages
 
-1. No Cloudflare, vá em **Add a site** (ou **Onboard a domain**), digite `codelelis.com` e escolha o plano **Free**. Ele procura registros existentes; um domínio recém-comprado não tem nenhum que importe. No fim, ele mostra **dois nameservers** (algo como `xxx.ns.cloudflare.com`).
-2. Na Spaceship, abra **Domain List → codelelis.com → Nameservers**, troque para **Custom** e cole os dois nameservers do Cloudflare. Se o **DNSSEC** estiver ligado na Spaceship, desligue antes.
-3. Espere o Cloudflare mostrar o site como **Active**; ele também avisa por e-mail. Costuma levar de minutos a algumas horas.
-4. Em **Workers & Pages → financas-app → Custom domains → Set up a custom domain**, digite `financas.codelelis.com` e confirme. O Cloudflare cria o CNAME e o certificado.
-5. Abra `https://financas.codelelis.com/api/health`. A resposta esperada é `{"status":"ok","database":"up"}`, depois do cold start.
+1. No Cloudflare, adicione o domínio, digitando `codelelis.com`, e escolha o plano **Free**. O caminho pode ser **Add a site** ou **Onboard a domain** na lista de domínios. Também dá para começar por **Custom domains** no Pages; nesse caso, entre as opções que aparecem, escolha **Connect a domain** (não _Transfer_ nem _Buy_).
+   - Na revisão dos registros, exclua os dois **A** da raiz que vieram da Spaceship: eles são da página de domínio estacionado.
+   - Os avisos sobre **MX** e **www** podem ser ignorados.
+2. Os **dois nameservers** do Cloudflare ficam em **DNS → Settings → Cloudflare Nameservers**. Os da conta do projeto são `angela.ns.cloudflare.com` e `otto.ns.cloudflare.com`.
+3. Na Spaceship, abra **Domain List → codelelis.com → Nameservers**, troque para **Custom** e cole os dois. Se o **DNSSEC** estiver ligado na Spaceship, desligue antes. Não ligue o DNSSEC no Cloudflare durante a troca.
+4. Para conferir se a troca chegou ao registro do `.com`, rode `nslookup -type=NS codelelis.com a.gtld-servers.net`. O Cloudflare marca o domínio como **Active** pouco depois, e avisa por e-mail.
+5. Em **Workers & Pages → financas-app → Custom domains → Set up a custom domain**, digite `financas.codelelis.com` e confirme. O Cloudflare cria o CNAME e o certificado. Se a raiz `codelelis.com` tiver ficado ligada ao projeto, remova: ela é de outros projetos.
+6. Abra `https://financas.codelelis.com/api/health`. A resposta esperada é `{"status":"ok","database":"up"}`, depois do cold start.
 
 ### 7.2 Virar a chave
 
@@ -243,13 +248,19 @@ Faça os quatro itens em sequência, em poucos minutos: entre o 3 e o 4, o login
 
 ### 7.3 E-mail com o domínio
 
-1. No Resend, vá em **Domains → Add Domain** e digite `codelelis.com`. Com o DNS no Cloudflare, **Auto configure** cria os registros (DKIM, SPF e o MX de retorno no subdomínio `send`). Espere o status **Verified**.
-2. No Render, mude `MAIL_FROM_EMAIL` para `nao-responda@codelelis.com`. Não é preciso criar essa caixa: enviar não depende dela.
-3. Confira: peça **Esqueci a senha** e envie um convite para um e-mail que **não** é o da conta Resend. Os dois devem chegar; olhe também a caixa de spam.
+1. No Resend, vá em **Domains → Add Domain**, digite `codelelis.com` e escolha a região **North Virginia (us-east-1)**, a mesma da API.
+   - Com o DNS no Cloudflare, o caminho automático (**Sign in to Cloudflare**) cria os registros: o DKIM em `resend._domainkey` e o subdomínio `send`, que aponta para o Resend com o MX e o SPF.
+   - Espere o status **Verified**.
+2. O DMARC não é do Resend: crie à mão em **Cloudflare → DNS → Records** um **TXT** `_dmarc` com `v=DMARC1; p=none;`.
+3. No Render, **crie** `MAIL_FROM_EMAIL` = `nao-responda@codelelis.com`. Sem ela, a API usa o padrão `onboarding@resend.dev`. Não é preciso criar essa caixa de e-mail: enviar não depende dela. O nome do remetente vem do padrão de `MAIL_FROM_NAME` ("Finanças").
+4. **Confira:** peça **Esqueci a senha** e envie um convite para um e-mail que **não** é o da conta Resend. Os dois devem chegar.
+   - **No começo, podem cair no spam:** um domínio novo ainda não tem reputação. Marque "Não é spam" nas caixas que você controla; a entrega melhora com o uso.
+   - Se continuar no spam depois de algumas semanas, avalie o DMARC `p=quarantine` e o texto dos e-mails.
 
 ## Produção atual
 
-- Front: <https://financas.codelelis.com>. O antigo <https://financas-app-t2l.pages.dev> só redireciona, depois do passo 7.2.
+- Front: <https://financas.codelelis.com>. O antigo <https://financas-app-t2l.pages.dev> só redireciona.
+- E-mail: `nao-responda@codelelis.com`, pelo Resend, com o domínio verificado.
 - API: `https://financas-api-qioy.onrender.com`. Só a Function a chama; `/api/health` responde direto.
 
 ## Próximos passos
