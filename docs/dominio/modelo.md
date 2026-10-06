@@ -41,7 +41,8 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 ### InstallmentPlan (Parcelamento) — fase 5
 
 - `workspace_id`, `description`, `total_cents`, `installments`, `first_period`
-- Gera um `Transaction` por parcela; a diferença de arredondamento vai para a última parcela.
+- Gera, ao ser criado, um `Transaction` por parcela (`installment_plan_id`, `installment_number`), uma por competência; o total pode ser digitado como total ou como valor da parcela, e a diferença de arredondamento vai para a última parcela ([ADR 0038](../adr/0038-recorrencias-e-parcelamentos.md)).
+- Encerrar remove as parcelas pendentes do mês atual em diante; as pagas ficam.
 
 ### Recurrence (Recorrência) — fase 5 ([ADR 0038](../adr/0038-recorrencias-e-parcelamentos.md))
 

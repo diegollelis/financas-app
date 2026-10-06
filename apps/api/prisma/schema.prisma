@@ -18,18 +18,19 @@ datasource db {
 // Owner of all financial data (ADR 0008). The personal workspace is created with the user, is
 // never shared nor deleted, and there is exactly one per user (ADR 0024).
 model Workspace {
-  id            String                 @id @default(uuid(7)) @db.Uuid
-  name          String                 @db.VarChar(100)
-  isPersonal    Boolean                @default(false) @map("is_personal")
-  members       Member[]
-  invitations   Invitation[]
-  categories    Category[]
-  transactions  Transaction[]
-  budgetConfigs BudgetConfig[]
-  recurrences   Recurrence[]
-  occurrences   RecurrenceOccurrence[]
-  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id               String                 @id @default(uuid(7)) @db.Uuid
+  name             String                 @db.VarChar(100)
+  isPersonal       Boolean                @default(false) @map("is_personal")
+  members          Member[]
+  invitations      Invitation[]
+  categories       Category[]
+  transactions     Transaction[]
+  budgetConfigs    BudgetConfig[]
+  recurrences      Recurrence[]
+  installmentPlans InstallmentPlan[]
+  occurrences      RecurrenceOccurrence[]
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("workspaces")
 }
@@ -178,16 +179,17 @@ enum TransactionType {
 // Classifies transactions, per type. New workspaces get the default ones; a category in use is
 // archived, not deleted (docs/dominio/modelo.md).
 model Category {
-  id           String          @id @default(uuid(7)) @db.Uuid
-  workspaceId  String          @map("workspace_id") @db.Uuid
-  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name         String          @db.VarChar(50)
-  type         TransactionType
-  archivedAt   DateTime?       @map("archived_at") @db.Timestamptz(3)
-  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
-  transactions Transaction[]
-  recurrences  Recurrence[]
+  id               String            @id @default(uuid(7)) @db.Uuid
+  workspaceId      String            @map("workspace_id") @db.Uuid
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String            @db.VarChar(50)
+  type             TransactionType
+  archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions     Transaction[]
+  recurrences      Recurrence[]
+  installmentPlans InstallmentPlan[]
 
   @@unique([workspaceId, type, name])
   // Target of the composite foreign key of transactions (ADR 0029).
@@ -201,27 +203,60 @@ model Category {
 // (checked at the end of the statement) instead of Restrict lets a workspace be deleted with
 // its categories and transactions in one go. CHECKs on amount and period are in the migration.
 model Transaction {
-  id              String                @id @default(uuid(7)) @db.Uuid
-  workspaceId     String                @map("workspace_id") @db.Uuid
-  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  type            TransactionType
-  description     String                @db.VarChar(200)
-  notes           String?               @db.VarChar(1000)
-  categoryId      String                @map("category_id") @db.Uuid
-  category        Category              @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
-  amountCents     Int                   @map("amount_cents")
-  period          String                @db.Char(7)
-  dueDate         DateTime?             @map("due_date") @db.Date
-  settledAt       DateTime?             @map("settled_at") @db.Date
+  id                String                @id @default(uuid(7)) @db.Uuid
+  workspaceId       String                @map("workspace_id") @db.Uuid
+  workspace         Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type              TransactionType
+  description       String                @db.VarChar(200)
+  notes             String?               @db.VarChar(1000)
+  categoryId        String                @map("category_id") @db.Uuid
+  category          Category              @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
+  amountCents       Int                   @map("amount_cents")
+  period            String                @db.Char(7)
+  dueDate           DateTime?             @map("due_date") @db.Date
+  settledAt         DateTime?             @map("settled_at") @db.Date
   // Generated by a variable recurrence and not yet confirmed: the amount is an estimate (ADR 0038).
-  amountEstimated Boolean               @default(false) @map("amount_estimated")
-  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
-  occurrence      RecurrenceOccurrence?
+  amountEstimated   Boolean               @default(false) @map("amount_estimated")
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  occurrence        RecurrenceOccurrence?
+  // Parcela: which plan and which of its installments (ADR 0038). Both or neither (CHECK in the
+  // migration); the description stays the purchase's, the "3/10" comes from these.
+  installmentPlanId String?               @map("installment_plan_id") @db.Uuid
+  installmentPlan   InstallmentPlan?      @relation(fields: [installmentPlanId], references: [id], onDelete: Cascade)
+  installmentNumber Int?                  @map("installment_number") @db.SmallInt
 
+  @@unique([installmentPlanId, installmentNumber])
   @@index([workspaceId, period])
   @@index([categoryId])
   @@map("transactions")
+}
+
+// Parcelamento (ADR 0038): a purchase or debt split into monthly installments. Unlike a
+// recurrence it has an end, so all its transactions are created with it, one per competência
+// from first_period on; the cents a split leaves go to the last one. Ending it removes the
+// pending installments from this month on and stamps ended_at. Same composite category key as
+// transactions; CHECKs on amount, count and periods are in the migration.
+model InstallmentPlan {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  workspaceId  String          @map("workspace_id") @db.Uuid
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type         TransactionType
+  description  String          @db.VarChar(200)
+  notes        String?         @db.VarChar(1000)
+  categoryId   String          @map("category_id") @db.Uuid
+  category     Category        @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
+  totalCents   Int             @map("total_cents")
+  installments Int             @db.SmallInt
+  firstPeriod  String          @map("first_period") @db.Char(7)
+  dueDay       Int?            @map("due_day") @db.SmallInt
+  endedAt      DateTime?       @map("ended_at") @db.Timestamptz(3)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions Transaction[]
+
+  @@index([workspaceId])
+  @@map("installment_plans")
 }
 
 // Recorrência (ADR 0038): a transaction that repeats every month (energy, internet, the card

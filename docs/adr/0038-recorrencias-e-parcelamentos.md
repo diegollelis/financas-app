@@ -81,3 +81,14 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
 - **Na linha,** um lançamento estimado mostra "Estimado" em texto discreto sob o valor. É texto, não um selo colorido, porque estimativa não é um status do lançamento.
 - **"Efetivar" de uma conta estimada** abre a gaveta "Efetivar …" (`features/transactions/settle-with-amount.tsx`) com "Valor da fatura (R$)" já preenchido pela estimativa. Valor e data vão juntos num `PATCH`. As contas fixas continuam efetivando com um toque.
 - **No Painel,** quando há estimativas pendentes, aparece "Inclui R$ X em valores estimados, de contas que variam." abaixo dos indicadores.
+
+## Nota (parcelamentos na API, 2026-10-06)
+
+- **Tabela `installment_plans`** (RLS, chave composta com a categoria):
+  - campos: `total_cents`, `installments` (2 a 72), `first_period`, `due_day` e `ended_at`;
+  - `transactions` ganhou `installment_plan_id` e `installment_number`, os dois preenchidos ou os dois nulos (CHECK), com chave única por plano e número.
+- **Criar gera todas as parcelas de uma vez,** numa escrita aninhada com o plano: uma por competência a partir da primeira.
+  - O valor pode ser o total (`amountIs: TOTAL`) ou o da parcela (`INSTALLMENT`, como a fatura mostra).
+  - `splitInstallments` divide o total em partes iguais e põe na última os centavos que sobram (R$ 1.000,00 em 3 = 333,33 + 333,33 + 333,34). A soma sempre fecha.
+- **A descrição de cada parcela é a da compra.** O "3/10" vem de `installment: { planId, number, count }` na resposta do lançamento. Assim, renomear uma parcela não quebra a numeração.
+- **Encerrar** (`DELETE`) remove as parcelas pendentes do mês atual em diante e marca `ended_at`. As efetivadas e as de meses passados ficam. A lista traz `settledCount`, quantas já foram pagas.

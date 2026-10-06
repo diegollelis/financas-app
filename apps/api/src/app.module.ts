@@ -13,6 +13,7 @@ import { MailModule } from './mail/mail.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SummaryModule } from './summary/summary.module.js';
 import { AnalysisModule } from './analysis/analysis.module.js';
+import { InstallmentsModule } from './installments/installments.module.js';
 import { RecurrencesModule } from './recurrences/recurrences.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
 import { WorkspacesModule } from './workspaces/workspaces.module.js';
@@ -33,6 +34,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     SummaryModule,
     AnalysisModule,
     RecurrencesModule,
+    InstallmentsModule,
   ],
   // Reports unexpected errors to Sentry (a no-op without SENTRY_DSN), without query data (ADR 0034).
   providers: [{ provide: APP_FILTER, useClass: AppExceptionFilter }],
