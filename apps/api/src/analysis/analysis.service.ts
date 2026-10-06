@@ -1,6 +1,12 @@
-import type { Analysis, AnalysisQuery, AnalysisRow } from '@financas/shared';
+import {
+  periodsBetween,
+  type Analysis,
+  type AnalysisQuery,
+  type AnalysisRow,
+} from '@financas/shared';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RecurrencesService } from '../recurrences/recurrences.service.js';
 
 /**
  * Sums of a range of competências (ADR 0037): by competência, type and category, both of all the
@@ -10,9 +16,14 @@ import { PrismaService } from '../prisma/prisma.service.js';
  */
 @Injectable()
 export class AnalysisService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly recurrences: RecurrencesService,
+  ) {}
 
   async get(workspaceId: string, { from, to }: AnalysisQuery): Promise<Analysis> {
+    // The range's months include their recurrences, as if each had been opened (ADR 0038).
+    await this.recurrences.materialize(workspaceId, periodsBetween(from, to));
     const db = this.prisma.forWorkspace(workspaceId);
     // Competências are `YYYY-MM`: as text they sort and compare like dates.
     const range = { workspaceId, period: { gte: from, lte: to } };

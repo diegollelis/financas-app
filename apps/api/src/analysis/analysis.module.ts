@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
+import { RecurrencesModule } from '../recurrences/recurrences.module.js';
 import { AnalysisController } from './analysis.controller.js';
 import { AnalysisService } from './analysis.service.js';
 
 @Module({
+  imports: [RecurrencesModule],
   controllers: [AnalysisController],
   providers: [AnalysisService],
 })
