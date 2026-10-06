@@ -98,5 +98,5 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Domínio próprio, `financas.codelelis.com` ([ADR 0039](adr/0039-dominio-proprio.md))
   - [x] Redirecionar o endereço antigo e roteiro no deploy.md
   - [x] DNS no Cloudflare, domínio no Pages e variáveis de produção
-  - [ ] E-mail com o domínio verificado no Resend
+  - [x] E-mail com o domínio verificado no Resend
   - [ ] Exigir a verificação de e-mail no cadastro
