@@ -50,7 +50,7 @@ O Render não tem servidores no Brasil. A latência que mais pesa é a da API co
 1. Crie a conta em <https://resend.com>.
 2. **API Keys → Create API Key**, com permissão _Sending access_. Guarde a chave (`re_...`): ela só aparece uma vez.
 
-Sem domínio próprio, o Resend só entrega no e-mail da sua conta ([ADR 0022](adr/0022-envio-de-email.md)). A API em produção exige a chave mesmo assim.
+Sem domínio próprio, o Resend só entrega no e-mail da sua conta ([ADR 0022](adr/0022-envio-de-email.md)). A API em produção exige a chave mesmo assim. O domínio é verificado depois, no passo [7.3](#73-e-mail-com-o-domínio).
 
 ## 3. Render (API)
 
@@ -198,9 +198,58 @@ O app já vem preparado ([ADR 0034](adr/0034-relatorio-de-erros-com-sentry.md)):
 
 9. Em cada evento de teste, confira que não aparecem cookies, cabeçalhos, IP nem dados de usuário. Depois, resolva as duas _issues_ (**Resolve**).
 
+## 7. Domínio próprio
+
+Decisão no [ADR 0039](adr/0039-dominio-proprio.md): o app em `financas.codelelis.com`, o DNS de `codelelis.com` no Cloudflare e o proxy mantido. Faça na ordem: o login só passa a valer no novo endereço no passo 3.
+
+### 7.1 DNS no Cloudflare e domínio no Pages
+
+1. No Cloudflare, vá em **Add a site** (ou **Onboard a domain**), digite `codelelis.com` e escolha o plano **Free**. Ele procura registros existentes; um domínio recém-comprado não tem nenhum que importe. No fim, ele mostra **dois nameservers** (algo como `xxx.ns.cloudflare.com`).
+2. Na Spaceship, abra **Domain List → codelelis.com → Nameservers**, troque para **Custom** e cole os dois nameservers do Cloudflare. Se o **DNSSEC** estiver ligado na Spaceship, desligue antes.
+3. Espere o Cloudflare mostrar o site como **Active**; ele também avisa por e-mail. Costuma levar de minutos a algumas horas.
+4. Em **Workers & Pages → financas-app → Custom domains → Set up a custom domain**, digite `financas.codelelis.com` e confirme. O Cloudflare cria o CNAME e o certificado.
+5. Abra `https://financas.codelelis.com/api/health`. A resposta esperada é `{"status":"ok","database":"up"}`, depois do cold start.
+
+### 7.2 Virar a chave
+
+Faça os quatro itens em sequência, em poucos minutos: entre o 3 e o 4, o login fica fora do ar.
+
+1. **Google Cloud → APIs & Services → Credentials →** cliente OAuth de produção:
+   - em **Authorized JavaScript origins**, adicione `https://financas.codelelis.com`;
+   - em **Authorized redirect URIs**, adicione `https://financas.codelelis.com/api/auth/callback/google`.
+
+   Mantenha as do `pages.dev` por enquanto.
+
+2. **Google Auth Platform → Branding:**
+   - página inicial `https://financas.codelelis.com`;
+   - política `https://financas.codelelis.com/privacidade`;
+   - em **Authorized domains**, adicione `codelelis.com`.
+
+   Se o Google pedir para comprovar a posse do domínio, use o Search Console (tipo **Domínio**). Ele dá um registro TXT, que você cria em **Cloudflare → DNS → Records**.
+
+3. **Render → financas-api → Environment:** `WEB_ORIGIN` e `BETTER_AUTH_URL` = `https://financas.codelelis.com`. Salvar reinicia a API.
+4. **Pages → financas-app → Settings → Variables and Secrets** (Production):
+   - `VITE_API_URL` = `https://financas.codelelis.com`;
+   - crie `VITE_CANONICAL_ORIGIN` = `https://financas.codelelis.com`.
+
+   Em seguida, vá em **Deployments → Retry deployment** no último deploy: as variáveis `VITE_` só mudam com um build novo.
+
+5. **Confira:**
+   - abrir o `pages.dev` leva ao novo endereço, mantendo o caminho;
+   - o login funciona por e-mail e pelo Google;
+   - nas ferramentas do navegador, o cookie `__Secure-` está no host novo;
+   - o Sentry não mostra erros novos.
+6. Depois de alguns dias sem problemas, remova do cliente OAuth as URLs do `pages.dev`.
+
+### 7.3 E-mail com o domínio
+
+1. No Resend, vá em **Domains → Add Domain** e digite `codelelis.com`. Com o DNS no Cloudflare, **Auto configure** cria os registros (DKIM, SPF e o MX de retorno no subdomínio `send`). Espere o status **Verified**.
+2. No Render, mude `MAIL_FROM_EMAIL` para `nao-responda@codelelis.com`. Não é preciso criar essa caixa: enviar não depende dela.
+3. Confira: peça **Esqueci a senha** e envie um convite para um e-mail que **não** é o da conta Resend. Os dois devem chegar; olhe também a caixa de spam.
+
 ## Produção atual
 
-- Front: <https://financas-app-t2l.pages.dev>
+- Front: <https://financas.codelelis.com>. O antigo <https://financas-app-t2l.pages.dev> só redireciona, depois do passo 7.2.
 - API: `https://financas-api-qioy.onrender.com`. Só a Function a chama; `/api/health` responde direto.
 
 ## Próximos passos

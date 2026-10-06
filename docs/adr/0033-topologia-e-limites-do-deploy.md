@@ -53,6 +53,7 @@ Quando houver domínio próprio (fase 5), a Function pode continuar ou ser troca
 - **Backup:** artefatos do Actions são públicos neste repositório. O dump deve ser criptografado antes de sair do runner, ou ficar fora do GitHub ([ADR 0012](0012-privacidade-lgpd.md)). Como o agendamento para após 60 dias sem atividade, o workflow precisa ser monitorado (o cron monitor do Sentry serve para isso).
 - **Ordem da fase 4**, um PR por passo: (1) proxy e configuração de produção da API (IP confiável, cookies `Secure`), com testes; (2) Dockerfile da API, Neon com o papel `financas_app` e serviço no Render; (3) front no Pages com a Function; (4) Google OAuth de produção; (5) Sentry; (6) backup e teste de restauração.
 - **Revisar este ADR** quando houver domínio próprio ou se algum limite acima for atingido.
+- **Revisão (2026-10-06):** com o domínio próprio, o proxy continua. O app e a API respondem em `financas.codelelis.com` ([ADR 0039](0039-dominio-proprio.md)).
 
 ## Notas de implementação (passo 1 da ordem acima)
 
