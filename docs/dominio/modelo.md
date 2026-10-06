@@ -43,10 +43,12 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 - `workspace_id`, `description`, `total_cents`, `installments`, `first_period`
 - Gera um `Transaction` por parcela; a diferença de arredondamento vai para a última parcela.
 
-### Recurrence (Recorrência) — fase 5
+### Recurrence (Recorrência) — fase 5 ([ADR 0038](../adr/0038-recorrencias-e-parcelamentos.md))
 
-- `workspace_id`, `description`, `category_id`, `type`, `estimated_amount_cents`, `due_day`, `active`
-- Gera os lançamentos pendentes de cada competência (ex.: energia, internet, fatura do cartão).
+- `workspace_id`, `type`, `description`, `notes?`, `category_id`, `amount_cents` (valor estimado), `due_day?` (1 a 31; o dia que o mês não tem vira o último), `start_period`, `end_period?` (nulo enquanto ativa).
+- Gera, ao abrir cada competência, o lançamento pendente que ainda falta ali (ex.: energia, internet, fatura do cartão).
+- Uma `RecurrenceOccurrence` (`recurrence_id`, `period`, `transaction_id?`) marca cada mês gerado. Excluir o lançamento gerado não faz o mês ser gerado de novo.
+- Mudar ou encerrar só altera os lançamentos pendentes do mês atual em diante.
 
 ### BudgetConfig (Configuração de orçamento)
 

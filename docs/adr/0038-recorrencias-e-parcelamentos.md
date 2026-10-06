@@ -1,0 +1,52 @@
+# 0038 — Recorrências geradas ao abrir o mês; parcelamentos gerados de uma vez
+
+- **Status:** Aceita
+- **Data:** 2026-10-06
+
+## Contexto
+
+Boa parte dos lançamentos de um mês se repete: energia, internet, aluguel e fatura do cartão. Outros vêm de uma compra parcelada ("Parcela 04 de 08"). Na planilha de origem, as duas coisas viviam só no texto e eram copiadas à mão todo mês ([planilha de origem](../dominio/planilha-origem.md), problema 6). O [modelo de domínio](../dominio/modelo.md) já previa `Recurrence` e `InstallmentPlan`.
+
+Uma recorrência **não tem fim**, então não dá para gerar todos os lançamentos dela de uma vez. Um parcelamento tem fim.
+
+## Opções consideradas
+
+**Quando uma recorrência vira lançamento**
+
+1. **Gerar 12 meses à frente** ao criar, com uma rotina que renova a janela: os meses futuros já aparecem cheios, mas mudar o valor estimado exige atualizar muitos lançamentos, e o plano gratuito do Render não tem rotina agendada.
+2. **Gerar ao abrir o mês:** quando uma competência é lida (Lançamentos, Painel, Análise), a API cria o lançamento pendente de cada recorrência ativa que ainda falta ali.
+
+**Como não gerar duas vezes nem regerar o que foi excluído**
+
+1. Uma chave única `(recurrence_id, period)` no próprio lançamento: excluir o lançamento apagaria a marca, e o mês seria gerado de novo.
+2. **Uma tabela de ocorrências:** uma linha por recorrência e competência gerada, criada **na mesma escrita** que o lançamento, que continua existindo quando o lançamento é excluído.
+
+## Decisão
+
+- **Recorrências geradas ao abrir o mês** (opção 2), com o valor estimado e pendentes; a pessoa ajusta o valor real e efetiva.
+  - `TransactionsService.list` (que serve Lançamentos e o Painel) e `AnalysisService.get` (cada competência do intervalo) chamam `RecurrencesService.materialize` antes de ler.
+  - A competência inicial é gerada já na criação, para o lançamento aparecer no mês que está na tela.
+  - Uma recorrência que nunca chega a um mês (início depois ou fim antes) não gera nada nele.
+- **Tabela `recurrence_occurrences`** (opção 2):
+  - a chave primária é `(recurrence_id, period)`;
+  - `transaction_id` é único e usa `ON DELETE SET NULL`;
+  - a ocorrência e o lançamento nascem numa **escrita aninhada só** do Prisma (atômica);
+  - abrir o mesmo mês duas vezes ao mesmo tempo esbarra na chave, e a segunda tentativa é ignorada (`P2002`);
+  - **excluir um lançamento gerado deixa a ocorrência sem lançamento**, e o mês não volta a ser gerado.
+- **O dia do vencimento** (1 a 31) que o mês não tem cai no último dia (31 em fevereiro → dia 28 ou 29), calculado por `dueDateIn` em `packages/shared`.
+- **Mudar e encerrar só tocam os pendentes do mês atual em diante.** Os efetivados e os meses passados são histórico.
+  - **Mudar** (valor, descrição, categoria, observações, dia) atualiza a recorrência e esses pendentes. O tipo e o início não mudam; para isso, encerra-se e cria-se outra.
+  - **Encerrar** remove esses pendentes e marca `end_period` como o mês anterior. Uma recorrência que nunca chegou ao mês atual é apagada; os lançamentos que já tinham sido efetivados ficam, só sem o vínculo.
+- **Mesmas garantias dos lançamentos:**
+  - RLS nas duas tabelas novas ([ADR 0028](0028-row-level-security.md));
+  - chave estrangeira composta com a categoria (mesmo espaço e mesmo tipo, [ADR 0029](0029-lancamentos-e-integridade-no-banco.md));
+  - CHECKs de valor positivo, dia de 1 a 31, competências válidas e fim não antes do início.
+- **Parcelamentos** (próximo PR): gerados todos de uma vez ao criar, porque têm fim. O valor é digitado como total ou como valor da parcela; com o total, a diferença de centavos vai para a última parcela.
+
+## Consequências
+
+- **Abrir um mês pode escrever no banco.** É idempotente e invisível para quem lê, mas significa que uma leitura (`GET`) tem efeito. Está registrado aqui e coberto por testes (abrir duas vezes, abrir ao mesmo tempo, mês excluído não volta).
+- **Mudar uma recorrência sobrescreve ajustes manuais** feitos num pendente do mês atual em diante. Os efetivados não mudam.
+- **Uma categoria usada por uma recorrência não pode ser excluída,** só arquivada, como uma categoria com lançamentos.
+- **O teste `rls-coverage`** passou a exigir RLS e política em toda tabela com `workspace_id`, para nenhuma tabela nova sair sem elas.
+- **Revisar** se um dia houver rotina agendada (plano pago) ou recorrências com outra frequência (semanal, anual).

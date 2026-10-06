@@ -6,6 +6,7 @@ export * from './error-reporting.ts';
 export * from './health.ts';
 export * from './invitation.ts';
 export * from './money-and-dates.ts';
+export * from './recurrence.ts';
 export * from './summary.ts';
 export * from './transaction.ts';
 export * from './workspace.ts';

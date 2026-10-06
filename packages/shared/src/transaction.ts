@@ -8,7 +8,7 @@ export const TRANSACTION_DESCRIPTION_MAX_LENGTH = 200;
 /** Matches the `transactions.notes` column (varchar 1000). */
 export const TRANSACTION_NOTES_MAX_LENGTH = 1000;
 
-const descriptionSchema = z
+export const transactionDescriptionSchema = z
   .string()
   .trim()
   .min(1, 'Descreva o lançamento.')
@@ -18,7 +18,7 @@ const descriptionSchema = z
   );
 
 /** Optional free text. A blank one is stored as null. */
-const notesSchema = z
+export const transactionNotesSchema = z
   .string()
   .trim()
   .max(TRANSACTION_NOTES_MAX_LENGTH, `Use no máximo ${TRANSACTION_NOTES_MAX_LENGTH} caracteres.`)
@@ -31,8 +31,8 @@ const notesSchema = z
  */
 export const createTransactionInputSchema = z.object({
   type: transactionTypeSchema,
-  description: descriptionSchema,
-  notes: notesSchema.optional(),
+  description: transactionDescriptionSchema,
+  notes: transactionNotesSchema.optional(),
   categoryId: z.uuid('Escolha uma categoria.'),
   amountCents: amountCentsSchema,
   period: periodSchema,
@@ -64,6 +64,8 @@ export const transactionSchema = z.object({
   period: periodSchema,
   dueDate: isoDateSchema.nullable(),
   settledAt: isoDateSchema.nullable(),
+  /** The recurrence that generated it (ADR 0038); null for one launched by hand. */
+  recurrenceId: z.uuid().nullable().default(null),
 });
 
 export type Transaction = z.infer<typeof transactionSchema>;

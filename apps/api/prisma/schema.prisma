@@ -18,16 +18,18 @@ datasource db {
 // Owner of all financial data (ADR 0008). The personal workspace is created with the user, is
 // never shared nor deleted, and there is exactly one per user (ADR 0024).
 model Workspace {
-  id            String         @id @default(uuid(7)) @db.Uuid
-  name          String         @db.VarChar(100)
-  isPersonal    Boolean        @default(false) @map("is_personal")
+  id            String                 @id @default(uuid(7)) @db.Uuid
+  name          String                 @db.VarChar(100)
+  isPersonal    Boolean                @default(false) @map("is_personal")
   members       Member[]
   invitations   Invitation[]
   categories    Category[]
   transactions  Transaction[]
   budgetConfigs BudgetConfig[]
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  recurrences   Recurrence[]
+  occurrences   RecurrenceOccurrence[]
+  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("workspaces")
 }
@@ -185,6 +187,7 @@ model Category {
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
   transactions Transaction[]
+  recurrences  Recurrence[]
 
   @@unique([workspaceId, type, name])
   // Target of the composite foreign key of transactions (ADR 0029).
@@ -198,24 +201,69 @@ model Category {
 // (checked at the end of the statement) instead of Restrict lets a workspace be deleted with
 // its categories and transactions in one go. CHECKs on amount and period are in the migration.
 model Transaction {
-  id          String          @id @default(uuid(7)) @db.Uuid
-  workspaceId String          @map("workspace_id") @db.Uuid
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String                @id @default(uuid(7)) @db.Uuid
+  workspaceId String                @map("workspace_id") @db.Uuid
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   type        TransactionType
-  description String          @db.VarChar(200)
-  notes       String?         @db.VarChar(1000)
-  categoryId  String          @map("category_id") @db.Uuid
-  category    Category        @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
-  amountCents Int             @map("amount_cents")
-  period      String          @db.Char(7)
-  dueDate     DateTime?       @map("due_date") @db.Date
-  settledAt   DateTime?       @map("settled_at") @db.Date
-  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  description String                @db.VarChar(200)
+  notes       String?               @db.VarChar(1000)
+  categoryId  String                @map("category_id") @db.Uuid
+  category    Category              @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
+  amountCents Int                   @map("amount_cents")
+  period      String                @db.Char(7)
+  dueDate     DateTime?             @map("due_date") @db.Date
+  settledAt   DateTime?             @map("settled_at") @db.Date
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  occurrence  RecurrenceOccurrence?
 
   @@index([workspaceId, period])
   @@index([categoryId])
   @@map("transactions")
+}
+
+// Recorrência (ADR 0038): a transaction that repeats every month (energy, internet, the card
+// bill). It is not a transaction itself: opening a competência creates its pending transaction
+// there, with the estimated amount. Active while end_period is null. Same composite category key
+// as transactions. CHECKs on amount, due day and periods are in the migration.
+model Recurrence {
+  id          String                 @id @default(uuid(7)) @db.Uuid
+  workspaceId String                 @map("workspace_id") @db.Uuid
+  workspace   Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type        TransactionType
+  description String                 @db.VarChar(200)
+  notes       String?                @db.VarChar(1000)
+  categoryId  String                 @map("category_id") @db.Uuid
+  category    Category               @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
+  amountCents Int                    @map("amount_cents")
+  // Day of the month it is due (1-31); a longer number than the month has means its last day.
+  dueDay      Int?                   @map("due_day") @db.SmallInt
+  startPeriod String                 @map("start_period") @db.Char(7)
+  endPeriod   String?                @map("end_period") @db.Char(7)
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+  occurrences RecurrenceOccurrence[]
+
+  @@index([workspaceId])
+  @@map("recurrences")
+}
+
+// One competência a recurrence was generated for (ADR 0038). Created together with its
+// transaction in one nested write, and unique per (recurrence, period), so opening a month twice
+// at once never duplicates it. Deleting the transaction keeps the occurrence with no transaction:
+// that month is not generated again.
+model RecurrenceOccurrence {
+  recurrenceId  String       @map("recurrence_id") @db.Uuid
+  recurrence    Recurrence   @relation(fields: [recurrenceId], references: [id], onDelete: Cascade)
+  period        String       @db.Char(7)
+  workspaceId   String       @map("workspace_id") @db.Uuid
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  transactionId String?      @unique @map("transaction_id") @db.Uuid
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@id([recurrenceId, period])
+  @@index([workspaceId, period])
+  @@map("recurrence_occurrences")
 }
 
 // Budget of one competência: income and the share of it for each destination, in basis points

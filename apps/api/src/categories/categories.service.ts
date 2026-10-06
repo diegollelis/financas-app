@@ -110,7 +110,8 @@ export class CategoriesService {
       if (isPrismaError(error, 'P2003')) {
         throw new ConflictException({
           code: 'CATEGORY_IN_USE',
-          message: 'Esta categoria tem lançamentos: ela não pode ser excluída, só arquivada.',
+          message:
+            'Esta categoria está em uso em lançamentos ou recorrências: ela não pode ser excluída, só arquivada.',
         });
       }
       throw error;

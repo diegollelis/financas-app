@@ -1,23 +1,16 @@
-import type {
-  CreateTransactionInput,
-  Transaction,
-  TransactionType,
-  UpdateTransactionInput,
-} from '@financas/shared';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { CreateTransactionInput, Transaction, UpdateTransactionInput } from '@financas/shared';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
-import { Prisma, type Transaction as TransactionRow } from '../generated/prisma/client.js';
+import { ensureUsableCategory } from '../categories/ensure-category.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RecurrencesService } from '../recurrences/recurrences.service.js';
+import { optionalDate, toIsoDate } from './dates.js';
 
-/** `YYYY-MM-DD` ↔ the Date Prisma uses for a DATE column (midnight UTC, no time zone shift). */
-const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`);
-const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
+/** Every read brings the recurrence that generated the transaction, if any (ADR 0038). */
+const withRecurrence = { occurrence: { select: { recurrenceId: true } } } as const;
 
-/** `undefined` keeps the field as it is; `null` clears it. */
-function optionalDate(isoDate: string | null | undefined) {
-  if (isoDate === undefined) return undefined;
-  return isoDate === null ? null : toDate(isoDate);
-}
+type TransactionRow = Prisma.TransactionGetPayload<{ include: typeof withRecurrence }>;
 
 function toResponse(transaction: TransactionRow): Transaction {
   return {
@@ -30,11 +23,9 @@ function toResponse(transaction: TransactionRow): Transaction {
     period: transaction.period,
     dueDate: transaction.dueDate && toIsoDate(transaction.dueDate),
     settledAt: transaction.settledAt && toIsoDate(transaction.settledAt),
+    recurrenceId: transaction.occurrence?.recurrenceId ?? null,
   };
 }
-
-const invalidCategory = (message: string) =>
-  new BadRequestException({ code: 'INVALID_CATEGORY', message });
 
 /**
  * Transactions (lançamentos) of one workspace. Same rules as categories: the workspaceId comes
@@ -43,12 +34,20 @@ const invalidCategory = (message: string) =>
  */
 @Injectable()
 export class TransactionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly recurrences: RecurrencesService,
+  ) {}
 
-  /** One competência: credits first, then debits; each by due date (none last), then creation. */
+  /**
+   * One competência: credits first, then debits; each by due date (none last), then creation.
+   * Opening it first creates the pending transactions of the recurrences it lacks (ADR 0038).
+   */
   async list(workspaceId: string, period: string): Promise<Transaction[]> {
+    await this.recurrences.materialize(workspaceId, [period]);
     const transactions = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
       where: { workspaceId, period },
+      include: withRecurrence,
       // The enum order is CREDIT, DEBIT; UUIDv7 ids follow the order of creation.
       orderBy: [{ type: 'asc' }, { dueDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
     });
@@ -56,7 +55,7 @@ export class TransactionsService {
   }
 
   async create(workspaceId: string, input: CreateTransactionInput): Promise<Transaction> {
-    await this.ensureCategory(workspaceId, input.categoryId, input.type);
+    await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     const transaction = await this.prisma.forWorkspace(workspaceId).transaction.create({
       data: {
         workspaceId,
@@ -69,6 +68,7 @@ export class TransactionsService {
         dueDate: optionalDate(input.dueDate) ?? null,
         settledAt: optionalDate(input.settledAt) ?? null,
       },
+      include: withRecurrence,
     });
     return toResponse(transaction);
   }
@@ -83,7 +83,7 @@ export class TransactionsService {
     const categoryId = input.categoryId ?? current.categoryId;
     // Only a change is checked: a transaction may keep a category archived after it was made.
     if (type !== current.type || categoryId !== current.categoryId) {
-      await this.ensureCategory(workspaceId, categoryId, type);
+      await ensureUsableCategory(this.prisma, workspaceId, categoryId, type);
     }
 
     try {
@@ -99,6 +99,7 @@ export class TransactionsService {
           dueDate: optionalDate(input.dueDate),
           settledAt: optionalDate(input.settledAt),
         },
+        include: withRecurrence,
       });
       return toResponse(transaction);
     } catch (error) {
@@ -110,6 +111,10 @@ export class TransactionsService {
     }
   }
 
+  /**
+   * Deleting a transaction a recurrence generated keeps its occurrence without a transaction
+   * (ON DELETE SET NULL), so that month is not generated again (ADR 0038).
+   */
   async remove(workspaceId: string, transactionId: string): Promise<void> {
     if (!z.uuid().safeParse(transactionId).success) throw new NotFoundException();
     const { count } = await this.prisma
@@ -119,34 +124,12 @@ export class TransactionsService {
   }
 
   /** An id that is not a uuid, or that belongs to another workspace, is simply not found. */
-  private async find(workspaceId: string, transactionId: string): Promise<TransactionRow> {
+  private async find(workspaceId: string, transactionId: string) {
     if (!z.uuid().safeParse(transactionId).success) throw new NotFoundException();
     const transaction = await this.prisma
       .forWorkspace(workspaceId)
       .transaction.findFirst({ where: { id: transactionId, workspaceId } });
     if (!transaction) throw new NotFoundException();
     return transaction;
-  }
-
-  /**
-   * The category must be of this workspace, of the transaction's type and not archived. The
-   * composite foreign key (ADR 0029) would refuse the first two anyway; checking here gives a
-   * clear message instead of a database error.
-   */
-  private async ensureCategory(workspaceId: string, categoryId: string, type: TransactionType) {
-    const category = await this.prisma
-      .forWorkspace(workspaceId)
-      .category.findFirst({ where: { id: categoryId, workspaceId } });
-    if (!category) throw invalidCategory('Categoria não encontrada neste espaço.');
-    if (category.type !== type) {
-      throw invalidCategory(
-        type === 'CREDIT'
-          ? 'Escolha uma categoria de crédito.'
-          : 'Escolha uma categoria de débito.',
-      );
-    }
-    if (category.archivedAt) {
-      throw invalidCategory('Esta categoria está arquivada. Reative-a ou escolha outra.');
-    }
   }
 }
