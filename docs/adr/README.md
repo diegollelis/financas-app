@@ -40,3 +40,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0034](0034-relatorio-de-erros-com-sentry.md)         | Relatório de erros com Sentry, sem dados pessoais                                 | Aceita |
 | [0035](0035-backup-do-banco.md)                       | Backup diário do banco, criptografado, num repositório privado                    | Aceita |
 | [0036](0036-design-mobile-first.md)                   | Interface mobile first, sóbria, com regras numa skill do projeto                  | Aceita |
+| [0037](0037-analise-de-periodos.md)                   | Análise de períodos: somas na API, filtros no cliente, gráficos em SVG próprio    | Aceita |
