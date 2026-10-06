@@ -23,11 +23,9 @@ describe('workspaces', () => {
     await t.app.close();
   });
 
-  /** Signs up and returns a browser holding that user's session. */
+  /** Signs up (e-mail verified) and returns a browser holding that user's session. */
   async function signUp(user: typeof maria) {
-    const browser = t.http();
-    await browser.post('/api/auth/sign-up/email').send(user).expect(200);
-    return browser;
+    return (await t.signUp(user)).browser;
   }
 
   it('creates a personal workspace on sign-up, owned by the new user', async () => {

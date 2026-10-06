@@ -23,14 +23,15 @@ describe('authentication (e-mail and password)', () => {
     await t.app.close();
   });
 
-  it('signs up, sets the session cookie and stores only a password hash', async () => {
+  it('signs up without a session (the e-mail comes first) and stores only a password hash', async () => {
     const agent = http();
 
     const response = await agent.post('/api/auth/sign-up/email').send(user).expect(200);
 
-    expect(response.headers['set-cookie']).toEqual(
-      expect.arrayContaining([expect.stringMatching(/session_token=.+HttpOnly/i)]),
-    );
+    // A password needs a verified e-mail (ADR 0022): no session until the link is opened.
+    expect(response.body).toMatchObject({ token: null });
+    expect(String(response.headers['set-cookie'] ?? '')).not.toMatch(/session_token=/);
+    await agent.get('/api/me').expect(401);
     const account = await t.prisma.account.findFirstOrThrow({
       where: { providerId: 'credential' },
     });
@@ -45,12 +46,19 @@ describe('authentication (e-mail and password)', () => {
     expect(stored.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7/);
   });
 
-  it('rejects a second sign-up with the same e-mail', async () => {
-    await http().post('/api/auth/sign-up/email').send(user).expect(200);
+  it('answers a repeated sign-up like a new one, without creating a second user', async () => {
+    const first = await http().post('/api/auth/sign-up/email').send(user).expect(200);
 
-    const response = await http().post('/api/auth/sign-up/email').send(user);
+    // Same status and shape: the answer does not reveal that the e-mail has an account.
+    const second = await http()
+      .post('/api/auth/sign-up/email')
+      .send({ ...user, password: 'senha-de-teste-999' })
+      .expect(200);
 
-    expect(response.status).toBe(422);
+    expect(Object.keys(second.body as object).sort()).toEqual(
+      Object.keys(first.body as object).sort(),
+    );
+    expect(second.body).toMatchObject({ token: null, user: { email: user.email } });
     expect(await t.prisma.user.count()).toBe(1);
   });
 
@@ -86,8 +94,20 @@ describe('authentication (e-mail and password)', () => {
     await http().get('/api/me').expect(401);
   });
 
+  it('refuses to sign in before the e-mail is verified', async () => {
+    await http().post('/api/auth/sign-up/email').send(user).expect(200);
+
+    const response = await http()
+      .post('/api/auth/sign-in/email')
+      .send({ email: user.email, password: user.password })
+      .expect(403);
+
+    expect(response.body).toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+  });
+
   it('signs in and returns the user on GET /api/me, honoring the shared contract', async () => {
     await http().post('/api/auth/sign-up/email').send(user).expect(200);
+    await t.prisma.user.update({ where: { email: user.email }, data: { emailVerified: true } });
     const agent = http();
 
     await agent
@@ -99,13 +119,12 @@ describe('authentication (e-mail and password)', () => {
     expect(meResponseSchema.strict().parse(response.body)).toMatchObject({
       name: user.name,
       email: user.email,
-      emailVerified: false,
+      emailVerified: true,
     });
   });
 
   it('signs out and invalidates the session', async () => {
-    const agent = http();
-    await agent.post('/api/auth/sign-up/email').send(user).expect(200);
+    const { browser: agent } = await t.signUp(user);
     await agent.get('/api/me').expect(200);
 
     await agent.post('/api/auth/sign-out').expect(200);

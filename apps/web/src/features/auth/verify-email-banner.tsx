@@ -4,8 +4,9 @@ import { authErrorMessage } from './auth-error-message';
 import { useResendVerification } from './use-auth-mutations';
 
 /**
- * Reminder shown while the e-mail is not confirmed. Not blocking for now (ADR 0022). The
- * confirmation link comes back to "/" with `?error=` when it is invalid or expired.
+ * Reminder for a session opened before verification became required (ADR 0022): it stays valid
+ * until it expires, and the next sign-in with a password will need the e-mail confirmed. The
+ * confirmation link comes back with `?error=` when it is invalid or expired.
  */
 export function VerifyEmailBanner({ email }: { email: string }) {
   const resend = useResendVerification();

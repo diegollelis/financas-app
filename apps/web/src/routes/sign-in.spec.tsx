@@ -36,7 +36,11 @@ describe('SignInPage', () => {
       expect.objectContaining({
         method: 'POST',
         credentials: 'include',
-        body: JSON.stringify({ email: 'maria@example.com', password: 'senha-de-teste-123' }),
+        body: JSON.stringify({
+          email: 'maria@example.com',
+          password: 'senha-de-teste-123',
+          callbackURL: '/',
+        }),
       }),
     );
   });
@@ -54,6 +58,23 @@ describe('SignInPage', () => {
     await fillAndSubmit('maria@example.com', 'senha-errada');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('E-mail ou senha incorretos.');
+  });
+
+  it('asks to confirm the e-mail when it is not verified yet', async () => {
+    mockApi({
+      'GET /api/me': noSession,
+      'POST /api/auth/sign-in/email': {
+        status: 403,
+        body: { code: 'EMAIL_NOT_VERIFIED', message: 'Email not verified' },
+      },
+    });
+    renderApp('/entrar');
+
+    await fillAndSubmit('maria@example.com', 'senha-de-teste-123');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Confirme seu e-mail para entrar. Enviamos um novo link',
+    );
   });
 
   it('validates the form before calling the API', async () => {

@@ -86,7 +86,9 @@ describe('VerifyEmailBanner', () => {
     expect(await screen.findByText(/Enviamos um novo link/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       new URL('/api/auth/send-verification-email', 'http://api.test'),
-      expect.objectContaining({ body: JSON.stringify({ email: fakeUser.email }) }),
+      expect.objectContaining({
+        body: JSON.stringify({ email: fakeUser.email, callbackURL: '/' }),
+      }),
     );
   });
 

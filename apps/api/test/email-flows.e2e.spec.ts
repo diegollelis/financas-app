@@ -59,6 +59,80 @@ describe('e-mail flows', () => {
       expect(await t.prisma.user.findFirstOrThrow()).toMatchObject({ emailVerified: false });
     });
 
+    it('brings the person back to the page they were heading to, if it is ours', async () => {
+      await t
+        .http()
+        .post('/api/auth/sign-up/email')
+        .send({ ...user, callbackURL: '/convites/abc' })
+        .expect(200);
+      const browser = t.http();
+
+      const response = await browser.get(pathOf(t.mailer.lastLinkTo(user.email))).expect(302);
+
+      expect(response.headers.location).toBe(`${testEnv.WEB_ORIGIN}/convites/abc`);
+    });
+
+    it.each(['//site-malicioso.com', '/\\site-malicioso.com'])(
+      'sends the link to the home page when the return page is not ours (%s)',
+      async (callbackURL) => {
+        await t
+          .http()
+          .post('/api/auth/sign-up/email')
+          .send({ ...user, callbackURL })
+          .expect(200);
+
+        const link = t.mailer.lastLinkTo(user.email);
+        expect(link.searchParams.get('callbackURL')).toBe(`${testEnv.WEB_ORIGIN}/`);
+      },
+    );
+
+    it('sends a new link when someone signs in with the right password but unverified', async () => {
+      await t.http().post('/api/auth/sign-up/email').send(user).expect(200);
+      t.mailer.sent.length = 0;
+
+      await t
+        .http()
+        .post('/api/auth/sign-in/email')
+        .send({ email: user.email, password: user.password, callbackURL: '/convites/abc' })
+        .expect(403);
+
+      expect(t.mailer.sent[0]?.subject).toBe('Confirme seu e-mail no Finanças');
+      const link = t.mailer.lastLinkTo(user.email);
+      expect(link.searchParams.get('callbackURL')).toBe(`${testEnv.WEB_ORIGIN}/convites/abc`);
+    });
+
+    it('sends nothing on a sign-in with a wrong password', async () => {
+      await t.http().post('/api/auth/sign-up/email').send(user).expect(200);
+      t.mailer.sent.length = 0;
+
+      await t
+        .http()
+        .post('/api/auth/sign-in/email')
+        .send({ email: user.email, password: 'senha-errada-123' })
+        .expect(401);
+
+      expect(t.mailer.sent).toHaveLength(0);
+    });
+
+    it('tells the owner, not the requester, about a sign-up with an existing e-mail', async () => {
+      await t.http().post('/api/auth/sign-up/email').send(user).expect(200);
+      t.mailer.sent.length = 0;
+
+      await t
+        .http()
+        .post('/api/auth/sign-up/email')
+        .send({ ...user, password: 'senha-de-teste-999' })
+        .expect(200);
+
+      expect(t.mailer.sent).toHaveLength(1);
+      expect(t.mailer.sent[0]).toMatchObject({
+        to: user.email,
+        subject: 'Você já tem uma conta no Finanças',
+      });
+      expect(t.mailer.lastLinkTo(user.email).toString()).toBe(`${testEnv.WEB_ORIGIN}/entrar`);
+      expect(t.mailer.sent[0]?.text).toContain(`${testEnv.WEB_ORIGIN}/esqueci-senha`);
+    });
+
     it('resends the verification e-mail on request', async () => {
       const browser = t.http();
       await browser.post('/api/auth/sign-up/email').send(user).expect(200);
@@ -87,8 +161,8 @@ describe('e-mail flows', () => {
     });
 
     it('resets the password through the e-mail link and signs out every session', async () => {
-      const oldBrowser = t.http();
-      await oldBrowser.post('/api/auth/sign-up/email').send(user).expect(200);
+      const { browser: oldBrowser } = await t.signUp(user);
+      await oldBrowser.get('/api/me').expect(200);
       await requestReset(user.email);
 
       // The e-mail link goes to the API, which checks the token and redirects to the web page.
@@ -112,6 +186,24 @@ describe('e-mail flows', () => {
         .post('/api/auth/sign-in/email')
         .send({ email: user.email, password: newPassword })
         .expect(200);
+    });
+
+    it('verifies the e-mail of whoever resets the password through it', async () => {
+      await t.http().post('/api/auth/sign-up/email').send(user).expect(200);
+      await requestReset(user.email);
+      const token = t.mailer.lastLinkTo(user.email).pathname.split('/').at(-1);
+      t.mailer.sent.length = 0;
+
+      await t.http().post('/api/auth/reset-password').send({ newPassword, token }).expect(200);
+
+      expect(await t.prisma.user.findFirstOrThrow()).toMatchObject({ emailVerified: true });
+      await t
+        .http()
+        .post('/api/auth/sign-in/email')
+        .send({ email: user.email, password: newPassword })
+        .expect(200);
+      // Signed in straight away: no second e-mail to verify.
+      expect(t.mailer.sent).toHaveLength(0);
     });
 
     it('accepts each token only once', async () => {

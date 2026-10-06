@@ -47,6 +47,34 @@ export function verificationEmail(to: string, name: string, url: string): MailMe
   };
 }
 
+/**
+ * Someone tried to sign up with an e-mail that already has an account (ADR 0022). The sign-up
+ * answers as if it were new, so nobody learns which e-mails have an account; the owner hears it
+ * here, with the way in. It signs no one in and verifies nothing.
+ */
+export function existingAccountEmail(
+  to: string,
+  name: string,
+  links: { signIn: string; resetPassword: string },
+): MailMessage {
+  const note =
+    'Se não foi você que tentou se cadastrar, ignore este e-mail: nada mudou na sua conta.';
+  return {
+    to,
+    subject: 'Você já tem uma conta no Finanças',
+    text: `Olá, ${name}!\n\nAlguém tentou criar uma conta no Finanças com este e-mail, mas ele já tem uma.\n\nPara entrar: ${links.signIn}\nSe não lembra a senha, crie uma nova: ${links.resetPassword}\n\n${note}`,
+    html: layout(
+      [
+        `Olá, ${escapeHtml(name)}!`,
+        'Alguém tentou criar uma conta no Finanças com este e-mail, mas ele já tem uma.',
+        `Se não lembra a senha, <a href="${escapeHtml(links.resetPassword)}">crie uma nova</a>.`,
+      ],
+      { label: 'Entrar', url: links.signIn },
+      note,
+    ),
+  };
+}
+
 export function resetPasswordEmail(to: string, name: string, url: string): MailMessage {
   const note =
     'O link vale por 1 hora e só pode ser usado uma vez. Se você não pediu, ignore este e-mail: sua senha continua a mesma.';

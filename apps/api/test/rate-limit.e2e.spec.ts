@@ -19,7 +19,8 @@ describe('rate limit', () => {
   beforeEach(async () => {
     await resetDatabase();
     t.mailer.sent.length = 0;
-    await t.http().post('/api/auth/sign-up/email').send(user).expect(200);
+    // A verified user: the right password signs in (ADR 0022).
+    await t.signUp(user);
     t.mailer.sent.length = 0;
   });
 

@@ -1,4 +1,9 @@
-import { INVITATION_PATH, RESET_PASSWORD_PATH } from '@financas/shared';
+import {
+  FORGOT_PASSWORD_PATH,
+  INVITATION_PATH,
+  RESET_PASSWORD_PATH,
+  SIGN_IN_PATH,
+} from '@financas/shared';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { RootLayout } from '@/components/root-layout';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
@@ -27,9 +32,9 @@ export const routes: RouteObject[] = [
       {
         element: <GuestOnly />,
         children: [
-          { path: '/entrar', element: <SignInPage /> },
+          { path: SIGN_IN_PATH, element: <SignInPage /> },
           { path: '/cadastro', element: <SignUpPage /> },
-          { path: '/esqueci-senha', element: <ForgotPasswordPage /> },
+          { path: FORGOT_PASSWORD_PATH, element: <ForgotPasswordPage /> },
         ],
       },
       {
