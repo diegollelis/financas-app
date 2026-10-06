@@ -82,7 +82,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Seletor de mês e ano na navegação de competência ("Mês atual" dentro dele)
 - [ ] Recorrências e parcelamentos ([ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
   - [x] API de recorrências: gerar ao abrir o mês, mudar e encerrar só os pendentes do mês atual em diante
-  - [ ] API de parcelamentos
+  - [x] API de parcelamentos: todas as parcelas de uma vez, total ou valor da parcela, centavos na última, encerrar
   - [x] "Repetir" (Todo mês) no "Novo lançamento", selo nas linhas e "Encerrar recorrência" no menu
   - [x] API de valor variável: média dos 3 últimos efetivados, "estimado" até confirmar, total estimado no Painel
   - [x] Tela de valor variável: "Fixo | Variável", aviso "Estimado" e "Efetivar" pedindo o valor

@@ -7,10 +7,14 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
 import { optionalDate, toIsoDate } from './dates.js';
 
-/** Every read brings the recurrence that generated the transaction, if any (ADR 0038). */
-const withRecurrence = { occurrence: { select: { recurrenceId: true } } } as const;
+/** Every read brings what generated the transaction, if anything: a recurrence or a plan (ADR 0038). */
+const withOrigin = {
+  occurrence: { select: { recurrenceId: true } },
+  // The plan's count, for "3/10".
+  installmentPlan: { select: { installments: true } },
+} as const;
 
-type TransactionRow = Prisma.TransactionGetPayload<{ include: typeof withRecurrence }>;
+type TransactionRow = Prisma.TransactionGetPayload<{ include: typeof withOrigin }>;
 
 function toResponse(transaction: TransactionRow): Transaction {
   return {
@@ -25,6 +29,14 @@ function toResponse(transaction: TransactionRow): Transaction {
     settledAt: transaction.settledAt && toIsoDate(transaction.settledAt),
     recurrenceId: transaction.occurrence?.recurrenceId ?? null,
     amountEstimated: transaction.amountEstimated,
+    installment:
+      transaction.installmentPlanId && transaction.installmentNumber && transaction.installmentPlan
+        ? {
+            planId: transaction.installmentPlanId,
+            number: transaction.installmentNumber,
+            count: transaction.installmentPlan.installments,
+          }
+        : null,
   };
 }
 
@@ -48,7 +60,7 @@ export class TransactionsService {
     await this.recurrences.materialize(workspaceId, [period]);
     const transactions = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
       where: { workspaceId, period },
-      include: withRecurrence,
+      include: withOrigin,
       // The enum order is CREDIT, DEBIT; UUIDv7 ids follow the order of creation.
       orderBy: [{ type: 'asc' }, { dueDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
     });
@@ -69,7 +81,7 @@ export class TransactionsService {
         dueDate: optionalDate(input.dueDate) ?? null,
         settledAt: optionalDate(input.settledAt) ?? null,
       },
-      include: withRecurrence,
+      include: withOrigin,
     });
     return toResponse(transaction);
   }
@@ -106,7 +118,7 @@ export class TransactionsService {
               ? false
               : undefined,
         },
-        include: withRecurrence,
+        include: withOrigin,
       });
       return toResponse(transaction);
     } catch (error) {

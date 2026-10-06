@@ -4,6 +4,7 @@ export * from './budget.ts';
 export * from './category.ts';
 export * from './error-reporting.ts';
 export * from './health.ts';
+export * from './installment.ts';
 export * from './invitation.ts';
 export * from './money-and-dates.ts';
 export * from './recurrence.ts';
