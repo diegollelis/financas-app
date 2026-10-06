@@ -129,6 +129,8 @@ async function phoneChecks(page: Page): Promise<string[]> {
       const box = el.getBoundingClientRect();
       // Visually hidden (e.g. the skip link until focused): not a target anyone taps.
       if (box.width === 0 || box.height === 0 || el.matches('.sr-only')) continue;
+      // Hidden from everyone (e.g. the native select Radix keeps for forms).
+      if (el.closest('[aria-hidden="true"]')) continue;
       if (box.height < min || box.width < min) {
         const name = (el.getAttribute('aria-label') ?? el.textContent ?? el.tagName)
           .trim()
@@ -162,6 +164,13 @@ async function main() {
     { name: 'espaco', path: `/espacos/${workspaceId}`, signedIn: true },
     { name: 'painel', path: `/espacos/${workspaceId}/painel`, signedIn: true },
     { name: 'lancamentos', path: `/espacos/${workspaceId}/lancamentos`, signedIn: true },
+    {
+      // The form, open: a sheet on the phone, a dialog from md.
+      name: 'lancamentos-novo',
+      path: `/espacos/${workspaceId}/lancamentos`,
+      signedIn: true,
+      open: 'Novo lançamento',
+    },
     { name: 'orcamento', path: `/espacos/${workspaceId}/orcamento`, signedIn: true },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
   ].filter((p) => !filter || p.name.includes(filter));
@@ -193,9 +202,16 @@ async function main() {
     for (const target of pages) {
       const page = await (target.signedIn ? context : guest).newPage();
       await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
+      if ('open' in target) {
+        await page.getByRole('button', { name: target.open, exact: true }).click();
+        await page.getByRole('dialog').waitFor();
+        // Lets the opening animation finish.
+        await page.waitForTimeout(400);
+      }
       const suffix = dark ? '-escuro' : '';
       const file = new URL(`${target.name}-${viewport.name}${suffix}.png`, OUT);
-      await page.screenshot({ path: fileURLToPath(file), fullPage: true });
+      // An open dialog is fixed to the screen: capture the viewport, not the whole page.
+      await page.screenshot({ path: fileURLToPath(file), fullPage: !('open' in target) });
       if (viewport.width < 768 && !dark) {
         const problems = await phoneChecks(page);
         problemCount += problems.length;

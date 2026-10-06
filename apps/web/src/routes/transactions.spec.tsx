@@ -70,7 +70,15 @@ function mockTransactions(overrides: Record<string, { status?: number; body: unk
 }
 
 const section = (name: 'Créditos' | 'Débitos') => screen.findByRole('region', { name });
-const newTransaction = () => screen.findByRole('region', { name: 'Novo lançamento' });
+
+/** The card of one transaction in a section, found by its description. */
+function row(container: HTMLElement, description: string) {
+  const item = within(container)
+    .getAllByRole('listitem')
+    .find((li) => li.textContent?.includes(description));
+  if (!item) throw new Error(`No transaction "${description}"`);
+  return item;
+}
 
 function expectCall(fetchMock: ReturnType<typeof mockApi>, path: string, init: object) {
   return vi.waitFor(() =>
@@ -79,6 +87,22 @@ function expectCall(fetchMock: ReturnType<typeof mockApi>, path: string, init: o
       expect.objectContaining(init),
     ),
   );
+}
+
+/** Radix Select: open it, then pick the option. */
+async function chooseCategory(form: HTMLElement, name: string) {
+  await userEvent.click(within(form).getByRole('combobox', { name: 'Categoria' }));
+  await userEvent.click(await screen.findByRole('option', { name }));
+}
+
+async function openNewTransaction() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Novo lançamento' }));
+  return screen.findByRole('dialog', { name: 'Novo lançamento' });
+}
+
+async function openActions(description: string) {
+  await userEvent.click(await screen.findByRole('button', { name: `Ações de ${description}` }));
+  return screen.findByRole('menu');
 }
 
 describe('TransactionsPage', () => {
@@ -104,34 +128,37 @@ describe('TransactionsPage', () => {
     expect(within(credits).getByText('Efetivado em 05/10/2026')).toBeInTheDocument();
     const debits = await section('Débitos');
     expect(debits).toHaveTextContent('Total: R$ 509,90');
-    const lightItem = within(debits).getByText('Conta de luz').closest('li');
-    expect(lightItem).toHaveTextContent('Energia · vence 10/10/2026');
+    const lightItem = row(debits, 'Conta de luz');
+    expect(within(lightItem).getByText('Energia')).toBeInTheDocument();
+    expect(within(lightItem).getByText('Vence em 10/10/2026')).toBeInTheDocument();
     expect(lightItem).toHaveTextContent('R$ 159,90');
     expect(lightItem).toHaveTextContent('Vencido');
-    const shoppingItem = within(debits).getByText('Compras da semana').closest('li');
-    expect(shoppingItem).toHaveTextContent('Pendente');
+    expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
   });
 
-  it('opens the competência of the address', async () => {
+  it('opens the competência of the address, and invites to add when it is empty', async () => {
     const fetchMock = mockTransactions({ [`GET ${base}`]: { body: [] } });
 
     renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-11`);
 
-    expect(await screen.findByText('novembro de 2026')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhum lançamento em novembro de 2026.')).toBeInTheDocument();
     await expectCall(fetchMock, `${base}?period=2026-11`, {});
-    expect(await section('Débitos')).toHaveTextContent('Nenhum lançamento.');
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar lançamento' }));
+    expect(await screen.findByRole('dialog', { name: 'Novo lançamento' })).toHaveTextContent(
+      'Competência de novembro de 2026.',
+    );
   });
 
-  it('creates a transaction in the competência and clears the form', async () => {
+  it('creates a transaction in the competência, closes the form and confirms', async () => {
     const fetchMock = mockTransactions({ [`POST ${base}`]: { status: 201, body: light } });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    const form = await newTransaction();
+    const form = await openNewTransaction();
     await userEvent.type(within(form).getByLabelText('Descrição'), 'Conta de luz');
-    await userEvent.selectOptions(within(form).getByLabelText('Categoria'), 'Energia');
+    await chooseCategory(form, 'Energia');
     await userEvent.type(within(form).getByLabelText('Valor (R$)'), '159,90');
     await userEvent.type(within(form).getByLabelText('Vencimento (opcional)'), '2026-10-10');
-    await userEvent.click(within(form).getByRole('button', { name: 'Lançar' }));
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
 
     await expectCall(fetchMock, base, {
       method: 'POST',
@@ -141,37 +168,68 @@ describe('TransactionsPage', () => {
         notes: null,
         categoryId: energyCategory.id,
         amountCents: 15_990,
-        period: '2026-10',
         dueDate: '2026-10-10',
+        period: '2026-10',
       }),
     });
-    await vi.waitFor(() => expect(within(form).getByLabelText('Descrição')).toHaveValue(''));
+    expect(await screen.findByText('Lançamento adicionado')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('shows why creating failed, and starts clean the next time', async () => {
+    mockTransactions({
+      [`POST ${base}`]: {
+        status: 400,
+        body: { code: 'INVALID_CATEGORY', message: 'Essa categoria não serve para débitos.' },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    let form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Conta de luz');
+    await chooseCategory(form, 'Energia');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '159,90');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+    expect(await within(form).findByRole('alert')).toHaveTextContent(
+      'Essa categoria não serve para débitos.',
+    );
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Novo lançamento' })).toHaveFocus(),
+    );
+    form = await openNewTransaction();
+    expect(within(form).getByLabelText('Descrição')).toHaveValue('');
+    expect(within(form).queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('offers only the categories of the chosen type', async () => {
     mockTransactions();
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    const form = await newTransaction();
-    const options = () =>
-      within(within(form).getByLabelText('Categoria'))
-        .getAllByRole('option')
-        .map((option) => option.textContent);
+    const form = await openNewTransaction();
+    const options = async () => {
+      await userEvent.click(within(form).getByRole('combobox', { name: 'Categoria' }));
+      const names = (await screen.findAllByRole('option')).map((option) => option.textContent);
+      await userEvent.keyboard('{Escape}');
+      return names;
+    };
 
-    expect(options()).toEqual(['Escolha…', 'Energia', 'Mercado']);
-    await userEvent.click(within(form).getByLabelText('Crédito'));
-    expect(options()).toEqual(['Escolha…', 'Salário']);
+    expect(within(form).getByRole('radio', { name: 'Débito' })).toBeChecked();
+    expect(await options()).toEqual(['Energia', 'Mercado']);
+    await userEvent.click(within(form).getByRole('radio', { name: 'Crédito' }));
+    expect(await options()).toEqual(['Salário']);
   });
 
   it('checks the amount before calling the API', async () => {
     const fetchMock = mockTransactions();
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    const form = await newTransaction();
+    const form = await openNewTransaction();
     await userEvent.type(within(form).getByLabelText('Descrição'), 'Conta de luz');
-    await userEvent.selectOptions(within(form).getByLabelText('Categoria'), 'Energia');
+    await chooseCategory(form, 'Energia');
     await userEvent.type(within(form).getByLabelText('Valor (R$)'), '15,9,9');
-    await userEvent.click(within(form).getByRole('button', { name: 'Lançar' }));
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
 
     expect(await within(form).findByText('Use um valor como 1.234,56.')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith(
@@ -180,7 +238,7 @@ describe('TransactionsPage', () => {
     );
   });
 
-  it('settles in one click with today’s date, and undoes it', async () => {
+  it('settles in one tap with today’s date, and undoes it from the menu', async () => {
     const fetchMock = mockTransactions({
       [`PATCH ${base}/${light.id}`]: { body: { ...light, settledAt: '2026-10-15' } },
       [`PATCH ${base}/${salary.id}`]: { body: { ...salary, settledAt: null } },
@@ -188,18 +246,30 @@ describe('TransactionsPage', () => {
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Efetivar Conta de luz' }));
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Desfazer efetivação de Salário de outubro' }),
-    );
-
     await expectCall(fetchMock, `${base}/${light.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ settledAt: '2026-10-15' }),
     });
+    expect(await screen.findByText('Lançamento efetivado')).toBeInTheDocument();
+
+    const menu = await openActions('Salário de outubro');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Desfazer efetivação' }));
     await expectCall(fetchMock, `${base}/${salary.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ settledAt: null }),
     });
+    expect(await screen.findByText('Efetivação desfeita')).toBeInTheDocument();
+  });
+
+  it('tells when a change fails', async () => {
+    mockTransactions({ [`PATCH ${base}/${light.id}`]: { status: 500, body: {} } });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Efetivar Conta de luz' }));
+
+    expect(
+      await screen.findByText('Não foi possível concluir agora. Tente de novo em instantes.'),
+    ).toBeInTheDocument();
   });
 
   it('edits a transaction', async () => {
@@ -208,13 +278,15 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Editar Conta de luz' }));
-    const debits = await section('Débitos');
-    const amount = within(debits).getByLabelText('Valor (R$)');
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    const amount = within(form).getByLabelText('Valor (R$)');
     expect(amount).toHaveValue('159,90');
+    expect(within(form).getByRole('combobox', { name: 'Categoria' })).toHaveTextContent('Energia');
     await userEvent.clear(amount);
     await userEvent.type(amount, '172,50');
-    await userEvent.click(within(debits).getByRole('button', { name: 'Salvar' }));
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));
 
     await expectCall(fetchMock, `${base}/${light.id}`, {
       method: 'PATCH',
@@ -227,22 +299,35 @@ describe('TransactionsPage', () => {
         dueDate: '2026-10-10',
       }),
     });
+    expect(await screen.findByText('Lançamento salvo')).toBeInTheDocument();
   });
 
-  it('asks for confirmation before deleting', async () => {
+  it('asks for confirmation, naming the transaction, before deleting', async () => {
     const fetchMock = mockTransactions({
       [`DELETE ${base}/${shopping.id}`]: { status: 204, body: null },
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Excluir Compras da semana' }));
+    let menu = await openActions('Compras da semana');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Excluir' }));
+    let confirm = await screen.findByRole('alertdialog', { name: 'Excluir Compras da semana?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
+    // Back where it started, not lost on the page.
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ações de Compras da semana' })).toHaveFocus(),
+    );
     expect(fetchMock).not.toHaveBeenCalledWith(
       new URL(`${base}/${shopping.id}`, 'http://api.test'),
       expect.anything(),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão' }));
+
+    menu = await openActions('Compras da semana');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Excluir' }));
+    confirm = await screen.findByRole('alertdialog', { name: 'Excluir Compras da semana?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Excluir' }));
 
     await expectCall(fetchMock, `${base}/${shopping.id}`, { method: 'DELETE' });
+    expect(await screen.findByText('Lançamento excluído')).toBeInTheDocument();
   });
 
   it('is read-only for a VIEWER', async () => {
@@ -254,7 +339,6 @@ describe('TransactionsPage', () => {
 
     expect(await section('Débitos')).toHaveTextContent('Conta de luz');
     expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Novo lançamento' })).not.toBeInTheDocument();
   });
 
   it('is reached from the sections of the workspace', async () => {

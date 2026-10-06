@@ -4,13 +4,22 @@ import {
   reaisInputSchema,
   type Category,
   type Transaction,
+  type TransactionType,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useWatch } from 'react-hook-form';
+import { RadioGroup as RadioGroupPrimitive } from 'radix-ui';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /**
@@ -34,9 +43,43 @@ export type TransactionFormValues = z.output<typeof transactionFormSchema>;
 /** 15990 → "159,90": the amount as the person would type it. */
 const amountText = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 });
 
-// Same box as Input (44px below md) until the shadcn Select replaces it (ADR 0036).
-const selectClassName =
-  'border-input h-11 w-full rounded-lg border bg-transparent px-3 text-base md:h-8 md:px-2.5 md:text-sm';
+const typeLabels: Record<TransactionType, string> = { DEBIT: 'Débito', CREDIT: 'Crédito' };
+
+function isTransactionType(value: string): value is TransactionType {
+  return value === 'DEBIT' || value === 'CREDIT';
+}
+
+/** The category picker; FormField hands it the id and error wiring for its trigger. */
+function CategorySelect({
+  id,
+  value,
+  onChange,
+  options,
+  ...aria
+}: {
+  id?: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Category[];
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
+}) {
+  return (
+    // An empty value shows the placeholder (Radix items never use '').
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger id={id} className="w-full" {...aria}>
+        <SelectValue placeholder="Escolha…" />
+      </SelectTrigger>
+      <SelectContent position="popper">
+        {options.map((category) => (
+          <SelectItem key={category.id} value={category.id}>
+            {category.archived ? `${category.name} (arquivada)` : category.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export function TransactionForm({
   idPrefix,
@@ -55,7 +98,6 @@ export function TransactionForm({
   submitLabel: string;
   pending: boolean;
   error: unknown;
-  /** To start over after creating, the page remounts the form with a new `key`. */
   onSubmit: (values: TransactionFormValues) => void;
   onCancel?: () => void;
 }) {
@@ -86,23 +128,37 @@ export function TransactionForm({
   return (
     <form
       noValidate
-      className="grid gap-3"
+      className="grid gap-4"
       onSubmit={(event) => void handleSubmit(onSubmit)(event)}
     >
-      <fieldset className="flex gap-4">
-        <legend className="sr-only">Tipo</legend>
-        {(['DEBIT', 'CREDIT'] as const).map((value) => (
-          <label key={value} className="flex items-center gap-2">
-            <input
-              type="radio"
-              value={value}
+      {/* Two large segments instead of small radio dots: 44px targets on the phone. */}
+      <Controller
+        control={control}
+        name="type"
+        render={({ field }) => (
+          <RadioGroupPrimitive.Root
+            aria-label="Tipo"
+            value={field.value}
+            onValueChange={(value) => {
+              if (!isTransactionType(value)) return;
+              field.onChange(value);
               // The category belongs to one type: changing the type asks for a new one.
-              {...register('type', { onChange: () => setValue('categoryId', '') })}
-            />
-            {value === 'DEBIT' ? 'Débito' : 'Crédito'}
-          </label>
-        ))}
-      </fieldset>
+              setValue('categoryId', '');
+            }}
+            className="bg-muted grid grid-cols-2 gap-1 rounded-lg p-1"
+          >
+            {(['DEBIT', 'CREDIT'] as const).map((value) => (
+              <RadioGroupPrimitive.Item
+                key={value}
+                value={value}
+                className="text-muted-foreground focus-visible:ring-ring/50 data-[state=checked]:bg-background data-[state=checked]:text-foreground h-11 rounded-md font-medium outline-none focus-visible:ring-3 data-[state=checked]:shadow-sm md:h-8"
+              >
+                {typeLabels[value]}
+              </RadioGroupPrimitive.Item>
+            ))}
+          </RadioGroupPrimitive.Root>
+        )}
+      />
       <FormField
         id={id('description')}
         label="Descrição"
@@ -110,22 +166,23 @@ export function TransactionForm({
       >
         <Input autoComplete="off" {...register('description')} />
       </FormField>
-      <FormField id={id('category')} label="Categoria" error={formState.errors.categoryId?.message}>
-        <select className={selectClassName} {...register('categoryId')}>
-          <option value="">Escolha…</option>
-          {options.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.archived ? `${category.name} (arquivada)` : category.name}
-            </option>
-          ))}
-        </select>
-      </FormField>
-      <div className="grid grid-cols-2 gap-3">
+      <Controller
+        control={control}
+        name="categoryId"
+        render={({ field, fieldState }) => (
+          <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
+            <CategorySelect value={field.value} onChange={field.onChange} options={options} />
+          </FormField>
+        )}
+      />
+      {/* One column on the phone, two from sm. */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <FormField id={id('amount')} label="Valor (R$)" error={formState.errors.amount?.message}>
           <Input
             inputMode="decimal"
             autoComplete="off"
             placeholder="0,00"
+            className="tabular-nums"
             {...register('amount')}
           />
         </FormField>
@@ -149,12 +206,12 @@ export function TransactionForm({
           {apiErrorMessage(error)}
         </p>
       )}
-      <div className="flex gap-2">
+      <div className="grid gap-2 sm:flex sm:flex-row-reverse sm:justify-start">
         <Button type="submit" disabled={pending}>
           {submitLabel}
         </Button>
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel}>
             Cancelar
           </Button>
         )}

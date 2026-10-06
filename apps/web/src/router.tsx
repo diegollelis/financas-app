@@ -1,5 +1,6 @@
 import { INVITATION_PATH, RESET_PASSWORD_PATH } from '@financas/shared';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import { RootLayout } from '@/components/root-layout';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
 import { WorkspaceLayout } from '@/features/workspaces/workspace-layout';
 import { BudgetPage } from '@/routes/budget';
@@ -18,38 +19,44 @@ import { WorkspacePage } from '@/routes/workspace';
 // Paths are UI text, so they are pt-BR (ADR 0021); component names stay in English.
 export const routes: RouteObject[] = [
   {
-    element: <GuestOnly />,
+    // Toasts for every page.
+    element: <RootLayout />,
     children: [
-      { path: '/entrar', element: <SignInPage /> },
-      { path: '/cadastro', element: <SignUpPage /> },
-      { path: '/esqueci-senha', element: <ForgotPasswordPage /> },
-    ],
-  },
-  {
-    element: <RequireAuth />,
-    children: [
-      { path: '/', element: <HomePage /> },
       {
-        // Header, sections nav and the workspace loaded once for every page below (ADR 0036).
-        path: '/espacos/:workspaceId',
-        element: <WorkspaceLayout />,
+        element: <GuestOnly />,
         children: [
-          { index: true, element: <WorkspacePage /> },
-          { path: 'categorias', element: <CategoriesPage /> },
-          // The competência travels as ?competencia=YYYY-MM (default: this month).
-          { path: 'lancamentos', element: <TransactionsPage /> },
-          { path: 'orcamento', element: <BudgetPage /> },
-          { path: 'painel', element: <DashboardPage /> },
+          { path: '/entrar', element: <SignInPage /> },
+          { path: '/cadastro', element: <SignUpPage /> },
+          { path: '/esqueci-senha', element: <ForgotPasswordPage /> },
         ],
       },
+      {
+        element: <RequireAuth />,
+        children: [
+          { path: '/', element: <HomePage /> },
+          {
+            // Header, sections nav and the workspace loaded once for every page below (ADR 0036).
+            path: '/espacos/:workspaceId',
+            element: <WorkspaceLayout />,
+            children: [
+              { index: true, element: <WorkspacePage /> },
+              { path: 'categorias', element: <CategoriesPage /> },
+              // The competência travels as ?competencia=YYYY-MM (default: this month).
+              { path: 'lancamentos', element: <TransactionsPage /> },
+              { path: 'orcamento', element: <BudgetPage /> },
+              { path: 'painel', element: <DashboardPage /> },
+            ],
+          },
+        ],
+      },
+      // Outside the guards: the e-mail link works whether or not someone is signed in here.
+      { path: RESET_PASSWORD_PATH, element: <ResetPasswordPage /> },
+      { path: `${INVITATION_PATH}/:token`, element: <InvitationPage /> },
+      // Public: Google's consent screen links here (ADR 0026).
+      { path: '/privacidade', element: <PrivacyPage /> },
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-  // Outside the guards: the e-mail link works whether or not someone is signed in here.
-  { path: RESET_PASSWORD_PATH, element: <ResetPasswordPage /> },
-  { path: `${INVITATION_PATH}/:token`, element: <InvitationPage /> },
-  // Public: Google's consent screen links here (ADR 0026).
-  { path: '/privacidade', element: <PrivacyPage /> },
-  { path: '*', element: <Navigate to="/" replace /> },
 ];
 
 export const router = createBrowserRouter(routes);

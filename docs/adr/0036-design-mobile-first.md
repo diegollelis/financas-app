@@ -97,3 +97,19 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
   - "Sair" fica no menu da conta.
   - O selo "Status da API" saiu, e o aviso de _cold start_ do `QueryState` ocupa o lugar dele.
 - **Capturas:** o script também fotografa o tema escuro a 360 e 1280 px (`*-escuro.png`).
+
+## Nota (Lançamentos, 2026-10-05)
+
+- **Cada lançamento é um cartão** numa lista com borda por seção: descrição, categoria, vencimento, observações e o selo de status à esquerda, e o valor em destaque à direita.
+- **Uma ação na linha, o resto no menu:** "Efetivar" fica visível enquanto o lançamento está pendente. Editar, "Desfazer efetivação" e Excluir ficam no menu "⋯" (`Ações de <descrição>`).
+- **Excluir pede confirmação** num `AlertDialog` que nomeia o lançamento e o valor. Depois de excluir, o foco vai para o título da seção, porque a linha que tinha o foco sumiu.
+- **Formulário em gaveta no celular e em diálogo a partir de `md`** (`components/responsive-dialog.tsx`, que escolhe pelo `useMediaQuery`).
+  - "Novo lançamento" fica fixo acima da barra inferior no celular e ao lado do título no desktop.
+  - Cada abertura remonta o formulário, então nenhum erro da tentativa anterior sobra.
+  - Ao fechar, o foco volta ao botão que abriu o formulário.
+- **Tipo e categoria:**
+  - o tipo virou um controle segmentado "Débito | Crédito" (`RadioGroup` do Radix, 44 px), no lugar dos _radios_ nativos;
+  - a categoria usa o `Select` do shadcn.
+- **Toasts** (`sonner`, no topo, montados em `components/root-layout.tsx`) depois de cada mudança: "Lançamento adicionado", "salvo", "efetivado", "excluído" e "Efetivação desfeita". As falhas também aparecem num toast.
+- **Exclusão com `mutateAsync`:** os _callbacks_ de `mutate()` não rodam se o componente for desmontado antes, e a linha some justamente quando a exclusão dá certo.
+- **Testes:** o `mockApi` responde 204 sem corpo, porque `Response.json` falha nesse caso. O _setup_ ganhou os _stubs_ que o Radix precisa no jsdom (`ResizeObserver` e captura de ponteiro), e o `matchMedia` falso responde "celular" para consultas de largura.

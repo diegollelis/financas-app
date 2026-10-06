@@ -11,8 +11,10 @@ export function mockApi(routes: Record<string, MockResponse>) {
     const key = `${init?.method ?? 'GET'} ${new URL(input).pathname}`;
     const route = routes[key];
     if (!route) return Promise.reject(new Error(`Unexpected request: ${key}`));
+    const response = { status: route.status ?? 200, headers: route.headers };
+    // 204 No Content cannot carry a body: Response.json would throw.
     return Promise.resolve(
-      Response.json(route.body, { status: route.status ?? 200, headers: route.headers }),
+      response.status === 204 ? new Response(null, response) : Response.json(route.body, response),
     );
   });
   vi.stubGlobal('fetch', fetchMock);
