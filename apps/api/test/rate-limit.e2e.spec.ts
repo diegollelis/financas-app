@@ -6,7 +6,12 @@ import { testEnv } from './test-env.js';
 
 // Rate limit of the auth routes (ADR 0023): per client IP and route, counters in the database.
 // All data here is fictitious (ADR 0019).
-const user = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
+const user = {
+  name: 'Maria Exemplo',
+  email: 'maria@example.com',
+  password: 'senha-de-teste-123',
+  acceptTerms: true,
+};
 const attacker = '203.0.113.7';
 
 describe('rate limit', () => {

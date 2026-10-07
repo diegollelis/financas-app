@@ -1,4 +1,6 @@
+import { TERMS_VERSION } from '@financas/shared';
 import { Navigate, Outlet, useLocation } from 'react-router';
+import { AcceptTerms } from './accept-terms';
 import { useReturnTo, withReturnTo } from './return-to';
 import { useMe } from './use-me';
 
@@ -12,7 +14,8 @@ function FullPageMessage({ children }: { children: string }) {
 
 /**
  * Layout route: renders its children only with a session. Otherwise sends to the sign-in page,
- * which brings the person back here afterwards (`?voltar=`).
+ * which brings the person back here afterwards (`?voltar=`). With a session but without the
+ * terms in force accepted (ADR 0041), asks for them first, staying on the same address.
  */
 export function RequireAuth() {
   const me = useMe();
@@ -28,6 +31,7 @@ export function RequireAuth() {
     const here = location.pathname + location.search;
     return <Navigate to={withReturnTo('/entrar', here)} replace />;
   }
+  if (me.data.termsVersion !== TERMS_VERSION) return <AcceptTerms user={me.data} />;
   // Pages read the user with useCurrentUser().
   return <Outlet context={me.data} />;
 }

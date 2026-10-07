@@ -1,6 +1,8 @@
 import {
   authResponseSchema,
+  meResponseSchema,
   statusResponseSchema,
+  TERMS_VERSION,
   type ForgotPasswordInput,
   type ResetPasswordInput,
   type SignInInput,
@@ -106,5 +108,14 @@ export function useGoogleSignIn(returnTo = '/') {
         z.object({ url: z.url() }),
       ),
     onSuccess: ({ url }) => navigateAway(url),
+  });
+}
+
+/** Accepts the terms in force (ADR 0041); the cached user then lets the app through. */
+export function useAcceptTerms() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost('/api/me/terms', { version: TERMS_VERSION }, meResponseSchema),
+    onSuccess: (user) => queryClient.setQueryData(meQueryKey, user),
   });
 }

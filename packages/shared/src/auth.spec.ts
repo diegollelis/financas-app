@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  acceptTermsInputSchema,
   meResponseSchema,
   resetPasswordFormSchema,
   safeReturnTo,
   signInInputSchema,
   signUpInputSchema,
+  TERMS_VERSION,
 } from './auth.ts';
 
 const validMe = {
@@ -12,6 +14,7 @@ const validMe = {
   name: 'Maria Exemplo',
   email: 'maria@example.com',
   emailVerified: false,
+  termsVersion: null,
 };
 
 describe('meResponseSchema', () => {
@@ -27,13 +30,19 @@ describe('meResponseSchema', () => {
     { label: 'id that is not a UUID', value: { ...validMe, id: '123' } },
     { label: 'invalid e-mail', value: { ...validMe, email: 'maria' } },
     { label: 'missing emailVerified', value: { ...validMe, emailVerified: undefined } },
+    { label: 'missing termsVersion', value: { ...validMe, termsVersion: undefined } },
   ])('rejects $label', ({ value }) => {
     expect(meResponseSchema.safeParse(value).success).toBe(false);
   });
 });
 
 describe('signUpInputSchema', () => {
-  const valid = { name: 'Maria Exemplo', email: 'maria@example.com', password: '12345678' };
+  const valid = {
+    name: 'Maria Exemplo',
+    email: 'maria@example.com',
+    password: '12345678',
+    acceptTerms: true,
+  };
 
   it('accepts valid input and trims the name', () => {
     expect(signUpInputSchema.parse({ ...valid, name: '  Maria Exemplo ' })).toEqual(valid);
@@ -61,9 +70,23 @@ describe('signUpInputSchema', () => {
       value: { ...valid, password: 'a'.repeat(129) },
       message: 'A senha pode ter no máximo 128 caracteres.',
     },
+    ...[false, undefined].map((acceptTerms) => ({
+      label: `terms not accepted (${String(acceptTerms)})`,
+      value: { ...valid, acceptTerms },
+      message: 'Aceite os Termos de uso e a Política de privacidade para criar a conta.',
+    })),
   ])('rejects $label with a pt-BR message', ({ value, message }) => {
     const result = signUpInputSchema.safeParse(value);
     expect(result.error?.issues[0]?.message).toBe(message);
+  });
+});
+
+describe('acceptTermsInputSchema', () => {
+  it('accepts only the version in force', () => {
+    expect(acceptTermsInputSchema.safeParse({ version: TERMS_VERSION }).success).toBe(true);
+    expect(
+      acceptTermsInputSchema.safeParse({ version: '1999-01-01' }).error?.issues[0]?.message,
+    ).toBe('Estes termos mudaram. Recarregue a página e leia de novo.');
   });
 });
 

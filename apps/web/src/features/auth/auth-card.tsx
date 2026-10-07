@@ -1,9 +1,10 @@
+import { PRIVACY_PATH, TERMS_PATH } from '@financas/shared';
 import type { ReactNode } from 'react';
 import { TextLink } from '@/components/text-link';
 
 /**
- * Frame of the sign-in, sign-up, password and invitation pages, with the privacy policy link
- * Google asks for. Mobile first (ADR 0036): on the phone the whole screen is the form, with no
+ * Frame of the sign-in, sign-up, password and invitation pages, with the links to the terms
+ * of use and the privacy policy (Google asks for the latter). Mobile first (ADR 0036): on the phone the whole screen is the form, with no
  * card around it; from sm, a centered card.
  */
 export function AuthCard({
@@ -32,9 +33,14 @@ export function AuthCard({
           <div>{children}</div>
         </div>
         <div className="text-muted-foreground text-center">{footer}</div>
-        <TextLink to="/privacidade" className="text-muted-foreground justify-self-center text-sm">
-          Política de privacidade
-        </TextLink>
+        <nav aria-label="Documentos" className="flex justify-center gap-6">
+          <TextLink to={TERMS_PATH} className="text-muted-foreground text-sm">
+            Termos de uso
+          </TextLink>
+          <TextLink to={PRIVACY_PATH} className="text-muted-foreground text-sm">
+            Política de privacidade
+          </TextLink>
+        </nav>
       </div>
     </main>
   );

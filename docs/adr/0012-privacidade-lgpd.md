@@ -36,3 +36,7 @@ O Google exige uma política de privacidade para publicar a tela de consentiment
 ## Nota (fase 5, 2026-10-07)
 
 Os termos de uso com aceite, a exportação dos dados e a exclusão de conta estão decididos no [ADR 0041](0041-termos-exportacao-e-exclusao-de-conta.md). Ele muda uma regra deste ADR: um espaço de que a pessoa é dona e que tem outros membros não é apagado junto com a conta. Em vez disso, a exclusão fica bloqueada até ela resolver esse espaço.
+
+## Nota (contato no domínio próprio, 2026-10-07)
+
+O contato público passou a ser `financas@codelelis.com`, no domínio do [ADR 0039](0039-dominio-proprio.md). O Cloudflare Email Routing recebe as mensagens e as encaminha para a caixa do projeto, `financas.app.contato@gmail.com`, que continua recebendo quem ainda usa o endereço antigo. O Google Cloud mantém o Gmail como e-mail de suporte da tela de consentimento, porque ali o endereço precisa ser uma conta Google.

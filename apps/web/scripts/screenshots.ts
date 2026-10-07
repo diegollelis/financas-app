@@ -10,6 +10,7 @@
  *   pnpm --filter @financas/web screenshots -- painel  → only pages whose name contains "painel"
  */
 import { mkdirSync } from 'node:fs';
+import { TERMS_VERSION } from '@financas/shared';
 import { fileURLToPath } from 'node:url';
 import { chromium, type APIRequestContext, type Page } from 'playwright';
 
@@ -24,6 +25,7 @@ const demoUser = {
   email: 'capturas@example.com',
   // Fictitious and local-only; gitleaks flags any password literal of this entropy.
   password: 'senha-de-capturas-123', // gitleaks:allow
+  acceptTerms: true,
 };
 
 const viewports = [
@@ -92,6 +94,18 @@ async function signIn(api: APIRequestContext) {
   if (verified.status() !== 302) throw new Error(`Could not verify: ${verified.status()}`);
   signedIn = await signInOnce();
   if (!signedIn.ok()) throw new Error(`Could not sign in after verifying: ${signedIn.status()}`);
+}
+
+/**
+ * Accepts the terms in force (ADR 0041), as the acceptance screen would: a demo user created
+ * before them, or before a new version, would see only that screen on every page.
+ */
+async function acceptTerms(api: APIRequestContext) {
+  const accepted = await api.post(`${API}/api/me/terms`, {
+    headers: { Origin: WEB },
+    data: { version: TERMS_VERSION },
+  });
+  if (!accepted.ok()) throw new Error(`Could not accept the terms: ${accepted.status()}`);
 }
 
 /** The competência `months` before `period` ('2026-01', 1 → '2025-12'). */
@@ -225,6 +239,12 @@ async function phoneChecks(page: Page): Promise<string[]> {
       if (box.width === 0 || box.height === 0 || el.matches('.sr-only')) continue;
       // Hidden from everyone (e.g. the native select Radix keeps for forms).
       if (el.closest('[aria-hidden="true"]')) continue;
+      // A link inside a sentence (the terms in the sign-up checkbox): WCAG 2.5.8 exempts inline
+      // targets, whose size the line of text sets. Links standing alone still need 44px.
+      if (el.matches('a') && getComputedStyle(el).display === 'inline') continue;
+      // A small box inside a big label (the checkboxes): the label is what the finger taps.
+      const label = el.closest('label')?.getBoundingClientRect();
+      if (label && label.height >= min && label.width >= min) continue;
       if (box.height < min || box.width < min) {
         const name = (el.getAttribute('aria-label') ?? el.textContent ?? el.tagName)
           .trim()
@@ -244,6 +264,7 @@ async function main() {
 
   const auth = await browser.newContext();
   await signIn(auth.request);
+  await acceptTerms(auth.request);
   const workspaces = (await (
     await auth.request.get(`${API}/api/workspaces`)
   ).json()) as Workspace[];
@@ -258,6 +279,8 @@ async function main() {
 
   const pages = [
     { name: 'entrar', path: '/entrar', signedIn: false },
+    { name: 'cadastro', path: '/cadastro', signedIn: false },
+    { name: 'termos', path: '/termos', signedIn: false },
     // "/" is not a page: it opens the last workspace used (ADR 0036). The switcher is captured open.
     {
       name: 'seletor-espaco',

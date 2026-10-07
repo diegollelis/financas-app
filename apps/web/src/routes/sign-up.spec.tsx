@@ -6,10 +6,13 @@ import { renderApp } from '@/test/render';
 
 const maria = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
 
-async function fillAndSubmit({ name, email, password }: typeof maria) {
+const termsBox = () => screen.getByRole('checkbox', { name: /^Li e aceito os Termos de uso/ });
+
+async function fillAndSubmit({ name, email, password }: typeof maria, { acceptTerms = true } = {}) {
   await userEvent.type(await screen.findByLabelText('Nome'), name);
   await userEvent.type(screen.getByLabelText('E-mail'), email);
   await userEvent.type(screen.getByLabelText(/^Senha/), password);
+  if (acceptTerms) await userEvent.click(termsBox());
   await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 }
 
@@ -31,7 +34,9 @@ describe('SignUpPage', () => {
     expect(router.state.location.pathname).toBe('/cadastro');
     expect(fetchMock).toHaveBeenCalledWith(
       new URL('/api/auth/sign-up/email', 'http://api.test'),
-      expect.objectContaining({ body: JSON.stringify({ ...maria, callbackURL: '/' }) }),
+      expect.objectContaining({
+        body: JSON.stringify({ ...maria, acceptTerms: true, callbackURL: '/' }),
+      }),
     );
   });
 
@@ -48,7 +53,7 @@ describe('SignUpPage', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       new URL('/api/auth/sign-up/email', 'http://api.test'),
       expect.objectContaining({
-        body: JSON.stringify({ ...maria, callbackURL: '/convites/abc' }),
+        body: JSON.stringify({ ...maria, acceptTerms: true, callbackURL: '/convites/abc' }),
       }),
     );
   });
@@ -88,6 +93,32 @@ describe('SignUpPage', () => {
       await screen.findByText('A senha precisa ter pelo menos 8 caracteres.'),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /api/me
+  });
+
+  it('asks to accept the terms before calling the API', async () => {
+    const fetchMock = mockApi({ 'GET /api/me': noSession });
+    renderApp('/cadastro');
+
+    await fillAndSubmit(maria, { acceptTerms: false });
+
+    expect(
+      await screen.findByText(
+        'Aceite os Termos de uso e a Política de privacidade para criar a conta.',
+      ),
+    ).toBeInTheDocument();
+    expect(termsBox()).toHaveAttribute('aria-invalid', 'true');
+    expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /api/me
+  });
+
+  it('links to the terms of use from the checkbox', async () => {
+    mockApi({ 'GET /api/me': noSession });
+    const { router } = renderApp('/cadastro');
+
+    // The first one is in the checkbox text; the page footer has another.
+    const [inCheckbox] = await screen.findAllByRole('link', { name: 'Termos de uso' });
+    await userEvent.click(inCheckbox!);
+
+    expect(router.state.location.pathname).toBe('/termos');
   });
 
   it('keeps the form and explains when the API refuses (too many attempts)', async () => {
