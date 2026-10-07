@@ -14,7 +14,7 @@ import { FormField } from '@/components/form-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CategorySelect } from '@/features/transactions/transaction-form';
+import { CategorySelect } from '@/features/categories/category-picker';
 import type { ReviewRow } from './review';
 
 /** Empty means none; anything else must be a real date. */

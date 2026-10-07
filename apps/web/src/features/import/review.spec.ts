@@ -18,6 +18,7 @@ const category = (n: number, name: string, type: Category['type'], archived = fa
   name,
   type,
   archived,
+  recentUses: 0,
 });
 const salario = category(1, 'Salário', 'CREDIT');
 const mercado = category(2, 'Mercado', 'DEBIT');

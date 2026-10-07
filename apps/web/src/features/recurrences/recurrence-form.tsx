@@ -13,7 +13,7 @@ import { FormField } from '@/components/form-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CategorySelect } from '@/features/transactions/transaction-form';
+import { CategorySelect } from '@/features/categories/category-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /** What can change in a recurrence: not its type nor its start (ADR 0038). */

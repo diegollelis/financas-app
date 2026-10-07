@@ -89,6 +89,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] "Parcelado" no "Novo lançamento", selo "Parcela n/N" e "Encerrar parcelamento" no menu
   - [x] Tela "Recorrências" no Mais: listar, editar (só o que mudou) e encerrar
   - [ ] "Tornar recorrente" no menu de um lançamento existente: criar a recorrência adotando o lançamento como o primeiro mês, sem duplicar
+- [x] Escolha de categoria com busca (sem depender de acentos) e "Mais usadas" dos últimos 6 meses (`recentUses` na lista de categorias)
+  - [ ] Sugerir a categoria pela descrição, a partir dos lançamentos anteriores
 - [ ] Rateio de lançamentos (ADR próprio)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
