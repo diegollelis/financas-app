@@ -1,5 +1,4 @@
 import { Link } from 'react-router';
-import { QueryState } from '@/components/query-state';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +38,21 @@ export function DeleteAccountSection() {
         lançamentos. Dos espaços de outras pessoas, você sai. Não é possível desfazer; baixe os seus
         dados antes, se quiser guardar uma cópia.
       </p>
-      <QueryState queries={[check]} />
+      {/* Its own error, not QueryState's: a 404 there means a workspace is gone. */}
+      {check.isError && (
+        <div role="alert" className="grid justify-items-start gap-2">
+          <p className="text-destructive">
+            Não foi possível conferir agora se a conta pode ser excluída.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => void check.refetch()}
+            disabled={check.isFetching}
+          >
+            {check.isFetching ? 'Tentando…' : 'Tentar de novo'}
+          </Button>
+        </div>
+      )}
       {blockers.length > 0 && (
         <div role="note" className="bg-muted grid gap-2 rounded-lg p-3">
           <p>

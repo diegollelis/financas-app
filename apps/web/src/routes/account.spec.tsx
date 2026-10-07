@@ -81,6 +81,21 @@ describe('AccountPage', () => {
     expect(screen.getByRole('button', { name: 'Excluir minha conta' })).toBeDisabled();
   });
 
+  it('says so when it cannot check, without the workspace "not found" notice', async () => {
+    // As while the API is being deployed: the route does not exist yet.
+    mockApi({
+      'GET /api/me': { body: verifiedUser },
+      'GET /api/me/deletion': { status: 404, body: { message: 'Not Found' } },
+    });
+    renderApp('/conta');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível conferir agora se a conta pode ser excluída.',
+    );
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Excluir minha conta' })).toBeDisabled();
+  });
+
   it('e-mails the confirmation link after asking once', async () => {
     const fetchMock = mockApi({
       'GET /api/me': { body: verifiedUser },
