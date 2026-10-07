@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { navigateAway } from '@/lib/browser';
-import { fakeUser, mockApi, personalWorkspace } from '@/test/mock-api';
+import { fakeUser, mockApi, personalWorkspace, signedInHome } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 // jsdom cannot load another page: sign-out's full navigation is checked by its argument.
@@ -68,7 +68,9 @@ describe('WorkspaceSwitcher', () => {
       await screen.findByRole('button', { name: 'Trocar de espaço (atual: Pessoal)' }),
     ).toBeInTheDocument();
     // Remembered: "/" opens it next time.
-    expect(window.localStorage.getItem('financas-ultimo-espaco')).toBe(personalWorkspace.id);
+    await vi.waitFor(() =>
+      expect(window.localStorage.getItem('financas-ultimo-espaco')).toBe(personalWorkspace.id),
+    );
   });
 
   it('creates a shared workspace and opens it', async () => {
@@ -178,6 +180,29 @@ describe('WorkspaceLayout', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Espaço não encontrado.');
     expect(screen.getByRole('link', { name: 'Ir para o meu espaço' })).toHaveAttribute('href', '/');
     expect(screen.queryByRole('navigation', { name: 'Seções do espaço' })).not.toBeInTheDocument();
+  });
+
+  it('leads someone removed from the workspace to their own, not back to it', async () => {
+    // Casa was the last workspace opened, and is still in the list loaded before.
+    window.localStorage.setItem('financas-ultimo-espaco', houseId);
+    mockApi({
+      ...signedInHome,
+      'GET /api/workspaces': { body: [personalWorkspace, house] },
+      [`GET ${base}`]: { status: 404, body: { message: 'Not Found' } },
+    });
+    const { router } = renderApp(`/espacos/${houseId}/painel`);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ele pode ter sido excluído, ou você não faz mais parte dele.',
+    );
+    await userEvent.click(screen.getByRole('link', { name: 'Ir para o meu espaço' }));
+
+    await vi.waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/painel`),
+    );
+    await vi.waitFor(() =>
+      expect(window.localStorage.getItem('financas-ultimo-espaco')).toBe(personalWorkspace.id),
+    );
   });
 
   it('tries again after a failure', async () => {

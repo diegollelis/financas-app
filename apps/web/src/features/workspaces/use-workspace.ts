@@ -8,6 +8,7 @@ import {
   type Workspace,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type { z } from 'zod';
 import { apiDelete, apiGet, apiPost } from '@/lib/api';
 import { forgetLastWorkspace } from './last-workspace';
@@ -88,17 +89,23 @@ export function useRemoveMember(workspaceId: string) {
  */
 export function useForgetWorkspace(workspaceId: string) {
   const queryClient = useQueryClient();
-  return {
-    beforeLeaving() {
-      forgetLastWorkspace(workspaceId);
-      queryClient.setQueryData<Workspace[]>(workspacesQueryKey, (list) =>
-        list?.filter((workspace) => workspace.id !== workspaceId),
-      );
-    },
-    afterLeaving() {
-      return queryClient.invalidateQueries({ queryKey: workspacesQueryKey, exact: true });
-    },
-  };
+  // The same object while the workspace is the same: callers run it from effects.
+  return useMemo(
+    () => ({
+      beforeLeaving() {
+        forgetLastWorkspace(workspaceId);
+        queryClient.setQueryData<Workspace[]>(workspacesQueryKey, (list) =>
+          list?.some((workspace) => workspace.id === workspaceId)
+            ? list.filter((workspace) => workspace.id !== workspaceId)
+            : list,
+        );
+      },
+      afterLeaving() {
+        return queryClient.invalidateQueries({ queryKey: workspacesQueryKey, exact: true });
+      },
+    }),
+    [queryClient, workspaceId],
+  );
 }
 
 /** A shared workspace and everything in it (OWNER only; never the personal one). */

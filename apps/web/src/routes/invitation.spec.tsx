@@ -25,10 +25,62 @@ describe('InvitationPage', () => {
         'Maria Exemplo convidou você para ver e editar as finanças do espaço "Casa".',
       ),
     ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('link', { name: 'Criar conta' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Criar conta e aceitar' }));
 
     expect(router.state.location.pathname).toBe('/cadastro');
-    expect(router.state.location.search).toBe('?voltar=%2Fconvites%2Ftoken-de-teste');
+    // Back with ?aceitar=1: the click here already meant "accept".
+    expect(router.state.location.search).toBe(
+      `?voltar=${encodeURIComponent('/convites/token-de-teste?aceitar=1')}`,
+    );
+  });
+
+  it('accepts on its own when coming back from signing in, and opens the workspace', async () => {
+    const fetchMock = mockApi({
+      'GET /api/me': { body: joao },
+      [`GET /api/invitations/${token}`]: { body: preview },
+      [`POST /api/invitations/${token}/accept`]: {
+        body: { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' },
+      },
+      [`GET /api/workspaces/${houseId}`]: {
+        body: { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' },
+      },
+      [`GET /api/workspaces/${houseId}/members`]: { body: [] },
+    });
+    const { router } = renderApp(`/convites/${token}?aceitar=1`);
+
+    expect(await screen.findByRole('heading', { name: 'Membros' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/espacos/${houseId}`);
+    const accepts = fetchMock.mock.calls.filter(([url]) =>
+      String(url).endsWith(`/api/invitations/${token}/accept`),
+    );
+    expect(accepts).toHaveLength(1);
+  });
+
+  it('never accepts on its own for another account', async () => {
+    const fetchMock = mockApi({
+      'GET /api/me': { body: { ...joao, email: 'outra@example.com' } },
+      [`GET /api/invitations/${token}`]: { body: preview },
+    });
+    renderApp(`/convites/${token}?aceitar=1`);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Saia e entre com o e-mail convidado.',
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      new URL(`/api/invitations/${token}/accept`, 'http://api.test'),
+      expect.anything(),
+    );
+  });
+
+  it('asks a new account for the terms before joining', async () => {
+    mockApi({
+      'GET /api/me': { body: { ...joao, termsVersion: null } },
+      [`GET /api/invitations/${token}`]: { body: preview },
+    });
+    renderApp(`/convites/${token}?aceitar=1`);
+
+    expect(await screen.findByRole('button', { name: 'Aceitar e continuar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aceitar convite' })).not.toBeInTheDocument();
   });
 
   it('accepts and opens the workspace', async () => {

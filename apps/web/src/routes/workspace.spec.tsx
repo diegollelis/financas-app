@@ -22,6 +22,7 @@ const pendingInvitation = {
   status: 'PENDING',
   expiresAt: '2026-10-09T12:00:00.000Z',
   acceptedAt: null,
+  removedAt: null,
 };
 
 function mockHouse(overrides: Record<string, { status?: number; body: unknown }> = {}) {
@@ -169,6 +170,22 @@ describe('WorkspacePage', () => {
             status: 'ACCEPTED',
             acceptedAt: '2026-09-15T12:00:00.000Z',
           },
+          {
+            ...pendingInvitation,
+            id: '01920000-0000-7000-8000-000000000007',
+            email: 'bia@example.com',
+            status: 'REMOVED',
+            acceptedAt: '2026-09-10T13:05:00.000Z',
+            removedAt: '2026-09-30T21:40:00.000Z',
+          },
+          {
+            ...pendingInvitation,
+            id: '01920000-0000-7000-8000-000000000008',
+            email: 'caio@example.com',
+            status: 'LEFT',
+            acceptedAt: '2026-09-11T10:00:00.000Z',
+            removedAt: '2026-09-12T10:00:00.000Z',
+          },
         ],
       },
     });
@@ -177,16 +194,22 @@ describe('WorkspacePage', () => {
     const list = await screen.findByRole('region', { name: 'Convites' });
     expect(list).toHaveTextContent('Aguardando, vale até 09/10/2026');
     expect(list).toHaveTextContent('Expirou em 20/09/2026');
-    expect(list).toHaveTextContent('Aceito em 15/09/2026');
+    // Dates and times in São Paulo (UTC-3).
+    expect(list).toHaveTextContent('Aceito em 15/09/2026 às 09:00');
+    expect(list).toHaveTextContent('Aceito em 10/09/2026 às 10:05');
+    expect(list).toHaveTextContent('Removido em 30/09/2026 às 18:40');
+    expect(list).toHaveTextContent('Saiu em 12/09/2026 às 07:00');
     expect(
       within(list).getByRole('button', { name: 'Cancelar convite de ana@example.com' }),
     ).toBeInTheDocument();
     expect(
       within(list).getByRole('button', { name: 'Apagar convite de pedro@example.com' }),
     ).toBeInTheDocument();
-    expect(
-      within(list).queryByRole('button', { name: /joao@example.com/ }),
-    ).not.toBeInTheDocument();
+    for (const email of ['joao@example.com', 'bia@example.com', 'caio@example.com']) {
+      expect(
+        within(list).queryByRole('button', { name: new RegExp(email) }),
+      ).not.toBeInTheDocument();
+    }
   });
 
   it('lets the OWNER remove a member, after naming them', async () => {

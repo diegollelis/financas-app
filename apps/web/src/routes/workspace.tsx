@@ -43,7 +43,17 @@ import {
 } from '@/features/workspaces/use-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
-const dateFormat = new Intl.DateTimeFormat('pt-BR');
+const dateFormat = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo' });
+const timeFormat = new Intl.DateTimeFormat('pt-BR', {
+  timeStyle: 'short',
+  timeZone: 'America/Sao_Paulo',
+});
+
+/** "07/10/2026 às 14:32", in São Paulo time. */
+function dateTime(iso: string) {
+  const date = new Date(iso);
+  return `${dateFormat.format(date)} às ${timeFormat.format(date)}`;
+}
 
 const accessOptions = [
   { value: 'EDITOR', label: 'Pode editar' },
@@ -258,13 +268,24 @@ function InviteForm({ workspaceId }: { workspaceId: string }) {
   );
 }
 
-/** What came of an invitation, as a badge: waiting (until when), accepted or expired (when). */
+/**
+ * What came of an invitation, as badges: waiting (until when), expired, accepted (when) and,
+ * once the membership ended, removed or left (when).
+ */
 function InvitationStatus({ invitation }: { invitation: InvitationResponse }) {
-  if (invitation.status === 'ACCEPTED') {
+  const { status, acceptedAt, removedAt } = invitation;
+  if (acceptedAt) {
     return (
-      <Badge variant="success">
-        Aceito em {dateFormat.format(new Date(invitation.acceptedAt ?? invitation.expiresAt))}
-      </Badge>
+      <>
+        <Badge variant={status === 'ACCEPTED' ? 'success' : 'secondary'}>
+          Aceito em {dateTime(acceptedAt)}
+        </Badge>
+        {removedAt && (
+          <Badge variant="outline">
+            {status === 'LEFT' ? 'Saiu' : 'Removido'} em {dateTime(removedAt)}
+          </Badge>
+        )}
+      </>
     );
   }
   if (invitation.status === 'EXPIRED') {
@@ -315,7 +336,7 @@ function InvitationRow({
           <InvitationStatus invitation={invitation} />
         </span>
       </span>
-      {invitation.status !== 'ACCEPTED' && (
+      {(pending || invitation.status === 'EXPIRED') && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button

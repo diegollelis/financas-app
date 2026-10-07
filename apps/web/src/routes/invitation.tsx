@@ -1,7 +1,9 @@
-import type { InvitationPreview } from '@financas/shared';
-import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { TERMS_VERSION, type InvitationPreview } from '@financas/shared';
+import { useEffect, useRef } from 'react';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { TextLink } from '@/components/text-link';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { AcceptTerms } from '@/features/auth/accept-terms';
 import { AuthCard } from '@/features/auth/auth-card';
 import { withReturnTo } from '@/features/auth/return-to';
 import { useSignOut } from '@/features/auth/use-auth-mutations';
@@ -11,26 +13,35 @@ import { apiErrorMessage } from '@/lib/error-message';
 
 const homeLink = <TextLink to="/">Ir para o início</TextLink>;
 
+/**
+ * On the way back from signing in or up: the person already chose to accept there, so the
+ * invitation is accepted without a second click (only by the invited e-mail, as always).
+ */
+const ACCEPT_PARAM = 'aceitar';
+
 function describe(invitation: InvitationPreview) {
   const access = invitation.role === 'EDITOR' ? 'ver e editar' : 'ver';
   const who = invitation.invitedByName ?? 'Alguém';
   return `${who} convidou você para ${access} as finanças do espaço "${invitation.workspaceName}".`;
 }
 
-/** The person is not signed in: sign in or sign up, then come back here (ADR 0027). */
+/**
+ * The person is not signed in: sign in or sign up, then come back here and the invitation is
+ * accepted on arrival (ADR 0027).
+ */
 function SignInFirst({ invitation }: { invitation: InvitationPreview }) {
   const location = useLocation();
-  const here = location.pathname;
+  const here = `${location.pathname}?${ACCEPT_PARAM}=1`;
   return (
     <div className="grid gap-3 text-sm">
       <p>
         Para aceitar, entre ou crie sua conta com o e-mail <strong>{invitation.email}</strong>.
       </p>
       <Link to={withReturnTo('/entrar', here)} className={buttonVariants()}>
-        Entrar
+        Entrar e aceitar
       </Link>
       <Link to={withReturnTo('/cadastro', here)} className={buttonVariants({ variant: 'outline' })}>
-        Criar conta
+        Criar conta e aceitar
       </Link>
     </div>
   );
@@ -52,9 +63,21 @@ function WrongAccount({ invitation, email }: { invitation: InvitationPreview; em
   );
 }
 
-function Accept({ token }: { token: string }) {
+function Accept({ token, onArrival }: { token: string; onArrival: boolean }) {
   const accept = useAcceptInvitation(token);
   const navigate = useNavigate();
+  const run = () =>
+    accept.mutate(undefined, {
+      onSuccess: (workspace) => void navigate(`/espacos/${workspace.id}`, { replace: true }),
+    });
+  // Once, even if React runs effects twice in development.
+  const started = useRef(false);
+  useEffect(() => {
+    if (!onArrival || started.current) return;
+    started.current = true;
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on arrival
+  }, [onArrival]);
   return (
     <div className="grid gap-3 text-sm">
       {accept.isError && (
@@ -62,14 +85,7 @@ function Accept({ token }: { token: string }) {
           {apiErrorMessage(accept.error)}
         </p>
       )}
-      <Button
-        onClick={() =>
-          accept.mutate(undefined, {
-            onSuccess: (workspace) => void navigate(`/espacos/${workspace.id}`, { replace: true }),
-          })
-        }
-        disabled={accept.isPending}
-      >
+      <Button onClick={run} disabled={accept.isPending}>
         {accept.isPending ? 'Entrando no espaço…' : 'Aceitar convite'}
       </Button>
     </div>
@@ -84,6 +100,7 @@ export function InvitationPage() {
   const { token = '' } = useParams();
   const preview = useInvitationPreview(token);
   const me = useMe();
+  const [searchParams] = useSearchParams();
 
   if (preview.isPending || me.isPending) {
     return (
@@ -114,6 +131,8 @@ export function InvitationPage() {
 
   const invitation = preview.data;
   const user = me.data;
+  // A new Google account accepts the terms before joining, not after (ADR 0041).
+  if (user && user.termsVersion !== TERMS_VERSION) return <AcceptTerms user={user} />;
   return (
     <AuthCard title="Convite" description={describe(invitation)} footer={homeLink}>
       {!user ? (
@@ -121,7 +140,7 @@ export function InvitationPage() {
       ) : user.email.toLowerCase() !== invitation.email ? (
         <WrongAccount invitation={invitation} email={user.email} />
       ) : (
-        <Accept token={token} />
+        <Accept token={token} onArrival={searchParams.has(ACCEPT_PARAM)} />
       )}
     </AuthCard>
   );

@@ -64,3 +64,27 @@ A lista de convites do dono deixou de mostrar só os pendentes. Agora ela traz o
 - o convite pendente pode ser cancelado;
 - o expirado pode ser apagado da lista;
 - o aceito fica, como registro de como a pessoa entrou.
+
+## Nota (aceite em um passo, 2026-10-07)
+
+**O problema:** quem abria o convite sem sessão clicava em "Entrar", entrava e voltava ao convite, e aí precisava clicar em "Aceitar convite". Parecia que tinha aceitado duas vezes.
+
+**Como ficou:**
+
+- Os botões passaram a dizer "Entrar e aceitar" e "Criar conta e aceitar".
+- A volta do login, do cadastro, do Google ou da confirmação do e-mail traz `?aceitar=1`, e a página aceita sozinha ao chegar.
+- A regra não mudou: só a conta do e-mail convidado aceita. Com outra conta, a página explica e não aceita nada.
+- Quem abre o link já com sessão continua vendo o botão, porque ali não houve clique antes.
+- Uma conta que ainda não aceitou os termos ([ADR 0041](0041-termos-exportacao-e-exclusao-de-conta.md)) vê os termos antes de entrar no espaço, e não depois.
+
+## Nota (remoção registrada no convite, 2026-10-07)
+
+**O problema:** ao remover um membro, o convite que o trouxe continuava como "Aceito".
+
+**Como ficou:**
+
+- `invitations` ganhou `removed_at` e `left_on_own`, gravados junto com a remoção do membro, na mesma transação.
+- O status passa a ser `REMOVED`, quando o dono removeu a pessoa, ou `LEFT`, quando ela saiu sozinha.
+- A tela mostra o aceite e o fim com data e hora, no horário de São Paulo: "Aceito em 10/09/2026 às 10:05" e "Removido em 30/09/2026 às 18:40" (ou "Saiu em …").
+- Esses convites são registro: não podem ser cancelados nem apagados.
+- A exportação de dados ([ADR 0041](0041-termos-exportacao-e-exclusao-de-conta.md)) inclui os dois campos.
