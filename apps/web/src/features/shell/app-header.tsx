@@ -1,3 +1,4 @@
+import { SIGN_IN_PATH } from '@financas/shared';
 import type { ReactNode } from 'react';
 import { useSignOut } from '@/features/auth/use-auth-mutations';
 import { AccountMenu } from './account-menu';
@@ -19,7 +20,8 @@ export function SkipLink() {
  * the app name outside a workspace) and the account menu.
  */
 export function AppHeader({ title }: { title: ReactNode }) {
-  const signOut = useSignOut();
+  // To the plain sign-in page: no ?voltar= to this account's pages for whoever comes next.
+  const signOut = useSignOut({ leaveTo: SIGN_IN_PATH });
   return (
     <header className="bg-background/95 sticky top-0 z-40 border-b pt-[env(safe-area-inset-top)] backdrop-blur">
       <div className="flex h-14 items-center gap-3 px-4 sm:px-6">

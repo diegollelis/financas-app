@@ -37,11 +37,20 @@ export function useSignIn(returnTo = '/') {
   });
 }
 
-export function useSignOut() {
+/**
+ * `leaveTo`: a page to load from scratch once signed out. The account menu loads the plain
+ * sign-in page: left to the route guard, it would add `?voltar=` with the page just left, and
+ * whoever signs in next on this browser (maybe another account) would be sent to a workspace
+ * that is not theirs. A full load (not a route change, which races with the guard) also leaves
+ * nothing of this account in memory. Without it the page stays: the invitation page, which then
+ * asks to sign in and come back.
+ */
+export function useSignOut({ leaveTo }: { leaveTo?: string } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => apiPost('/api/auth/sign-out', {}, z.object({ success: z.boolean() })),
     onSuccess: () => {
+      if (leaveTo) navigateAway(leaveTo);
       queryClient.setQueryData(meQueryKey, null);
       // Drops everything else cached: the next person on this browser must not see it.
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== meQueryKey[0] });
