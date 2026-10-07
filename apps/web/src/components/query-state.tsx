@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { WorkspaceGone } from '@/features/workspaces/workspace-gone';
 import { ApiError } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -71,17 +71,8 @@ export function ErrorState({
   onRetry: () => void;
   retrying: boolean;
 }) {
-  if (error instanceof ApiError && error.status === 404) {
-    // Same answer for "does not exist" and "not yours" (ADR 0025).
-    return (
-      <div role="alert" className="grid justify-items-start gap-3">
-        <p>Espaço não encontrado. Ele pode ter sido excluído, ou você não faz mais parte dele.</p>
-        <Button asChild variant="outline">
-          <Link to="/">Ir para o meu espaço</Link>
-        </Button>
-      </div>
-    );
-  }
+  // Same answer for "does not exist" and "not yours" (ADR 0025): explain and take them home.
+  if (error instanceof ApiError && error.status === 404) return <WorkspaceGone />;
   return (
     <div role="alert" className="grid justify-items-start gap-3">
       <p className="text-destructive">{apiErrorMessage(error)}</p>

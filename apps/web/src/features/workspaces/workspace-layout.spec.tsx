@@ -178,9 +178,33 @@ describe('WorkspaceLayout', () => {
     renderApp(`/espacos/${houseId}/painel`);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Espaço não encontrado.');
-    expect(screen.getByRole('link', { name: 'Ir para o meu espaço' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Ir para o meu espaço agora' })).toHaveAttribute(
+      'href',
+      '/',
+    );
     expect(screen.queryByRole('navigation', { name: 'Seções do espaço' })).not.toBeInTheDocument();
   });
+
+  it('says it is leaving, and goes to the personal workspace on its own', async () => {
+    // A page of Casa finds out first (the transactions answer 404), while Casa is still the last
+    // workspace opened and in the list loaded before.
+    window.localStorage.setItem('financas-ultimo-espaco', houseId);
+    mockApi({
+      ...signedInHome,
+      'GET /api/workspaces': { body: [personalWorkspace, house] },
+      [`GET ${base}`]: { body: house },
+      [`GET ${base}/categories`]: { status: 404, body: { message: 'Not Found' } },
+    });
+    const { router } = renderApp(`/espacos/${houseId}/categorias`);
+
+    expect(
+      await screen.findByText(/Levando você para o seu espaço em 5 segundos/),
+    ).toBeInTheDocument();
+    await vi.waitFor(
+      () => expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/painel`),
+      { timeout: 7000 },
+    );
+  }, 10_000);
 
   it('leads someone removed from the workspace to their own, not back to it', async () => {
     // Casa was the last workspace opened, and is still in the list loaded before.
@@ -195,7 +219,7 @@ describe('WorkspaceLayout', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Ele pode ter sido excluído, ou você não faz mais parte dele.',
     );
-    await userEvent.click(screen.getByRole('link', { name: 'Ir para o meu espaço' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Ir para o meu espaço agora' }));
 
     await vi.waitFor(() =>
       expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/painel`),

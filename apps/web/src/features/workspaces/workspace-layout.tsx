@@ -27,11 +27,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { VerifyEmailBanner } from '@/features/auth/verify-email-banner';
 import { AppHeader, SkipLink } from '@/features/shell/app-header';
-import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { CurrentWorkspaceContext } from './current-workspace';
 import { rememberLastWorkspace } from './last-workspace';
-import { useForgetWorkspace, useWorkspace } from './use-workspace';
+import { useWorkspace } from './use-workspace';
 import { WorkspaceSwitcher } from './workspace-switcher';
 
 type Section = {
@@ -152,13 +151,6 @@ export function WorkspaceLayout() {
     // Only a workspace that loaded: a 404 must not become where "/" goes next time.
     if (opened) rememberLastWorkspace(opened);
   }, [opened]);
-  // Deleted, or the person was removed from it while here: "/" ("Ir para o meu espaço") must not
-  // pick it again, from the "last workspace" memory or the list loaded before.
-  const forget = useForgetWorkspace(workspaceId);
-  const gone = workspace.error instanceof ApiError && workspace.error.status === 404;
-  useEffect(() => {
-    if (gone) forget.beforeLeaving();
-  }, [gone, forget]);
 
   return (
     <div className="min-h-svh">
