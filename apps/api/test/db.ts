@@ -16,7 +16,7 @@ export function ownerClient() {
 export async function resetDatabase() {
   const owner = ownerClient();
   try {
-    await owner.$executeRaw`TRUNCATE TABLE installment_plans, recurrence_occurrences, recurrences, budget_configs, transactions, categories, users, sessions, accounts, verifications, rate_limits, invitations, members, workspaces CASCADE`;
+    await owner.$executeRaw`TRUNCATE TABLE imports, installment_plans, recurrence_occurrences, recurrences, budget_configs, transactions, categories, users, sessions, accounts, verifications, rate_limits, invitations, members, workspaces CASCADE`;
   } finally {
     await owner.$disconnect();
   }

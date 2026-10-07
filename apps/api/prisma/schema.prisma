@@ -28,6 +28,7 @@ model Workspace {
   budgetConfigs    BudgetConfig[]
   recurrences      Recurrence[]
   installmentPlans InstallmentPlan[]
+  imports          TransactionImport[]
   occurrences      RecurrenceOccurrence[]
   createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -66,17 +67,18 @@ model Member {
 // ---------------------------------------------------------------------------
 
 model User {
-  id              String       @id @default(uuid(7)) @db.Uuid
-  name            String       @db.VarChar(100)
-  email           String       @unique @db.VarChar(254)
-  emailVerified   Boolean      @default(false) @map("email_verified")
+  id              String              @id @default(uuid(7)) @db.Uuid
+  name            String              @db.VarChar(100)
+  email           String              @unique @db.VarChar(254)
+  emailVerified   Boolean             @default(false) @map("email_verified")
   image           String?
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions        Session[]
   accounts        Account[]
   memberships     Member[]
   invitationsSent Invitation[]
+  importsCreated  TransactionImport[]
 
   @@map("users")
 }
@@ -225,11 +227,36 @@ model Transaction {
   installmentPlanId String?               @map("installment_plan_id") @db.Uuid
   installmentPlan   InstallmentPlan?      @relation(fields: [installmentPlanId], references: [id], onDelete: Cascade)
   installmentNumber Int?                  @map("installment_number") @db.SmallInt
+  // Brought in by a spreadsheet import (ADR 0040): undoing the import deletes it.
+  importId          String?               @map("import_id") @db.Uuid
+  importBatch       TransactionImport?    @relation(fields: [importId], references: [id], onDelete: Cascade)
 
   @@unique([installmentPlanId, installmentNumber])
   @@index([workspaceId, period])
   @@index([categoryId])
+  @@index([importId])
   @@map("transactions")
+}
+
+// Importação (ADR 0040): one spreadsheet import, all its transactions created at once and
+// undone together (deleting it cascades to them). The file never reaches the API: the browser
+// reads it and sends only the confirmed transactions. CHECKs on count and periods are in the
+// migration.
+model TransactionImport {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  workspaceId      String        @map("workspace_id") @db.Uuid
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Who imported; kept as null if that account is later deleted.
+  createdById      String?       @map("created_by") @db.Uuid
+  createdBy        User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  transactionCount Int           @map("transaction_count")
+  firstPeriod      String        @map("first_period") @db.Char(7)
+  lastPeriod       String        @map("last_period") @db.Char(7)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  transactions     Transaction[]
+
+  @@index([workspaceId, createdAt])
+  @@map("imports")
 }
 
 // Parcelamento (ADR 0038): a purchase or debt split into monthly installments. Unlike a

@@ -26,6 +26,7 @@
     "@prisma/client": "catalog:",
     "@sentry/nestjs": "^11.4.0",
     "better-auth": "^1.7.7",
+    "express": "^5.2.1",
     "prisma": "catalog:",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",

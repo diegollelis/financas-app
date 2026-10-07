@@ -29,3 +29,33 @@ export async function ensureUsableCategory(
     throw invalidCategory('Esta categoria está arquivada. Reative-a ou escolha outra.');
   }
 }
+
+/**
+ * The same rule for many transactions at once (a spreadsheet import, ADR 0040): one query for
+ * every distinct category, and the first problem found refuses the whole batch.
+ */
+export async function ensureUsableCategories(
+  prisma: PrismaService,
+  workspaceId: string,
+  uses: { categoryId: string; type: TransactionType }[],
+) {
+  const ids = [...new Set(uses.map((use) => use.categoryId))];
+  const categories = await prisma
+    .forWorkspace(workspaceId)
+    .category.findMany({ where: { id: { in: ids }, workspaceId } });
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  for (const { categoryId, type } of uses) {
+    const category = byId.get(categoryId);
+    if (!category) throw invalidCategory('Categoria não encontrada neste espaço.');
+    if (category.type !== type) {
+      throw invalidCategory(
+        `A categoria ${category.name} é de ${category.type === 'CREDIT' ? 'crédito' : 'débito'}.`,
+      );
+    }
+    if (category.archivedAt) {
+      throw invalidCategory(
+        `A categoria ${category.name} está arquivada. Reative-a ou escolha outra.`,
+      );
+    }
+  }
+}

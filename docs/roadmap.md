@@ -93,7 +93,10 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês
   - [x] Gastos por categoria e categoria ao longo do tempo
-- [ ] Importação do `.xlsx` (com relatório de inconsistências)
+- [ ] Importação do `.xlsx` (com relatório de inconsistências, [ADR 0040](adr/0040-importacao-da-planilha.md))
+  - [x] API: importação registrada, todos os lançamentos de uma vez, desfazer
+  - [ ] Leitura da planilha no navegador e relatório de inconsistências
+  - [ ] Tela "Importar planilha" no Mais
 - [ ] LGPD: termos com aceite no cadastro, exportação e exclusão de conta (a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
 - [x] Domínio próprio, `financas.codelelis.com` ([ADR 0039](adr/0039-dominio-proprio.md))
   - [x] Redirecionar o endereço antigo e roteiro no deploy.md
