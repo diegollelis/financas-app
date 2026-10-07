@@ -88,6 +88,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Tela de valor variável: "Fixo | Variável", aviso "Estimado" e "Efetivar" pedindo o valor
   - [x] "Parcelado" no "Novo lançamento", selo "Parcela n/N" e "Encerrar parcelamento" no menu
   - [x] Tela "Recorrências" no Mais: listar, editar (só o que mudou) e encerrar
+  - [ ] "Tornar recorrente" no menu de um lançamento existente: criar a recorrência adotando o lançamento como o primeiro mês, sem duplicar
 - [ ] Rateio de lançamentos (ADR próprio)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
@@ -97,9 +98,16 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] API: importação registrada, todos os lançamentos de uma vez, desfazer
   - [x] Planilha modelo: gerar no navegador, ler e relatório de inconsistências
   - [x] Tela "Importar planilha" no Mais: prévia por competência, editar e corrigir linhas, correspondência de categorias, desfazer
-- [ ] LGPD: termos com aceite no cadastro, exportação e exclusão de conta (a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
+- [ ] LGPD ([ADR 0041](adr/0041-termos-exportacao-e-exclusao-de-conta.md); a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
+  - [ ] Termos de uso em `/termos`, aceite no cadastro e tela de aceite para contas existentes e o Google
+  - [ ] Exportação dos dados em JSON
+  - [ ] Exclusão de conta com link por e-mail e página `/conta`
 - [x] Domínio próprio, `financas.codelelis.com` ([ADR 0039](adr/0039-dominio-proprio.md))
   - [x] Redirecionar o endereço antigo e roteiro no deploy.md
   - [x] DNS no Cloudflare, domínio no Pages e variáveis de produção
   - [x] E-mail com o domínio verificado no Resend
   - [x] Exigir a verificação de e-mail no cadastro
+
+## Fase 6 — Identidade visual
+
+- [ ] Nome, logo, ícones do app e paleta definitivos, a partir das referências geradas pelo dono do projeto

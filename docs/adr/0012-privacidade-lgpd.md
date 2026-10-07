@@ -32,3 +32,7 @@ A aplicação pública vai armazenar dados financeiros pessoais de terceiros, o 
 ## Nota (fase 4, 2026-10-04)
 
 O Google exige uma política de privacidade para publicar a tela de consentimento do login ([ADR 0026](0026-login-com-google.md)). Por isso ela foi antecipada: é a página pública `/privacidade` do front (`apps/web/src/routes/privacy.tsx`), com o contato `financas.app.contato@gmail.com`. O texto descreve só o que o app guarda hoje e deve mudar junto com ele. Enquanto exportação e exclusão de conta não existem no app (fase 5), os pedidos do titular chegam por esse e-mail. Os termos de uso, o aceite no cadastro e uma revisão jurídica continuam na fase 5.
+
+## Nota (fase 5, 2026-10-07)
+
+Os termos de uso com aceite, a exportação dos dados e a exclusão de conta estão decididos no [ADR 0041](0041-termos-exportacao-e-exclusao-de-conta.md). Ele muda uma regra deste ADR: um espaço de que a pessoa é dona e que tem outros membros não é apagado junto com a conta. Em vez disso, a exclusão fica bloqueada até ela resolver esse espaço.

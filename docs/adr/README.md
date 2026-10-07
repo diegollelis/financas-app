@@ -44,3 +44,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0038](0038-recorrencias-e-parcelamentos.md)          | Recorrências geradas ao abrir o mês; parcelamentos gerados de uma vez             | Aceita |
 | [0039](0039-dominio-proprio.md)                       | Domínio próprio: financas.codelelis.com, DNS no Cloudflare, proxy mantido         | Aceita |
 | [0040](0040-importacao-da-planilha.md)                | Importação da planilha: lida no navegador, lançamentos confirmados, desfazível    | Aceita |
+| [0041](0041-termos-exportacao-e-exclusao-de-conta.md) | Termos com aceite, exportação em JSON e exclusão de conta por link                | Aceita |
