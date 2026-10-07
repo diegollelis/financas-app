@@ -56,3 +56,11 @@ Espaços compartilhados ([ADR 0024](0024-espacos-membros-e-espaco-pessoal.md)) s
 
 - Faltam a remoção de membro, a saída do espaço e a promoção a dono. Com elas vem a regra de que todo espaço tem ao menos um `OWNER` ([modelo](../dominio/modelo.md)).
 - Convites aceitos ficam na tabela como histórico (`accepted_at`). Uma limpeza periódica de convites vencidos pode vir depois, se a tabela crescer.
+
+## Nota (status dos convites, 2026-10-07)
+
+A lista de convites do dono deixou de mostrar só os pendentes. Agora ela traz os 30 mais recentes, cada um com o status (`PENDING`, `ACCEPTED` ou `EXPIRED`) e a data do aceite. Antes, um convite aceito sumia da lista sem aviso. Na página Membros:
+
+- o convite pendente pode ser cancelado;
+- o expirado pode ser apagado da lista;
+- o aceito fica, como registro de como a pessoa entrou.

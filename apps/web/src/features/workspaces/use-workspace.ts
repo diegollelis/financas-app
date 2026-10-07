@@ -5,10 +5,12 @@ import {
   memberListResponseSchema,
   workspaceSchema,
   type CreateWorkspaceInput,
+  type Workspace,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import { apiDelete, apiGet, apiPost } from '@/lib/api';
+import { forgetLastWorkspace } from './last-workspace';
 import { workspacesQueryKey } from './use-workspaces';
 
 // Everything about one workspace lives under ['workspaces', id, ...], so a single invalidation
@@ -79,14 +81,23 @@ export function useRemoveMember(workspaceId: string) {
 }
 
 /**
- * Leaving or deleting a workspace: the caller first goes elsewhere (its pages would refetch and
- * find nothing), then this drops what was cached of it and refreshes the list of workspaces.
+ * Leaving or deleting a workspace, before going to "/": takes it out of the cached list and of
+ * the "last workspace" memory, or "/" would open it again and find nothing. The list is then
+ * refetched. Its own cached data is left to TanStack Query's garbage collection: removing it
+ * while its pages are still mounted would refetch it and flash "Espaço não encontrado".
  */
 export function useForgetWorkspace(workspaceId: string) {
   const queryClient = useQueryClient();
-  return () => {
-    queryClient.removeQueries({ queryKey: keys.workspace(workspaceId) });
-    return queryClient.invalidateQueries({ queryKey: workspacesQueryKey, exact: true });
+  return {
+    beforeLeaving() {
+      forgetLastWorkspace(workspaceId);
+      queryClient.setQueryData<Workspace[]>(workspacesQueryKey, (list) =>
+        list?.filter((workspace) => workspace.id !== workspaceId),
+      );
+    },
+    afterLeaving() {
+      return queryClient.invalidateQueries({ queryKey: workspacesQueryKey, exact: true });
+    },
   };
 }
 

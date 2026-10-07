@@ -68,9 +68,9 @@ function MemberRow({ workspace, member }: { workspace: Workspace; member: Member
     void remove.mutateAsync(member.userId).then(
       () => {
         if (isMe) {
-          // Out of this workspace's pages before they refetch and find nothing.
+          forget.beforeLeaving();
           void navigate('/', { replace: true });
-          void forget();
+          void forget.afterLeaving();
           toast.success(`Você saiu de ${workspace.name}`);
           return;
         }
@@ -155,8 +155,9 @@ function DeleteWorkspace({ workspace }: { workspace: Workspace }) {
   const confirm = () =>
     void deleteWorkspace.mutateAsync().then(
       () => {
+        forget.beforeLeaving();
         void navigate('/', { replace: true });
-        void forget();
+        void forget.afterLeaving();
         toast.success(`Espaço ${workspace.name} excluído`);
       },
       (error: unknown) => toast.error(apiErrorMessage(error)),
@@ -257,8 +258,34 @@ function InviteForm({ workspaceId }: { workspaceId: string }) {
   );
 }
 
-/** One pending invitation; cancelling it asks first, since the link stops working (ADR 0036). */
-function PendingInvitation({
+/** What came of an invitation, as a badge: waiting (until when), accepted or expired (when). */
+function InvitationStatus({ invitation }: { invitation: InvitationResponse }) {
+  if (invitation.status === 'ACCEPTED') {
+    return (
+      <Badge variant="success">
+        Aceito em {dateFormat.format(new Date(invitation.acceptedAt ?? invitation.expiresAt))}
+      </Badge>
+    );
+  }
+  if (invitation.status === 'EXPIRED') {
+    return (
+      <Badge variant="warning">
+        Expirou em {dateFormat.format(new Date(invitation.expiresAt))}
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline">
+      Aguardando, vale até {dateFormat.format(new Date(invitation.expiresAt))}
+    </Badge>
+  );
+}
+
+/**
+ * One invitation. A pending one can be cancelled (its link stops working) and an expired one
+ * cleared from the list; both ask first (ADR 0036). An accepted one stays, as the record.
+ */
+function InvitationRow({
   workspaceId,
   invitation,
 }: {
@@ -266,12 +293,13 @@ function PendingInvitation({
   invitation: InvitationResponse;
 }) {
   const revoke = useRevokeInvitation(workspaceId);
-  // mutateAsync: the row leaves the list when the cancel succeeds, and mutate's callbacks of an
+  const pending = invitation.status === 'PENDING';
+  // mutateAsync: the row leaves the list when this succeeds, and mutate's callbacks of an
   // unmounted component never run.
   const confirmRevoke = () =>
     void revoke.mutateAsync(invitation.id).then(
       () => {
-        toast.success('Convite cancelado');
+        toast.success(pending ? 'Convite cancelado' : 'Convite apagado');
         // The row (and its button) is gone: go back to the section.
         document.getElementById('invite-title')?.focus();
       },
@@ -279,60 +307,64 @@ function PendingInvitation({
     );
 
   return (
-    <li className="flex min-h-14 items-center gap-3 py-2">
-      <span className="grid min-w-0 flex-1">
+    <li className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 py-2">
+      <span className="grid min-w-0 flex-1 gap-1">
         <span className="font-medium break-all">{invitation.email}</span>
-        <span className="text-muted-foreground text-sm">
-          {roleLabels[invitation.role]}, vale até{' '}
-          {dateFormat.format(new Date(invitation.expiresAt))}
+        <span className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">{roleLabels[invitation.role]}</span>
+          <InvitationStatus invitation={invitation} />
         </span>
       </span>
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`Cancelar convite de ${invitation.email}`}
-            disabled={revoke.isPending}
-          >
-            Cancelar
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancelar o convite de {invitation.email}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O link enviado por e-mail deixa de funcionar. Você pode convidar de novo depois.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Manter convite</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmRevoke}>
-              Cancelar convite
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {invitation.status !== 'ACCEPTED' && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`${pending ? 'Cancelar' : 'Apagar'} convite de ${invitation.email}`}
+              disabled={revoke.isPending}
+            >
+              {pending ? 'Cancelar' : 'Apagar'}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {pending
+                  ? `Cancelar o convite de ${invitation.email}?`
+                  : `Apagar o convite expirado de ${invitation.email}?`}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {pending
+                  ? 'O link enviado por e-mail deixa de funcionar. Você pode convidar de novo depois.'
+                  : 'Ele sai da lista. Para dar acesso a essa pessoa, envie um convite novo.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{pending ? 'Manter convite' : 'Manter'}</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={confirmRevoke}>
+                {pending ? 'Cancelar convite' : 'Apagar convite'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </li>
   );
 }
 
-function PendingInvitations({ workspaceId }: { workspaceId: string }) {
+function Invitations({ workspaceId }: { workspaceId: string }) {
   const invitations = useInvitations(workspaceId, true);
 
   if (!invitations.isSuccess || invitations.data.length === 0) return null;
   return (
-    <section aria-labelledby="pending-title" className="grid gap-2">
-      <h3 id="pending-title" className="font-medium">
-        Convites pendentes
+    <section aria-labelledby="invitations-title" className="grid gap-2">
+      <h3 id="invitations-title" className="font-medium">
+        Convites
       </h3>
       <ul className="divide-y rounded-xl border px-4">
         {invitations.data.map((invitation) => (
-          <PendingInvitation
-            key={invitation.id}
-            workspaceId={workspaceId}
-            invitation={invitation}
-          />
+          <InvitationRow key={invitation.id} workspaceId={workspaceId} invitation={invitation} />
         ))}
       </ul>
     </section>
@@ -357,7 +389,7 @@ function Sharing({ workspace }: { workspace: Workspace }) {
         Convidar alguém
       </h2>
       <InviteForm workspaceId={workspace.id} />
-      <PendingInvitations workspaceId={workspace.id} />
+      <Invitations workspaceId={workspace.id} />
     </section>
   );
 }

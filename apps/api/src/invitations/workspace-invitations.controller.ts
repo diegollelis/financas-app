@@ -60,11 +60,11 @@ export class WorkspaceInvitationsController {
 
   @Get()
   @ApiOkResponse({
-    description: 'Pending invitations, newest first.',
+    description: 'The latest invitations, newest first, each with its status.',
     schema: openApi(invitationListResponseSchema),
   })
   list(@CurrentMembership() membership: WorkspaceMembership): Promise<InvitationResponse[]> {
-    return this.invitations.listPending(membership.workspaceId);
+    return this.invitations.list(membership.workspaceId);
   }
 
   @Delete(':invitationId')
