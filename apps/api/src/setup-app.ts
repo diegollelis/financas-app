@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { toNodeHandler } from 'better-auth/node';
+import { json } from 'express';
 import { AUTH, AUTH_BASE_PATH, type Auth } from './auth/auth.js';
 import { trustProxiedClientIp } from './common/client-ip.js';
 import { createValidationPipe } from './common/validation.js';
@@ -8,6 +9,10 @@ import type { Env } from './config/env.js';
 
 /** Prefix of every API route, Nest's and Better Auth's (`/api/auth`). */
 const API_PREFIX = 'api';
+
+/** The import route (ADR 0040), whose body is a whole spreadsheet's transactions. */
+const IMPORTS_PATH = `/${API_PREFIX}/workspaces/:workspaceId/imports`;
+const IMPORT_BODY_LIMIT = '4mb';
 
 /**
  * HTTP setup shared by main.ts and the HTTP tests, so tests run the same pipeline as production.
@@ -42,6 +47,13 @@ export function setupApp(app: NestExpressApplication) {
   // forwards only /api/* to this API (ADR 0033), so local and production paths are the same.
   app.setGlobalPrefix(API_PREFIX);
 
+  // A spreadsheet import (ADR 0040) carries up to 2,000 transactions, some 500 KB and at most
+  // about 3 MB: a larger limit for that route only, mounted first (a parsed body is not parsed
+  // again). Every other route keeps the default 100 KB.
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .post(IMPORTS_PATH, json({ limit: IMPORT_BODY_LIMIT }));
   app.useBodyParser('json');
   app.useBodyParser('urlencoded', { extended: true });
 
