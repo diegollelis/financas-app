@@ -12,6 +12,9 @@ export const FORGOT_PASSWORD_PATH = '/esqueci-senha';
 export const PRIVACY_PATH = '/privacidade';
 export const TERMS_PATH = '/termos';
 
+/** The signed-in person's account page: data export and account deletion (ADR 0041). */
+export const ACCOUNT_PATH = '/conta';
+
 /**
  * The terms of use version in force (ADR 0041): the date of their last relevant change. Changing
  * it asks every user to accept the terms again.

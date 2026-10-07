@@ -30,6 +30,17 @@ const errorBodySchema = z.object({
   message: z.string().optional(),
 });
 
+/** The ApiError of a failed response, with the API's code and message when it sent them. */
+async function apiError(response: Response, method: string, path: string) {
+  const errorBody = errorBodySchema.safeParse(await response.json().catch(() => null));
+  return new ApiError(
+    response.status,
+    `${method} ${path} failed with status ${response.status}`,
+    errorBody.data,
+    Number(response.headers.get('X-Retry-After')) || undefined,
+  );
+}
+
 /**
  * Calls the API and validates the response with the same Zod schema the API uses. If the API
  * breaks the contract, the error shows up here instead of deep inside a component.
@@ -50,15 +61,7 @@ async function request<T extends z.ZodType>(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok) {
-    const errorBody = errorBodySchema.safeParse(await response.json().catch(() => null));
-    throw new ApiError(
-      response.status,
-      `${method} ${path} failed with status ${response.status}`,
-      errorBody.data,
-      Number(response.headers.get('X-Retry-After')) || undefined,
-    );
-  }
+  if (!response.ok) throw await apiError(response, method, path);
   // 204 No Content (e.g. DELETE): there is no body to read.
   return schema.parse(response.status === 204 ? undefined : await response.json());
 }
@@ -82,4 +85,19 @@ export function apiPatch<T extends z.ZodType>(path: string, body: unknown, schem
 /** For routes that answer 204 No Content. */
 export async function apiDelete(path: string): Promise<void> {
   await request('DELETE', path, z.undefined());
+}
+
+/**
+ * A file the API sends as an attachment (the data export, ADR 0041): its content and the name
+ * from Content-Disposition, or `fallbackName` when it has none.
+ */
+export async function apiDownload(
+  path: string,
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(new URL(path, env.VITE_API_URL), { credentials: 'include' });
+  if (!response.ok) throw await apiError(response, 'GET', path);
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallbackName;
+  return { blob: await response.blob(), filename };
 }
