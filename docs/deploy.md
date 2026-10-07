@@ -257,6 +257,25 @@ Faça os quatro itens em sequência, em poucos minutos: entre o 3 e o 4, o login
    - **No começo, podem cair no spam:** um domínio novo ainda não tem reputação. Marque "Não é spam" nas caixas que você controla; a entrega melhora com o uso.
    - Se continuar no spam depois de algumas semanas, avalie o DMARC `p=quarantine` e o texto dos e-mails.
 
+## Problemas conhecidos
+
+### Deploy do Render falha com "Port scan timeout"
+
+**Sintoma:** em **Render → financas-api → Events**, o deploy aparece como **Deploy failed**. No log, a imagem foi construída e as migrações rodaram ("No pending migrations to apply."), mas logo depois vêm `Port scan timeout reached, no open ports detected` e `Timed Out`. Nenhuma mensagem da API aparece, nem as do Nest ("Mapped … route").
+
+**O que significa:** a API não chegou a abrir a porta a tempo, e o Render desistiu. **A versão anterior continua no ar:** o app não cai, mas a mudança nova não entra. É fácil não perceber, porque o front, publicado pelo Pages, já está na versão nova. Em 2026-10-06, isso fez o cadastro novo conversar com a API antiga: as contas entravam sem confirmar o e-mail.
+
+**O que fazer:**
+
+1. Clique em **Manual Deploy → Deploy latest commit**. Na única vez em que aconteceu, o segundo deploy passou sem mudar nada. A imagem idêntica subia localmente em cerca de 3 segundos, então foi uma travada da instância gratuita, não do código.
+2. Se falhar de novo, abra a aba **Logs** (não o log do deploy) e veja o que a API escreveu depois das migrações.
+3. Para descartar um problema no código, construa e rode a imagem localmente com `NODE_ENV=production`:
+   - construa com `docker build -f apps/api/Dockerfile -t financas-api .`;
+   - rode com variáveis fictícias, apontando para o Postgres local (`host.docker.internal:5434`);
+   - se `/api/health` responder, o código sobe.
+
+**Para não ser pego de surpresa:** depois de cada merge que muda a API, confira em **Events** se o deploy chegou a **Deploy live** antes de testar em produção.
+
 ## Produção atual
 
 - Front: <https://financas.codelelis.com>. O antigo <https://financas-app-t2l.pages.dev> só redireciona.
