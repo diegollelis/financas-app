@@ -64,3 +64,27 @@ A planilha tem dados bancários: descrições com chaves Pix, contas e nomes de 
 - **A conta que importou fica registrada** (`created_by`). Se essa conta for excluída (LGPD), o registro fica sem autor e a importação continua.
 - **`express` passou a ser dependência direta da API**, na mesma versão que o Nest já usava, para montar o parser de JSON com limite próprio só na rota de importação.
 - **Rever este ADR** se aparecer outro formato de planilha, como CSV de banco ou outra estrutura de abas.
+
+## Nota (só a planilha modelo, 2026-10-07)
+
+A planilha antiga deixou de ser lida diretamente. A importação aceita **só uma planilha modelo**, num formato único que serve a qualquer pessoa do app, que é público. O dono copia o histórico da planilha antiga para o modelo uma vez. O mapeamento das abas mensais (`B22:G42` e `J22:O42`) descrito na Decisão fica sem efeito.
+
+- **Aba "Lançamentos",** uma linha por lançamento e o cabeçalho na linha 1. As colunas são Competência, Tipo, Descrição, Categoria e Valor (obrigatórias) e Vencimento, Efetivado em e Observações (opcionais).
+  - São achadas pelo título, em qualquer ordem e sem depender de maiúsculas ou acentos.
+  - Se a aba foi renomeada, vale a primeira aba.
+- **O que cada célula aceita:**
+  - a competência vem como `2026-09`, `09/2026` ou uma data: o Excel transforma "2026-09" em data;
+  - o valor vem como número ou como texto em reais (`1.500,00`);
+  - as datas vêm como células de data ou como `dd/mm/aaaa`;
+  - uma célula de data é lida em UTC, como a biblioteca a entrega, para não mudar de dia.
+- **"Baixar planilha modelo"** gera o arquivo no próprio navegador, com `write-excel-file` carregado sob demanda. Ele vem com o cabeçalho, uma linha de exemplo fictícia e a aba "Categorias", com as categorias ativas do espaço.
+- **O relatório** (`parseTemplateRows`, em `packages/shared`, puro e testado):
+  - **erros,** que deixam a linha de fora: coluna obrigatória faltando, competência, tipo, valor ou data inválidos, descrição vazia ou longa e valor zero (problema 7);
+  - **avisos:** "Parcela N de M" (problema 6), dado que parece pessoal, como CPF, Pix, conta ou e-mail (problema 12), e efetivação fora da competência.
+- **A categoria chega como nome.** A tela liga cada nome a uma categoria do espaço antes de enviar.
+- **Bibliotecas:** `read-excel-file` e `write-excel-file`, as duas do mesmo autor, só no `apps/web` e carregadas só na tela de importação.
+- **Prévia e edição antes de confirmar.**
+  - A tela lista as linhas por competência, com os totais. Cada linha pode ser desmarcada.
+  - "Editar" abre a mesma gaveta do "Novo lançamento" já preenchida. A mudança vale só na prévia, e nada vai à API antes da confirmação.
+  - Uma linha com erro não é descartada sem escolha: `parseTemplateRows` a devolve em `drafts`, com o que deu para ler (o que é inválido vem vazio), e "Corrigir" a abre no formulário para entrar na importação.
+  - Para mudar muitas linhas de uma vez, a própria planilha continua sendo o melhor lugar: corrige-se e escolhe-se o arquivo de novo.
