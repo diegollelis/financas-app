@@ -1,4 +1,11 @@
-import { categoryListResponseSchema, categorySchema, workspaceSchema } from '@financas/shared';
+import {
+  CATEGORY_USAGE_MONTHS,
+  categoryListResponseSchema,
+  categorySchema,
+  currentPeriod,
+  shiftPeriod,
+  workspaceSchema,
+} from '@financas/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_CATEGORIES } from '../src/categories/default-categories.js';
 import { createTestApp } from './app.js';
@@ -83,6 +90,41 @@ describe('categories', () => {
       const categories = await list(browser, workspaceSchema.parse(created.body).id);
 
       expect(categories).toHaveLength(defaultCount);
+    });
+  });
+
+  describe('recent uses', () => {
+    it('counts each category’s transactions in the last months, for the "Mais usadas" group', async () => {
+      const { browser, personalWorkspaceId } = await t.signUp(maria);
+      const before = await list(browser, personalWorkspaceId);
+      expect(before.every((category) => category.recentUses === 0)).toBe(true);
+      const mercado = before.find((category) => category.name === 'Mercado')!;
+      const energia = before.find((category) => category.name === 'Energia')!;
+      const now = currentPeriod();
+      const add = (categoryId: string, period: string) =>
+        browser
+          .post(`/api/workspaces/${personalWorkspaceId}/transactions`)
+          .send({
+            type: 'DEBIT',
+            description: 'Compra de exemplo',
+            categoryId,
+            amountCents: 1000,
+            period,
+          })
+          .expect(201);
+
+      await add(mercado.id, now);
+      await add(mercado.id, shiftPeriod(now, 1 - CATEGORY_USAGE_MONTHS));
+      await add(energia.id, shiftPeriod(now, -2));
+      // Out of the window: too old, and a future month.
+      await add(energia.id, shiftPeriod(now, -CATEGORY_USAGE_MONTHS));
+      await add(energia.id, shiftPeriod(now, 1));
+
+      const after = await list(browser, personalWorkspaceId);
+      const uses = (id: string) => after.find((category) => category.id === id)!.recentUses;
+      expect(uses(mercado.id)).toBe(2);
+      expect(uses(energia.id)).toBe(1);
+      expect(after.filter((category) => category.recentUses > 0)).toHaveLength(2);
     });
   });
 

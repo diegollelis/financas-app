@@ -1,20 +1,24 @@
-import type {
-  Category,
-  CreateCategoryInput,
-  TransactionType,
-  UpdateCategoryInput,
+import {
+  CATEGORY_USAGE_MONTHS,
+  currentPeriod,
+  shiftPeriod,
+  type Category,
+  type CreateCategoryInput,
+  type TransactionType,
+  type UpdateCategoryInput,
 } from '@financas/shared';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma, type Category as CategoryRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-function toResponse(category: CategoryRow): Category {
+function toResponse(category: CategoryRow, recentUses = 0): Category {
   return {
     id: category.id,
     name: category.name,
     type: category.type,
     archived: category.archivedAt !== null,
+    recentUses,
   };
 }
 
@@ -46,12 +50,24 @@ export class CategoriesService {
 
   /** All of them, archived too: credits first, then debits, each by name. */
   async list(workspaceId: string): Promise<Category[]> {
-    const categories = await this.prisma
-      .forWorkspace(workspaceId)
-      .category.findMany({ where: { workspaceId } });
+    const db = this.prisma.forWorkspace(workspaceId);
+    const now = currentPeriod();
+    const [categories, usage] = await Promise.all([
+      db.category.findMany({ where: { workspaceId } }),
+      // One count per category, on the (workspace_id, period) index.
+      db.transaction.groupBy({
+        by: ['categoryId'],
+        where: {
+          workspaceId,
+          period: { gte: shiftPeriod(now, 1 - CATEGORY_USAGE_MONTHS), lte: now },
+        },
+        _count: { _all: true },
+      }),
+    ]);
+    const uses = new Map(usage.map((row) => [row.categoryId, row._count._all]));
     return categories
       .sort((a, b) => typeOrder[a.type] - typeOrder[b.type] || collator.compare(a.name, b.name))
-      .map(toResponse);
+      .map((category) => toResponse(category, uses.get(category.id) ?? 0));
   }
 
   async create(workspaceId: string, input: CreateCategoryInput): Promise<Category> {

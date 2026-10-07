@@ -301,6 +301,15 @@ async function main() {
       opens: 'dialog' as const,
     },
     {
+      // Its category picker: "Mais usadas" first; its own sheet on the phone, a popover from md.
+      name: 'lancamentos-categoria',
+      path: `/espacos/${workspaceId}/lancamentos`,
+      signedIn: true,
+      open: /^Novo lançamento$/,
+      opens: 'dialog' as const,
+      combobox: 'Categoria',
+    },
+    {
       // The month picker, opened away from this month (the dot shows beside the name).
       name: 'competencia-seletor',
       path: `/espacos/${workspaceId}/lancamentos?competencia=${monthsBefore(period, 14)}`,
@@ -364,6 +373,11 @@ async function main() {
         await page.getByRole('button', { name: target.open }).first().click();
         await page.getByRole(target.opens).waitFor();
         // Lets the opening animation finish.
+        await page.waitForTimeout(400);
+      }
+      if ('combobox' in target && target.combobox) {
+        await page.getByRole('combobox', { name: target.combobox }).click();
+        await page.getByRole('option').first().waitFor();
         await page.waitForTimeout(400);
       }
       const suffix = dark ? '-escuro' : '';

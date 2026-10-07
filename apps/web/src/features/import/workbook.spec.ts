@@ -9,6 +9,7 @@ const category = (n: number, name: string, type: Category['type'], archived = fa
   name,
   type,
   archived,
+  recentUses: 0,
 });
 
 describe('planilha modelo', () => {

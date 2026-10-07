@@ -17,13 +17,7 @@ import { FormField } from '@/components/form-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { CategorySelect } from '@/features/categories/category-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /**
@@ -111,38 +105,6 @@ function installmentsPreview(
     return `${count.data} parcelas de ${formatCents(first)}, total ${formatCents(total)}.`;
   }
   return `${count.data} parcelas: ${count.data - 1} de ${formatCents(first)} e a última de ${formatCents(last)}, total ${formatCents(total)}.`;
-}
-
-/** The category picker; FormField hands it the id and error wiring for its trigger. */
-export function CategorySelect({
-  id,
-  value,
-  onChange,
-  options,
-  ...aria
-}: {
-  id?: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Category[];
-  'aria-invalid'?: boolean;
-  'aria-describedby'?: string;
-}) {
-  return (
-    // An empty value shows the placeholder (Radix items never use '').
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger id={id} className="w-full" {...aria}>
-        <SelectValue placeholder="Escolha…" />
-      </SelectTrigger>
-      <SelectContent position="popper">
-        {options.map((category) => (
-          <SelectItem key={category.id} value={category.id}>
-            {category.archived ? `${category.name} (arquivada)` : category.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
 }
 
 export function TransactionForm({

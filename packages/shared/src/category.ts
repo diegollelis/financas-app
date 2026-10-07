@@ -42,9 +42,17 @@ export const categorySchema = z.object({
   name: z.string(),
   type: transactionTypeSchema,
   archived: z.boolean(),
+  /**
+   * Transactions in the last CATEGORY_USAGE_MONTHS competências, this one included: orders the
+   * "Mais usadas" group of the category picker. 0 where it is not counted (create, update).
+   */
+  recentUses: z.number().int().nonnegative().default(0),
 });
 
 export type Category = z.infer<typeof categorySchema>;
+
+/** How far back `recentUses` counts, in competências. */
+export const CATEGORY_USAGE_MONTHS = 6;
 
 /** `GET /workspaces/:workspaceId/categories`: all of them, archived too, by type and name. */
 export const categoryListResponseSchema = z.array(categorySchema);

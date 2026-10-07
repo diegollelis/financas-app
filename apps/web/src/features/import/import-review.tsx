@@ -12,7 +12,7 @@ import { FormField } from '@/components/form-field';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CategorySelect } from '@/features/transactions/transaction-form';
+import { CategorySelect } from '@/features/categories/category-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 import { ImportRowForm } from './import-row-form';
 import {
