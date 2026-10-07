@@ -2,7 +2,7 @@
  * Screenshots of the main pages at the three review widths of the financas-ui skill (ADR 0036),
  * plus two automatic checks at phone width: horizontal scroll and touch targets under 44px.
  *
- * Needs the API (:3333) and the web app (:5173) running locally. Signs in as a fictitious local
+ * Needs the API (:3333), the web app (:5173) and Mailpit (:8025) running locally. Signs in as a fictitious local
  * user (created on the first run) and adds sample transactions to the current month when it has
  * none, so the pages show real content. Never point this at production.
  *
@@ -15,6 +15,7 @@ import { chromium, type APIRequestContext, type Page } from 'playwright';
 
 const WEB = 'http://localhost:5173';
 const API = 'http://localhost:3333';
+const MAILPIT = 'http://localhost:8025';
 const OUT = new URL('../.screenshots/', import.meta.url);
 
 // Fictitious data only (ADR 0019). Lives only in the local development database.
@@ -46,15 +47,51 @@ function currentPeriod(): string {
     .slice(0, 7);
 }
 
+/** The confirmation link of the newest e-mail Mailpit caught for the demo user. */
+async function verificationLink(api: APIRequestContext): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const search = await api.get(
+      `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${demoUser.email}`)}`,
+    );
+    const { messages } = (await search.json()) as { messages: { ID: string; Subject: string }[] };
+    const message = messages.find((m) => m.Subject === 'Confirme seu e-mail no Finanças');
+    if (message) {
+      const full = (await (await api.get(`${MAILPIT}/api/v1/message/${message.ID}`)).json()) as {
+        Text: string;
+      };
+      const link = /https?:\/\/\S+/.exec(full.Text)?.[0];
+      if (link) return link;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('No confirmation e-mail in Mailpit for the demo user');
+}
+
+/**
+ * Signs in as the demo user, creating it on the first run. A password needs a verified e-mail
+ * (ADR 0022): when the API says it is not, the link it e-mails to Mailpit is opened, as a person
+ * would, and that already signs in.
+ */
 async function signIn(api: APIRequestContext) {
   const headers = { Origin: WEB };
-  const signedIn = await api.post(`${API}/api/auth/sign-in/email`, {
-    headers,
-    data: { email: demoUser.email, password: demoUser.password },
-  });
+  const signInOnce = () =>
+    api.post(`${API}/api/auth/sign-in/email`, {
+      headers,
+      data: { email: demoUser.email, password: demoUser.password },
+    });
+  let signedIn = await signInOnce();
   if (signedIn.ok()) return;
-  const signedUp = await api.post(`${API}/api/auth/sign-up/email`, { headers, data: demoUser });
-  if (!signedUp.ok()) throw new Error(`Could not sign in or sign up: ${signedUp.status()}`);
+  if (signedIn.status() === 401) {
+    const signedUp = await api.post(`${API}/api/auth/sign-up/email`, { headers, data: demoUser });
+    if (!signedUp.ok()) throw new Error(`Could not sign up: ${signedUp.status()}`);
+    signedIn = await signInOnce();
+  }
+  if (signedIn.status() !== 403) throw new Error(`Could not sign in: ${signedIn.status()}`);
+  // Not verified: this sign-in has just e-mailed a fresh link.
+  const verified = await api.get(await verificationLink(api), { maxRedirects: 0 });
+  if (verified.status() !== 302) throw new Error(`Could not verify: ${verified.status()}`);
+  signedIn = await signInOnce();
+  if (!signedIn.ok()) throw new Error(`Could not sign in after verifying: ${signedIn.status()}`);
 }
 
 /** The competência `months` before `period` ('2026-01', 1 → '2025-12'). */
@@ -251,6 +288,7 @@ async function main() {
     { name: 'orcamento', path: `/espacos/${workspaceId}/orcamento`, signedIn: true },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
     { name: 'recorrencias', path: `/espacos/${workspaceId}/recorrencias`, signedIn: true },
+    { name: 'importar', path: `/espacos/${workspaceId}/importar`, signedIn: true },
     { name: 'analise', path: `/espacos/${workspaceId}/analise`, signedIn: true },
     {
       // On the phone the filters are behind a button; from md they are on the page.

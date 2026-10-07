@@ -88,3 +88,15 @@ A planilha antiga deixou de ser lida diretamente. A importação aceita **só um
   - "Editar" abre a mesma gaveta do "Novo lançamento" já preenchida. A mudança vale só na prévia, e nada vai à API antes da confirmação.
   - Uma linha com erro não é descartada sem escolha: `parseTemplateRows` a devolve em `drafts`, com o que deu para ler (o que é inválido vem vazio), e "Corrigir" a abre no formulário para entrar na importação.
   - Para mudar muitas linhas de uma vez, a própria planilha continua sendo o melhor lugar: corrige-se e escolhe-se o arquivo de novo.
+
+## Nota (tela "Importar planilha", 2026-10-07)
+
+- **A página `/espacos/:workspaceId/importar` fica no "Mais".** Ela tem "Baixar planilha modelo", o campo para escolher o `.xlsx` e a lista "Importações anteriores", com "Desfazer". O "Desfazer" pede confirmação e avisa que os lançamentos editados ou efetivados depois também saem. VIEWERs só veem a lista.
+- **Prévia** (`features/import/import-review.tsx`, com a lógica pura em `features/import/review.ts`):
+  - as linhas aparecem agrupadas por competência, com os créditos e débitos marcados de cada mês;
+  - cada linha tem uma caixa para marcar ou desmarcar, e o rótulo em volta dela dá o alvo de 44 px no celular;
+  - as linhas com erro chegam desmarcadas, e "Corrigir" abre a gaveta (`import-row-form.tsx`) com os campos de um lançamento mais Competência e Efetivado em;
+  - um aviso aparece quando as competências já foram importadas antes, porque importar de novo duplica os lançamentos.
+- **Categorias:** um nome da planilha que bate com uma categoria ativa do mesmo tipo (sem depender de maiúsculas ou acentos) entra direto. Os outros aparecem em "Categorias" para escolher a correspondente; a escolha vale para todas as linhas daquele nome.
+- **"Importar N lançamentos"** envia só as linhas marcadas e válidas, conferidas com o mesmo schema da API. Depois, leva à primeira competência importada.
+- **O script de capturas** (`apps/web/scripts/screenshots.ts`) passou a confirmar o e-mail do usuário fictício pelo Mailpit, já que entrar com senha agora exige e-mail verificado ([ADR 0022](0022-envio-de-email.md)).

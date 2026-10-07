@@ -3,6 +3,7 @@ import {
   ArrowLeftRight,
   ChartColumn,
   ChartPie,
+  FileUp,
   Ellipsis,
   LayoutDashboard,
   Repeat,
@@ -48,6 +49,7 @@ const sections: Section[] = [
   { path: 'orcamento', label: 'Orçamento', icon: ChartPie, byPeriod: true },
   { path: 'analise', label: 'Análise', icon: ChartColumn, more: true },
   { path: 'recorrencias', label: 'Recorrências', icon: Repeat, more: true },
+  { path: 'importar', label: 'Importar', icon: FileUp, more: true },
   { path: 'categorias', label: 'Categorias', icon: Tags, more: true },
   { path: '', label: 'Membros', icon: Users, more: true },
 ];
