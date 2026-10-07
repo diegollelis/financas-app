@@ -145,6 +145,8 @@ export class DataExportService {
         createdAt: iso(invitation.createdAt),
         expiresAt: iso(invitation.expiresAt),
         acceptedAt: isoOrNull(invitation.acceptedAt),
+        removedAt: isoOrNull(invitation.removedAt),
+        leftOnOwn: invitation.leftOnOwn,
       })),
       categories: categories.map((category) => ({
         id: category.id,

@@ -7,6 +7,7 @@ import {
   type CreateInvitationInput,
   type InvitationPreview,
   type InvitationResponse,
+  type InvitationStatus,
   type Workspace,
 } from '@financas/shared';
 import {
@@ -30,14 +31,21 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+function status(invitation: Invitation, now: Date): InvitationStatus {
+  if (invitation.removedAt) return invitation.leftOnOwn ? 'LEFT' : 'REMOVED';
+  if (invitation.acceptedAt) return 'ACCEPTED';
+  return invitation.expiresAt > now ? 'PENDING' : 'EXPIRED';
+}
+
 function toResponse(invitation: Invitation, now = new Date()): InvitationResponse {
   return {
     id: invitation.id,
     email: invitation.email,
     role: invitation.role,
-    status: invitation.acceptedAt ? 'ACCEPTED' : invitation.expiresAt > now ? 'PENDING' : 'EXPIRED',
+    status: status(invitation, now),
     expiresAt: invitation.expiresAt.toISOString(),
     acceptedAt: invitation.acceptedAt && invitation.acceptedAt.toISOString(),
+    removedAt: invitation.removedAt && invitation.removedAt.toISOString(),
   };
 }
 

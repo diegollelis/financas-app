@@ -125,6 +125,35 @@ describe('invitations', () => {
       await owner.browser.delete(`${base}/${accepted.invitation.id}`).expect(404);
     });
 
+    it("records when an accepted invitation's member was removed, or left", async () => {
+      const { owner, workspaceId } = await mariaWithHouse();
+      const base = `/api/workspaces/${workspaceId}`;
+      const forJoao = await invite(owner.browser, workspaceId, joao.email, 'EDITOR');
+      const joaoIn = await t.signUp(joao);
+      await joaoIn.browser.post(`/api/invitations/${forJoao.token}/accept`).expect(200);
+      const forAna = await invite(owner.browser, workspaceId, ana.email, 'VIEWER');
+      const anaIn = await t.signUp(ana);
+      await anaIn.browser.post(`/api/invitations/${forAna.token}/accept`).expect(200);
+      const before = new Date();
+
+      await owner.browser.delete(`${base}/members/${joaoIn.userId}`).expect(204);
+      await anaIn.browser.delete(`${base}/members/${anaIn.userId}`).expect(204);
+
+      const list = invitationListResponseSchema.parse(
+        (await owner.browser.get(`${base}/invitations`).expect(200)).body,
+      );
+      expect(list.map(({ email, status }) => [email, status])).toEqual([
+        [ana.email, 'LEFT'],
+        [joao.email, 'REMOVED'],
+      ]);
+      for (const invitation of list) {
+        expect(invitation.acceptedAt).not.toBeNull();
+        expect(new Date(invitation.removedAt!).getTime()).toBeGreaterThanOrEqual(before.getTime());
+      }
+      // A record, not something to cancel.
+      await owner.browser.delete(`${base}/invitations/${forJoao.invitation.id}`).expect(404);
+    });
+
     it('replaces the previous invitation to the same e-mail', async () => {
       const { owner, workspaceId } = await mariaWithHouse();
       const first = await invite(owner.browser, workspaceId, joao.email);

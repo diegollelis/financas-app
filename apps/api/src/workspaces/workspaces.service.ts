@@ -126,6 +126,7 @@ export class WorkspacesService {
     if (!z.uuid().safeParse(userId).success) throw new NotFoundException();
     const member = await this.prisma.member.findUnique({
       where: { workspaceId_userId: { workspaceId, userId } },
+      include: { user: { select: { email: true } } },
     });
     if (!member) throw new NotFoundException();
     if (member.role === 'OWNER') {
@@ -134,7 +135,19 @@ export class WorkspacesService {
         message: 'O dono não sai do espaço. Para encerrá-lo, exclua o espaço.',
       });
     }
-    await this.prisma.member.delete({ where: { id: member.id } });
+    // The invitation that let them in shows when and how they went (ADR 0027).
+    await this.prisma.$transaction([
+      this.prisma.member.delete({ where: { id: member.id } }),
+      this.prisma.invitation.updateMany({
+        where: {
+          workspaceId,
+          email: member.user.email.toLowerCase(),
+          acceptedAt: { not: null },
+          removedAt: null,
+        },
+        data: { removedAt: new Date(), leftOnOwn: userId === actor.userId },
+      }),
+    ]);
   }
 
   /**

@@ -104,6 +104,9 @@ const exportInvitationSchema = z.object({
   createdAt: instant,
   expiresAt: instant,
   acceptedAt: instant.nullable(),
+  /** When the membership it gave ended, and whether the person left on their own. */
+  removedAt: instant.nullable(),
+  leftOnOwn: z.boolean(),
 });
 
 /** A workspace the person owns: all of it. */

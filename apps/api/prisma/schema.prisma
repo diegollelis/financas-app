@@ -160,6 +160,10 @@ model Invitation {
   invitedBy   User?         @relation(fields: [invitedById], references: [id], onDelete: SetNull)
   expiresAt   DateTime      @map("expires_at") @db.Timestamptz(3)
   acceptedAt  DateTime?     @map("accepted_at") @db.Timestamptz(3)
+  // When the membership it gave ended: the OWNER removed the person, or they left on their own.
+  // The accepted invitation stays as the record of how they came in and went out.
+  removedAt   DateTime?     @map("removed_at") @db.Timestamptz(3)
+  leftOnOwn   Boolean       @default(false) @map("left_on_own")
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 

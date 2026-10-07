@@ -20,8 +20,11 @@ export const createInvitationInputSchema = z.object({
 
 export type CreateInvitationInput = z.infer<typeof createInvitationInputSchema>;
 
-/** Waiting for an answer, accepted, or past its expiry without one. */
-export const invitationStatusSchema = z.enum(['PENDING', 'ACCEPTED', 'EXPIRED']);
+/**
+ * Waiting for an answer, accepted, or past its expiry without one; once accepted, the membership
+ * may have ended: the OWNER removed the person (REMOVED) or they left on their own (LEFT).
+ */
+export const invitationStatusSchema = z.enum(['PENDING', 'ACCEPTED', 'EXPIRED', 'REMOVED', 'LEFT']);
 
 export type InvitationStatus = z.infer<typeof invitationStatusSchema>;
 
@@ -33,6 +36,8 @@ export const invitationSchema = z.object({
   status: invitationStatusSchema,
   expiresAt: z.iso.datetime(),
   acceptedAt: z.iso.datetime().nullable(),
+  /** When the membership ended (REMOVED or LEFT). */
+  removedAt: z.iso.datetime().nullable(),
 });
 
 export type InvitationResponse = z.infer<typeof invitationSchema>;
