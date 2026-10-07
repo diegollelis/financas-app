@@ -99,3 +99,18 @@ Escolhidos com o dono do projeto: **bloquear até resolver**, **JSON completo**,
 - **O arquivo também traz as sessões abertas,** com o IP e o navegador que o app guarda por segurança. Esses dados são da pessoa, e a política de privacidade os menciona.
 - **Uma tabela nova não fica de fora por esquecimento:** um teste lê do banco toda tabela com `workspace_id` e falha se ela não estiver em `EXPORTED_TABLES` (`apps/api/src/account/data-export.service.ts`).
 - **O download passa pelo `fetch`, e não por um link direto.** A tela mostra "Preparando o arquivo…" enquanto ele é montado. Um erro aparece como aviso, em vez de baixar um arquivo com a mensagem de erro.
+
+## Nota (remover membros e excluir espaço, 2026-10-07)
+
+**A regra "bloquear até resolver" precisava de um jeito de resolver.** Até aqui, o app não removia membros nem excluía espaços: só cancelava convites. Então entraram, antes da exclusão de conta:
+
+- `DELETE /workspaces/:workspaceId/members/:userId`: o dono remove qualquer outra pessoa, e qualquer outro membro pode sair sozinho. O dono nunca sai (`OWNER_STAYS`), porque cada espaço tem um único dono. Os lançamentos de quem sai continuam no espaço, que é o dono deles.
+- `DELETE /workspaces/:workspaceId`: só o dono, e nunca no espaço pessoal (`PERSONAL_WORKSPACE`). Apaga o espaço e tudo o que há nele em cascata, inclusive as tabelas com RLS: a cascata de chave estrangeira não passa pelas políticas.
+- **Na página Membros:**
+  - o dono vê "Remover" em cada outra pessoa;
+  - um membro que não é o dono vê "Sair" na própria linha;
+  - o dono de um espaço compartilhado vê "Excluir espaço", que lembra de baixar os dados antes.
+
+  As três ações pedem confirmação, nomeando a pessoa ou o espaço.
+
+Os termos de uso já diziam que o dono pode remover membros a qualquer momento. Agora o app faz isso.

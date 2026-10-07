@@ -4,6 +4,7 @@ import { ApiError } from './api';
 const ptBrCodes = new Set([
   'INVALID_INPUT',
   'PERSONAL_WORKSPACE',
+  'OWNER_STAYS',
   'ALREADY_MEMBER',
   'TOO_MANY_INVITATIONS',
   'EMAIL_MISMATCH',

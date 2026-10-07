@@ -6,7 +6,13 @@ import {
   type Workspace,
   type WorkspaceRole,
 } from '@financas/shared';
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { z } from 'zod';
 import { createDefaultCategories } from '../categories/default-categories.js';
 import type { Member, Workspace as WorkspaceRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -99,6 +105,50 @@ export class WorkspacesService {
       email: member.user.email,
       role: member.role,
     }));
+  }
+
+  /**
+   * Takes someone out of the workspace: the OWNER removes anyone else, and any other member can
+   * leave on their own. The OWNER never leaves (each workspace has exactly one, ADR 0027): to end
+   * a shared workspace, it is deleted. Their transactions stay: they belong to the workspace.
+   */
+  async removeMember(
+    workspaceId: string,
+    actor: { userId: string; role: WorkspaceRole },
+    userId: string,
+  ): Promise<void> {
+    if (actor.role !== 'OWNER' && userId !== actor.userId) {
+      throw new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: 'Só o dono do espaço remove outras pessoas.',
+      });
+    }
+    if (!z.uuid().safeParse(userId).success) throw new NotFoundException();
+    const member = await this.prisma.member.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+    });
+    if (!member) throw new NotFoundException();
+    if (member.role === 'OWNER') {
+      throw new ConflictException({
+        code: 'OWNER_STAYS',
+        message: 'O dono não sai do espaço. Para encerrá-lo, exclua o espaço.',
+      });
+    }
+    await this.prisma.member.delete({ where: { id: member.id } });
+  }
+
+  /**
+   * Deletes a shared workspace with everything in it (members, invitations and all the business
+   * tables, by cascade). The personal one stays for as long as the account (ADR 0024).
+   */
+  async delete(workspaceId: string, isPersonal: boolean): Promise<void> {
+    if (isPersonal) {
+      throw new ConflictException({
+        code: 'PERSONAL_WORKSPACE',
+        message: 'O espaço pessoal não pode ser excluído: ele existe enquanto a conta existir.',
+      });
+    }
+    await this.prisma.workspace.delete({ where: { id: workspaceId } });
   }
 
   private findMemberships(userId: string) {

@@ -1,11 +1,14 @@
 import {
+  ACCOUNT_PATH,
   createInvitationInputSchema,
   type CreateInvitationInput,
   type InvitationResponse,
+  type MemberResponse,
   type Workspace,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
+import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import type { z } from 'zod';
 import { FormField } from '@/components/form-field';
@@ -26,12 +29,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useCurrentUser } from '@/features/auth/use-me';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { roleLabels } from '@/features/workspaces/roles';
 import {
   useCreateInvitation,
+  useDeleteWorkspace,
+  useForgetWorkspace,
   useInvitations,
   useMembers,
+  useRemoveMember,
   useRevokeInvitation,
 } from '@/features/workspaces/use-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -43,26 +50,158 @@ const accessOptions = [
   { value: 'VIEWER', label: 'Só visualizar' },
 ] as const;
 
-function Members({ workspaceId }: { workspaceId: string }) {
-  const members = useMembers(workspaceId);
+/**
+ * One member. The OWNER can remove anyone else; any other member can leave (ADR 0041). Both ask
+ * first, naming the person or the workspace.
+ */
+function MemberRow({ workspace, member }: { workspace: Workspace; member: MemberResponse }) {
+  const me = useCurrentUser();
+  const navigate = useNavigate();
+  const remove = useRemoveMember(workspace.id);
+  const forget = useForgetWorkspace(workspace.id);
+  const isMe = member.userId === me.id;
+  const canRemove = member.role !== 'OWNER' && (workspace.role === 'OWNER' || isMe);
+
+  // mutateAsync: the row leaves the list on success, and an unmounted component's mutate
+  // callbacks never run.
+  const confirm = () =>
+    void remove.mutateAsync(member.userId).then(
+      () => {
+        if (isMe) {
+          // Out of this workspace's pages before they refetch and find nothing.
+          void navigate('/', { replace: true });
+          void forget();
+          toast.success(`Você saiu de ${workspace.name}`);
+          return;
+        }
+        toast.success(`${member.name} foi removido do espaço`);
+        document.getElementById('members-title')?.focus();
+      },
+      (error: unknown) => toast.error(apiErrorMessage(error)),
+    );
+
+  return (
+    <li className="flex min-h-14 items-center gap-3 py-2">
+      <span className="grid min-w-0 flex-1">
+        <span className="font-medium break-words">
+          {member.name}
+          {isMe && <span className="text-muted-foreground font-normal"> (você)</span>}
+        </span>
+        <span className="text-muted-foreground text-sm break-all">{member.email}</span>
+      </span>
+      <Badge variant="secondary">{roleLabels[member.role]}</Badge>
+      {canRemove && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={isMe ? `Sair de ${workspace.name}` : `Remover ${member.name}`}
+              disabled={remove.isPending}
+            >
+              {isMe ? 'Sair' : 'Remover'}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {isMe ? `Sair de ${workspace.name}?` : `Remover ${member.name} do espaço?`}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {isMe
+                  ? 'Você deixa de ver os dados deste espaço. Para voltar, o dono precisa convidar você de novo.'
+                  : `${member.name} deixa de ver e de mudar os dados de ${workspace.name}. Os lançamentos continuam no espaço, e você pode convidar de novo depois.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={confirm}>
+                {isMe ? 'Sair do espaço' : 'Remover'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </li>
+  );
+}
+
+function Members({ workspace }: { workspace: Workspace }) {
+  const members = useMembers(workspace.id);
 
   return (
     <>
+      {/* Focusable from script: where focus goes after removing someone. */}
+      <h2 id="members-title" tabIndex={-1} className="sr-only">
+        Membros do espaço
+      </h2>
       <QueryState queries={[members]} skeleton={<ListSkeleton rows={2} />} />
       {members.isSuccess && (
-        <ul aria-label="Membros do espaço" className="divide-y rounded-xl border px-4">
+        <ul aria-labelledby="members-title" className="divide-y rounded-xl border px-4">
           {members.data.map((member) => (
-            <li key={member.userId} className="flex min-h-14 items-center gap-3 py-2">
-              <span className="grid min-w-0 flex-1">
-                <span className="font-medium break-words">{member.name}</span>
-                <span className="text-muted-foreground text-sm break-all">{member.email}</span>
-              </span>
-              <Badge variant="secondary">{roleLabels[member.role]}</Badge>
-            </li>
+            <MemberRow key={member.userId} workspace={workspace} member={member} />
           ))}
         </ul>
       )}
     </>
+  );
+}
+
+/** The OWNER ends a shared workspace, with everything in it. Never the personal one. */
+function DeleteWorkspace({ workspace }: { workspace: Workspace }) {
+  const navigate = useNavigate();
+  const deleteWorkspace = useDeleteWorkspace(workspace.id);
+  const forget = useForgetWorkspace(workspace.id);
+  const confirm = () =>
+    void deleteWorkspace.mutateAsync().then(
+      () => {
+        void navigate('/', { replace: true });
+        void forget();
+        toast.success(`Espaço ${workspace.name} excluído`);
+      },
+      (error: unknown) => toast.error(apiErrorMessage(error)),
+    );
+
+  return (
+    <section aria-labelledby="delete-workspace-title" className="grid gap-3">
+      <h2 id="delete-workspace-title" className="font-medium">
+        Excluir espaço
+      </h2>
+      <p className="text-muted-foreground">
+        Apaga o espaço e tudo o que há nele: lançamentos, categorias, orçamentos, recorrências e
+        parcelamentos. Os membros perdem o acesso. Para guardar uma cópia, baixe seus dados em{' '}
+        <Link to={ACCOUNT_PATH} className="text-primary underline">
+          Minha conta
+        </Link>{' '}
+        antes.
+      </p>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="outline"
+            className="text-destructive justify-self-start"
+            disabled={deleteWorkspace.isPending}
+          >
+            Excluir espaço
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir o espaço {workspace.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todos os dados de {workspace.name} são apagados, e os membros perdem o acesso. Não é
+              possível desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirm}>
+              Excluir espaço
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
   );
 }
 
@@ -229,8 +368,11 @@ export function WorkspacePage() {
   return (
     <>
       <PageHeader title="Membros" description={`Seu acesso: ${roleLabels[workspace.role]}`} />
-      <Members workspaceId={workspace.id} />
+      <Members workspace={workspace} />
       <Sharing workspace={workspace} />
+      {workspace.role === 'OWNER' && !workspace.isPersonal && (
+        <DeleteWorkspace workspace={workspace} />
+      )}
     </>
   );
 }

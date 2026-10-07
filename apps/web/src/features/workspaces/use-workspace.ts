@@ -68,3 +68,29 @@ export function useRevokeInvitation(workspaceId: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.invitations(workspaceId) }),
   });
 }
+
+/** The OWNER removes someone, or a member removes themselves (leaves). */
+export function useRemoveMember(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => apiDelete(`/api/workspaces/${workspaceId}/members/${userId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.members(workspaceId) }),
+  });
+}
+
+/**
+ * Leaving or deleting a workspace: the caller first goes elsewhere (its pages would refetch and
+ * find nothing), then this drops what was cached of it and refreshes the list of workspaces.
+ */
+export function useForgetWorkspace(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.removeQueries({ queryKey: keys.workspace(workspaceId) });
+    return queryClient.invalidateQueries({ queryKey: workspacesQueryKey, exact: true });
+  };
+}
+
+/** A shared workspace and everything in it (OWNER only; never the personal one). */
+export function useDeleteWorkspace(workspaceId: string) {
+  return useMutation({ mutationFn: () => apiDelete(`/api/workspaces/${workspaceId}`) });
+}

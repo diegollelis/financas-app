@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { fakeUser, mockApi, personalWorkspace } from '@/test/mock-api';
+import { fakeUser, mockApi, personalWorkspace, signedInHome } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 const houseId = '01920000-0000-7000-8000-000000000002';
@@ -147,6 +147,78 @@ describe('WorkspacePage', () => {
     expect(screen.queryByRole('heading', { name: 'Convidar alguém' })).not.toBeInTheDocument();
   });
 
+  it('lets the OWNER remove a member, after naming them', async () => {
+    const joao = members[1]!;
+    const fetchMock = mockHouse({
+      [`DELETE /api/workspaces/${houseId}/members/${joao.userId}`]: { status: 204, body: null },
+    });
+    renderApp(`/espacos/${houseId}`);
+
+    // The OWNER's own row has no button: the OWNER never leaves.
+    expect(await screen.findByRole('button', { name: 'Remover João Exemplo' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Sair de/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Remover João Exemplo' }));
+    const confirm = await screen.findByRole('alertdialog', {
+      name: 'Remover João Exemplo do espaço?',
+    });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Remover' }));
+
+    expect(await screen.findByText('João Exemplo foi removido do espaço')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(`/api/workspaces/${houseId}/members/${joao.userId}`, 'http://api.test'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('lets any other member leave, and goes back to their own workspaces', async () => {
+    const viewer = { ...members[1]!, userId: fakeUser.id, name: fakeUser.name };
+    const fetchMock = mockApi({
+      ...signedInHome,
+      [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } },
+      [`GET /api/workspaces/${houseId}/members`]: {
+        body: [{ ...members[0]!, userId: members[1]!.userId, name: 'Dona da Casa' }, viewer],
+      },
+      [`DELETE /api/workspaces/${houseId}/members/${fakeUser.id}`]: { status: 204, body: null },
+    });
+    const { router } = renderApp(`/espacos/${houseId}`);
+
+    expect(screen.queryByRole('button', { name: /^Remover/ })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Sair de Casa' }));
+    const confirm = await screen.findByRole('alertdialog', { name: 'Sair de Casa?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Sair do espaço' }));
+
+    expect(await screen.findByText('Você saiu de Casa')).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/painel`),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(`/api/workspaces/${houseId}/members/${fakeUser.id}`, 'http://api.test'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('lets the OWNER delete a shared workspace, after confirming', async () => {
+    const fetchMock = mockHouse({
+      ...signedInHome,
+      [`DELETE /api/workspaces/${houseId}`]: { status: 204, body: null },
+    });
+    const { router } = renderApp(`/espacos/${houseId}`);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Excluir espaço' }));
+    const confirm = await screen.findByRole('alertdialog', { name: 'Excluir o espaço Casa?' });
+    expect(confirm).toHaveTextContent('Não é possível desfazer.');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Excluir espaço' }));
+
+    expect(await screen.findByText('Espaço Casa excluído')).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/painel`),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(`/api/workspaces/${houseId}`, 'http://api.test'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
   it('explains that the personal workspace is not shared', async () => {
     mockApi({
       'GET /api/me': { body: fakeUser },
@@ -158,6 +230,7 @@ describe('WorkspacePage', () => {
 
     expect(await screen.findByText(/Este é o seu espaço pessoal/)).toBeInTheDocument();
     expect(screen.queryByLabelText('E-mail da pessoa')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Excluir espaço' })).not.toBeInTheDocument();
   });
 
   it('answers "not found" for a workspace that is not yours', async () => {
