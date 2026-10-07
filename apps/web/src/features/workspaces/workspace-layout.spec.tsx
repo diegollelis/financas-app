@@ -1,8 +1,12 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { navigateAway } from '@/lib/browser';
 import { fakeUser, mockApi, personalWorkspace } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
+
+// jsdom cannot load another page: sign-out's full navigation is checked by its argument.
+vi.mock('@/lib/browser', () => ({ navigateAway: vi.fn() }));
 
 // Fictitious data (ADR 0019).
 const houseId = '01920000-0000-7000-8000-000000000002';
@@ -153,16 +157,17 @@ describe('WorkspaceLayout', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('signs out from the account menu', async () => {
+  it('signs out from the account menu, loading the plain sign-in page', async () => {
     mockHouse({ 'POST /api/auth/sign-out': { body: { success: true } } });
-    renderApp(`/espacos/${houseId}`);
+    renderApp(`/espacos/${houseId}/painel`);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Menu da conta' }));
     const menu = await screen.findByRole('menu');
     expect(menu).toHaveTextContent(fakeUser.email);
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Sair' }));
 
-    expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
+    // No ?voltar= to this workspace: whoever signs in next may be another account.
+    await vi.waitFor(() => expect(navigateAway).toHaveBeenCalledWith('/entrar'));
   });
 
   it('answers "not found" without the sections for a workspace that is not yours', async () => {
