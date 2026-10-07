@@ -310,6 +310,8 @@ describe('WorkspacePage', () => {
 
     renderApp(`/espacos/${houseId}`);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Espaço não encontrado.');
+    expect(
+      await screen.findByRole('alertdialog', { name: 'Espaço não encontrado' }),
+    ).toBeInTheDocument();
   });
 });

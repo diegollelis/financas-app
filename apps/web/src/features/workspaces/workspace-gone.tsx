@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useForgetWorkspace } from './use-workspace';
 
@@ -8,15 +16,17 @@ export const WORKSPACE_GONE_REDIRECT_SECONDS = 5;
 
 /**
  * A workspace page answered 404: the workspace was deleted, or the person was removed from it
- * (the API gives the same answer to both, ADR 0025). Explains it, forgets it as the last
- * workspace (or "/" would pick it again) and goes to "/" after a short countdown, or at once
- * with the button: nobody is left stuck on a page that can no longer load.
+ * (the API gives the same answer to both, ADR 0025). A modal that cannot be dismissed explains
+ * it and blocks the page behind, which can no longer load; it forgets the workspace as the last
+ * one (or "/" would pick it again) and goes to "/" after a short countdown, or at once with the
+ * button.
  */
 export function WorkspaceGone() {
   const { workspaceId = '' } = useParams();
   const navigate = useNavigate();
   const forget = useForgetWorkspace(workspaceId);
   const [seconds, setSeconds] = useState(WORKSPACE_GONE_REDIRECT_SECONDS);
+  const leave = () => void navigate('/', { replace: true });
 
   useEffect(() => {
     forget.beforeLeaving();
@@ -31,19 +41,25 @@ export function WorkspaceGone() {
   }, [seconds, navigate]);
 
   return (
-    <div className="grid justify-items-start gap-3">
-      <p role="alert">
-        Espaço não encontrado. Ele pode ter sido excluído, ou você não faz mais parte dele.
-      </p>
-      {/* Not a live region: a number announced every second would only be noise. */}
-      <p className="text-muted-foreground">
-        Levando você para o seu espaço em {seconds} {seconds === 1 ? 'segundo' : 'segundos'}…
-      </p>
-      <Button asChild variant="outline">
-        <Link to="/" replace>
-          Ir para o meu espaço agora
-        </Link>
-      </Button>
-    </div>
+    // Always open; closing it is leaving. Escape does nothing: there is nowhere to stay.
+    <AlertDialog open>
+      <AlertDialogContent onEscapeKeyDown={(event) => event.preventDefault()}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Espaço não encontrado</AlertDialogTitle>
+          <AlertDialogDescription>
+            Ele pode ter sido excluído, ou você não faz mais parte dele.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {/* Not a live region: a number announced every second would only be noise. */}
+        <p className="text-muted-foreground text-center text-sm">
+          Levando você para o seu espaço em {seconds} {seconds === 1 ? 'segundo' : 'segundos'}…
+        </p>
+        <AlertDialogFooter>
+          <Button onClick={leave} autoFocus>
+            Ir para o meu espaço agora
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

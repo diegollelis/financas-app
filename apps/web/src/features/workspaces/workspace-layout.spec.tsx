@@ -177,11 +177,12 @@ describe('WorkspaceLayout', () => {
 
     renderApp(`/espacos/${houseId}/painel`);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Espaço não encontrado.');
-    expect(screen.getByRole('link', { name: 'Ir para o meu espaço agora' })).toHaveAttribute(
-      'href',
-      '/',
-    );
+    const gone = await screen.findByRole('alertdialog', { name: 'Espaço não encontrado' });
+    expect(gone).toHaveTextContent('Ele pode ter sido excluído, ou você não faz mais parte dele.');
+    // The only way on: there is nothing to stay for.
+    expect(within(gone).getByRole('button', { name: 'Ir para o meu espaço agora' })).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('alertdialog', { name: 'Espaço não encontrado' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Seções do espaço' })).not.toBeInTheDocument();
   });
 
@@ -216,10 +217,9 @@ describe('WorkspaceLayout', () => {
     });
     const { router } = renderApp(`/espacos/${houseId}/painel`);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Ele pode ter sido excluído, ou você não faz mais parte dele.',
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ir para o meu espaço agora' }),
     );
-    await userEvent.click(screen.getByRole('link', { name: 'Ir para o meu espaço agora' }));
 
     await vi.waitFor(() =>
       expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/painel`),

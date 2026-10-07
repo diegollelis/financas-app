@@ -239,7 +239,9 @@ describe('CategoriesPage', () => {
 
     renderApp(`/espacos/${houseId}/categorias`);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Espaço não encontrado.');
+    expect(
+      await screen.findByRole('alertdialog', { name: 'Espaço não encontrado' }),
+    ).toBeInTheDocument();
   });
 
   it('is reached from the sections of the workspace', async () => {
