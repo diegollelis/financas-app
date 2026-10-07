@@ -9,6 +9,7 @@ import { RootLayout } from '@/components/root-layout';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
 import { WorkspaceLayout } from '@/features/workspaces/workspace-layout';
 import { AnalysisPage } from '@/routes/analysis';
+import { ImportPage } from '@/routes/import';
 import { RecurrencesPage } from '@/routes/recurrences';
 import { BudgetPage } from '@/routes/budget';
 import { CategoriesPage } from '@/routes/categories';
@@ -56,6 +57,8 @@ export const routes: RouteObject[] = [
               { path: 'analise', element: <AnalysisPage /> },
               // Recurrences and installment plans (ADR 0038).
               { path: 'recorrencias', element: <RecurrencesPage /> },
+              // The spreadsheet is read in the browser; only confirmed rows go out (ADR 0040).
+              { path: 'importar', element: <ImportPage /> },
             ],
           },
         ],
