@@ -6,7 +6,12 @@ import { testEnv } from './test-env.js';
 
 // Google sign-in, end to end, with Google's token endpoint faked (ADR 0026).
 // All data here is fictitious (ADR 0019).
-const maria = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
+const maria = {
+  name: 'Maria Exemplo',
+  email: 'maria@example.com',
+  password: 'senha-de-teste-123',
+  acceptTerms: true,
+};
 const mariaOnGoogle: GoogleProfile = { sub: 'google-maria', email: maria.email, name: maria.name };
 
 describe('Google sign-in', () => {
@@ -69,7 +74,8 @@ describe('Google sign-in', () => {
 
     expect(location).toBe(`${testEnv.WEB_ORIGIN}/`);
     const me = await browser.get('/api/me').expect(200);
-    expect(me.body).toMatchObject({ email: maria.email, emailVerified: true });
+    // No checkbox on Google: the web app asks for the terms on the first visit (ADR 0041).
+    expect(me.body).toMatchObject({ email: maria.email, emailVerified: true, termsVersion: null });
     const workspaces = await browser.get('/api/workspaces').expect(200);
     expect(workspaces.body).toMatchObject([{ name: 'Pessoal', isPersonal: true, role: 'OWNER' }]);
   });

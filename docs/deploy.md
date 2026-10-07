@@ -257,6 +257,18 @@ Faça os quatro itens em sequência, em poucos minutos: entre o 3 e o 4, o login
    - **No começo, podem cair no spam:** um domínio novo ainda não tem reputação. Marque "Não é spam" nas caixas que você controla; a entrega melhora com o uso.
    - Se continuar no spam depois de algumas semanas, avalie o DMARC `p=quarantine` e o texto dos e-mails.
 
+### 7.4 Receber e-mail no domínio (contato)
+
+O Resend só envia. O contato público, `financas@codelelis.com` (política de privacidade e termos), é recebido pelo **Cloudflare Email Routing**, que encaminha para a caixa do projeto, `financas.app.contato@gmail.com`.
+
+1. Em **codelelis.com → Email → Email Routing**, ative o roteamento (**Get started** ou **Onboard Domain**). O Cloudflare cria e trava os registros **MX** e **SPF** da raiz. Eles não conflitam com os do Resend, que ficam em `send.codelelis.com`.
+2. Em **Routing rules → Create routing rule**:
+   - **Email pattern:** `financas` @ `codelelis.com`;
+   - **Action:** **Send to an email**;
+   - **Destination:** `financas.app.contato@gmail.com`, confirmado pelo link que o Cloudflare envia.
+3. Deixe a regra **catch-all** desligada: ela receberia qualquer endereço do domínio, e com isso só spam.
+4. **Confira:** de outro e-mail, escreva para `financas@codelelis.com`. A mensagem deve chegar no Gmail do projeto.
+
 ## Problemas conhecidos
 
 ### Deploy do Render falha com "Port scan timeout"

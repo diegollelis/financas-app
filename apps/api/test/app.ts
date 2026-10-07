@@ -61,7 +61,10 @@ export async function createTestApp() {
      */
     async signUp(user: { name: string; email: string; password: string }) {
       const browser = http();
-      await browser.post('/api/auth/sign-up/email').send(user).expect(200);
+      await browser
+        .post('/api/auth/sign-up/email')
+        .send({ ...user, acceptTerms: true })
+        .expect(200);
       const { id: userId } = await prisma.user.update({
         where: { email: user.email },
         data: { emailVerified: true },

@@ -99,7 +99,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Planilha modelo: gerar no navegador, ler e relatório de inconsistências
   - [x] Tela "Importar planilha" no Mais: prévia por competência, editar e corrigir linhas, correspondência de categorias, desfazer
 - [ ] LGPD ([ADR 0041](adr/0041-termos-exportacao-e-exclusao-de-conta.md); a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
-  - [ ] Termos de uso em `/termos`, aceite no cadastro e tela de aceite para contas existentes e o Google
+  - [x] Termos de uso em `/termos`, aceite no cadastro e tela de aceite para contas existentes e o Google
   - [ ] Exportação dos dados em JSON
   - [ ] Exclusão de conta com link por e-mail e página `/conta`
 - [x] Domínio próprio, `financas.codelelis.com` ([ADR 0039](adr/0039-dominio-proprio.md))

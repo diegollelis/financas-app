@@ -8,6 +8,16 @@ export const PASSWORD_MAX_LENGTH = 128;
 export const SIGN_IN_PATH = '/entrar';
 export const FORGOT_PASSWORD_PATH = '/esqueci-senha';
 
+/** Public legal pages (ADRs 0012 and 0041). */
+export const PRIVACY_PATH = '/privacidade';
+export const TERMS_PATH = '/termos';
+
+/**
+ * The terms of use version in force (ADR 0041): the date of their last relevant change. Changing
+ * it asks every user to accept the terms again.
+ */
+export const TERMS_VERSION = '2026-10-07';
+
 /** Web page that receives the password reset link (the API builds the e-mail link to it). */
 export const RESET_PASSWORD_PATH = '/redefinir-senha';
 
@@ -34,6 +44,9 @@ export const passwordSchema = z
   .min(PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`)
   .max(PASSWORD_MAX_LENGTH, `A senha pode ter no máximo ${PASSWORD_MAX_LENGTH} caracteres.`);
 
+const ACCEPT_TERMS_MESSAGE =
+  'Aceite os Termos de uso e a Política de privacidade para criar a conta.';
+
 export const signUpInputSchema = z.object({
   name: z
     .string()
@@ -42,6 +55,8 @@ export const signUpInputSchema = z.object({
     .max(NAME_MAX_LENGTH, `Use no máximo ${NAME_MAX_LENGTH} caracteres.`),
   email: emailSchema,
   password: passwordSchema,
+  // A boolean (not z.literal(true)), so the form can start unchecked; only true passes.
+  acceptTerms: z.boolean(ACCEPT_TERMS_MESSAGE).refine((accepted) => accepted, ACCEPT_TERMS_MESSAGE),
 });
 
 export type SignUpInput = z.infer<typeof signUpInputSchema>;
@@ -84,12 +99,21 @@ export const meResponseSchema = z.object({
   name: z.string(),
   email: z.email(),
   emailVerified: z.boolean(),
+  /** The terms version accepted (ADR 0041); anything but TERMS_VERSION asks for acceptance. */
+  termsVersion: z.string().nullable(),
 });
 
 export type MeResponse = z.infer<typeof meResponseSchema>;
 
 /** Body of a successful sign-up or sign-in. Only the user is read; the session is the cookie. */
 export const authResponseSchema = z.object({ user: meResponseSchema });
+
+/** Body of `POST /me/terms`: only the version in force can be accepted. */
+export const acceptTermsInputSchema = z.object({
+  version: z.literal(TERMS_VERSION, 'Estes termos mudaram. Recarregue a página e leia de novo.'),
+});
+
+export type AcceptTermsInput = z.infer<typeof acceptTermsInputSchema>;
 
 /** Body of an error from the auth routes (`/api/auth/*`). */
 export const authErrorSchema = z.object({

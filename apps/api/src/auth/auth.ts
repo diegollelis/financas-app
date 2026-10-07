@@ -7,6 +7,7 @@ import {
   safeReturnTo,
   SIGN_IN_PATH,
   signUpInputSchema,
+  TERMS_VERSION,
 } from '@financas/shared';
 import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
@@ -118,6 +119,14 @@ export function createAuth(
     secret: env.BETTER_AUTH_SECRET,
     // Requests that carry cookies are only accepted from these origins (CSRF protection).
     trustedOrigins: [env.WEB_ORIGIN],
+    user: {
+      // The terms of use accepted (ADR 0041). Never set from a request body (input: false): the
+      // e-mail sign-up records them below, and POST /me/terms records the rest.
+      additionalFields: {
+        termsVersion: { type: 'string', required: false, input: false },
+        termsAcceptedAt: { type: 'date', required: false, input: false, returned: false },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: PASSWORD_MIN_LENGTH,
@@ -212,6 +221,14 @@ export function createAuth(
       },
       user: {
         create: {
+          // The e-mail sign-up only gets here with acceptTerms checked (bodySchemas). A Google
+          // sign-up has no checkbox: the web app asks on the first visit (ADR 0041).
+          before: (user, context) =>
+            Promise.resolve(
+              context?.path === '/sign-up/email'
+                ? { data: { ...user, termsVersion: TERMS_VERSION, termsAcceptedAt: new Date() } }
+                : undefined,
+            ),
           // Runs after the user is committed. A failure must not fail the sign-up: the user can
           // already sign in, and listing workspaces creates the missing personal one.
           after: (user) =>
@@ -234,9 +251,13 @@ export function createAuth(
             message: result.error.issues[0]?.message ?? 'Dados inválidos.',
           });
         }
-        // Continues with the parsed body (e.g. the name already trimmed).
+        // Continues with the parsed body (e.g. the name already trimmed). acceptTerms has done its
+        // job here; Better Auth does not know it.
         const body = ctx.body as Record<string, unknown>;
-        return Promise.resolve({ context: { body: { ...body, ...result.data } } });
+        delete body.acceptTerms;
+        const parsed: Record<string, unknown> = { ...result.data };
+        delete parsed.acceptTerms;
+        return Promise.resolve({ context: { body: { ...body, ...parsed } } });
       }),
     },
     advanced: {

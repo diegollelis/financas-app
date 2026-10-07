@@ -1,4 +1,10 @@
-import { currentPeriod, DEFAULT_BUDGET_SHARES, summarizePeriod, todayIso } from '@financas/shared';
+import {
+  currentPeriod,
+  DEFAULT_BUDGET_SHARES,
+  summarizePeriod,
+  TERMS_VERSION,
+  todayIso,
+} from '@financas/shared';
 import { vi } from 'vitest';
 
 type MockResponse = { status?: number; body: unknown; headers?: Record<string, string> };
@@ -28,6 +34,8 @@ export const fakeUser = {
   name: 'Maria Exemplo',
   email: 'maria@example.com',
   emailVerified: false,
+  // Accepted the terms in force, so pages render without the acceptance screen (ADR 0041).
+  termsVersion: TERMS_VERSION,
 };
 
 /**

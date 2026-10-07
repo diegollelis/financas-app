@@ -5,7 +5,12 @@ import { testEnv } from './test-env.js';
 
 // E-mail verification and password reset, end to end: the e-mail is captured by FakeMailer and
 // the test opens its link like the user would. All data here is fictitious (ADR 0019).
-const user = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
+const user = {
+  name: 'Maria Exemplo',
+  email: 'maria@example.com',
+  password: 'senha-de-teste-123',
+  acceptTerms: true,
+};
 
 /** Path and query of a link, for supertest (which already targets the test server). */
 const pathOf = (link: URL) => `${link.pathname}${link.search}`;

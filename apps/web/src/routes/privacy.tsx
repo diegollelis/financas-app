@@ -1,36 +1,16 @@
-import type { ReactNode } from 'react';
-import { TextLink } from '@/components/text-link';
-
-/** Where data subjects send their requests (LGPD, art. 18). Public on purpose (ADR 0012). */
-const PRIVACY_CONTACT_EMAIL = 'financas.app.contato@gmail.com';
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="grid gap-2">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}
+import { TERMS_PATH } from '@financas/shared';
+import { Link } from 'react-router';
+import { ContactLink, LegalPage, LegalSection as Section } from '@/features/legal/legal-page';
 
 /**
  * Public privacy policy (ADR 0012), required by Google to publish the sign-in consent screen
  * (ADR 0026). It describes only what the app really stores; update it whenever that changes.
  */
 export function PrivacyPage() {
-  const contact = (
-    <a href={`mailto:${PRIVACY_CONTACT_EMAIL}`} className="text-primary underline">
-      {PRIVACY_CONTACT_EMAIL}
-    </a>
-  );
+  const contact = <ContactLink />;
 
   return (
-    <main className="mx-auto grid max-w-2xl gap-6 p-6 text-sm leading-relaxed">
-      <header className="grid gap-1">
-        <h1 className="text-2xl font-semibold">Política de privacidade</h1>
-        <p className="text-muted-foreground">Última atualização: 4 de outubro de 2026</p>
-      </header>
-
+    <LegalPage title="Política de privacidade" updated="7 de outubro de 2026">
       <Section title="Quem somos">
         <p>
           O Finanças é um projeto pessoal de estudo, sem fins lucrativos, para controle financeiro
@@ -47,7 +27,11 @@ export function PrivacyPage() {
           <li>
             <strong>Conta:</strong> nome e e-mail. A senha é guardada só de forma cifrada (hash), e
             ninguém consegue lê-la. Se você entrar com o Google, recebemos do Google apenas o seu
-            nome, e-mail e foto do perfil.
+            nome, e-mail e foto do perfil. Guardamos também a versão dos{' '}
+            <Link to={TERMS_PATH} className="text-primary underline">
+              Termos de uso
+            </Link>{' '}
+            que você aceitou e quando.
           </li>
           <li>
             <strong>Dados financeiros:</strong> os lançamentos, categorias e orçamentos que você
@@ -96,7 +80,8 @@ export function PrivacyPage() {
         <p>
           Enquanto a sua conta existir. As sessões expiram em 7 dias. Quando a conta é excluída (por
           enquanto, a pedido pelo e-mail abaixo), os seus dados são apagados, junto com os espaços
-          dos quais você é o único dono.
+          dos quais você é o único dono. As cópias de segurança (backups) do banco são
+          criptografadas e guardadas por 30 dias; um dado apagado sai delas quando elas vencem.
         </p>
       </Section>
 
@@ -123,10 +108,6 @@ export function PrivacyPage() {
           serão avisadas no app.
         </p>
       </Section>
-
-      <footer>
-        <TextLink to="/">Voltar para o Finanças</TextLink>
-      </footer>
-    </main>
+    </LegalPage>
   );
 }

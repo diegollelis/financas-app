@@ -5,7 +5,12 @@ import { resetDatabase } from './db.js';
 
 // HTTP test against the real test database: Better Auth, Prisma and the guard together.
 // All data here is fictitious (ADR 0019).
-const user = { name: 'Maria Exemplo', email: 'maria@example.com', password: 'senha-de-teste-123' };
+const user = {
+  name: 'Maria Exemplo',
+  email: 'maria@example.com',
+  password: 'senha-de-teste-123',
+  acceptTerms: true,
+};
 
 describe('authentication (e-mail and password)', () => {
   let t: Awaited<ReturnType<typeof createTestApp>>;
