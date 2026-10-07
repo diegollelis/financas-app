@@ -20,17 +20,28 @@ export const createInvitationInputSchema = z.object({
 
 export type CreateInvitationInput = z.infer<typeof createInvitationInputSchema>;
 
-/** A pending invitation, as listed to the workspace OWNER. */
+/** Waiting for an answer, accepted, or past its expiry without one. */
+export const invitationStatusSchema = z.enum(['PENDING', 'ACCEPTED', 'EXPIRED']);
+
+export type InvitationStatus = z.infer<typeof invitationStatusSchema>;
+
+/** An invitation, as listed to the workspace OWNER: what came of it, too. */
 export const invitationSchema = z.object({
   id: z.uuid(),
   email: z.email(),
   role: workspaceRoleSchema,
+  status: invitationStatusSchema,
   expiresAt: z.iso.datetime(),
+  acceptedAt: z.iso.datetime().nullable(),
 });
 
 export type InvitationResponse = z.infer<typeof invitationSchema>;
 
+/** `GET /workspaces/:workspaceId/invitations`: the latest ones, newest first. */
 export const invitationListResponseSchema = z.array(invitationSchema);
+
+/** How many invitations the list shows: enough history without growing forever. */
+export const INVITATION_LIST_LIMIT = 30;
 
 /** `GET /invitations/:token`: what the invited person sees before accepting. */
 export const invitationPreviewSchema = z.object({

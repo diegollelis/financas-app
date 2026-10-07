@@ -19,7 +19,9 @@ const pendingInvitation = {
   id: '01920000-0000-7000-8000-000000000004',
   email: 'ana@example.com',
   role: 'EDITOR',
+  status: 'PENDING',
   expiresAt: '2026-10-09T12:00:00.000Z',
+  acceptedAt: null,
 };
 
 function mockHouse(overrides: Record<string, { status?: number; body: unknown }> = {}) {
@@ -46,7 +48,7 @@ describe('WorkspacePage', () => {
     expect(within(memberList).getByText('joao@example.com')).toBeInTheDocument();
     expect(memberList).toHaveTextContent('Leitor');
     expect(await screen.findByText('ana@example.com')).toBeInTheDocument();
-    expect(screen.getByText(/Editor, vale até 09\/10\/2026/)).toBeInTheDocument();
+    expect(screen.getByText('Aguardando, vale até 09/10/2026')).toBeInTheDocument();
   });
 
   it('invites someone with the chosen access', async () => {
@@ -147,6 +149,46 @@ describe('WorkspacePage', () => {
     expect(screen.queryByRole('heading', { name: 'Convidar alguém' })).not.toBeInTheDocument();
   });
 
+  it('shows what came of each invitation, with the action that fits it', async () => {
+    mockHouse({
+      [`GET /api/workspaces/${houseId}/invitations`]: {
+        body: [
+          pendingInvitation,
+          {
+            ...pendingInvitation,
+            id: '01920000-0000-7000-8000-000000000005',
+            email: 'pedro@example.com',
+            status: 'EXPIRED',
+            expiresAt: '2026-09-20T12:00:00.000Z',
+          },
+          {
+            ...pendingInvitation,
+            id: '01920000-0000-7000-8000-000000000006',
+            email: 'joao@example.com',
+            role: 'VIEWER',
+            status: 'ACCEPTED',
+            acceptedAt: '2026-09-15T12:00:00.000Z',
+          },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}`);
+
+    const list = await screen.findByRole('region', { name: 'Convites' });
+    expect(list).toHaveTextContent('Aguardando, vale até 09/10/2026');
+    expect(list).toHaveTextContent('Expirou em 20/09/2026');
+    expect(list).toHaveTextContent('Aceito em 15/09/2026');
+    expect(
+      within(list).getByRole('button', { name: 'Cancelar convite de ana@example.com' }),
+    ).toBeInTheDocument();
+    expect(
+      within(list).getByRole('button', { name: 'Apagar convite de pedro@example.com' }),
+    ).toBeInTheDocument();
+    expect(
+      within(list).queryByRole('button', { name: /joao@example.com/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it('lets the OWNER remove a member, after naming them', async () => {
     const joao = members[1]!;
     const fetchMock = mockHouse({
@@ -179,6 +221,7 @@ describe('WorkspacePage', () => {
         body: [{ ...members[0]!, userId: members[1]!.userId, name: 'Dona da Casa' }, viewer],
       },
       [`DELETE /api/workspaces/${houseId}/members/${fakeUser.id}`]: { status: 204, body: null },
+      'GET /api/workspaces': { body: [personalWorkspace, { ...house, role: 'VIEWER' }] },
     });
     const { router } = renderApp(`/espacos/${houseId}`);
 
@@ -200,6 +243,8 @@ describe('WorkspacePage', () => {
   it('lets the OWNER delete a shared workspace, after confirming', async () => {
     const fetchMock = mockHouse({
       ...signedInHome,
+      // As loaded before the deletion, with Casa in it; and Casa is the last workspace opened.
+      'GET /api/workspaces': { body: [personalWorkspace, house] },
       [`DELETE /api/workspaces/${houseId}`]: { status: 204, body: null },
     });
     const { router } = renderApp(`/espacos/${houseId}`);
@@ -210,6 +255,7 @@ describe('WorkspacePage', () => {
     await userEvent.click(within(confirm).getByRole('button', { name: 'Excluir espaço' }));
 
     expect(await screen.findByText('Espaço Casa excluído')).toBeInTheDocument();
+    // Not back to Casa ("Espaço não encontrado"): to the personal workspace.
     await vi.waitFor(() =>
       expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/painel`),
     );

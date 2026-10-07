@@ -96,6 +96,35 @@ describe('invitations', () => {
       await t.http().get(`/api/invitations/${token}`).expect(404);
     });
 
+    it('shows what came of each invitation: pending, accepted or expired', async () => {
+      const { owner, workspaceId } = await mariaWithHouse();
+      const base = `/api/workspaces/${workspaceId}/invitations`;
+      const accepted = await invite(owner.browser, workspaceId, joao.email, 'VIEWER');
+      const invited = await t.signUp(joao);
+      await invited.browser.post(`/api/invitations/${accepted.token}/accept`).expect(200);
+      const expired = await invite(owner.browser, workspaceId, 'pedro@example.com', 'EDITOR');
+      await t.prisma.invitation.update({
+        where: { id: expired.invitation.id },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+      const pending = await invite(owner.browser, workspaceId, ana.email, 'EDITOR');
+
+      const list = invitationListResponseSchema.parse(
+        (await owner.browser.get(base).expect(200)).body,
+      );
+
+      expect(list.map(({ email, status }) => [email, status])).toEqual([
+        [ana.email, 'PENDING'],
+        ['pedro@example.com', 'EXPIRED'],
+        [joao.email, 'ACCEPTED'],
+      ]);
+      expect(list[2]!.acceptedAt).not.toBeNull();
+      expect(list[0]).toMatchObject({ id: pending.invitation.id, acceptedAt: null });
+      // An expired one can be cleared from the list; an accepted one stays as the record.
+      await owner.browser.delete(`${base}/${expired.invitation.id}`).expect(204);
+      await owner.browser.delete(`${base}/${accepted.invitation.id}`).expect(404);
+    });
+
     it('replaces the previous invitation to the same e-mail', async () => {
       const { owner, workspaceId } = await mariaWithHouse();
       const first = await invite(owner.browser, workspaceId, joao.email);
@@ -217,12 +246,12 @@ describe('invitations', () => {
       expect(
         await t.prisma.user.findUniqueOrThrow({ where: { id: invited.userId } }),
       ).toMatchObject({ emailVerified: true });
-      // Used once: the link is gone and no longer listed.
+      // Used once: the link no longer works, and the list shows it as accepted.
       await t.http().get(`/api/invitations/${token}`).expect(404);
       const list = await owner.browser
         .get(`/api/workspaces/${workspaceId}/invitations`)
         .expect(200);
-      expect(list.body).toEqual([]);
+      expect(list.body).toMatchObject([{ email: joao.email, status: 'ACCEPTED' }]);
     });
 
     it('requires a session', async () => {

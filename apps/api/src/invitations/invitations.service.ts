@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  INVITATION_LIST_LIMIT,
   INVITATION_PATH,
   INVITATION_TTL_DAYS,
   MAX_PENDING_INVITATIONS,
@@ -29,12 +30,14 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-function toResponse(invitation: Invitation): InvitationResponse {
+function toResponse(invitation: Invitation, now = new Date()): InvitationResponse {
   return {
     id: invitation.id,
     email: invitation.email,
     role: invitation.role,
+    status: invitation.acceptedAt ? 'ACCEPTED' : invitation.expiresAt > now ? 'PENDING' : 'EXPIRED',
     expiresAt: invitation.expiresAt.toISOString(),
+    acceptedAt: invitation.acceptedAt && invitation.acceptedAt.toISOString(),
   };
 }
 
@@ -126,15 +129,22 @@ export class InvitationsService {
   }
 
   /** Pending invitations of the workspace, newest first. */
-  async listPending(workspaceId: string): Promise<InvitationResponse[]> {
+  /** The latest invitations with what came of them: pending, accepted or expired. */
+  async list(workspaceId: string): Promise<InvitationResponse[]> {
     const invitations = await this.prisma.invitation.findMany({
-      where: { workspaceId, ...pending() },
+      where: { workspaceId },
       orderBy: { createdAt: 'desc' },
+      take: INVITATION_LIST_LIMIT,
     });
-    return invitations.map(toResponse);
+    const now = new Date();
+    return invitations.map((invitation) => toResponse(invitation, now));
   }
 
-  /** Cancels a pending invitation. Filtered by workspace too: an id from elsewhere is a 404. */
+  /**
+   * Cancels a pending invitation, or clears an expired one from the list; an accepted one stays,
+   * as the record of how the member came in. Filtered by workspace too: an id from elsewhere is
+   * a 404.
+   */
   async revoke(workspaceId: string, invitationId: string): Promise<void> {
     if (!z.uuid().safeParse(invitationId).success) throw new NotFoundException();
     const { count } = await this.prisma.invitation.deleteMany({
