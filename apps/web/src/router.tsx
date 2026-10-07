@@ -1,4 +1,5 @@
 import {
+  ACCOUNT_PATH,
   FORGOT_PASSWORD_PATH,
   INVITATION_PATH,
   PRIVACY_PATH,
@@ -19,6 +20,7 @@ import { DashboardPage } from '@/routes/dashboard';
 import { ForgotPasswordPage } from '@/routes/forgot-password';
 import { HomePage } from '@/routes/home';
 import { InvitationPage } from '@/routes/invitation';
+import { AccountPage } from '@/routes/account';
 import { PrivacyPage } from '@/routes/privacy';
 import { TermsPage } from '@/routes/terms';
 import { ResetPasswordPage } from '@/routes/reset-password';
@@ -45,6 +47,7 @@ export const routes: RouteObject[] = [
         element: <RequireAuth />,
         children: [
           { path: '/', element: <HomePage /> },
+          { path: ACCOUNT_PATH, element: <AccountPage /> },
           {
             // Header, sections nav and the workspace loaded once for every page below (ADR 0036).
             path: '/espacos/:workspaceId',

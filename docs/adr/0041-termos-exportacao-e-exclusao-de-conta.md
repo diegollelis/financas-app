@@ -92,3 +92,10 @@ Escolhidos com o dono do projeto: **bloquear até resolver**, **JSON completo**,
   - termos com aceite (cadastro, tela de aceite, `/termos`);
   - exportação;
   - exclusão de conta e página `/conta`.
+
+## Nota (exportação, 2026-10-07)
+
+- **A página `/conta` chegou com a exportação,** e não com a exclusão: o botão "Baixar meus dados" precisava de um lugar. Ela abre pelo item "Minha conta" do menu da conta. A exclusão entra nela no próximo PR.
+- **O arquivo também traz as sessões abertas,** com o IP e o navegador que o app guarda por segurança. Esses dados são da pessoa, e a política de privacidade os menciona.
+- **Uma tabela nova não fica de fora por esquecimento:** um teste lê do banco toda tabela com `workspace_id` e falha se ela não estiver em `EXPORTED_TABLES` (`apps/api/src/account/data-export.service.ts`).
+- **O download passa pelo `fetch`, e não por um link direto.** A tela mostra "Preparando o arquivo…" enquanto ele é montado. Um erro aparece como aviso, em vez de baixar um arquivo com a mensagem de erro.

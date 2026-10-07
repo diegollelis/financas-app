@@ -2,6 +2,7 @@ export * from './analysis.ts';
 export * from './auth.ts';
 export * from './budget.ts';
 export * from './category.ts';
+export * from './data-export.ts';
 export * from './error-reporting.ts';
 export * from './health.ts';
 export * from './import.ts';

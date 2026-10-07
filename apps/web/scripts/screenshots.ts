@@ -290,6 +290,7 @@ async function main() {
       opens: 'menu' as const,
     },
     { name: 'espaco', path: `/espacos/${workspaceId}`, signedIn: true },
+    { name: 'conta', path: '/conta', signedIn: true },
     { name: 'painel', path: `/espacos/${workspaceId}/painel`, signedIn: true },
     { name: 'lancamentos', path: `/espacos/${workspaceId}/lancamentos`, signedIn: true },
     {

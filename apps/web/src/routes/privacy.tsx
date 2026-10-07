@@ -1,4 +1,4 @@
-import { TERMS_PATH } from '@financas/shared';
+import { ACCOUNT_PATH, TERMS_PATH } from '@financas/shared';
 import { Link } from 'react-router';
 import { ContactLink, LegalPage, LegalSection as Section } from '@/features/legal/legal-page';
 
@@ -88,9 +88,13 @@ export function PrivacyPage() {
       <Section title="Os seus direitos">
         <p>
           Pela Lei Geral de Proteção de Dados (LGPD), você pode pedir acesso, correção, cópia
-          (portabilidade) ou exclusão dos seus dados, e saber com quem eles são compartilhados.
-          Enquanto essas opções não estão disponíveis dentro do app, faça o pedido pelo e-mail{' '}
-          {contact}. Respondemos em até 15 dias.
+          (portabilidade) ou exclusão dos seus dados, e saber com quem eles são compartilhados. Você
+          corrige os seus dados no próprio app e baixa uma cópia deles em{' '}
+          <Link to={ACCOUNT_PATH} className="text-primary underline">
+            Minha conta
+          </Link>
+          . Enquanto a exclusão da conta não está disponível dentro do app, e para os outros
+          pedidos, escreva para {contact}. Respondemos em até 15 dias.
         </p>
       </Section>
 
