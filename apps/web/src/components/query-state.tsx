@@ -75,7 +75,7 @@ export function ErrorState({
     // Same answer for "does not exist" and "not yours" (ADR 0025).
     return (
       <div role="alert" className="grid justify-items-start gap-3">
-        <p>Espaço não encontrado.</p>
+        <p>Espaço não encontrado. Ele pode ter sido excluído, ou você não faz mais parte dele.</p>
         <Button asChild variant="outline">
           <Link to="/">Ir para o meu espaço</Link>
         </Button>
