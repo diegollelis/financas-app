@@ -100,11 +100,11 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] API: importação registrada, todos os lançamentos de uma vez, desfazer
   - [x] Planilha modelo: gerar no navegador, ler e relatório de inconsistências
   - [x] Tela "Importar planilha" no Mais: prévia por competência, editar e corrigir linhas, correspondência de categorias, desfazer
-- [ ] LGPD ([ADR 0041](adr/0041-termos-exportacao-e-exclusao-de-conta.md); a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
+- [x] LGPD ([ADR 0041](adr/0041-termos-exportacao-e-exclusao-de-conta.md); a política de privacidade já existe em `/privacidade`, [ADR 0012](adr/0012-privacidade-lgpd.md))
   - [x] Termos de uso em `/termos`, aceite no cadastro e tela de aceite para contas existentes e o Google
   - [x] Exportação dos dados em JSON, na página `/conta` ("Minha conta", no menu da conta)
   - [x] Remover membros, sair de um espaço e excluir um espaço compartilhado (sem isso, a exclusão de conta ficaria bloqueada sem saída)
-  - [ ] Exclusão de conta com link por e-mail, em `/conta`
+  - [x] Exclusão de conta com link por e-mail, em `/conta`
 - [x] Domínio próprio, `financas.codelelis.com` ([ADR 0039](adr/0039-dominio-proprio.md))
   - [x] Redirecionar o endereço antigo e roteiro no deploy.md
   - [x] DNS no Cloudflare, domínio no Pages e variáveis de produção

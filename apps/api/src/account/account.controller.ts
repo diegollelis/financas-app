@@ -1,4 +1,9 @@
-import { dataExportSchema, todayIso } from '@financas/shared';
+import {
+  accountDeletionSchema,
+  dataExportSchema,
+  todayIso,
+  type AccountDeletion,
+} from '@financas/shared';
 import { Controller, Get, Res, UseGuards } from '@nestjs/common';
 import {
   ApiCookieAuth,
@@ -12,6 +17,7 @@ import { z } from 'zod';
 import type { AuthSession } from '../auth/auth.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { SessionGuard } from '../auth/session.guard.js';
+import { AccountDeletionService } from './account-deletion.service.js';
 import { DataExportService } from './data-export.service.js';
 
 /** The signed-in person's own account (ADR 0041). */
@@ -20,7 +26,25 @@ import { DataExportService } from './data-export.service.js';
 @Controller('me')
 @UseGuards(SessionGuard)
 export class AccountController {
-  constructor(private readonly dataExport: DataExportService) {}
+  constructor(
+    private readonly dataExport: DataExportService,
+    private readonly accountDeletion: AccountDeletionService,
+  ) {}
+
+  /**
+   * What deleting the account would need resolved first (ADR 0041): the workspaces the person
+   * owns with others in them or invited. The deletion itself goes through Better Auth
+   * (POST /api/auth/delete-user), which checks the same.
+   */
+  @Get('deletion')
+  @ApiOkResponse({
+    description: 'The workspaces that block the deletion; empty when nothing does.',
+    schema: z.toJSONSchema(accountDeletionSchema, { target: 'openapi-3.0' }) as SchemaObject,
+  })
+  @ApiUnauthorizedResponse({ description: 'No valid session cookie.' })
+  async deletion(@CurrentUser() user: AuthSession['user']): Promise<AccountDeletion> {
+    return { blockers: await this.accountDeletion.blockers(user.id) };
+  }
 
   /**
    * Everything the app keeps about the person, as a JSON file to download (LGPD, art. 18). Not

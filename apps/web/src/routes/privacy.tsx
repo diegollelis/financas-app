@@ -78,10 +78,11 @@ export function PrivacyPage() {
 
       <Section title="Por quanto tempo">
         <p>
-          Enquanto a sua conta existir. As sessões expiram em 7 dias. Quando a conta é excluída (por
-          enquanto, a pedido pelo e-mail abaixo), os seus dados são apagados, junto com os espaços
-          dos quais você é o único dono. As cópias de segurança (backups) do banco são
-          criptografadas e guardadas por 30 dias; um dado apagado sai delas quando elas vencem.
+          Enquanto a sua conta existir. As sessões expiram em 7 dias. Quando você exclui a conta (em
+          Minha conta), os seus dados são apagados, junto com os espaços em que só você participa;
+          um espaço seu com outras pessoas precisa ser resolvido antes. As cópias de segurança
+          (backups) do banco são criptografadas e guardadas por 30 dias; um dado apagado sai delas
+          quando elas vencem.
         </p>
       </Section>
 
@@ -93,8 +94,8 @@ export function PrivacyPage() {
           <Link to={ACCOUNT_PATH} className="text-primary underline">
             Minha conta
           </Link>
-          . Enquanto a exclusão da conta não está disponível dentro do app, e para os outros
-          pedidos, escreva para {contact}. Respondemos em até 15 dias.
+          , onde também pode excluir a conta. Para os outros pedidos, escreva para {contact}.
+          Respondemos em até 15 dias.
         </p>
       </Section>
 

@@ -21,6 +21,9 @@ export function authErrorMessage(error: unknown): string {
         return 'O login com Google não está disponível no momento.';
       case 'INVALID_TOKEN':
         return 'Este link é inválido ou expirou. Peça um novo.';
+      case 'OWNS_SHARED_WORKSPACES':
+        // Our own check before deleting an account (ADR 0041): pt-BR, naming the workspaces.
+        return error.detail ?? 'Antes de excluir a conta, resolva os espaços compartilhados.';
       case 'INVALID_INPUT':
         // Our own validation on the API (shared Zod schema): the message is already pt-BR.
         return error.detail ?? 'Confira os dados informados.';

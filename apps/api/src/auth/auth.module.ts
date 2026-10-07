@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AccountDeletionService } from '../account/account-deletion.service.js';
+import { AccountModule } from '../account/account.module.js';
 import type { Env } from '../config/env.js';
 import { Mailer } from '../mail/mailer.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -13,17 +15,18 @@ import { SessionGuard } from './session.guard.js';
 // (importing it back from WorkspacesModule would be a circular dependency).
 @Global()
 @Module({
-  imports: [WorkspacesModule],
+  imports: [WorkspacesModule, AccountModule],
   controllers: [MeController],
   providers: [
     {
       provide: AUTH,
-      inject: [PrismaService, ConfigService, Mailer, WorkspacesService],
+      inject: [PrismaService, ConfigService, Mailer, WorkspacesService, AccountDeletionService],
       useFactory: (
         prisma: PrismaService,
         config: ConfigService<Env, true>,
         mailer: Mailer,
         workspaces: WorkspacesService,
+        accountDeletion: AccountDeletionService,
       ) =>
         createAuth(
           prisma,
@@ -35,7 +38,11 @@ import { SessionGuard } from './session.guard.js';
             GOOGLE_CLIENT_SECRET: config.get('GOOGLE_CLIENT_SECRET', { infer: true }),
           },
           mailer,
-          (userId) => workspaces.ensurePersonalWorkspace(userId),
+          {
+            onUserCreated: (userId) => workspaces.ensurePersonalWorkspace(userId),
+            ensureDeletable: (userId) => accountDeletion.ensureDeletable(userId),
+            beforeUserDeleted: (user) => accountDeletion.deleteOwnedData(user),
+          },
         ),
     },
     SessionGuard,

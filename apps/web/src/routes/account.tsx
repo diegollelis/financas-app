@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
 import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
+import { DeleteAccountSection } from '@/features/account/delete-account-section';
 import { useDataExport } from '@/features/account/use-data-export';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { AppHeader, SkipLink } from '@/features/shell/app-header';
@@ -90,6 +91,8 @@ export function AccountPage() {
               {dataExport.isPending ? 'Preparando o arquivo…' : 'Baixar meus dados'}
             </Button>
           </section>
+
+          <DeleteAccountSection />
         </div>
       </main>
     </div>
