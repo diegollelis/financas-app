@@ -1,13 +1,13 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import '@fontsource-variable/geist';
+@import '@fontsource-variable/inter';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -29,6 +29,12 @@
   --color-success-muted: var(--success-muted);
   --color-warning: var(--warning);
   --color-warning-muted: var(--warning-muted);
+  --color-credit: var(--credit);
+  --color-credit-muted: var(--credit-muted);
+  --color-debit: var(--debit);
+  --color-debit-muted: var(--debit-muted);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-accent: var(--brand-accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -52,85 +58,119 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * CodeLélis Finanças (ADR 0043): the approved palette, mapped onto the existing tokens.
+ * A value with no comment is one of the brand's official colors. A value marked "derived" is a
+ * semantic variant of an official color, made for contrast or as a fill; it is not a new brand
+ * color, and it is listed with its origin in ADR 0043 and in scripts/palette-contrast.spec.ts,
+ * which fails on any color that is neither. The same test checks that every text pair reaches
+ * 4.5:1 (UI parts 3:1) in both themes.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* Brand color (ADR 0036): indigo, chosen against the chart blue. White text on it: 7.2:1. */
-  --primary: #3f47c4;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  /* Brand blue. White text on it: 4.8:1. */
+  --primary: #0066ff;
   --primary-foreground: #ffffff;
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  /* Semantic states (ADR 0036), never raw palette classes. Text on its muted fill: 6:1 or more. */
-  --success: #166534;
-  --success-muted: #dcf3e4;
-  --warning: #8a4b00;
-  --warning-muted: #fdecc8;
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: #3f47c4;
-  /* Chart series, in this order (blue, orange, aqua): checked for color blindness and
-     contrast in both themes. Aqua is under 3:1 on white, so charts always show values. */
+  /* Derived: the step between Light and Border, a fill that shows on both. */
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  /* Derived from #64748b, one step darker: the official one is 4.3:1 on the muted fill. */
+  --muted-foreground: #5b6b82;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  /* Derived from #dc2626 (error): darker, since the official one falls under 4.5:1 on the 10%
+     red fill of the destructive button. */
+  --destructive: #b91c1c;
+  /* Derived from #16a34a (income) and #f59e0b (alerts): their text versions, 4.5:1 or more
+     on their fills too; the fills are light tints of the same colors. */
+  --success: #15803d;
+  --success-muted: #dcfce7;
+  --warning: #b45309;
+  --warning-muted: #fef3c7;
+  /* Money in and out as fills, icons and outlines (text uses --success and --destructive).
+     Never the only cue: a sign or a label goes with them. The -muted fills are derived tints. */
+  --credit: #16a34a;
+  --credit-muted: #dcfce7;
+  --debit: #ef4444;
+  --debit-muted: #fee2e2;
+  /* The other two brand colors: decoration only (about 2:1 on white), never text. */
+  --brand-secondary: #00c2ff;
+  --brand-accent: #00e6b8;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #0066ff;
+  /* Derived (ADR 0032): the chart series, in this order (blue, orange, aqua), checked for
+     color blindness and contrast in both themes. Aqua is under 3:1 on white, so charts always
+     show values. Revalidated from the brand colors in the dashboard PR. */
   --chart-1: #2a78d6;
   --chart-2: #eb6834;
   --chart-3: #1baf7a;
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
+  --chart-4: #64748b;
+  --chart-5: #94a3b8;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-accent: #f1f5f9;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #0066ff;
 }
 
+/* The navy of the brand (its dark surfaces), not gray. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: #8f96f2;
-  --primary-foreground: #14161a;
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --success: #7fd3a0;
-  --success-muted: #12301f;
-  --warning: #f2c06b;
+  --background: #0a1f3d;
+  --foreground: #f8fafc;
+  --card: #11284a;
+  --card-foreground: #f8fafc;
+  --popover: #11284a;
+  --popover-foreground: #f8fafc;
+  /* Derived from #0066ff, lighter: the brand blue is too dark on navy. Navy text on it: 5.5:1. */
+  --primary: #4d94ff;
+  --primary-foreground: #0a1f3d;
+  --secondary: #1f3b6d;
+  --secondary-foreground: #f8fafc;
+  --muted: #11284a;
+  --muted-foreground: #94a3b8;
+  --accent: #1f3b6d;
+  --accent-foreground: #f8fafc;
+  /* Derived from #ef4444, lighter: the official one is 3.9:1 on the navy surface. */
+  --destructive: #f87171;
+  --success: #22c55e;
+  /* Derived: dark tints of income, alerts and expenses, as fills on navy. */
+  --success-muted: #0f3b2a;
+  --warning: #f59e0b;
   --warning-muted: #3a2a0c;
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: #8f96f2;
+  --credit: #22c55e;
+  --credit-muted: #0f3b2a;
+  --debit: #f87171;
+  --debit-muted: #3b1520;
+  --brand-secondary: #00c2ff;
+  --brand-accent: #00e6b8;
+  --border: #1e3a8a;
+  --input: #1e3a8a;
+  --ring: #4d94ff;
+  /* Derived (ADR 0032): the chart series for dark. */
   --chart-1: #3987e5;
   --chart-2: #d95926;
   --chart-3: #199e70;
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --chart-4: #94a3b8;
+  --chart-5: #64748b;
+  --sidebar: #0a1f3d;
+  --sidebar-foreground: #f8fafc;
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-accent: #1f3b6d;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #1e3a8a;
+  --sidebar-ring: #4d94ff;
 }
 
 @layer base {

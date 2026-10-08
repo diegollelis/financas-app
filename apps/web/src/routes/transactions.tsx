@@ -218,6 +218,12 @@ function EndSeriesDialog({
 }
 
 /**
+ * A badge that carries people's names, which have any length: it breaks into lines instead of
+ * widening the row past a 360px screen.
+ */
+const WRAPPING_BADGE = 'h-auto max-w-full justify-start rounded-md text-left whitespace-normal';
+
+/**
  * One transaction: what it is, how much, its status and, for EDITORs, one inline action
  * (settle) plus the rest in a menu (ADR 0036).
  */
@@ -295,12 +301,12 @@ function TransactionItem({
             </Badge>
           )}
           {personName && (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className={WRAPPING_BADGE}>
               {transaction.type === 'CREDIT' ? 'A receber de' : 'A pagar para'} {personName}
             </Badge>
           )}
           {sharedWith.length > 0 && (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className={WRAPPING_BADGE}>
               <Users aria-hidden />
               Dividido com {sharedWith.join(', ')}
             </Badge>

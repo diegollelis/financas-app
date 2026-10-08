@@ -94,6 +94,31 @@ O acento de "Lélis" é obrigatório em todo lugar.
 
 **Garantia:** um teste calcula o contraste dos pares de tokens nos dois temas e falha abaixo de 4,5:1 para texto e de 3:1 para elementos de interface.
 
+**Tokens derivados**
+
+As cores oficiais são as da paleta aprovada, mais as de estado (sucesso `#22C55E`, erro `#DC2626`, info `#3B82F6` e neutro `#6B7280`). Quando uma delas não serve a um uso, por contraste ou porque o uso pede um fundo, entra uma variante.
+
+**Variantes são tokens semânticos derivados, não cores da marca.** Uma variante nova só entra com registro nesta tabela e na lista do teste `apps/web/scripts/palette-contrast.spec.ts`. O teste reprova qualquer cor de `index.css` que não seja oficial nem derivada registrada, e qualquer hex nos componentes.
+
+| Valor                                          | Token                                        | Origem                                                           | Motivo                                                     |
+| ---------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- |
+| `#F1F5F9`                                      | `--secondary`, `--muted`, `--accent` (claro) | entre `#F8FAFC` e `#E2E8F0`                                      | fundo que aparece sobre o fundo da página e sobre o cartão |
+| `#5B6B82`                                      | `--muted-foreground` (claro)                 | `#64748B`, mais escuro                                           | a oficial dá 4,3:1 sobre o `--muted`                       |
+| `#B91C1C`                                      | `--destructive` (claro)                      | `#DC2626`, mais escuro                                           | 4,5:1 sobre o fundo do botão de excluir                    |
+| `#15803D`                                      | `--success` (claro)                          | `#16A34A`, mais escuro                                           | sucesso como texto                                         |
+| `#B45309`                                      | `--warning` (claro)                          | `#F59E0B`, mais escuro                                           | alerta como texto (a oficial dá 2,1:1)                     |
+| `#DCFCE7`, `#FEF3C7`, `#FEE2E2`                | `*-muted` (claro)                            | receitas, alertas e despesas, tons claros                        | fundos dos selos e avisos                                  |
+| `#4D94FF`                                      | `--primary` (escuro)                         | `#0066FF`, mais claro                                            | o azul da marca fica escuro demais sobre o marinho         |
+| `#F87171`                                      | `--destructive`, `--debit` (escuro)          | `#EF4444`, mais claro                                            | a oficial dá 3,9:1 sobre o cartão marinho                  |
+| `#0F3B2A`, `#3A2A0C`, `#3B1520`                | `*-muted` (escuro)                           | receitas, alertas e despesas, tons escuros                       | fundos sobre o marinho                                     |
+| `#2A78D6`, `#EB6834`, `#1BAF7A` e os do escuro | `--chart-1..3`                               | a paleta validada do [ADR 0032](0032-graficos-sem-biblioteca.md) | revalidada a partir das cores oficiais no PR do Painel     |
+
+No tema escuro, três oficiais servem como estão e não precisam de derivado:
+
+- `#94A3B8` como texto suave (5,7:1);
+- `#22C55E` como sucesso (6,5:1);
+- `#F59E0B` como alerta (6,9:1).
+
 **Outras regras visuais**
 
 - **Fonte:** Inter (`@fontsource-variable/inter`, no lugar da Geist), com a escala 32/24/20/16/14/12.
