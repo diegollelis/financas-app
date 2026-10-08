@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { TextLink } from '@/components/text-link';
+import { AppFooter } from '@/features/shell/app-footer';
 
 /**
  * Where data subjects send their requests (LGPD, art. 18). Public on purpose (ADR 0012). Cloudflare
@@ -42,9 +43,10 @@ export function LegalPage({
         <p className="text-muted-foreground">Última atualização: {updated}</p>
       </header>
       {children}
-      <footer>
-        <TextLink to="/">Voltar para o Finanças</TextLink>
-      </footer>
+      <TextLink to="/" className="justify-self-start">
+        Voltar para o Finanças
+      </TextLink>
+      <AppFooter />
     </main>
   );
 }

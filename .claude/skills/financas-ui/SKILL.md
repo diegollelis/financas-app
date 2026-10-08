@@ -19,7 +19,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 - **No new colors:** a hex lives only in `src/index.css`, and each one is either an official brand color or a derived semantic token (a contrast variant or a fill of an official color) registered with its origin in ADR 0043 and in `scripts/palette-contrast.spec.ts`, which fails otherwise. Components use tokens only.
 - **The brand gradient lives only in the artwork**; buttons and surfaces are solid.
 - **Font:** Inter.
-- **Logo in code:** only through `BrandLogo` (`components/brand-logo.tsx`, variants `symbol` and `horizontal`, a light and a dark file switched by `.dark`). The CL symbol on the phone header; the horizontal logo from md (in the sidebar column of a workspace, 56px tall from lg, where the sidebar is 288px) and on the auth pages. The art's "FINANÇAS" is an eighth of the logo's height: below about 56px it is not legible, so never shrink the horizontal logo to fit.
+- **Logo in code (ADR 0044):** inside the app, the mark is `AppBrand` (the official CL symbol plus "Finanças" as text, a link to "/"); the full artwork (`BrandLogo variant="horizontal"`, a light and a dark file switched by `.dark`) only on the auth pages, at 56px tall or more, since its "FINANÇAS" is an eighth of its height. Never redraw the art or recreate the CL. Every page ends with `AppFooter` (`features/shell/app-footer.tsx`): the brand is reserved, the code is MIT, so never write "todos os direitos reservados".
 
 ## Visual direction
 
@@ -35,7 +35,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 - Write the base classes for a **360 px** wide screen, then add `sm:` (640), `md:` (768) and `lg:` (1024). Never design desktop first and squeeze it down.
 - **No horizontal scroll** at 360 px. Tables become stacked rows or cards below `md`. Forms are one column below `sm`.
 - Page gutters `px-4`, then `sm:px-6`. Do not wrap whole pages in a `Card`. Content max width around `max-w-3xl` on desktop, left-aligned in the main column.
-- **App shell** (workspace pages): a header with the **workspace switcher** (the workspace name: switch or create a workspace; switching keeps the section and `?competencia=`) and the account menu; a **bottom tab bar** below `md` (Painel, Lançamentos, Orçamento, Mais) with safe-area padding; a **sidebar** from `md`. The active item has `aria-current="page"`. Leave bottom padding so content never hides behind the bar. There is no page outside a workspace: "/" opens the last workspace used.
+- **App shell** (workspace pages, ADR 0044): on the phone, a sticky header with `AppBrand`, the **workspace switcher** (labelled "Espaço", always in sight; switch or create a workspace; switching keeps the section and `?competencia=`) and the account menu, and a **bottom tab bar** (Painel, Lançamentos, Orçamento, Mais) with safe-area padding. From `md`, no header: a full-height **sidebar** with the brand, the switcher, the sections and the account at its foot. Each part renders once, where the screen puts it (`useMediaQuery(DESKTOP_QUERY)`), never twice and hidden by CSS. The active item has `aria-current="page"`. Leave bottom padding so content never hides behind the bar. There is no page outside a workspace: "/" opens the last workspace used.
 - **Touch targets of 44 px or more** below `md` (`h-11` / `size-11`), with at least 8 px between neighbors. Compact sizes only from `md`.
 - The main action of a page stays reachable: a fixed "Novo lançamento" button above the tab bar on mobile, a normal button on desktop.
 

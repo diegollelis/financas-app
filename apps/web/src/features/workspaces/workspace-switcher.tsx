@@ -15,16 +15,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 import { CreateWorkspaceForm } from './create-workspace-form';
 import { roleLabels } from './roles';
 import { useWorkspaces } from './use-workspaces';
 
 /**
- * The workspace name in the header is the way to switch workspace or create one (ADR 0036): every
+ * The workspace name (at the top of the page on the phone, in the sidebar on the desktop) is the way to switch workspace or create one (ADR 0036): every
  * page keeps the sections nav, and there is no separate "workspaces" page. Switching keeps the
  * section and the competência: /espacos/A/lancamentos?competencia=… → /espacos/B/lancamentos?….
  */
-export function WorkspaceSwitcher({ current }: { current: Workspace }) {
+export function WorkspaceSwitcher({
+  current,
+  className,
+}: {
+  current: Workspace;
+  /** The trigger's look where it sits: a full-width box in the desktop sidebar (ADR 0044). */
+  className?: string;
+}) {
   const workspaces = useWorkspaces();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
@@ -43,9 +51,17 @@ export function WorkspaceSwitcher({ current }: { current: Workspace }) {
             ref={triggerRef}
             variant="ghost"
             aria-label={`Trocar de espaço (atual: ${current.name})`}
-            className="-ml-2 max-w-full min-w-0 justify-start px-2 text-base font-semibold md:px-2 md:text-sm"
+            className={cn(
+              '-ml-2 h-11 max-w-full min-w-0 justify-start gap-2 px-2 py-1 text-left font-semibold md:h-auto md:px-2',
+              className && 'ml-0',
+              className,
+            )}
           >
-            <span className="truncate">{current.name}</span>
+            {/* Labelled: a bare name could read as a filter or an account (ADR 0044). */}
+            <span className="grid min-w-0 leading-tight">
+              <span className="text-muted-foreground text-xs font-normal">Espaço</span>
+              <span className="truncate text-sm">{current.name}</span>
+            </span>
             <ChevronDown aria-hidden className="text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>

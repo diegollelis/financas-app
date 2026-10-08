@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { navigateAway } from '@/lib/browser';
 import { fakeUser, mockApi, personalWorkspace, signedInHome } from '@/test/mock-api';
+import { stubPrefersDark } from '@/test/match-media';
 import { renderApp } from '@/test/render';
 
 // jsdom cannot load another page: sign-out's full navigation is checked by its argument.
@@ -107,12 +108,19 @@ describe('WorkspaceSwitcher', () => {
 });
 
 describe('WorkspaceLayout', () => {
-  it('shows the workspace in the header and marks the section of the page', async () => {
+  it('shows the app, the workspace and the section of the page', async () => {
     mockHouse();
 
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    expect(await within(await screen.findByRole('banner')).findByText('Casa')).toBeInTheDocument();
+    // The product's mark in the header; the workspace leads the page (ADR 0044).
+    expect(
+      within(await screen.findByRole('banner')).getByRole('link', { name: 'Finanças' }),
+    ).toHaveAttribute('href', '/');
+    expect(
+      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Casa)' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('contentinfo')).toHaveTextContent('A marca é de uso reservado');
     const nav = await sectionsNav();
     expect(within(nav).getByRole('link', { name: 'Lançamentos' })).toHaveAttribute(
       'aria-current',
@@ -124,6 +132,22 @@ describe('WorkspaceLayout', () => {
       '#conteudo',
     );
     expect(screen.getByRole('main')).toHaveAttribute('id', 'conteudo');
+  });
+
+  it('puts everything in a full-height sidebar on the desktop, with no header', async () => {
+    stubPrefersDark(false, { desktop: true });
+    mockHouse();
+
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    expect(await screen.findByRole('link', { name: 'Finanças' })).toHaveAttribute('href', '/');
+    expect(
+      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Casa)' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    // The account at the sidebar's foot, by name instead of an icon.
+    await userEvent.click(screen.getByRole('button', { name: new RegExp(fakeUser.name) }));
+    expect(await screen.findByRole('menuitem', { name: 'Minha conta' })).toBeInTheDocument();
   });
 
   it('keeps the competência when moving between the pages of a month', async () => {

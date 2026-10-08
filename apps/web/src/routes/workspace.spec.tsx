@@ -42,7 +42,9 @@ describe('WorkspacePage', () => {
     renderApp(`/espacos/${houseId}`);
 
     expect(await screen.findByRole('heading', { name: 'Membros' })).toBeInTheDocument();
-    expect(within(screen.getByRole('banner')).getByText('Casa')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Casa)' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Seu acesso: Dono')).toBeInTheDocument();
     const memberList = await screen.findByRole('list', { name: 'Membros do espaço' });
     expect(within(memberList).getByText('João Exemplo')).toBeInTheDocument();

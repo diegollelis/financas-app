@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useParams, useSearchParams } from 'react-router';
+import { AppBrand } from '@/components/brand-logo';
 import { ListSkeleton, QueryState } from '@/components/query-state';
 import {
   Sheet,
@@ -27,7 +28,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { VerifyEmailBanner } from '@/features/auth/verify-email-banner';
-import { AppHeader, SkipLink } from '@/features/shell/app-header';
+import { AppFooter } from '@/features/shell/app-footer';
+import { AppHeader, SidebarAccount, SkipLink } from '@/features/shell/app-header';
+import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import { CurrentWorkspaceContext } from './current-workspace';
 import { rememberLastWorkspace } from './last-workspace';
@@ -129,7 +132,7 @@ function SectionNav({ workspaceId }: { workspaceId: string }) {
   return (
     <nav
       aria-label="Seções do espaço"
-      className="bg-sidebar fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] md:sticky md:top-14 md:h-[calc(100svh-3.5rem)] md:w-56 md:shrink-0 lg:top-18 lg:h-[calc(100svh-4.5rem)] lg:w-72 md:border-t-0 md:border-r md:p-3"
+      className="bg-sidebar fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] md:static md:flex-1 md:overflow-y-auto md:border-t-0 md:bg-transparent md:p-3"
     >
       <ul className="grid grid-cols-4 md:flex md:flex-col md:gap-1">
         {links.map((link) => (
@@ -151,54 +154,75 @@ function SectionNav({ workspaceId }: { workspaceId: string }) {
 }
 
 /**
- * Layout route of every page of a workspace (ADR 0036): header, the sections as a bottom tab bar
- * on the phone and a sidebar from md, and the workspace loaded once for the pages under it.
- * While loading or failing, the layout shows the state; pages render only with the workspace.
+ * Layout route of every page of a workspace (ADRs 0036, 0044), with the workspace loaded once for
+ * the pages under it. While loading or failing, the layout shows the state; pages render only
+ * with the workspace.
+ *
+ * - Phone: the header with the app's mark, the workspace (always in sight) and the account; the
+ *   sections as a bottom tab bar.
+ * - Desktop: no header. A full-height sidebar holds the mark, the workspace, the sections and,
+ *   at its foot, the account, so the brand and the context never share a row.
+ *
+ * Each part renders once, where the screen puts it (not twice and hidden by CSS).
  */
 export function WorkspaceLayout() {
   const { workspaceId = '' } = useParams();
   const user = useCurrentUser();
   const workspace = useWorkspace(workspaceId);
+  const desktop = useMediaQuery(DESKTOP_QUERY);
   const opened = workspace.isSuccess ? workspace.data.id : null;
   useEffect(() => {
     // Only a workspace that loaded: a 404 must not become where "/" goes next time.
     if (opened) rememberLastWorkspace(opened);
   }, [opened]);
 
+  const switcher = (className?: string) =>
+    workspace.isSuccess ? (
+      <WorkspaceSwitcher current={workspace.data} className={className} />
+    ) : (
+      workspace.isPending && <Skeleton className="h-6 w-32" />
+    );
+  const sections = !workspace.isError && <SectionNav workspaceId={workspaceId} />;
+
   return (
-    <div className="min-h-svh">
+    <div className="min-h-svh md:flex">
       <SkipLink />
-      <AppHeader
-        sidebar={!workspace.isError}
-        title={
-          workspace.isSuccess ? (
-            <WorkspaceSwitcher current={workspace.data} />
-          ) : (
-            workspace.isPending && <Skeleton className="h-5 w-32" />
-          )
-        }
-      />
-      <div className="md:flex">
-        {!workspace.isError && <SectionNav workspaceId={workspaceId} />}
+      {desktop ? (
+        <div className="bg-sidebar sticky top-0 flex h-svh w-60 shrink-0 flex-col border-r">
+          <div className="px-5 pt-5 pb-4">
+            <AppBrand />
+          </div>
+          <div className="px-3">{switcher('w-full justify-between border px-3 py-2 md:px-3')}</div>
+          {sections}
+          <div className="mt-auto">
+            <SidebarAccount />
+          </div>
+        </div>
+      ) : (
+        <AppHeader workspace={switcher()} />
+      )}
+      {/* The page column: the footer is outside <main>, which holds only the page, so it stays a
+          contentinfo landmark. */}
+      <div className="min-w-0 flex-1 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] text-base sm:px-6 md:pb-8 md:text-sm">
         <main
           id="conteudo"
           tabIndex={-1}
-          className="min-w-0 flex-1 px-4 pt-5 pb-[calc(5rem+env(safe-area-inset-bottom))] text-base outline-none sm:px-6 md:pt-8 md:pb-12 md:text-sm"
+          className="grid max-w-3xl gap-6 pt-5 outline-none md:pt-8"
         >
-          <div className="grid max-w-3xl gap-6">
-            {/* On every page until confirmed; not blocking (ADR 0022). */}
-            {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
-            {workspace.isSuccess ? (
-              <CurrentWorkspaceContext value={workspace.data}>
-                {/* Pages read the user with useCurrentUser(), as under RequireAuth. */}
-                <Outlet context={user} />
-              </CurrentWorkspaceContext>
-            ) : (
-              <QueryState queries={[workspace]} skeleton={<ListSkeleton />} />
-            )}
-          </div>
+          {/* On every page until confirmed; not blocking (ADR 0022). */}
+          {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
+          {workspace.isSuccess ? (
+            <CurrentWorkspaceContext value={workspace.data}>
+              {/* Pages read the user with useCurrentUser(), as under RequireAuth. */}
+              <Outlet context={user} />
+            </CurrentWorkspaceContext>
+          ) : (
+            <QueryState queries={[workspace]} skeleton={<ListSkeleton />} />
+          )}
         </main>
+        <AppFooter className="mt-12 max-w-3xl" />
       </div>
+      {!desktop && sections}
     </div>
   );
 }

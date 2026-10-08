@@ -1,11 +1,11 @@
-import { PRIVACY_PATH, TERMS_PATH } from '@financas/shared';
 import type { ReactNode } from 'react';
 import { BrandLogo } from '@/components/brand-logo';
-import { TextLink } from '@/components/text-link';
+import { AppFooter } from '@/features/shell/app-footer';
 
 /**
- * Frame of the sign-in, sign-up, password and invitation pages, with the links to the terms
- * of use and the privacy policy (Google asks for the latter). Mobile first (ADR 0036): on the phone the whole screen is the form, with no
+ * Frame of the sign-in, sign-up, password and invitation pages, ending with the footer: the
+ * links to the terms of use and the privacy policy (Google asks for the latter) and the brand's
+ * signature (ADR 0044). Mobile first (ADR 0036): on the phone the whole screen is the form, with no
  * card around it; from sm, a centered card.
  */
 export function AuthCard({
@@ -33,14 +33,7 @@ export function AuthCard({
           <div>{children}</div>
         </div>
         <div className="text-muted-foreground text-center">{footer}</div>
-        <nav aria-label="Documentos" className="flex justify-center gap-6">
-          <TextLink to={TERMS_PATH} className="text-muted-foreground text-sm">
-            Termos de uso
-          </TextLink>
-          <TextLink to={PRIVACY_PATH} className="text-muted-foreground text-sm">
-            Política de privacidade
-          </TextLink>
-        </nav>
+        <AppFooter center className="mt-4" />
       </div>
     </main>
   );
