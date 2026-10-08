@@ -2,6 +2,8 @@ import {
   createPersonInputSchema,
   personListResponseSchema,
   personSchema,
+  transactionListResponseSchema,
+  type Transaction,
   updatePersonInputSchema,
   type CreatePersonInput,
   type Person,
@@ -15,6 +17,7 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
   type SchemaObject,
@@ -45,6 +48,19 @@ export class PeopleController {
   })
   list(@CurrentMembership() membership: WorkspaceMembership): Promise<Person[]> {
     return this.people.list(membership.workspaceId);
+  }
+
+  @Get(':personId/transactions')
+  @ApiOkResponse({
+    description: "The person's transactions, of any competência, newest first (up to 200).",
+    schema: openApi(transactionListResponseSchema),
+  })
+  @ApiNotFoundResponse({ description: 'Not a person of this workspace.' })
+  transactions(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('personId') personId: string,
+  ): Promise<Transaction[]> {
+    return this.people.transactions(membership.workspaceId, personId);
   }
 
   @Post()

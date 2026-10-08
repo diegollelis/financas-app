@@ -321,6 +321,7 @@ async function main() {
     { name: 'orcamento', path: `/espacos/${workspaceId}/orcamento`, signedIn: true },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
     { name: 'recorrencias', path: `/espacos/${workspaceId}/recorrencias`, signedIn: true },
+    { name: 'pessoas', path: `/espacos/${workspaceId}/pessoas`, signedIn: true },
     { name: 'importar', path: `/espacos/${workspaceId}/importar`, signedIn: true },
     { name: 'analise', path: `/espacos/${workspaceId}/analise`, signedIn: true },
     {

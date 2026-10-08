@@ -1,4 +1,10 @@
-import type { CreatePersonInput, Person, UpdatePersonInput } from '@financas/shared';
+import {
+  PERSON_TRANSACTIONS_LIMIT,
+  type CreatePersonInput,
+  type Person,
+  type Transaction,
+  type UpdatePersonInput,
+} from '@financas/shared';
 import {
   BadRequestException,
   ConflictException,
@@ -8,6 +14,7 @@ import {
 import { z } from 'zod';
 import { Prisma, type Person as PersonRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { toTransactionResponse, withOrigin } from '../transactions/transactions.service.js';
 
 /** Sorts names as a Brazilian reader expects ("Álvaro" next to "Alice"). */
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
@@ -93,6 +100,21 @@ export class PeopleService {
       if (isPrismaError(error, 'P2025')) throw new NotFoundException();
       throw error;
     }
+  }
+
+  /**
+   * Everything linked to this person, of any competência, newest first (ADR 0042): what they
+   * owe and are owed, pending or settled, and the shares of the debits split with them.
+   */
+  async transactions(workspaceId: string, personId: string): Promise<Transaction[]> {
+    await this.find(workspaceId, personId);
+    const transactions = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+      where: { workspaceId, personId },
+      include: withOrigin,
+      orderBy: [{ period: 'desc' }, { id: 'desc' }],
+      take: PERSON_TRANSACTIONS_LIMIT,
+    });
+    return transactions.map(toTransactionResponse);
   }
 
   /** One with transactions can only be archived: the foreign key refuses the delete. */
