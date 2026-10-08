@@ -134,7 +134,12 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - o "G" do Google no botão;
   - o rodapé na base da tela.
   - Centralizado no desktop, de propósito.
-- [ ] Painel e gráficos: indicadores com ícone, paleta dos gráficos revalidada e etiquetas de receita e despesa (corrigir também as violações do axe no Painel: `<dl>` e o nome do seletor de espaço)
+- [x] Painel ([ADR 0045](adr/0045-largura-por-pagina-e-grade-do-painel.md)):
+  - coluna larga por página e grade de 2 colunas do xl em diante;
+  - "Despesas e meta" vazio com ação ("Definir renda");
+  - axe zerado no Painel: listas `<dl>`, os nomes do seletor de espaço, do de mês e dos meses (WCAG 2.5.3);
+  - os indicadores ficam sem ícone, e a paleta dos gráficos continua a do ADR 0032.
+- [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada
 
