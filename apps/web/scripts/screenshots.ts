@@ -256,6 +256,33 @@ async function phoneChecks(page: Page): Promise<string[]> {
   }, MIN_TARGET);
 }
 
+/** axe-core, injected into each page: the automated part of an accessibility review. */
+const AXE_SOURCE = fileURLToPath(import.meta.resolve('axe-core/axe.min.js'));
+
+/**
+ * WCAG 2.1 A and AA violations axe finds on the page, one line per rule and element. Run in both
+ * themes, since color contrast changes with them. axe does not measure the contrast of borders
+ * (WCAG 1.4.11): the palette test covers the tokens that draw them.
+ */
+async function accessibilityChecks(page: Page): Promise<string[]> {
+  await page.addScriptTag({ path: AXE_SOURCE });
+  return page.evaluate(async () => {
+    type AxeResult = {
+      violations: { id: string; help: string; nodes: { target: string[] }[] }[];
+    };
+    const axe = (window as unknown as { axe: { run: (options: object) => Promise<AxeResult> } })
+      .axe;
+    const result = await axe.run({
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+    });
+    return result.violations.flatMap((violation) =>
+      violation.nodes.map(
+        (node) => `axe ${violation.id} (${violation.help}): ${node.target.join(' ')}`,
+      ),
+    );
+  });
+}
+
 async function main() {
   const filter = process.argv[2];
   mkdirSync(OUT, { recursive: true });
@@ -353,6 +380,7 @@ async function main() {
   ];
 
   let problemCount = 0;
+  let a11yCount = 0;
   for (const { viewport, dark } of passes) {
     const colorScheme = dark ? 'dark' : 'light';
     const context = await browser.newContext({
@@ -392,6 +420,13 @@ async function main() {
         for (const problem of problems)
           console.log(`  ${target.name} (${viewport.width}px): ${problem}`);
       }
+      // Accessibility, on the phone in each theme: the layout matters less than the colors.
+      if (viewport.width < 768) {
+        const violations = await accessibilityChecks(page);
+        a11yCount += violations.length;
+        for (const violation of violations)
+          console.log(`  ${target.name} (${colorScheme}): ${violation}`);
+      }
       await page.close();
     }
     await context.close();
@@ -402,6 +437,11 @@ async function main() {
   console.log(`\nCapturas em ${fileURLToPath(OUT)}`);
   console.log(
     problemCount === 0 ? 'Nenhum problema no celular.' : `${problemCount} problema(s) no celular.`,
+  );
+  console.log(
+    a11yCount === 0
+      ? 'Nenhuma violação de acessibilidade (axe, WCAG 2.1 AA).'
+      : `${a11yCount} violação(ões) de acessibilidade (axe, WCAG 2.1 AA).`,
   );
 }
 
