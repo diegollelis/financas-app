@@ -50,6 +50,9 @@ export type Person = z.infer<typeof personSchema>;
 /** `GET /workspaces/:workspaceId/people`: all of them, archived too, by name. */
 export const personListResponseSchema = z.array(personSchema);
 
+/** How many of a person's transactions their page lists, newest first. */
+export const PERSON_TRANSACTIONS_LIMIT = 200;
+
 /** People in one split, besides you. */
 export const MAX_SPLIT_PEOPLE = 10;
 

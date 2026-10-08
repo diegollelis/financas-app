@@ -16,7 +16,7 @@ import { RecurrencesService } from '../recurrences/recurrences.service.js';
 import { optionalDate, toIsoDate } from './dates.js';
 
 /** Every read brings what generated the transaction, if anything: a recurrence or a plan (ADR 0038). */
-const withOrigin = {
+export const withOrigin = {
   occurrence: { select: { recurrenceId: true } },
   // The plan's count, for "3/10".
   installmentPlan: { select: { installments: true } },
@@ -24,7 +24,7 @@ const withOrigin = {
 
 type TransactionRow = Prisma.TransactionGetPayload<{ include: typeof withOrigin }>;
 
-function toResponse(transaction: TransactionRow): Transaction {
+export function toTransactionResponse(transaction: TransactionRow): Transaction {
   return {
     id: transaction.id,
     type: transaction.type,
@@ -74,7 +74,7 @@ export class TransactionsService {
       // The enum order is CREDIT, DEBIT; UUIDv7 ids follow the order of creation.
       orderBy: [{ type: 'asc' }, { dueDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
     });
-    return transactions.map(toResponse);
+    return transactions.map(toTransactionResponse);
   }
 
   /**
@@ -102,7 +102,7 @@ export class TransactionsService {
       },
       include: withOrigin,
     });
-    return toResponse(transaction);
+    return toTransactionResponse(transaction);
   }
 
   /** The credits of a split: each person resolved (or created) and the Reembolso category. */
@@ -174,7 +174,7 @@ export class TransactionsService {
         },
         include: withOrigin,
       });
-      return toResponse(transaction);
+      return toTransactionResponse(transaction);
     } catch (error) {
       // Deleted by someone else between the read and the update.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {

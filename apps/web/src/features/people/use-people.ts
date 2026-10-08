@@ -1,6 +1,7 @@
 import {
   personListResponseSchema,
   personSchema,
+  transactionListResponseSchema,
   type CreatePersonInput,
   type Person,
   type UpdatePersonInput,
@@ -72,4 +73,17 @@ export function useResolvePerson(workspaceId: string, people: Person[]) {
     error: create.error ?? update.error,
     isPending: create.isPending || update.isPending,
   };
+}
+
+/** Everything linked to one person, of any competência, newest first (ADR 0042). */
+export function usePersonTransactions(workspaceId: string, personId: string | null) {
+  return useQuery({
+    queryKey: [...peopleKey(workspaceId), personId, 'transactions'],
+    queryFn: () =>
+      apiGet(
+        `/api/workspaces/${workspaceId}/people/${personId}/transactions`,
+        transactionListResponseSchema,
+      ),
+    enabled: personId !== null,
+  });
 }

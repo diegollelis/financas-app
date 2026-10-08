@@ -96,3 +96,12 @@ Escolhidos com o dono do projeto: **contatos por nome (opção 2)**, **valor a r
   - A exportação de dados ([ADR 0041](0041-termos-exportacao-e-exclusao-de-conta.md)) inclui as pessoas, e o teste de cobertura dela exige isso.
   - `people` tem `workspace_id`, então entra no teste de RLS.
 - **A entrega se divide em dois PRs:** a API (pessoas, ligação, divisão, Reembolso) e a tela.
+
+## Nota (página Pessoas, 2026-10-08)
+
+**A página Pessoas mostra o histórico de qualquer mês.** Para isso entrou `GET /workspaces/:workspaceId/people/:personId/transactions`: os lançamentos ligados à pessoa, de qualquer competência, do mais recente ao mais antigo, até 200. O histórico é só leitura: efetivar e editar continuam em Lançamentos.
+
+**Dividir parcelamentos e recorrências** ficou de fora desta etapa e entrou no roadmap, nesta ordem:
+
+- **primeiro os parcelamentos:** as parcelas já nascem todas juntas, então as partes de cada pessoa podem nascer com elas;
+- **depois as recorrências:** a recorrência teria que guardar a divisão e gerar a parte de cada pessoa a cada mês.

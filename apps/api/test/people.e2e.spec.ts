@@ -2,6 +2,7 @@ import {
   categoryListResponseSchema,
   currentPeriod,
   personListResponseSchema,
+  shiftPeriod,
   personSchema,
   transactionListResponseSchema,
   transactionSchema,
@@ -28,6 +29,7 @@ const peopleRoutes: WorkspaceRoute[] = [
     body: { archived: true },
   },
   { method: 'delete', path: (id) => `/api/workspaces/${id}/people/${SOME_ID}` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/people/${SOME_ID}/transactions` },
 ];
 
 describe('people and splits', () => {
@@ -181,6 +183,34 @@ describe('people and splits', () => {
       // He leaves: the person stays, as the name typed.
       await other.browser.delete(`${base}/members/${other.userId}`).expect(204);
       expect((await people(owner.browser, base))[0]).toMatchObject({ name: 'Joãozinho' });
+    });
+
+    it("lists a person's transactions of any competência, newest first", async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const bruno = await addPerson(browser, base, 'Bruno');
+      const add = (personId: string, description: string, when: string) =>
+        browser
+          .post(`${base}/transactions`)
+          .send({
+            type: 'CREDIT',
+            description,
+            categoryId: category('Outros', 'CREDIT').id,
+            amountCents: 1_000,
+            period: when,
+            personId,
+          })
+          .expect(201);
+      await add(ana.id, 'Mais antigo', shiftPeriod(period, -3));
+      await add(ana.id, 'Mais novo', period);
+      await add(bruno.id, 'Do Bruno', period);
+
+      const response = await browser.get(`${base}/people/${ana.id}/transactions`).expect(200);
+
+      expect(
+        transactionListResponseSchema.parse(response.body).map((item) => item.description),
+      ).toEqual(['Mais novo', 'Mais antigo']);
+      await browser.get(`${base}/people/${SOME_ID}/transactions`).expect(404);
     });
 
     it('hides the routes from outsiders', async () => {
