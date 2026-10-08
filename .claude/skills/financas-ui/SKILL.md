@@ -19,6 +19,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 - **No new colors:** a hex lives only in `src/index.css`, and each one is either an official brand color or a derived semantic token (a contrast variant or a fill of an official color) registered with its origin in ADR 0043 and in `scripts/palette-contrast.spec.ts`, which fails otherwise. Components use tokens only.
 - **The brand gradient lives only in the artwork**; buttons and surfaces are solid.
 - **Font:** Inter.
+- **Logo in code:** only through `BrandLogo` (`components/brand-logo.tsx`, variants `symbol` and `horizontal`, a light and a dark file switched by `.dark`). The CL symbol on the phone header; the horizontal logo from md (in the sidebar column of a workspace, 56px tall from lg, where the sidebar is 288px) and on the auth pages. The art's "FINANÇAS" is an eighth of the logo's height: below about 56px it is not legible, so never shrink the horizontal logo to fit.
 
 ## Visual direction
 

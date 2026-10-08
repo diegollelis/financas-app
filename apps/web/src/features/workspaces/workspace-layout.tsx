@@ -57,8 +57,14 @@ const sections: Section[] = [
 ];
 
 // One element, two layouts: a tab of the bottom bar on the phone, a row of the sidebar from md.
+// The active one is told by more than its color (ADR 0043): a pill behind the icon on the
+// phone; from md, a filled row in bold with a blue bar at its left edge.
 const navItemClassName =
-  'text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex h-14 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium outline-none focus-visible:ring-3 md:h-9 md:flex-row md:justify-start md:gap-3 md:px-3 md:text-sm aria-[current=page]:text-primary md:aria-[current=page]:bg-primary/10';
+  'group text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex h-14 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium outline-none focus-visible:ring-3 md:h-9 md:flex-row md:justify-start md:gap-3 md:px-3 md:text-sm md:hover:bg-sidebar-accent aria-[current=page]:text-primary relative md:aria-[current=page]:bg-primary/15 md:aria-[current=page]:font-semibold md:aria-[current=page]:before:absolute md:aria-[current=page]:before:inset-y-2 md:aria-[current=page]:before:left-0 md:aria-[current=page]:before:w-[3px] md:aria-[current=page]:before:rounded-full md:aria-[current=page]:before:bg-primary';
+
+/** The icon of a tab; on the phone, the active tab's icon sits in a pill. */
+const navIconClassName =
+  'flex h-7 w-14 items-center justify-center rounded-full group-aria-[current=page]:bg-primary/15 group-data-[active=true]:bg-primary/15 md:contents';
 
 function useSectionLinks(workspaceId: string) {
   const [searchParams] = useSearchParams();
@@ -83,9 +89,12 @@ function MoreSheet({ links }: { links: ReturnType<typeof useSectionLinks> }) {
       <SheetTrigger asChild>
         <button
           type="button"
+          data-active={active}
           className={cn(navItemClassName, 'w-full md:hidden', active && 'text-primary')}
         >
-          <Ellipsis aria-hidden className="size-5" />
+          <span className={navIconClassName}>
+            <Ellipsis aria-hidden className="size-5" />
+          </span>
           Mais
         </button>
       </SheetTrigger>
@@ -120,13 +129,15 @@ function SectionNav({ workspaceId }: { workspaceId: string }) {
   return (
     <nav
       aria-label="Seções do espaço"
-      className="bg-background fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] md:sticky md:top-14 md:h-[calc(100svh-3.5rem)] md:w-56 md:shrink-0 md:border-t-0 md:border-r md:p-3"
+      className="bg-sidebar fixed inset-x-0 bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] md:sticky md:top-14 md:h-[calc(100svh-3.5rem)] md:w-56 md:shrink-0 lg:top-18 lg:h-[calc(100svh-4.5rem)] lg:w-72 md:border-t-0 md:border-r md:p-3"
     >
       <ul className="grid grid-cols-4 md:flex md:flex-col md:gap-1">
         {links.map((link) => (
           <li key={link.path} className={cn(link.more && 'hidden md:block')}>
             <NavLink to={link.to} end className={navItemClassName}>
-              <link.icon aria-hidden className="size-5 md:size-4" />
+              <span className={navIconClassName}>
+                <link.icon aria-hidden className="size-5 md:size-4" />
+              </span>
               {link.label}
             </NavLink>
           </li>
@@ -158,6 +169,7 @@ export function WorkspaceLayout() {
     <div className="min-h-svh">
       <SkipLink />
       <AppHeader
+        sidebar={!workspace.isError}
         title={
           workspace.isSuccess ? (
             <WorkspaceSwitcher current={workspace.data} />
