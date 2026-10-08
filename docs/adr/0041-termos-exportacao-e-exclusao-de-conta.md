@@ -114,3 +114,27 @@ Escolhidos com o dono do projeto: **bloquear até resolver**, **JSON completo**,
   As três ações pedem confirmação, nomeando a pessoa ou o espaço.
 
 Os termos de uso já diziam que o dono pode remover membros a qualquer momento. Agora o app faz isso.
+
+## Nota (exclusão de conta, 2026-10-07)
+
+**O link do e-mail abre uma página do app, não o callback do Better Auth.** O callback (`GET /delete-user/callback`) exigiria uma sessão aberta no navegador que abriu o e-mail, que muitas vezes é o do celular, sem login. Ele também excluiria a conta com um único toque. Por isso, o link leva a `/conta/excluir?token=…`, uma página protegida pelo login: quem chega sem sessão entra e volta. A página pede mais um clique e então envia `POST /api/auth/delete-user { token }`, que o Better Auth aceita e que exclui na hora.
+
+**As verificações rodam duas vezes:**
+
+- **ao pedir o link:** um hook antes de `/delete-user` responde 409 `OWNS_SHARED_WORKSPACES`, com os nomes dos espaços, e nenhum e-mail sai;
+- **ao usar o link:** a mesma verificação roda de novo em `beforeDelete`, porque alguém pode ter entrado num espaço nesse meio-tempo.
+
+`GET /me/deletion` lista esses espaços para a tela, com links para resolvê-los.
+
+**O que `beforeDelete` faz,** numa transação, antes de o Better Auth apagar o usuário:
+
+- exclui os espaços em que só a pessoa participa, inclusive o pessoal;
+- apaga os convites pendentes para o e-mail dela;
+- marca como "Saiu" (`LEFT`) os convites aceitos que a levaram a espaços de outras pessoas.
+
+Sessões, contas de login e participações saem em cascata com o usuário.
+
+**Outros pontos:**
+
+- O pedido do link tem limite próprio por IP: 3 a cada 5 minutos, como as outras rotas que enviam e-mail.
+- O token fica na query string, que nunca vai para o Sentry (`redactUrl` descarta a query inteira). Por isso, `TOKEN_SEGMENTS` não precisou mudar.

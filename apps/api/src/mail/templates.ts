@@ -112,3 +112,26 @@ export function invitationEmail(
     ),
   };
 }
+
+/**
+ * The link that confirms deleting the account (ADR 0041). It opens a page of the web app, which
+ * asks once more before deleting: whoever holds an unlocked device cannot delete it in one tap.
+ */
+export function deleteAccountEmail(to: string, name: string, url: string): MailMessage {
+  const note =
+    'O link vale por 1 hora e só pode ser usado uma vez. Se você não pediu, ignore este e-mail: a sua conta continua como está. Se achar que alguém entrou nela, troque a senha.';
+  return {
+    to,
+    subject: 'Confirme a exclusão da sua conta no Finanças',
+    text: `Olá, ${name}!\n\nRecebemos um pedido para excluir a sua conta no Finanças e todos os seus dados. Para confirmar, abra o link abaixo:\n${url}\n\n${note}`,
+    html: layout(
+      [
+        `Olá, ${escapeHtml(name)}!`,
+        'Recebemos um pedido para excluir a sua conta no Finanças e todos os seus dados.',
+        'Ao abrir o link, você confirma a exclusão mais uma vez. Depois disso, ela não pode ser desfeita.',
+      ],
+      { label: 'Confirmar exclusão', url },
+      note,
+    ),
+  };
+}

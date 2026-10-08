@@ -15,6 +15,12 @@ export const TERMS_PATH = '/termos';
 /** The signed-in person's account page: data export and account deletion (ADR 0041). */
 export const ACCOUNT_PATH = '/conta';
 
+/** Opened from the e-mailed link (`?token=`): asks once more and deletes the account (ADR 0041). */
+export const DELETE_ACCOUNT_PATH = '/conta/excluir';
+
+/** Public page shown once the account is gone. */
+export const ACCOUNT_DELETED_PATH = '/conta-excluida';
+
 /**
  * The terms of use version in force (ADR 0041): the date of their last relevant change. Changing
  * it asks every user to accept the terms again.
@@ -123,3 +129,29 @@ export const authErrorSchema = z.object({
   code: z.string().optional(),
   message: z.string(),
 });
+
+/**
+ * A workspace that keeps the account from being deleted (ADR 0041): the person owns it and other
+ * people are in it, or invited to it. It must be resolved first, so nobody loses data unawares.
+ */
+export const deletionBlockerSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  otherMembers: z.number().int().nonnegative(),
+  pendingInvitations: z.number().int().nonnegative(),
+});
+
+export type DeletionBlocker = z.infer<typeof deletionBlockerSchema>;
+
+/** `GET /me/deletion`: what deleting the account would need resolved first; empty = nothing. */
+export const accountDeletionSchema = z.object({ blockers: z.array(deletionBlockerSchema) });
+
+export type AccountDeletion = z.infer<typeof accountDeletionSchema>;
+
+/** The pt-BR answer when a workspace blocks the deletion (code OWNS_SHARED_WORKSPACES). */
+export function deletionBlockedMessage(names: string[]): string {
+  const list = names.map((name) => `"${name}"`).join(', ');
+  return names.length === 1
+    ? `Antes de excluir a conta, resolva o espaço ${list}: remova os membros e os convites, ou exclua o espaço.`
+    : `Antes de excluir a conta, resolva os espaços ${list}: remova os membros e os convites, ou exclua os espaços.`;
+}

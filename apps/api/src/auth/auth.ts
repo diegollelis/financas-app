@@ -1,4 +1,5 @@
 import {
+  DELETE_ACCOUNT_PATH,
   FORGOT_PASSWORD_PATH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -11,7 +12,7 @@ import {
 } from '@financas/shared';
 import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
-import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import * as Sentry from '@sentry/nestjs';
 import type { z } from 'zod';
@@ -20,7 +21,12 @@ import { redactPrismaError } from '../common/error-reporting.js';
 import type { Env } from '../config/env.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Mailer, MailMessage } from '../mail/mailer.js';
-import { existingAccountEmail, resetPasswordEmail, verificationEmail } from '../mail/templates.js';
+import {
+  deleteAccountEmail,
+  existingAccountEmail,
+  resetPasswordEmail,
+  verificationEmail,
+} from '../mail/templates.js';
 
 /** Every Better Auth route lives under this prefix (sign-up, sign-in, sign-out, get-session...). */
 export const AUTH_BASE_PATH = '/api/auth';
@@ -57,8 +63,14 @@ export function createAuth(
   prisma: PrismaClient,
   env: AuthEnv,
   mailer: Mailer,
-  /** Runs after a user is created, by any sign-up method (e-mail now, Google later): ADR 0024. */
-  onUserCreated: (userId: string) => Promise<void>,
+  lifecycle: {
+    /** Runs after a user is created, by any sign-up method (e-mail or Google): ADR 0024. */
+    onUserCreated: (userId: string) => Promise<void>;
+    /** Throws Better Auth's 409 while a workspace blocks deleting the account (ADR 0041). */
+    ensureDeletable: (userId: string) => Promise<void>;
+    /** Checks again and deletes what only this user owns, right before the user goes. */
+    beforeUserDeleted: (user: { id: string; email: string }) => Promise<void>;
+  },
 ) {
   /**
    * Sends without making the request wait. Besides being faster, the response time no longer
@@ -125,6 +137,24 @@ export function createAuth(
       additionalFields: {
         termsVersion: { type: 'string', required: false, input: false },
         termsAcceptedAt: { type: 'date', required: false, input: false, returned: false },
+      },
+      // Account deletion (ADR 0041), confirmed by an e-mailed link. The link opens a page of
+      // the web app, which asks once more and sends the token back (POST /delete-user with
+      // { token }): Better Auth's own GET callback would need a session in whatever browser
+      // opened the e-mail, and would delete in a single tap.
+      deleteUser: {
+        enabled: true,
+        deleteTokenExpiresIn: 60 * 60,
+        sendDeleteAccountVerification: ({ user, token }) =>
+          deliver(
+            'account deletion',
+            deleteAccountEmail(
+              user.email,
+              user.name,
+              webPage(`${DELETE_ACCOUNT_PATH}?token=${encodeURIComponent(token)}`),
+            ),
+          ),
+        beforeDelete: (user) => lifecycle.beforeUserDeleted(user),
       },
     },
     emailAndPassword: {
@@ -207,6 +237,8 @@ export function createAuth(
         '/send-verification-email': { window: 300, max: 3 },
         '/reset-password': { window: 300, max: 5 },
         '/reset-password/*': { window: 300, max: 5 },
+        // Sends an e-mail too.
+        '/delete-user': { window: 300, max: 3 },
       },
     },
     databaseHooks: {
@@ -232,7 +264,7 @@ export function createAuth(
           // Runs after the user is committed. A failure must not fail the sign-up: the user can
           // already sign in, and listing workspaces creates the missing personal one.
           after: (user) =>
-            onUserCreated(user.id).catch((error: unknown) => {
+            lifecycle.onUserCreated(user.id).catch((error: unknown) => {
               redactPrismaError(error);
               logger.error(`Could not create the personal workspace: ${(error as Error).message}`);
               Sentry.captureException(error);
@@ -241,24 +273,36 @@ export function createAuth(
       },
     },
     hooks: {
-      before: createAuthMiddleware((ctx): Promise<{ context: { body: unknown } } | undefined> => {
-        const schema = bodySchemas[ctx.path];
-        if (!schema) return Promise.resolve(undefined);
-        const result = schema.safeParse(ctx.body);
-        if (!result.success) {
-          throw new APIError('BAD_REQUEST', {
-            code: 'INVALID_INPUT',
-            message: result.error.issues[0]?.message ?? 'Dados inválidos.',
-          });
-        }
-        // Continues with the parsed body (e.g. the name already trimmed). acceptTerms has done its
-        // job here; Better Auth does not know it.
-        const body = ctx.body as Record<string, unknown>;
-        delete body.acceptTerms;
-        const parsed: Record<string, unknown> = { ...result.data };
-        delete parsed.acceptTerms;
-        return Promise.resolve({ context: { body: { ...body, ...parsed } } });
-      }),
+      before: createAuthMiddleware(
+        async (ctx): Promise<{ context: { body: unknown } } | undefined> => {
+          // Asking to delete the account: no link goes out while a workspace blocks it, so the
+          // person learns at once what to resolve (the deletion itself checks again).
+          if (
+            ctx.path === '/delete-user' &&
+            !(ctx.body as { token?: unknown } | undefined)?.token
+          ) {
+            const session = await getSessionFromCtx(ctx);
+            if (session) await lifecycle.ensureDeletable(session.user.id);
+            return undefined;
+          }
+          const schema = bodySchemas[ctx.path];
+          if (!schema) return undefined;
+          const result = schema.safeParse(ctx.body);
+          if (!result.success) {
+            throw new APIError('BAD_REQUEST', {
+              code: 'INVALID_INPUT',
+              message: result.error.issues[0]?.message ?? 'Dados inválidos.',
+            });
+          }
+          // Continues with the parsed body (e.g. the name already trimmed). acceptTerms has done its
+          // job here; Better Auth does not know it.
+          const body = ctx.body as Record<string, unknown>;
+          delete body.acceptTerms;
+          const parsed: Record<string, unknown> = { ...result.data };
+          delete parsed.acceptTerms;
+          return { context: { body: { ...body, ...parsed } } };
+        },
+      ),
     },
     advanced: {
       // Set only by our proxy; trustProxiedClientIp drops it from anyone else (ADR 0033).

@@ -1,5 +1,7 @@
 import {
+  ACCOUNT_DELETED_PATH,
   ACCOUNT_PATH,
+  DELETE_ACCOUNT_PATH,
   FORGOT_PASSWORD_PATH,
   INVITATION_PATH,
   PRIVACY_PATH,
@@ -21,6 +23,8 @@ import { ForgotPasswordPage } from '@/routes/forgot-password';
 import { HomePage } from '@/routes/home';
 import { InvitationPage } from '@/routes/invitation';
 import { AccountPage } from '@/routes/account';
+import { AccountDeletedPage } from '@/routes/account-deleted';
+import { DeleteAccountPage } from '@/routes/delete-account';
 import { PrivacyPage } from '@/routes/privacy';
 import { TermsPage } from '@/routes/terms';
 import { ResetPasswordPage } from '@/routes/reset-password';
@@ -48,6 +52,7 @@ export const routes: RouteObject[] = [
         children: [
           { path: '/', element: <HomePage /> },
           { path: ACCOUNT_PATH, element: <AccountPage /> },
+          { path: DELETE_ACCOUNT_PATH, element: <DeleteAccountPage /> },
           {
             // Header, sections nav and the workspace loaded once for every page below (ADR 0036).
             path: '/espacos/:workspaceId',
@@ -75,6 +80,7 @@ export const routes: RouteObject[] = [
       // Public: Google's consent screen links here (ADR 0026).
       { path: PRIVACY_PATH, element: <PrivacyPage /> },
       { path: TERMS_PATH, element: <TermsPage /> },
+      { path: ACCOUNT_DELETED_PATH, element: <AccountDeletedPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
