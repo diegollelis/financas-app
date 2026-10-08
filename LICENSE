@@ -1,3 +1,8 @@
+Scope: the MIT License below covers this repository's source code and documentation. It does
+not cover the CodeLélis name and brand: the CL symbol, the logos and the app icons in
+apps/web/public/brand/ and apps/web/public/ (favicon-*.png, icon-*.png, apple-touch-icon.png).
+Those are © Diego Lélis, all rights reserved; see apps/web/public/brand/LICENSE.md.
+
 MIT License
 
 Copyright (c) 2026 Diego Lélis
