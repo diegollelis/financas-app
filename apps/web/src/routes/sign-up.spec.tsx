@@ -83,6 +83,15 @@ describe('SignUpPage', () => {
     expect(screen.getByLabelText('E-mail')).toHaveValue(maria.email);
   });
 
+  it('marks the fields so the browser can fill them and suggest a new password', async () => {
+    mockApi({ 'GET /api/me': noSession });
+    renderApp('/cadastro');
+
+    expect(await screen.findByLabelText('Nome')).toHaveAttribute('autocomplete', 'name');
+    expect(screen.getByLabelText('E-mail')).toHaveAttribute('autocomplete', 'email');
+    expect(screen.getByLabelText(/^Senha/)).toHaveAttribute('autocomplete', 'new-password');
+  });
+
   it('shows the password rule before calling the API', async () => {
     const fetchMock = mockApi({ 'GET /api/me': noSession });
     renderApp('/cadastro');
