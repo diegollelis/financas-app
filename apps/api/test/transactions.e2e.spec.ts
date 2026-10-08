@@ -111,6 +111,8 @@ describe('transactions', () => {
         recurrenceId: null,
         amountEstimated: false,
         installment: null,
+        personId: null,
+        splitOfId: null,
       });
       expect(await list(browser, workspaceId, '2026-10')).toEqual([light]);
       expect(await list(browser, workspaceId, '2026-11')).toEqual([]);

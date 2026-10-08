@@ -89,10 +89,16 @@ export class TransactionsController {
   @HttpCode(204)
   @ApiNoContentResponse({ description: 'Transaction deleted.' })
   @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  @ApiQuery({
+    name: 'withShares',
+    required: false,
+    description: 'true: also deletes the shares split from this debit (ADR 0042).',
+  })
   remove(
     @CurrentMembership() membership: WorkspaceMembership,
     @Param('transactionId') transactionId: string,
+    @Query('withShares') withShares?: string,
   ): Promise<void> {
-    return this.transactions.remove(membership.workspaceId, transactionId);
+    return this.transactions.remove(membership.workspaceId, transactionId, withShares === 'true');
   }
 }

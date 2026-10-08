@@ -38,8 +38,20 @@ const exportTransactionSchema = z.object({
   installmentPlanId: z.uuid().nullable(),
   installmentNumber: z.number().int().nullable(),
   importId: z.uuid().nullable(),
+  /** A receber de / a pagar para this person, and the debit a share was split from. */
+  personId: z.uuid().nullable(),
+  splitOfId: z.uuid().nullable(),
   createdAt: instant,
   updatedAt: instant,
+});
+
+const exportPersonSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  /** Linked to this member's account (by id), while it was one. */
+  memberUserId: z.uuid().nullable(),
+  archivedAt: instant.nullable(),
+  createdAt: instant,
 });
 
 const exportBudgetSchema = z.object({
@@ -119,6 +131,7 @@ const ownedWorkspaceSchema = z.object({
   members: z.array(exportMemberSchema),
   invitations: z.array(exportInvitationSchema),
   categories: z.array(exportCategorySchema),
+  people: z.array(exportPersonSchema),
   transactions: z.array(exportTransactionSchema),
   budgets: z.array(exportBudgetSchema),
   recurrences: z.array(exportRecurrenceSchema),

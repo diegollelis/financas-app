@@ -30,6 +30,7 @@ model Workspace {
   installmentPlans InstallmentPlan[]
   imports          TransactionImport[]
   occurrences      RecurrenceOccurrence[]
+  people           Person[]
   createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -82,6 +83,7 @@ model User {
   memberships     Member[]
   invitationsSent Invitation[]
   importsCreated  TransactionImport[]
+  linkedPeople    Person[]
 
   @@map("users")
 }
@@ -237,12 +239,45 @@ model Transaction {
   // Brought in by a spreadsheet import (ADR 0040): undoing the import deletes it.
   importId          String?               @map("import_id") @db.Uuid
   importBatch       TransactionImport?    @relation(fields: [importId], references: [id], onDelete: Cascade)
+  // A receber de (credit) or a pagar para (debit) this person (ADR 0042). Same composite key as
+  // the category: a person of the same workspace only; one with transactions is not deleted.
+  personId          String?               @map("person_id") @db.Uuid
+  person            Person?               @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  // The debit this share was split from (ADR 0042). Deleting that debit keeps the share,
+  // unlinked, unless the person asks to delete it too.
+  splitOfId         String?               @map("split_of_id") @db.Uuid
+  splitOf           Transaction?          @relation("Split", fields: [splitOfId], references: [id], onDelete: SetNull)
+  shares            Transaction[]         @relation("Split")
 
   @@unique([installmentPlanId, installmentNumber])
   @@index([workspaceId, period])
   @@index([categoryId])
   @@index([importId])
+  @@index([personId])
+  @@index([splitOfId])
   @@map("transactions")
+}
+
+// Pessoa (ADR 0042): a contact of the workspace, by name, whether or not they use the app; the
+// other side of "a receber de" and "a pagar para". Optionally linked to a member of the same
+// workspace, whose account name it then shows; if they leave, it stays as a contact. Archived,
+// not deleted, once it has transactions.
+model Person {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  workspaceId  String        @map("workspace_id") @db.Uuid
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String        @db.VarChar(100)
+  memberUserId String?       @map("member_user_id") @db.Uuid
+  memberUser   User?         @relation(fields: [memberUserId], references: [id], onDelete: SetNull)
+  archivedAt   DateTime?     @map("archived_at") @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions Transaction[]
+
+  @@unique([workspaceId, name])
+  // Target of the composite foreign key of transactions.
+  @@unique([id, workspaceId])
+  @@map("people")
 }
 
 // Importação (ADR 0040): one spreadsheet import, all its transactions created at once and

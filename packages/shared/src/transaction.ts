@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
 import { amountCentsSchema, isoDateSchema, periodSchema } from './money-and-dates.ts';
+import { MAX_SPLIT_PEOPLE, personNameSchema } from './person.ts';
 
 /** Matches the `transactions.description` column (varchar 200). */
 export const TRANSACTION_DESCRIPTION_MAX_LENGTH = 200;
@@ -27,9 +28,10 @@ export const transactionNotesSchema = z
 
 /**
  * A credit or a debit of one competência (ADR 0010). The category must be of the same type and
- * of the same workspace (ADR 0029). `settledAt` null = still pending.
+ * of the same workspace (ADR 0029). `settledAt` null = still pending. `personId`: a receber de
+ * (credit) or a pagar para (debit) that person of the workspace (ADR 0042).
  */
-export const createTransactionInputSchema = z.object({
+export const transactionFieldsSchema = z.object({
   type: transactionTypeSchema,
   description: transactionDescriptionSchema,
   notes: transactionNotesSchema.optional(),
@@ -38,15 +40,61 @@ export const createTransactionInputSchema = z.object({
   period: periodSchema,
   dueDate: isoDateSchema.nullable().optional(),
   settledAt: isoDateSchema.nullable().optional(),
+  personId: z.uuid().nullable().optional(),
 });
+
+/**
+ * One transaction with no person and no split: what a spreadsheet import brings (ADR 0040).
+ * Without refinements, so forms can `.pick()` from it (Zod refuses that on refined objects).
+ */
+export const plainTransactionInputSchema = transactionFieldsSchema.omit({ personId: true });
+
+export type PlainTransactionInput = z.infer<typeof plainTransactionInputSchema>;
+
+/** One person's share of a split debit: someone already listed, or a new name (ADR 0042). */
+export const splitShareInputSchema = z
+  .object({
+    personId: z.uuid().optional(),
+    newPersonName: personNameSchema.optional(),
+    amountCents: amountCentsSchema,
+  })
+  .refine((share) => (share.personId === undefined) !== (share.newPersonName === undefined), {
+    message: 'Escolha a pessoa de cada parte.',
+  });
+
+export type SplitShareInput = z.infer<typeof splitShareInputSchema>;
+
+export const createTransactionInputSchema = transactionFieldsSchema
+  .extend({
+    /**
+     * Splits a debit you paid (ADR 0042): besides it, one pending credit per share, "a receber"
+     * from that person, in the Reembolso category.
+     */
+    split: z
+      .array(splitShareInputSchema)
+      .min(1, 'Informe com quem dividir.')
+      .max(MAX_SPLIT_PEOPLE, `Divida com no máximo ${MAX_SPLIT_PEOPLE} pessoas.`)
+      .optional(),
+  })
+  .superRefine((input, context) => {
+    if (!input.split) return;
+    const issue = (message: string) =>
+      context.addIssue({ code: 'custom', message, path: ['split'] });
+    if (input.type !== 'DEBIT') issue('Só um débito pode ser dividido.');
+    if (input.personId) issue('Um lançamento dividido não fica ligado a uma só pessoa.');
+    const others = input.split.reduce((sum, share) => sum + share.amountCents, 0);
+    if (others > input.amountCents) issue('As partes dos outros passam do valor do lançamento.');
+    const people = input.split.map((share) => share.personId ?? share.newPersonName?.toLowerCase());
+    if (new Set(people).size !== people.length) issue('A mesma pessoa aparece duas vezes.');
+  });
 
 export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
 
 /**
- * Any subset of the fields. Settling in one click is `{ settledAt: '<today>' }`; undoing it is
- * `{ settledAt: null }`.
+ * Any subset of the fields (a split happens only on creation). Settling in one click is
+ * `{ settledAt: '<today>' }`; undoing it is `{ settledAt: null }`.
  */
-export const updateTransactionInputSchema = createTransactionInputSchema
+export const updateTransactionInputSchema = transactionFieldsSchema
   .partial()
   .refine((input) => Object.values(input).some((value) => value !== undefined), {
     message: 'Nada para alterar.',
@@ -73,6 +121,10 @@ export const transactionSchema = z.object({
     .object({ planId: z.uuid(), number: z.number().int(), count: z.number().int() })
     .nullable()
     .default(null),
+  /** A receber de / a pagar para this person (ADR 0042); null when not linked. */
+  personId: z.uuid().nullable().default(null),
+  /** The debit this share was split from (ADR 0042); null otherwise. */
+  splitOfId: z.uuid().nullable().default(null),
 });
 
 export type Transaction = z.infer<typeof transactionSchema>;

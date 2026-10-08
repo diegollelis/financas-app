@@ -1,7 +1,15 @@
-import type { CreateTransactionInput, Transaction, UpdateTransactionInput } from '@financas/shared';
+import {
+  shareDescription,
+  type CreateTransactionInput,
+  type SplitShareInput,
+  type Transaction,
+  type UpdateTransactionInput,
+} from '@financas/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
+import { reimbursementCategoryId } from '../categories/reimbursement-category.js';
+import { ensureUsablePerson } from '../people/ensure-person.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
@@ -37,6 +45,8 @@ function toResponse(transaction: TransactionRow): Transaction {
             count: transaction.installmentPlan.installments,
           }
         : null,
+    personId: transaction.personId,
+    splitOfId: transaction.splitOfId,
   };
 }
 
@@ -67,8 +77,15 @@ export class TransactionsService {
     return transactions.map(toResponse);
   }
 
+  /**
+   * One transaction, or a split debit (ADR 0042): the debit and, in the same nested write, one
+   * pending credit per share, "a receber" from that person, in the Reembolso category. New names
+   * in the split become people first.
+   */
   async create(workspaceId: string, input: CreateTransactionInput): Promise<Transaction> {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
+    if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
+    const shares = input.split ? await this.shares(workspaceId, input, input.split) : [];
     const transaction = await this.prisma.forWorkspace(workspaceId).transaction.create({
       data: {
         workspaceId,
@@ -80,10 +97,45 @@ export class TransactionsService {
         period: input.period,
         dueDate: optionalDate(input.dueDate) ?? null,
         settledAt: optionalDate(input.settledAt) ?? null,
+        personId: input.personId ?? null,
+        ...(shares.length > 0 && { shares: { create: shares } }),
       },
       include: withOrigin,
     });
     return toResponse(transaction);
+  }
+
+  /** The credits of a split: each person resolved (or created) and the Reembolso category. */
+  private async shares(
+    workspaceId: string,
+    input: CreateTransactionInput,
+    split: SplitShareInput[],
+  ) {
+    const categoryId = await reimbursementCategoryId(this.prisma, workspaceId);
+    const people = await Promise.all(split.map((share) => this.splitPerson(workspaceId, share)));
+    return split.map((share, index) => ({
+      workspaceId,
+      type: 'CREDIT' as const,
+      description: shareDescription(people[index]!.name, input.description),
+      categoryId,
+      amountCents: share.amountCents,
+      period: input.period,
+      personId: people[index]!.id,
+    }));
+  }
+
+  /** Someone already listed, or a new name: an existing person of that name is reused. */
+  private async splitPerson(workspaceId: string, share: SplitShareInput) {
+    if (share.personId) return ensureUsablePerson(this.prisma, workspaceId, share.personId);
+    const db = this.prisma.forWorkspace(workspaceId);
+    const name = share.newPersonName!;
+    const existing = await db.person.findFirst({
+      where: { workspaceId, name: { equals: name, mode: 'insensitive' } },
+    });
+    if (existing?.archivedAt) {
+      return db.person.update({ where: { id: existing.id }, data: { archivedAt: null } });
+    }
+    return existing ?? db.person.create({ data: { workspaceId, name } });
   }
 
   async update(
@@ -92,6 +144,7 @@ export class TransactionsService {
     input: UpdateTransactionInput,
   ): Promise<Transaction> {
     const current = await this.find(workspaceId, transactionId);
+    if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     const type = input.type ?? current.type;
     const categoryId = input.categoryId ?? current.categoryId;
     // Only a change is checked: a transaction may keep a category archived after it was made.
@@ -111,6 +164,7 @@ export class TransactionsService {
           period: input.period,
           dueDate: optionalDate(input.dueDate),
           settledAt: optionalDate(input.settledAt),
+          personId: input.personId,
           // Giving the amount, or settling, confirms an estimate (ADR 0038). Undoing a settlement
           // does not make it an estimate again.
           amountEstimated:
@@ -132,13 +186,18 @@ export class TransactionsService {
 
   /**
    * Deleting a transaction a recurrence generated keeps its occurrence without a transaction
-   * (ON DELETE SET NULL), so that month is not generated again (ADR 0038).
+   * (ON DELETE SET NULL), so that month is not generated again (ADR 0038). The shares split from
+   * a debit go with it only when asked (`withShares`); otherwise they stay, unlinked
+   * (ON DELETE SET NULL, ADR 0042).
    */
-  async remove(workspaceId: string, transactionId: string): Promise<void> {
+  async remove(workspaceId: string, transactionId: string, withShares = false): Promise<void> {
     if (!z.uuid().safeParse(transactionId).success) throw new NotFoundException();
-    const { count } = await this.prisma
-      .forWorkspace(workspaceId)
-      .transaction.deleteMany({ where: { id: transactionId, workspaceId } });
+    const { count } = await this.prisma.forWorkspace(workspaceId).transaction.deleteMany({
+      where: {
+        workspaceId,
+        OR: [{ id: transactionId }, ...(withShares ? [{ splitOfId: transactionId }] : [])],
+      },
+    });
     if (count === 0) throw new NotFoundException();
   }
 

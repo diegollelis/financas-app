@@ -71,7 +71,7 @@ Calculados na API a partir dos lançamentos, nunca armazenados, nas visões prev
 
 Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras.
 
-**Créditos:** Salário · PLR · 13º salário · Férias · Benefício · Cashback · Freelance · Vendas · Empréstimo · Consórcio · Saque-aniversário FGTS · Restituição IRPF · Outros
+**Créditos:** Salário · PLR · 13º salário · Férias · Benefício · Cashback · Freelance · Vendas · Empréstimo · Consórcio · Saque-aniversário FGTS · Restituição IRPF · Reembolso · Outros
 
 **Débitos:** Cartão de crédito · Energia · Internet · Celular · Streaming · Mercado · Vale-alimentação · Combustível · Carro · Seguro do carro · IPVA · Lote · Consórcio · Empréstimo · Faculdade · Pós-graduação · Curso · Inglês · Concurso · Saúde · Farmácia · Suplemento · Roupas · Lazer · Viagem · Outros
 

@@ -1,5 +1,5 @@
 import {
-  createTransactionInputSchema,
+  plainTransactionInputSchema,
   formatCents,
   installmentCountSchema,
   parseReais,
@@ -24,7 +24,7 @@ import { apiErrorMessage } from '@/lib/error-message';
  * What the form edits: the shared rules for description and notes, plus the fields typed as
  * text (amount in reais, optional due date) turned into what the API takes.
  */
-const transactionFormSchema = createTransactionInputSchema
+const transactionFormSchema = plainTransactionInputSchema
   .pick({ type: true, description: true, notes: true })
   .extend({
     categoryId: z.string().min(1, 'Escolha uma categoria.'),
