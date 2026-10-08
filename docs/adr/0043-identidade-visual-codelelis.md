@@ -146,6 +146,7 @@ Uma versão da logo para tamanhos pequenos, com "FINANÇAS" proporcionalmente ma
 - **Fica fora:**
   - contas e cartões, investimentos, patrimônio, metas, notificações e "% vs. mês anterior": cada um, se vier, terá ADR próprio;
   - **logos de bancos e de outras marcas, em qualquer caso**, porque o repositório é público.
+  - **Única exceção (validação do login):** o "G" do Google no botão "Continuar com Google". As diretrizes de marca do Google pedem esse símbolo no botão de login, e as pessoas reconhecem o botão mais rápido com ele. Ele fica num componente próprio (`features/auth/google-logo.tsx`), com as cores do Google, e só nesse botão. O teste da paleta abre uma exceção nomeada só para esse arquivo. Logos de bancos continuam proibidas.
 
 **Ordem dos PRs:**
 

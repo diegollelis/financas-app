@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { authErrorMessage } from './auth-error-message';
+import { GoogleLogo } from './google-logo';
 import { useReturnTo } from './return-to';
 import { useGoogleSignIn } from './use-auth-mutations';
 
@@ -21,6 +22,7 @@ export function GoogleButton() {
         // Stays disabled after success, while the browser leaves for Google.
         disabled={googleSignIn.isPending || googleSignIn.isSuccess}
       >
+        <GoogleLogo className="size-5 md:size-4" />
         Continuar com Google
       </Button>
       {googleSignIn.isError && (

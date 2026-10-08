@@ -153,6 +153,8 @@ describe('palette origin', () => {
     const offenders = (readdirSync(src, { recursive: true }) as string[])
       .filter((file) => /\.tsx?$/.test(file) && !/\.spec\.tsx?$/.test(file))
       .filter((file) => !file.replaceAll('\\', '/').endsWith('lib/theme.ts'))
+      // Google's own colors, on its sign-in button only (ADR 0043): not the app's palette.
+      .filter((file) => !file.replaceAll('\\', '/').endsWith('features/auth/google-logo.tsx'))
       .filter((file) => /#[0-9a-fA-F]{6}\b/.test(readFileSync(join(src, file), 'utf8')));
     expect(offenders).toEqual([]);
   });
