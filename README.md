@@ -90,4 +90,4 @@ Este repositório é público. Ele nunca contém credenciais, a planilha origina
 
 ## Licença
 
-[MIT](LICENSE)
+O código e a documentação estão sob a licença [MIT](LICENSE). **A marca não:** o nome CodeLélis, o símbolo CL, as logos e os ícones do app (`apps/web/public/brand/` e os ícones em `apps/web/public/`) são de Diego Lélis, com todos os direitos reservados ([detalhes](apps/web/public/brand/LICENSE.md)).

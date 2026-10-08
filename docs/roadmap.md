@@ -121,7 +121,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 ## Fase 6 — Identidade visual
 
 - [x] Decisão da identidade `<CodeLélis/> Finanças` ([ADR 0043](adr/0043-identidade-visual-codelelis.md))
-- [ ] Arquivos da marca: símbolo, logos, favicon, ícones do app e manifesto, derivados das artes aprovadas
+- [x] Arquivos da marca: símbolo, logos, favicon, ícones do app e manifesto, derivados das artes aprovadas (a marca fora da licença MIT)
 - [ ] Tokens: paleta, tema escuro marinho, fonte Inter, raio e teste de contraste
 - [ ] Moldura do app: logo no cabeçalho, na barra lateral e nas telas de login
 - [ ] Painel e gráficos: indicadores com ícone, paleta dos gráficos revalidada e etiquetas de receita e despesa

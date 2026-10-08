@@ -45,6 +45,7 @@ Run from the repo root. Package scripts run with `pnpm --filter @financas/<api|w
 | Scan the whole git history for secrets                            | `pnpm secrets`                                                        |
 | Build the API image (from the root, as Render does)               | `docker build -f apps/api/Dockerfile -t financas-api .`               |
 | Screenshots at 360/768/1280 px + phone checks (servers running)   | `pnpm --filter @financas/web screenshots [page]`                      |
+| Regenerate the brand files from the approved artwork (ADR 0043)   | `pnpm --filter @financas/web brand-assets -- <package folder>`        |
 
 CI (`.github/workflows/ci.yml`) runs `format:check`, `lint`, `typecheck`, `test` and `build`, plus a gitleaks job and a job that builds the API Docker image. Run the same commands before pushing.
 
