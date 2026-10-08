@@ -33,7 +33,7 @@ const sectionsNav = () => screen.findByRole('navigation', { name: 'Seções do e
 
 async function openSwitcher(current: string) {
   await userEvent.click(
-    await screen.findByRole('button', { name: `Trocar de espaço (atual: ${current})` }),
+    await screen.findByRole('button', { name: `Trocar de espaço: Espaço ${current}` }),
   );
   return screen.findByRole('menu');
 }
@@ -66,7 +66,7 @@ describe('WorkspaceSwitcher', () => {
     expect(router.state.location.pathname).toBe(`/espacos/${personalWorkspace.id}/lancamentos`);
     expect(router.state.location.search).toBe('?competencia=2026-11');
     expect(
-      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Pessoal)' }),
+      await screen.findByRole('button', { name: 'Trocar de espaço: Espaço Pessoal' }),
     ).toBeInTheDocument();
     // Remembered: "/" opens it next time.
     await vi.waitFor(() =>
@@ -102,7 +102,7 @@ describe('WorkspaceSwitcher', () => {
       expect(router.state.location.pathname).toBe(`/espacos/${created.id}/painel`),
     );
     expect(
-      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Viagem)' }),
+      await screen.findByRole('button', { name: 'Trocar de espaço: Espaço Viagem' }),
     ).toBeInTheDocument();
   });
 });
@@ -118,7 +118,7 @@ describe('WorkspaceLayout', () => {
       within(await screen.findByRole('banner')).getByRole('link', { name: 'Finanças' }),
     ).toHaveAttribute('href', '/');
     expect(
-      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Casa)' }),
+      await screen.findByRole('button', { name: 'Trocar de espaço: Espaço Casa' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toHaveTextContent('A marca é de uso reservado');
     const nav = await sectionsNav();
@@ -142,7 +142,7 @@ describe('WorkspaceLayout', () => {
 
     expect(await screen.findByRole('link', { name: 'Finanças' })).toHaveAttribute('href', '/');
     expect(
-      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Casa)' }),
+      await screen.findByRole('button', { name: 'Trocar de espaço: Espaço Casa' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     // The account at the sidebar's foot, by name instead of an icon.

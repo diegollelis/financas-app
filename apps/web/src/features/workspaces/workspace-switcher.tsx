@@ -50,7 +50,6 @@ export function WorkspaceSwitcher({
           <Button
             ref={triggerRef}
             variant="ghost"
-            aria-label={`Trocar de espaço (atual: ${current.name})`}
             className={cn(
               '-ml-2 h-11 max-w-full min-w-0 justify-start gap-2 px-2 py-1 text-left font-semibold md:h-auto md:px-2',
               className && 'ml-0',
@@ -58,8 +57,9 @@ export function WorkspaceSwitcher({
             )}
           >
             {/* Labelled: a bare name could read as a filter or an account (ADR 0044). */}
+            <span className="sr-only">Trocar de espaço:</span>{' '}
             <span className="grid min-w-0 leading-tight">
-              <span className="text-muted-foreground text-xs font-normal">Espaço</span>
+              <span className="text-muted-foreground text-xs font-normal">Espaço</span>{' '}
               <span className="truncate text-sm">{current.name}</span>
             </span>
             <ChevronDown aria-hidden className="text-muted-foreground" />

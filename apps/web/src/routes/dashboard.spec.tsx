@@ -211,7 +211,7 @@ describe('DashboardPage', () => {
       expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
       // Already on this month: the picker offers no way to it.
       await userEvent.click(
-        screen.getByRole('button', { name: 'Escolher competência (atual: outubro de 2026)' }),
+        screen.getByRole('button', { name: 'Escolher competência: outubro de 2026' }),
       );
       expect(
         await screen.findByRole('dialog', { name: 'Escolher competência' }),
