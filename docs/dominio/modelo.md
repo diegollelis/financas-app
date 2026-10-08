@@ -59,9 +59,9 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 - Uma competência sem configuração salva herda a última salva antes dela; sem nenhuma, valem 60/20/15/5 e renda 0 ([ADR 0030](../adr/0030-orcamento-por-competencia-com-heranca.md)).
 - Evolução possível: destinos de orçamento configuráveis (lista em vez de quatro campos fixos).
 
-### Rateio (fase 5, a definir)
+### Pessoa e rateio (fase 5)
 
-Lançamento dividido com outra pessoa (membro do espaço ou contato externo). Modelagem a decidir em ADR próprio.
+Pessoa (`Person`): um contato do espaço, só o nome, para quem usa ou não o app, opcionalmente ligado a um membro. Um lançamento pode ser ligado a uma pessoa (crédito = a receber de, débito = a pagar para), e dividir um gasto cria um crédito pendente "a receber" por pessoa, na categoria Reembolso ([ADR 0042](../adr/0042-pessoas-e-rateio.md)).
 
 ## Indicadores do painel (por espaço e competência)
 
