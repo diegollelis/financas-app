@@ -91,7 +91,11 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [ ] "Tornar recorrente" no menu de um lançamento existente: criar a recorrência adotando o lançamento como o primeiro mês, sem duplicar
 - [x] Escolha de categoria com busca (sem depender de acentos) e "Mais usadas" dos últimos 6 meses (`recentUses` na lista de categorias)
   - [ ] Sugerir a categoria pela descrição, a partir dos lançamentos anteriores
-- [ ] Rateio de lançamentos (ADR próprio)
+- [ ] Rateio de lançamentos e pessoas ([ADR 0042](adr/0042-pessoas-e-rateio.md))
+  - [ ] API: pessoas, lançamento ligado a uma pessoa, dividir um gasto e categoria Reembolso
+  - [ ] Tela: "Dividir com alguém" no novo lançamento, selos e página Pessoas
+  - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
+  - [ ] Divisão das contas da casa por percentual entre os membros (ADR próprio)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês
