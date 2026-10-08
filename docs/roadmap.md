@@ -122,7 +122,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 - [x] Decisão da identidade `<CodeLélis/> Finanças` ([ADR 0043](adr/0043-identidade-visual-codelelis.md))
 - [x] Arquivos da marca: símbolo, logos, favicon, ícones do app e manifesto, derivados das artes aprovadas (a marca fora da licença MIT)
-- [ ] Tokens: paleta, tema escuro marinho, fonte Inter, raio e teste de contraste
+- [x] Tokens: paleta, tema escuro marinho, fonte Inter, raio e teste de contraste e de origem das cores (oficiais ou derivadas registradas)
 - [ ] Moldura do app: logo no cabeçalho, na barra lateral e nas telas de login
 - [ ] Painel e gráficos: indicadores com ícone, paleta dos gráficos revalidada e etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças

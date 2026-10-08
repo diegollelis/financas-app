@@ -16,6 +16,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 - **Name:** the logo art reads `<CodeLélis/> FINANÇAS`. In plain text where the logo is not beside it (tab title, installed app name, e-mails, legal pages) write **"CodeLélis Finanças"**; inside the app, where the logo shows, **"Finanças"**. Always "Lélis", with the accent.
 - **The marks are artwork:** use only the files in `apps/web/public/brand/` (derived from the approved art by `scripts/brand-assets.ts`, never redrawn). Never recreate the CL in CSS or SVG, and never add other brands' logos (banks included).
 - **Palette:** primary `#0066FF`; `--brand-secondary` (`#00C2FF`) and `--brand-accent` (`#00E6B8`) are decorative only, never text. Credit/debit/warning hues fill icons, outlines and muted backgrounds; text in those meanings uses the darker token variants (4.5:1). Dark theme is navy, not gray.
+- **No new colors:** a hex lives only in `src/index.css`, and each one is either an official brand color or a derived semantic token (a contrast variant or a fill of an official color) registered with its origin in ADR 0043 and in `scripts/palette-contrast.spec.ts`, which fails otherwise. Components use tokens only.
 - **The brand gradient lives only in the artwork**; buttons and surfaces are solid.
 - **Font:** Inter.
 

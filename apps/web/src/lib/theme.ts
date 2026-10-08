@@ -13,7 +13,7 @@ export type ResolvedTheme = 'light' | 'dark';
 export const THEME_STORAGE_KEY = 'financas-tema';
 
 /** The `--background` of each theme, for the browser bar (`<meta name="theme-color">`). */
-const themeColors: Record<ResolvedTheme, string> = { light: '#ffffff', dark: '#0a0a0a' };
+const themeColors: Record<ResolvedTheme, string> = { light: '#f8fafc', dark: '#0a1f3d' };
 
 const darkQuery = '(prefers-color-scheme: dark)';
 
