@@ -7,6 +7,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { analysisKey } from '@/features/analysis/use-analysis';
+import { peopleKey } from '@/features/people/use-people';
 import { summaryKey } from '@/features/summary/use-summary';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
@@ -34,6 +35,8 @@ export function useInvalidateTransactions(workspaceId: string) {
       // The month's dashboard and the analysis are computed from the transactions.
       queryClient.invalidateQueries({ queryKey: summaryKey(workspaceId) }),
       queryClient.invalidateQueries({ queryKey: analysisKey(workspaceId) }),
+      // What each person owes, or is owed, comes from the pending transactions (ADR 0042).
+      queryClient.invalidateQueries({ queryKey: peopleKey(workspaceId) }),
     ]);
 }
 
@@ -55,11 +58,14 @@ export function useUpdateTransaction(workspaceId: string) {
   });
 }
 
+/** `withShares`: also the shares split from this debit (ADR 0042). */
 export function useDeleteTransaction(workspaceId: string) {
   const onSuccess = useInvalidateTransactions(workspaceId);
   return useMutation({
-    mutationFn: (transactionId: string) =>
-      apiDelete(`/api/workspaces/${workspaceId}/transactions/${transactionId}`),
+    mutationFn: ({ id, withShares = false }: { id: string; withShares?: boolean }) =>
+      apiDelete(
+        `/api/workspaces/${workspaceId}/transactions/${id}${withShares ? '?withShares=true' : ''}`,
+      ),
     onSuccess,
   });
 }
