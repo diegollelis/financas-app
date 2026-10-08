@@ -107,6 +107,22 @@ describe('PeoplePage', () => {
     expect(text(items[1]!)).toContain('Casa de praiajulho de 2026A pagarPago');
   });
 
+  it('says so when the history cannot load, without the workspace "not found" notice', async () => {
+    // Someone else deleted the person meanwhile, or the API is still being deployed.
+    mockPeople({
+      [`GET ${base}/${ana.id}/transactions`]: { status: 404, body: { message: 'Not Found' } },
+    });
+    renderApp(page);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver lançamentos com Ana' }));
+
+    const history = await screen.findByRole('dialog', { name: 'Lançamentos com Ana' });
+    expect(await within(history).findByRole('alert')).toHaveTextContent(
+      'Não foi possível carregar os lançamentos desta pessoa agora.',
+    );
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
   it('archives someone, and deletes only from the archived', async () => {
     const fetchMock = mockPeople({
       [`PATCH ${base}/${carlos.id}`]: { body: { ...carlos, archived: true } },

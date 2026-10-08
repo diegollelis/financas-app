@@ -139,7 +139,22 @@ function PersonHistory({
       title={person ? `Lançamentos com ${person.name}` : 'Lançamentos'}
       description="De todos os meses, do mais recente ao mais antigo. Para efetivar ou mudar, use Lançamentos."
     >
-      <QueryState queries={[transactions]} />
+      {/* Its own states, not QueryState's: a 404 here is a person gone, not the workspace. */}
+      {transactions.isPending && <p className="text-muted-foreground">Carregando…</p>}
+      {transactions.isError && (
+        <div role="alert" className="grid justify-items-start gap-2">
+          <p className="text-destructive">
+            Não foi possível carregar os lançamentos desta pessoa agora.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => void transactions.refetch()}
+            disabled={transactions.isFetching}
+          >
+            {transactions.isFetching ? 'Tentando…' : 'Tentar de novo'}
+          </Button>
+        </div>
+      )}
       {transactions.isSuccess &&
         (transactions.data.length === 0 ? (
           <p className="text-muted-foreground">Nenhum lançamento com esta pessoa ainda.</p>
