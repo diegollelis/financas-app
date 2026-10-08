@@ -57,14 +57,19 @@ export function PeriodPicker({ period, onPick }: { period: string; onPick: () =>
                 to={to(target)}
                 onClick={onPick}
                 aria-current={open ? 'true' : undefined}
-                aria-label={`${formatPeriod(target)}${today ? ', mês atual' : ''}`}
                 className={cn(
                   'focus-visible:ring-ring/50 flex h-11 items-center justify-center rounded-lg text-base font-medium outline-none focus-visible:ring-3 md:h-9 md:text-sm',
                   open ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
                   today && !open && 'border-primary border',
                 )}
               >
+                {/* "jan" on screen, "jan, janeiro de 2026" heard: the name starts with what
+                    is seen (WCAG 2.5.3). */}
                 {label}
+                <span className="sr-only">
+                  , {formatPeriod(target)}
+                  {today ? ', mês atual' : ''}
+                </span>
               </Link>
             </li>
           );

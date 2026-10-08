@@ -179,7 +179,7 @@ describe('BudgetPage', () => {
     expect(
       within(screen.getByRole('main'))
         .getAllByRole('button')
-        .map((button) => button.getAttribute('aria-label')),
+        .map((button) => button.textContent),
     ).toEqual([expect.stringMatching(/^Escolher competência/)]);
   });
 

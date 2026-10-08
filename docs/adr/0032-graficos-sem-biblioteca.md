@@ -27,3 +27,12 @@ As cores `--chart-1..5` que vieram com o shadcn/ui são tons de cinza, e nada as
 - Nenhuma dependência nova. O gráfico é testado como o resto da página, pelo texto e pelo `aria-label`.
 - Comparativos entre meses (fase 5) vão precisar de linhas e eixos. Será a hora de rever esta decisão, provavelmente adotando o Recharts com estas mesmas cores.
 - Uma série nova usa a próxima cor da ordem validada, nunca uma cor inventada.
+
+## Nota (2026-10-08, identidade visual)
+
+Com a identidade CodeLélis ([ADR 0043](0043-identidade-visual-codelelis.md)), a paleta das séries foi reavaliada a partir das cores oficiais e **continua a mesma**.
+
+- **Azul, ciano e menta da marca** (`#0066FF`, `#00C2FF`, `#00E6B8`) ficam próximos demais entre si e têm pouco contraste sobre o branco.
+- **Verde e vermelho** (receitas e despesas) são o par que mais falha para daltonismo.
+
+As cores validadas aqui ficam registradas como tokens derivados no ADR 0043.

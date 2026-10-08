@@ -39,10 +39,10 @@ const october = [
   debit(200_000, '2026-10-20'),
 ];
 
-function mockDashboard(summary: object, period = '2026-10') {
+function mockDashboard(summary: object, period = '2026-10', role = house.role) {
   return mockApi({
     'GET /api/me': { body: verifiedUser },
-    [`GET /api/workspaces/${houseId}`]: { body: house },
+    [`GET /api/workspaces/${houseId}`]: { body: { ...house, role } },
     [`GET /api/workspaces/${houseId}/summary/${period}`]: { body: summary },
   });
 }
@@ -146,11 +146,33 @@ describe('DashboardPage', () => {
     renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
 
     expect(await screen.findByText('Nenhum lançamento nesta competência.')).toBeInTheDocument();
+    // A VIEWER cannot set the net income: the goal says when it shows, and links to the budget.
     expect(
-      screen.getByText('Informe a renda líquida no orçamento para acompanhar a meta de despesas.'),
+      screen.getByText(
+        'A meta de despesas aparece quando a renda líquida for definida no orçamento.',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ver orçamento' })).toHaveAttribute(
+    for (const link of screen.getAllByRole('link', { name: 'Ver orçamento' })) {
+      expect(link).toHaveAttribute('href', `/espacos/${houseId}/orcamento?competencia=2026-11`);
+    }
+  });
+
+  it('offers whoever edits to set the net income, from the empty goal', async () => {
+    mockDashboard(
+      summarizePeriod([], { ...budget, period: '2026-11', netIncomeCents: 0 }, today),
+      '2026-11',
+      'EDITOR',
+    );
+
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
+
+    expect(
+      await screen.findByText(
+        'Defina a renda líquida no orçamento para acompanhar a meta de despesas.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Definir renda' })).toHaveAttribute(
       'href',
       `/espacos/${houseId}/orcamento?competencia=2026-11`,
     );
@@ -211,7 +233,7 @@ describe('DashboardPage', () => {
       expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
       // Already on this month: the picker offers no way to it.
       await userEvent.click(
-        screen.getByRole('button', { name: 'Escolher competência (atual: outubro de 2026)' }),
+        screen.getByRole('button', { name: 'Escolher competência: outubro de 2026' }),
       );
       expect(
         await screen.findByRole('dialog', { name: 'Escolher competência' }),

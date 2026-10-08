@@ -101,7 +101,7 @@ describe('InvitationPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Membros' })).toBeInTheDocument();
     expect(
-      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Casa)' }),
+      await screen.findByRole('button', { name: 'Trocar de espaço: Espaço Casa' }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}`);
     expect(fetchMock).toHaveBeenCalledWith(

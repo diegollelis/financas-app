@@ -28,11 +28,13 @@ export function PeriodNav({ period }: { period: string }) {
     <Button
       ref={triggerRef}
       variant="ghost"
-      aria-label={`Escolher competência (atual: ${formatPeriod(period)}${away ? ', fora do mês atual' : ''})`}
       className="min-w-0 flex-1 gap-2 text-base font-medium sm:w-44 sm:flex-none md:text-sm"
       onClick={desktop ? undefined : () => setOpen(true)}
     >
+      {/* The name holds the visible month (WCAG 2.5.3): the rest is screen-reader text. */}
+      <span className="sr-only">Escolher competência:</span>{' '}
       <span className="truncate first-letter:uppercase">{formatPeriod(period)}</span>
+      {away && <span className="sr-only">, fora do mês atual</span>}
       {away && <span aria-hidden className="bg-primary size-1.5 shrink-0 rounded-full" />}
       <ChevronDown aria-hidden className="text-muted-foreground" />
     </Button>

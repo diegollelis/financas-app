@@ -64,7 +64,8 @@ export const routes: RouteObject[] = [
               // The competência travels as ?competencia=YYYY-MM (default: this month).
               { path: 'lancamentos', element: <TransactionsPage /> },
               { path: 'orcamento', element: <BudgetPage /> },
-              { path: 'painel', element: <DashboardPage /> },
+              // A dashboard of blocks side by side: the wide column (ADR 0045).
+              { path: 'painel', element: <DashboardPage />, handle: { wide: true } },
               // The range and filters travel in the address (ADR 0037).
               { path: 'analise', element: <AnalysisPage /> },
               // Recurrences and installment plans (ADR 0038).

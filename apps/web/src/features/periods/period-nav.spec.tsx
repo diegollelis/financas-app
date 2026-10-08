@@ -46,7 +46,7 @@ describe('PeriodNav', () => {
     ).toHaveAttribute('href', `/espacos/${houseId}/lancamentos?competencia=2026-02`);
     expect(
       within(nav).getByRole('button', {
-        name: 'Escolher competência (atual: março de 2026, fora do mês atual)',
+        name: 'Escolher competência: março de 2026, fora do mês atual',
       }),
     ).toBeInTheDocument();
     // The row never changes shape: no "Mês atual" in it.
@@ -59,16 +59,16 @@ describe('PeriodNav', () => {
     const picker = await openPicker();
     // Opens on the year on screen, with its month marked.
     expect(within(picker).getByText('2026')).toBeInTheDocument();
-    expect(within(picker).getByRole('link', { name: 'março de 2026' })).toHaveAttribute(
+    expect(within(picker).getByRole('link', { name: 'mar, março de 2026' })).toHaveAttribute(
       'aria-current',
       'true',
     );
     expect(
-      within(picker).getByRole('link', { name: 'outubro de 2026, mês atual' }),
+      within(picker).getByRole('link', { name: 'out, outubro de 2026, mês atual' }),
     ).toBeInTheDocument();
 
     await userEvent.click(within(picker).getByRole('button', { name: 'Ano anterior: 2025' }));
-    await userEvent.click(within(picker).getByRole('link', { name: 'março de 2025' }));
+    await userEvent.click(within(picker).getByRole('link', { name: 'mar, março de 2025' }));
 
     expect(router.state.location.search).toBe('?competencia=2025-03');
     expect(await screen.findByText('março de 2025')).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe('PeriodNav', () => {
     await userEvent.click(within(picker).getByRole('link', { name: 'Ir para o mês atual' }));
 
     expect(router.state.location.search).toBe('?competencia=2026-10');
-    picker = await openPicker('Escolher competência (atual: outubro de 2026)');
+    picker = await openPicker('Escolher competência: outubro de 2026');
     expect(
       within(picker).queryByRole('link', { name: 'Ir para o mês atual' }),
     ).not.toBeInTheDocument();
@@ -93,7 +93,7 @@ describe('PeriodNav', () => {
     const { router } = renderTransactions('');
 
     const picker = await openPicker();
-    await userEvent.click(within(picker).getByRole('link', { name: 'janeiro de 2026' }));
+    await userEvent.click(within(picker).getByRole('link', { name: 'jan, janeiro de 2026' }));
 
     expect(router.state.location.search).toBe('?competencia=2026-01');
   });

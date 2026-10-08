@@ -43,7 +43,7 @@ describe('WorkspacePage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Membros' })).toBeInTheDocument();
     expect(
-      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Casa)' }),
+      await screen.findByRole('button', { name: 'Trocar de espaço: Espaço Casa' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Seu acesso: Dono')).toBeInTheDocument();
     const memberList = await screen.findByRole('list', { name: 'Membros do espaço' });

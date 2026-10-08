@@ -1,4 +1,10 @@
-import { formatBasisPoints, formatCents, formatPeriod, type Summary } from '@financas/shared';
+import {
+  formatBasisPoints,
+  formatCents,
+  formatPeriod,
+  hasRole,
+  type Summary,
+} from '@financas/shared';
 import { TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -34,10 +40,18 @@ function StatTile({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  className,
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: ReactNode;
+}) {
   const id = `dashboard-${title.toLowerCase().replace(/\W+/g, '-')}`;
   return (
-    <section aria-labelledby={id} className="grid gap-3">
+    <section aria-labelledby={id} className={cn('grid content-start gap-3', className)}>
       <h2 id={id} className="font-medium">
         {title}
       </h2>
@@ -155,23 +169,38 @@ function DestinationTable({ summary }: { summary: Summary }) {
 
 type PageLinks = { transactions: string; budget: string };
 
-function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
+/**
+ * The month on one screen (ADRs 0031, 0045). One column up to xl; from there, two: the balance
+ * across the top, then credits and debits beside where the credits go, and the expenses goal
+ * beside the budget, so a wide screen is used without stretching any row.
+ */
+function Dashboard({
+  summary,
+  links,
+  canEdit,
+}: {
+  summary: Summary;
+  links: PageLinks;
+  canEdit: boolean;
+}) {
   const { credits, debits } = summary;
   const desktop = useMediaQuery(DESKTOP_QUERY);
   return (
-    <>
-      <OverdueNotice summary={summary} transactionsLink={links.transactions} />
-      <Section title="Saldo e resultado">
+    <div className="grid gap-6 xl:grid-cols-2 xl:gap-x-10 xl:gap-y-8">
+      <div className="empty:hidden xl:col-span-2">
+        <OverdueNotice summary={summary} transactionsLink={links.transactions} />
+      </div>
+      <Section title="Saldo e resultado" className="xl:col-span-2">
         {/* Planned: as if everything were settled. Settled: only what happened (ADR 0031). */}
-        <dl className="grid gap-4">
+        <div className="grid gap-4">
           {/* The one number the month leads with (dataviz skill: one hero per view). */}
-          <div className="grid gap-1">
+          <dl className="grid gap-1">
             <dt className="text-muted-foreground">Saldo previsto</dt>
             <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
               <SignedCents cents={summary.balance.plannedCents} />
             </dd>
-          </div>
-          <div className="grid sm:grid-cols-3 sm:gap-3">
+          </dl>
+          <dl className="grid sm:grid-cols-3 sm:gap-3">
             <StatTile label="Saldo efetivado">
               <SignedCents cents={summary.balance.settledCents} />
             </StatTile>
@@ -181,8 +210,8 @@ function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
             <StatTile label="Resultado efetivado">
               <SignedCents cents={summary.result.settledCents} />
             </StatTile>
-          </div>
-        </dl>
+          </dl>
+        </div>
         {summary.estimatedCents > 0 && (
           // The planned view counts estimates of variable bills (ADR 0038): say how much.
           <p>
@@ -215,7 +244,7 @@ function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
         <CreditsBar summary={summary} />
       </Section>
       <Section title="Despesas e meta">
-        <ExpensesMeter summary={summary} />
+        <ExpensesMeter summary={summary} budgetLink={links.budget} canEdit={canEdit} />
       </Section>
       <Section title="Orçamento por destino">
         <div className="grid justify-items-start gap-1">
@@ -230,7 +259,7 @@ function Dashboard({ summary, links }: { summary: Summary; links: PageLinks }) {
           créditos recebidos.
         </p>
       </Section>
-    </>
+    </div>
   );
 }
 
@@ -268,7 +297,13 @@ export function DashboardPage() {
         <PeriodNav period={period} />
       </PageHeader>
       <QueryState queries={[summary]} skeleton={<DashboardSkeleton />} />
-      {summary.isSuccess && <Dashboard summary={summary.data} links={links} />}
+      {summary.isSuccess && (
+        <Dashboard
+          summary={summary.data}
+          links={links}
+          canEdit={hasRole(workspace.role, 'EDITOR')}
+        />
+      )}
     </>
   );
 }
