@@ -27,8 +27,14 @@ export function AppFooter({ className, center = false }: { className?: string; c
         <TextLink to={TERMS_PATH} className="text-muted-foreground">
           Termos de uso
         </TextLink>
-        <TextLink to={PRIVACY_PATH} className="text-muted-foreground">
-          Política de privacidade
+        {/* Short, so the three links fit one line on a phone; the full name is still the
+            accessible one (the sign-in page must link the privacy policy, as Google asks). */}
+        <TextLink
+          to={PRIVACY_PATH}
+          aria-label="Política de privacidade"
+          className="text-muted-foreground"
+        >
+          Privacidade
         </TextLink>
         <a
           href={SOURCE_CODE_URL}

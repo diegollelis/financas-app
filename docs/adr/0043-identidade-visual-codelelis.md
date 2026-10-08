@@ -100,18 +100,19 @@ As cores oficiais são as da paleta aprovada, mais as de estado (sucesso `#22C55
 
 **Variantes são tokens semânticos derivados, não cores da marca.** Uma variante nova só entra com registro nesta tabela e na lista do teste `apps/web/scripts/palette-contrast.spec.ts`. O teste reprova qualquer cor de `index.css` que não seja oficial nem derivada registrada, e qualquer hex nos componentes.
 
-| Valor                                          | Token                                        | Origem                                                           | Motivo                                                     |
-| ---------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- |
-| `#F1F5F9`                                      | `--secondary`, `--muted`, `--accent` (claro) | entre `#F8FAFC` e `#E2E8F0`                                      | fundo que aparece sobre o fundo da página e sobre o cartão |
-| `#5B6B82`                                      | `--muted-foreground` (claro)                 | `#64748B`, mais escuro                                           | a oficial dá 4,3:1 sobre o `--muted`                       |
-| `#B91C1C`                                      | `--destructive` (claro)                      | `#DC2626`, mais escuro                                           | 4,5:1 sobre o fundo do botão de excluir                    |
-| `#15803D`                                      | `--success` (claro)                          | `#16A34A`, mais escuro                                           | sucesso como texto                                         |
-| `#B45309`                                      | `--warning` (claro)                          | `#F59E0B`, mais escuro                                           | alerta como texto (a oficial dá 2,1:1)                     |
-| `#DCFCE7`, `#FEF3C7`, `#FEE2E2`                | `*-muted` (claro)                            | receitas, alertas e despesas, tons claros                        | fundos dos selos e avisos                                  |
-| `#4D94FF`                                      | `--primary` (escuro)                         | `#0066FF`, mais claro                                            | o azul da marca fica escuro demais sobre o marinho         |
-| `#F87171`                                      | `--destructive`, `--debit` (escuro)          | `#EF4444`, mais claro                                            | a oficial dá 3,9:1 sobre o cartão marinho                  |
-| `#0F3B2A`, `#3A2A0C`, `#3B1520`                | `*-muted` (escuro)                           | receitas, alertas e despesas, tons escuros                       | fundos sobre o marinho                                     |
-| `#2A78D6`, `#EB6834`, `#1BAF7A` e os do escuro | `--chart-1..3`                               | a paleta validada do [ADR 0032](0032-graficos-sem-biblioteca.md) | revalidada a partir das cores oficiais no PR do Painel     |
+| Valor                                          | Token                                        | Origem                                                           | Motivo                                                                                                          |
+| ---------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `#F1F5F9`                                      | `--secondary`, `--muted`, `--accent` (claro) | entre `#F8FAFC` e `#E2E8F0`                                      | fundo que aparece sobre o fundo da página e sobre o cartão                                                      |
+| `#5B6B82`                                      | `--muted-foreground` (claro)                 | `#64748B`, mais escuro                                           | a oficial dá 4,3:1 sobre o `--muted`                                                                            |
+| `#7D8CA2`                                      | `--input-border` (claro)                     | entre `#64748B` e `#94A3B8`                                      | a borda de campos e caixas de marcação precisa de 3:1 (WCAG 1.4.11); no escuro, a oficial `#64748B` já dá 3,1:1 |
+| `#B91C1C`                                      | `--destructive` (claro)                      | `#DC2626`, mais escuro                                           | 4,5:1 sobre o fundo do botão de excluir                                                                         |
+| `#15803D`                                      | `--success` (claro)                          | `#16A34A`, mais escuro                                           | sucesso como texto                                                                                              |
+| `#B45309`                                      | `--warning` (claro)                          | `#F59E0B`, mais escuro                                           | alerta como texto (a oficial dá 2,1:1)                                                                          |
+| `#DCFCE7`, `#FEF3C7`, `#FEE2E2`                | `*-muted` (claro)                            | receitas, alertas e despesas, tons claros                        | fundos dos selos e avisos                                                                                       |
+| `#4D94FF`                                      | `--primary` (escuro)                         | `#0066FF`, mais claro                                            | o azul da marca fica escuro demais sobre o marinho                                                              |
+| `#F87171`                                      | `--destructive`, `--debit` (escuro)          | `#EF4444`, mais claro                                            | a oficial dá 3,9:1 sobre o cartão marinho                                                                       |
+| `#0F3B2A`, `#3A2A0C`, `#3B1520`                | `*-muted` (escuro)                           | receitas, alertas e despesas, tons escuros                       | fundos sobre o marinho                                                                                          |
+| `#2A78D6`, `#EB6834`, `#1BAF7A` e os do escuro | `--chart-1..3`                               | a paleta validada do [ADR 0032](0032-graficos-sem-biblioteca.md) | revalidada a partir das cores oficiais no PR do Painel                                                          |
 
 No tema escuro, três oficiais servem como estão e não precisam de derivado:
 
@@ -145,6 +146,7 @@ Uma versão da logo para tamanhos pequenos, com "FINANÇAS" proporcionalmente ma
 - **Fica fora:**
   - contas e cartões, investimentos, patrimônio, metas, notificações e "% vs. mês anterior": cada um, se vier, terá ADR próprio;
   - **logos de bancos e de outras marcas, em qualquer caso**, porque o repositório é público.
+  - **Única exceção (validação do login):** o "G" do Google no botão "Continuar com Google". As diretrizes de marca do Google pedem esse símbolo no botão de login, e as pessoas reconhecem o botão mais rápido com ele. Ele fica num componente próprio (`features/auth/google-logo.tsx`), com as cores do Google, e só nesse botão. O teste da paleta abre uma exceção nomeada só para esse arquivo. Logos de bancos continuam proibidas.
 
 **Ordem dos PRs:**
 

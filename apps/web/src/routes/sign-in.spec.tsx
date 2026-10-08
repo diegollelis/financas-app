@@ -89,6 +89,35 @@ describe('SignInPage', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1); // only GET /api/me
   });
 
+  it('goes through the form in reading order with Tab, with fields the browser can fill', async () => {
+    mockApi({ 'GET /api/me': noSession });
+    renderApp('/entrar');
+
+    const email = await screen.findByLabelText('E-mail');
+    const password = screen.getByLabelText('Senha');
+    // Password managers and the phone's keyboard rely on these.
+    expect(email).toHaveAttribute('autocomplete', 'email');
+    expect(email).toHaveAttribute('type', 'email');
+    expect(password).toHaveAttribute('autocomplete', 'current-password');
+
+    const order = [
+      email,
+      password,
+      screen.getByRole('button', { name: 'Mostrar senha' }),
+      screen.getByRole('link', { name: 'Esqueci minha senha' }),
+      screen.getByRole('button', { name: 'Entrar' }),
+      screen.getByRole('button', { name: 'Continuar com Google' }),
+      screen.getByRole('link', { name: 'Cadastre-se' }),
+      screen.getByRole('link', { name: 'Termos de uso' }),
+      screen.getByRole('link', { name: 'Política de privacidade' }),
+      screen.getByRole('link', { name: /Código-fonte/ }),
+    ];
+    for (const element of order) {
+      await userEvent.tab();
+      expect(element).toHaveFocus();
+    }
+  });
+
   it('sends visitors who already have a session to their dashboard', async () => {
     mockApi({
       'GET /api/me': { body: fakeUser },

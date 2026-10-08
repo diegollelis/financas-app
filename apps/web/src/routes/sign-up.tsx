@@ -9,8 +9,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { FormField } from '@/components/form-field';
+import { SubmitButton } from '@/components/submit-button';
 import { TextLink } from '@/components/text-link';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PasswordInput } from '@/components/password-input';
 import { Input } from '@/components/ui/input';
@@ -116,9 +116,11 @@ export function SignUpPage() {
             {authErrorMessage(signUp.error)}
           </p>
         )}
-        <Button type="submit" disabled={signUp.isPending}>
-          {signUp.isPending ? 'Criando conta…' : 'Criar conta'}
-        </Button>
+        <SubmitButton
+          pending={signUp.isPending}
+          label="Criar conta"
+          pendingLabel="Criando conta…"
+        />
       </form>
       <GoogleButton />
     </AuthCard>

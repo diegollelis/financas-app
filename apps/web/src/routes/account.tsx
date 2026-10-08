@@ -26,13 +26,13 @@ export function AccountPage() {
     });
 
   return (
-    <div className="min-h-svh">
+    <div className="flex min-h-svh flex-col">
       <SkipLink />
       <AppHeader />
       <main
         id="conteudo"
         tabIndex={-1}
-        className="px-4 pt-3 pb-8 text-base outline-none sm:px-6 md:pt-6 md:text-sm"
+        className="flex-1 px-4 pt-3 pb-8 text-base outline-none sm:px-6 md:pt-6 md:text-sm"
       >
         <div className="grid max-w-3xl gap-6">
           <TextLink to="/" className="text-muted-foreground -ml-1 gap-1 justify-self-start">

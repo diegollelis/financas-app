@@ -32,6 +32,20 @@ describe('ResetPasswordPage', () => {
     );
   });
 
+  it('marks both fields as a new password, for the password manager', async () => {
+    mockApi({});
+    renderApp('/redefinir-senha?token=token-de-teste');
+
+    expect(await screen.findByLabelText(/^Nova senha/)).toHaveAttribute(
+      'autocomplete',
+      'new-password',
+    );
+    expect(screen.getByLabelText('Repita a nova senha')).toHaveAttribute(
+      'autocomplete',
+      'new-password',
+    );
+  });
+
   it('checks that both passwords match before calling the API', async () => {
     const fetchMock = mockApi({});
     renderApp('/redefinir-senha?token=token-de-teste');

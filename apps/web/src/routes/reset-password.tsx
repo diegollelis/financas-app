@@ -7,8 +7,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router';
 import { FormField } from '@/components/form-field';
+import { SubmitButton } from '@/components/submit-button';
 import { TextLink } from '@/components/text-link';
-import { Button } from '@/components/ui/button';
 import { PasswordInput } from '@/components/password-input';
 import { AuthCard } from '@/features/auth/auth-card';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
@@ -82,9 +82,11 @@ export function ResetPasswordPage() {
             {authErrorMessage(resetPassword.error)}
           </p>
         )}
-        <Button type="submit" disabled={resetPassword.isPending}>
-          {resetPassword.isPending ? 'Salvando…' : 'Salvar nova senha'}
-        </Button>
+        <SubmitButton
+          pending={resetPassword.isPending}
+          label="Salvar nova senha"
+          pendingLabel="Salvando…"
+        />
       </form>
     </AuthCard>
   );

@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WorkspaceGone } from '@/features/workspaces/workspace-gone';
 import { ApiError } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/error-message';
+import { useElapsed } from '@/lib/use-elapsed';
 
 /** After this long, a pending request is most likely the API waking up (ADR 0033). */
 export const SLOW_LOADING_MS = 3000;
@@ -17,15 +17,6 @@ type QueryLike = {
   error: Error | null;
   refetch: () => Promise<unknown>;
 };
-
-function useElapsed(ms: number) {
-  const [elapsed, setElapsed] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setElapsed(true), ms);
-    return () => clearTimeout(timer);
-  }, [ms]);
-  return elapsed;
-}
 
 /**
  * A skeleton shaped like the content, plus a word about the cold start when it takes a while: on

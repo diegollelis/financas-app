@@ -75,6 +75,9 @@ const uiPairs: [string, string][] = [
   ['ring', 'card'],
   ['credit', 'card'],
   ['debit', 'card'],
+  // The edge of a field or checkbox (WCAG 1.4.11): where to type or tap.
+  ['input-border', 'card'],
+  ['input-border', 'background'],
 ];
 
 /**
@@ -113,6 +116,7 @@ const OFFICIAL = new Set([
 const DERIVED: Record<string, string> = {
   '#f1f5f9': 'between #f8fafc and #e2e8f0: a fill that shows on the background and on cards',
   '#5b6b82': '#64748b, darker: 4.5:1 on the muted fill',
+  '#7d8ca2': 'between #64748b and #94a3b8: the edge of fields, 3:1 on cards and the background',
   '#b91c1c': '#dc2626, darker: 4.5:1 on the destructive button fill',
   '#15803d': '#16a34a, darker: success as text',
   '#b45309': '#f59e0b, darker: warning as text',
@@ -149,6 +153,8 @@ describe('palette origin', () => {
     const offenders = (readdirSync(src, { recursive: true }) as string[])
       .filter((file) => /\.tsx?$/.test(file) && !/\.spec\.tsx?$/.test(file))
       .filter((file) => !file.replaceAll('\\', '/').endsWith('lib/theme.ts'))
+      // Google's own colors, on its sign-in button only (ADR 0043): not the app's palette.
+      .filter((file) => !file.replaceAll('\\', '/').endsWith('features/auth/google-logo.tsx'))
       .filter((file) => /#[0-9a-fA-F]{6}\b/.test(readFileSync(join(src, file), 'utf8')));
     expect(offenders).toEqual([]);
   });

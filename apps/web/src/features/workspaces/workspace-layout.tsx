@@ -185,7 +185,7 @@ export function WorkspaceLayout() {
   const sections = !workspace.isError && <SectionNav workspaceId={workspaceId} />;
 
   return (
-    <div className="min-h-svh md:flex">
+    <div className="flex min-h-svh flex-col md:flex-row">
       <SkipLink />
       {desktop ? (
         <div className="bg-sidebar sticky top-0 flex h-svh w-60 shrink-0 flex-col border-r">
@@ -203,11 +203,11 @@ export function WorkspaceLayout() {
       )}
       {/* The page column: the footer is outside <main>, which holds only the page, so it stays a
           contentinfo landmark. */}
-      <div className="min-w-0 flex-1 px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] text-base sm:px-6 md:pb-8 md:text-sm">
+      <div className="flex min-w-0 flex-1 flex-col px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] text-base sm:px-6 md:pb-8 md:text-sm">
         <main
           id="conteudo"
           tabIndex={-1}
-          className="grid max-w-3xl gap-6 pt-5 outline-none md:pt-8"
+          className="grid max-w-3xl flex-1 content-start gap-6 pt-5 outline-none md:pt-8"
         >
           {/* On every page until confirmed; not blocking (ADR 0022). */}
           {!user.emailVerified && <VerifyEmailBanner email={user.email} />}

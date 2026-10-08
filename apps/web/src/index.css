@@ -23,6 +23,7 @@
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
+  --color-input-border: var(--input-border);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
@@ -104,6 +105,9 @@
   --brand-accent: #00e6b8;
   --border: #e2e8f0;
   --input: #e2e8f0;
+  /* Derived between #64748b and #94a3b8: the edge of fields and checkboxes, which must reach 3:1
+     to show where a field is (WCAG 1.4.11). Dividers keep the soft --border. */
+  --input-border: #7d8ca2;
   --ring: #0066ff;
   /* Derived (ADR 0032): the chart series, in this order (blue, orange, aqua), checked for
      color blindness and contrast in both themes. Aqua is under 3:1 on white, so charts always
@@ -156,6 +160,7 @@
   --brand-accent: #00e6b8;
   --border: #1e3a8a;
   --input: #1e3a8a;
+  --input-border: #64748b;
   --ring: #4d94ff;
   /* Derived (ADR 0032): the chart series for dark. */
   --chart-1: #3987e5;
