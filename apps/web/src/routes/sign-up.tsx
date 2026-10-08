@@ -12,6 +12,7 @@ import { FormField } from '@/components/form-field';
 import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PasswordInput } from '@/components/password-input';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
 import { CheckEmail } from '@/features/auth/check-email';
@@ -66,7 +67,7 @@ export function SignUpPage() {
           label={`Senha (mínimo de ${PASSWORD_MIN_LENGTH} caracteres)`}
           error={formState.errors.password?.message}
         >
-          <Input type="password" autoComplete="new-password" {...register('password')} />
+          <PasswordInput autoComplete="new-password" {...register('password')} />
         </FormField>
         {/* Required (ADR 0041). The links open the documents; the rest of the text checks the box. */}
         <div className="grid gap-2">

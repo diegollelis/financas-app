@@ -125,6 +125,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Tokens: paleta, tema escuro marinho, fonte Inter, raio e teste de contraste e de origem das cores (oficiais ou derivadas registradas)
 - [x] Moldura do app: `BrandLogo`, a logo nas telas de login, o item ativo com barra azul
 - [x] Marca do produto e moldura revista ([ADR 0044](adr/0044-marca-do-produto-e-moldura.md)): `[CL] Finanças` dentro do app, barra lateral de altura inteira no desktop (marca, espaço, seções e conta), o espaço no topo da página no celular e o rodapé com a assinatura CodeLélis
+- [x] Login, cadastro e redefinir senha: botão para mostrar e ocultar a senha (`PasswordInput`)
 - [ ] Painel e gráficos: indicadores com ícone, paleta dos gráficos revalidada e etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro
