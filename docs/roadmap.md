@@ -139,6 +139,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - "Despesas e meta" vazio com ação ("Definir renda");
   - axe zerado no Painel: listas `<dl>`, os nomes do seletor de espaço, do de mês e dos meses (WCAG 2.5.3);
   - os indicadores ficam sem ícone, e a paleta dos gráficos continua a do ADR 0032.
+- [x] Orçamento editado no Painel, num modal ([ADR 0046](adr/0046-orcamento-no-painel.md)): a página saiu (o endereço antigo leva ao Painel), a renda líquida aparece em "Orçamento por destino", e Análise passa a ser aba no celular
 - [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada
