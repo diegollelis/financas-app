@@ -89,7 +89,8 @@ describe('Budget dialog (on the dashboard)', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Editar orçamento' }));
+    // No net income yet: the button says what is missing.
+    await userEvent.click(await screen.findByRole('button', { name: 'Definir renda' }));
     const dialog = await screen.findByRole('dialog', { name: 'Orçamento de novembro de 2026' });
     expect(
       await within(dialog).findByText(/^Percentuais padrão: nenhuma competência até aqui/),
@@ -163,7 +164,7 @@ describe('Budget dialog (on the dashboard)', () => {
     );
   });
 
-  it('opens from the empty expenses goal to set the net income', async () => {
+  it('opens as "Definir renda" when the net income is not set', async () => {
     const noIncome: Budget = { ...inherited, netIncomeCents: 0 };
     mockBudget(monthRoutes(noIncome));
     renderApp(`/espacos/${houseId}/painel`);

@@ -171,9 +171,9 @@ function DestinationTable({ summary }: { summary: Summary }) {
 type PageLinks = { transactions: string };
 
 /**
- * The month on one screen (ADRs 0031, 0045). One column up to xl; from there, two: the balance
- * across the top, then credits and debits beside where the credits go, and the expenses goal
- * beside the budget, so a wide screen is used without stretching any row.
+ * The month on one screen (ADRs 0031, 0045, 0046). One column up to xl; from there, two: the
+ * balance across the top, credits and debits beside where the credits go, and the budget (with
+ * the expenses goal) across the bottom, so a wide screen is used without stretching any row.
  */
 function Dashboard({
   summary,
@@ -245,10 +245,7 @@ function Dashboard({
       <Section title="Para onde vão os créditos">
         <CreditsBar summary={summary} />
       </Section>
-      <Section title="Despesas e meta">
-        <ExpensesMeter summary={summary} onSetIncome={onEditBudget} />
-      </Section>
-      <Section title="Orçamento por destino">
+      <Section title="Orçamento por destino" className="xl:col-span-2">
         <div className="grid justify-items-start gap-2">
           {/* The net income the goals are a share of: shown here now that the budget has no
               page of its own (ADR 0046). */}
@@ -261,12 +258,18 @@ function Dashboard({
             </span>
           </p>
           <p className="text-muted-foreground">{budgetOrigin(summary)}</p>
-          {onEditBudget && (
-            <Button variant="outline" onClick={onEditBudget}>
-              Editar orçamento
-            </Button>
-          )}
+          {onEditBudget &&
+            // One button, named for what is missing: without a net income there are no goals.
+            (summary.budget.netIncomeCents > 0 ? (
+              <Button variant="outline" onClick={onEditBudget}>
+                Editar orçamento
+              </Button>
+            ) : (
+              <Button onClick={onEditBudget}>Definir renda</Button>
+            ))}
         </div>
+        {/* The expenses goal, drawn: the one destination with a limit to watch. */}
+        <ExpensesMeter summary={summary} />
         {desktop ? <DestinationTable summary={summary} /> : <DestinationCards summary={summary} />}
         <p className="text-muted-foreground">
           Meta: sobre a renda líquida. Previsto: sobre todos os créditos. Efetivado: sobre os

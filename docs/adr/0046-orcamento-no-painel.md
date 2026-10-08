@@ -32,14 +32,17 @@ Para editar, a pessoa saía do Painel e voltava para ver o efeito. A página tam
   - o modal fecha e o foco volta para o botão que o abriu;
   - o Painel se atualiza, porque o salvamento já invalida os resumos (`useSaveBudget`).
 
-**O que abre o modal:**
+**O que abre o modal:** um botão só, em "Orçamento por destino", com o nome do que falta:
 
-- "Editar orçamento", em "Orçamento por destino";
-- "Definir renda", no estado vazio de "Despesas e meta" ([ADR 0045](0045-largura-por-pagina-e-grade-do-painel.md)).
+- **"Definir renda",** destacado, enquanto a renda líquida não está definida;
+- **"Editar orçamento"** depois.
 
-Os dois aparecem só para quem edita (EDITOR e OWNER). Quem só lê (VIEWER) vê os números, sem botão.
+Ele aparece só para quem edita (EDITOR e OWNER). Quem só lê (VIEWER) vê os números, sem botão.
 
-**No Painel:** "Orçamento por destino" passa a mostrar a **renda líquida**, que antes só aparecia na página do orçamento.
+**No Painel:**
+
+- **"Orçamento por destino" mostra a renda líquida,** que antes só aparecia na página do orçamento.
+- **O bloco "Despesas e meta" ([ADR 0045](0045-largura-por-pagina-e-grade-do-painel.md)) saiu.** Vazio, ele só repetia o convite do botão. Com renda definida, o medidor de despesas, com o aviso "Acima da meta", passa para dentro de "Orçamento por destino", que ocupa a largura toda do xl em diante.
 
 **O endereço antigo:** `/orcamento?competencia=…` redireciona para o Painel do mesmo mês (`BudgetRedirect`), para não quebrar favoritos nem o histórico do navegador.
 
