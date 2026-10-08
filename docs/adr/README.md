@@ -46,3 +46,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0040](0040-importacao-da-planilha.md)                | Importação da planilha: lida no navegador, lançamentos confirmados, desfazível    | Aceita |
 | [0041](0041-termos-exportacao-e-exclusao-de-conta.md) | Termos com aceite, exportação em JSON e exclusão de conta por link                | Aceita |
 | [0042](0042-pessoas-e-rateio.md)                      | Pessoas, valores a receber e a pagar, e rateio de lançamentos                     | Aceita |
+| [0043](0043-identidade-visual-codelelis.md)           | Identidade visual <CodeLélis/> Finanças: arquivos derivados, tokens mantidos      | Aceita |

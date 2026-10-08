@@ -1,6 +1,6 @@
 ---
 name: financas-ui
-description: Interface rules of this project (Finanças App), ADR 0036. Use for ANY change in apps/web (pages, components, styles, layout, copy, forms, tests of pages), and together with frontend-design, whose brief this is. Covers mobile first, the app shell, shadcn/ui, tokens, states, money and dates, accessibility, tests and the review checklist.
+description: Interface rules of this project (CodeLélis Finanças), ADRs 0036 and 0043. Use for ANY change in apps/web (pages, components, styles, layout, copy, forms, tests of pages), and together with frontend-design, whose brief this is. Covers mobile first, the app shell, shadcn/ui, tokens, states, money and dates, accessibility, tests and the review checklist.
 ---
 
 # Finanças UI
@@ -10,6 +10,14 @@ Read `docs/adr/0036-design-mobile-first.md` first if you have not in this sessio
 ## Product and audience
 
 A personal and family monthly finance app in pt-BR, mostly used **on a phone**, often one-handed and in a hurry: record a bill, settle it, check the month's balance. The interface must feel calm and trustworthy. Numbers are the content; chrome stays quiet.
+
+## Brand (ADR 0043)
+
+- **Name:** the logo art reads `<CodeLélis/> FINANÇAS`. In plain text where the logo is not beside it (tab title, installed app name, e-mails, legal pages) write **"CodeLélis Finanças"**; inside the app, where the logo shows, **"Finanças"**. Always "Lélis", with the accent.
+- **The marks are artwork:** use only the files in `apps/web/public/brand/` (derived from the approved art by `scripts/brand-assets.ts`, never redrawn). Never recreate the CL in CSS or SVG, and never add other brands' logos (banks included).
+- **Palette:** primary `#0066FF`; `--brand-secondary` (`#00C2FF`) and `--brand-accent` (`#00E6B8`) are decorative only, never text. Credit/debit/warning hues fill icons, outlines and muted backgrounds; text in those meanings uses the darker token variants (4.5:1). Dark theme is navy, not gray.
+- **The brand gradient lives only in the artwork**; buttons and surfaces are solid.
+- **Font:** Inter.
 
 ## Visual direction
 
