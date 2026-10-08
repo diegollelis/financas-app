@@ -93,7 +93,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [ ] Sugerir a categoria pela descrição, a partir dos lançamentos anteriores
 - [ ] Rateio de lançamentos e pessoas ([ADR 0042](adr/0042-pessoas-e-rateio.md))
   - [x] API: pessoas, lançamento ligado a uma pessoa, dividir um gasto e categoria Reembolso
-  - [ ] Tela: "Dividir com alguém" no novo lançamento, selos e página Pessoas
+  - [x] Tela: "Dividir com alguém" no novo lançamento, "A receber de / A pagar para", selos e excluir com as partes
+  - [ ] Página Pessoas: saldos e os lançamentos de cada uma
   - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
   - [ ] Divisão das contas da casa por percentual entre os membros (ADR próprio)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))

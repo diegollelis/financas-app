@@ -61,6 +61,7 @@ function mockTransactions(overrides: Record<string, { status?: number; body: unk
   return mockApi({
     'GET /api/me': { body: verifiedUser },
     [`GET /api/workspaces/${houseId}`]: { body: house },
+    [`GET /api/workspaces/${houseId}/people`]: { body: [] },
     [`GET /api/workspaces/${houseId}/categories`]: {
       body: [salaryCategory, energyCategory, marketCategory],
     },
@@ -70,6 +71,17 @@ function mockTransactions(overrides: Record<string, { status?: number; body: unk
 }
 
 const section = (name: 'Créditos' | 'Débitos') => screen.findByRole('region', { name });
+
+// People (ADR 0042).
+const ana = {
+  id: '01920000-0000-7000-8000-000000000301',
+  name: 'Ana',
+  memberUserId: null,
+  archived: false,
+  receivableCents: 0,
+  payableCents: 0,
+};
+const peopleBase = `/api/workspaces/${houseId}/people`;
 
 // Intl separates "R$" from the number with a non-breaking space.
 function nbsp(text: string | null | undefined) {
@@ -452,6 +464,7 @@ describe('TransactionsPage', () => {
         amountCents: 15_990,
         dueDate: '2026-10-10',
         period: '2026-10',
+        personId: null,
       }),
     });
     expect(await screen.findByText('Lançamento adicionado')).toBeInTheDocument();
@@ -579,6 +592,7 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 17_250,
         dueDate: '2026-10-10',
+        personId: null,
       }),
     });
     expect(await screen.findByText('Lançamento salvo')).toBeInTheDocument();
@@ -610,6 +624,131 @@ describe('TransactionsPage', () => {
 
     await expectCall(fetchMock, `${base}/${shopping.id}`, { method: 'DELETE' });
     expect(await screen.findByText('Lançamento excluído')).toBeInTheDocument();
+  });
+
+  it('splits a new debit with people, equally, the leftover staying in your share', async () => {
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`POST ${base}`]: { status: 201, body: shopping },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Jantar');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '300,00');
+    // One person or a split: a split has no "A pagar para".
+    expect(within(form).getByLabelText('A pagar para (opcional)')).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    expect(within(form).queryByLabelText('A pagar para (opcional)')).not.toBeInTheDocument();
+    await userEvent.type(within(form).getByLabelText('Pessoa 1'), 'Ana');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar pessoa' }));
+    await userEvent.type(within(form).getByLabelText('Pessoa 2'), 'Bruno');
+    await userEvent.click(within(form).getByRole('button', { name: 'Dividir igualmente' }));
+
+    expect(within(form).getByText(/^Sua parte: R\$\s100,00/)).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Jantar',
+        notes: null,
+        categoryId: marketCategory.id,
+        amountCents: 30_000,
+        dueDate: null,
+        period: '2026-10',
+        split: [
+          { personId: ana.id, amountCents: 10_000 },
+          { newPersonName: 'Bruno', amountCents: 10_000 },
+        ],
+      }),
+    });
+    expect(
+      await screen.findByText('Lançamento adicionado, dividido com 2 pessoas'),
+    ).toBeInTheDocument();
+  });
+
+  it('checks the shares before calling the API', async () => {
+    const fetchMock = mockTransactions();
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Jantar');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '100,00');
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    await userEvent.click(within(form).getByRole('radio', { name: 'Em %' }));
+    await userEvent.type(within(form).getByLabelText('Parte (%)'), '120');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    expect(await within(form).findByText('Informe o nome.')).toBeInTheDocument();
+    expect(within(form).getByText('De 0 a 100%.')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      new URL(base, 'http://api.test'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('links a credit to a new person, created on save', async () => {
+    const carlos = { ...ana, id: '01920000-0000-7000-8000-000000000302', name: 'Carlos' };
+    const fetchMock = mockTransactions({
+      [`POST ${peopleBase}`]: { status: 201, body: carlos },
+      [`POST ${base}`]: { status: 201, body: salary },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.click(within(form).getByRole('radio', { name: 'Crédito' }));
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Empréstimo ao Carlos');
+    await chooseCategory(form, 'Salário');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '200,00');
+    await userEvent.type(within(form).getByLabelText('A receber de (opcional)'), 'Carlos');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, peopleBase, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Carlos' }),
+    });
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: expect.stringContaining(`"personId":"${carlos.id}"`) as string,
+    });
+  });
+
+  it('shows who a transaction is with, and offers to delete a split with its shares', async () => {
+    const dinner = transaction(4, {
+      type: 'DEBIT',
+      description: 'Jantar',
+      categoryId: marketCategory.id,
+      amountCents: 30_000,
+    });
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Ana: parte de Jantar',
+      categoryId: salaryCategory.id,
+      amountCents: 15_000,
+      personId: ana.id,
+      splitOfId: dinner.id,
+    });
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`GET ${base}`]: { body: [share, dinner] },
+      [`DELETE ${base}/${dinner.id}`]: { status: 204, body: null },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    expect(await section('Créditos')).toHaveTextContent('A receber de Ana');
+    expect(await section('Débitos')).toHaveTextContent('Dividido com Ana');
+    const menu = await openActions('Jantar');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Excluir' }));
+    const confirm = await screen.findByRole('alertdialog', { name: 'Excluir Jantar?' });
+    expect(confirm).toHaveTextContent('Ele foi dividido com Ana');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Excluir com as partes' }));
+
+    await expectCall(fetchMock, `${base}/${dinner.id}?withShares=true`, { method: 'DELETE' });
+    expect(await screen.findByText('Lançamento e partes excluídos')).toBeInTheDocument();
   });
 
   it('is read-only for a VIEWER', async () => {

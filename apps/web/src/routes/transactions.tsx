@@ -6,10 +6,11 @@ import {
   todayIso,
   transactionStatus,
   type Category,
+  type Person,
   type Transaction,
   type TransactionType,
 } from '@financas/shared';
-import { CreditCard, Ellipsis, Plus, Repeat } from 'lucide-react';
+import { CreditCard, Ellipsis, Plus, Repeat, Users } from 'lucide-react';
 import { useRef, useState, type RefObject } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
@@ -39,7 +40,9 @@ import {
   useEndInstallmentPlan,
 } from '@/features/installments/use-installments';
 import { useCreateRecurrence, useEndRecurrence } from '@/features/recurrences/use-recurrences';
+import { findPerson, usePeople, useResolvePerson } from '@/features/people/use-people';
 import { SettleWithAmount } from '@/features/transactions/settle-with-amount';
+import { shareCents } from '@/features/transactions/split';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import {
@@ -80,12 +83,15 @@ function StatusBadge({ transaction, today }: { transaction: Transaction; today: 
 function DeleteDialog({
   workspaceId,
   transaction,
+  shares,
   open,
   onOpenChange,
   returnFocusTo,
 }: {
   workspaceId: string;
   transaction: Transaction;
+  /** The shares split from this debit, in this competência: offered to go with it. */
+  shares: { names: string[]; count: number };
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The row's actions button: opened from a menu item, the dialog has no trigger of its own. */
@@ -94,9 +100,9 @@ function DeleteDialog({
   const remove = useDeleteTransaction(workspaceId);
   // mutateAsync, not mutate's callbacks: those are skipped when the component unmounts, and
   // this row leaves the list exactly when the delete succeeds.
-  const confirmDelete = () =>
-    remove.mutateAsync(transaction.id).then(() => {
-      toast.success('Lançamento excluído');
+  const confirmDelete = (withShares: boolean) =>
+    remove.mutateAsync({ id: transaction.id, withShares }).then(() => {
+      toast.success(withShares ? 'Lançamento e partes excluídos' : 'Lançamento excluído');
       // The row is gone, and with it the button that had the focus: go to its section.
       document.getElementById(sectionTitleId(transaction.type))?.focus();
     }, showError);
@@ -117,13 +123,26 @@ function DeleteDialog({
             {transaction.recurrenceId &&
               ' A recorrência continua nos outros meses, e este mês não volta a ser gerado.'}
             {transaction.installment && ' As outras parcelas continuam.'}
+            {shares.count > 0 &&
+              ` Ele foi dividido com ${shares.names.join(', ')}: as partes a receber podem sair junto ou ficar.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => void confirmDelete()}>
-            Excluir
-          </AlertDialogAction>
+          {shares.count > 0 ? (
+            <>
+              <AlertDialogAction variant="outline" onClick={() => void confirmDelete(false)}>
+                Excluir só o gasto
+              </AlertDialogAction>
+              <AlertDialogAction variant="destructive" onClick={() => void confirmDelete(true)}>
+                Excluir com as partes
+              </AlertDialogAction>
+            </>
+          ) : (
+            <AlertDialogAction variant="destructive" onClick={() => void confirmDelete(false)}>
+              Excluir
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -206,6 +225,8 @@ function TransactionItem({
   workspaceId,
   transaction,
   category,
+  personName,
+  sharedWith,
   canEdit,
   today,
   onEdit,
@@ -213,6 +234,10 @@ function TransactionItem({
   workspaceId: string;
   transaction: Transaction;
   category: Category | undefined;
+  /** The person it is linked to (ADR 0042), when any. */
+  personName: string | null;
+  /** The people its shares are owed by, when it is a split debit. */
+  sharedWith: string[];
   canEdit: boolean;
   today: string;
   onEdit: (transaction: Transaction, returnFocusTo: HTMLElement | null) => void;
@@ -267,6 +292,17 @@ function TransactionItem({
             <Badge variant="secondary">
               <CreditCard aria-hidden />
               Parcela {transaction.installment.number}/{transaction.installment.count}
+            </Badge>
+          )}
+          {personName && (
+            <Badge variant="secondary">
+              {transaction.type === 'CREDIT' ? 'A receber de' : 'A pagar para'} {personName}
+            </Badge>
+          )}
+          {sharedWith.length > 0 && (
+            <Badge variant="secondary">
+              <Users aria-hidden />
+              Dividido com {sharedWith.join(', ')}
             </Badge>
           )}
         </span>
@@ -348,6 +384,7 @@ function TransactionItem({
             <DeleteDialog
               workspaceId={workspaceId}
               transaction={transaction}
+              shares={{ names: sharedWith, count: sharedWith.length }}
               open={confirmingDelete}
               onOpenChange={setConfirmingDelete}
               returnFocusTo={actionsRef}
@@ -373,6 +410,7 @@ function TransactionDialog({
   workspaceId,
   period,
   categories,
+  people,
   editing,
   open,
   onOpenChange,
@@ -381,6 +419,7 @@ function TransactionDialog({
   workspaceId: string;
   period: string;
   categories: Category[];
+  people: Person[];
   /** The transaction being edited; null to create one. */
   editing: Transaction | null;
   open: boolean;
@@ -392,6 +431,7 @@ function TransactionDialog({
   const createRecurrence = useCreateRecurrence(workspaceId);
   const createPlan = useCreateInstallmentPlan(workspaceId);
   const update = useUpdateTransaction(workspaceId);
+  const person = useResolvePerson(workspaceId, people);
   // Which kind of creation was last submitted: its pending state and error are the form's.
   const [repeat, setRepeat] = useState<TransactionFormValues['repeat']>('NONE');
   const mutation = editing
@@ -405,7 +445,14 @@ function TransactionDialog({
     toast.success(message);
     onOpenChange(false);
   };
-  const submit = (values: TransactionFormValues) => {
+  const submit = async (values: TransactionFormValues) => {
+    // A name typed in "A receber de" / "A pagar para": the person, created when new (ADR 0042).
+    let personId: string | null;
+    try {
+      personId = values.repeat === 'NONE' ? await person.resolve(values.person) : null;
+    } catch {
+      return; // Shown by the form, from person.error.
+    }
     const fields = {
       type: values.type,
       description: values.description,
@@ -415,7 +462,7 @@ function TransactionDialog({
     };
     if (editing) {
       update.mutate(
-        { id: editing.id, ...fields, dueDate: values.dueDate },
+        { id: editing.id, ...fields, dueDate: values.dueDate, personId },
         { onSuccess: done('Lançamento salvo') },
       );
     } else if (values.repeat === 'INSTALLMENTS') {
@@ -448,10 +495,29 @@ function TransactionDialog({
         },
         { onSuccess: done('Lançamento adicionado, repetindo todo mês') },
       );
+    } else if (values.splitOn && values.type === 'DEBIT') {
+      // The debit and one "a receber" per person, at once (ADR 0042). A name already listed
+      // goes by id; a new one becomes a person in the same request.
+      setRepeat('NONE');
+      const split = values.shares.map((share) => {
+        const listed = findPerson(people, share.name);
+        const amountCents = shareCents(values.amount, share.value, values.shareMode) ?? 0;
+        return listed && !listed.archived
+          ? { personId: listed.id, amountCents }
+          : { newPersonName: share.name.trim(), amountCents };
+      });
+      create.mutate(
+        { ...fields, dueDate: values.dueDate, period, split },
+        {
+          onSuccess: done(
+            `Lançamento adicionado, dividido com ${split.length} ${split.length === 1 ? 'pessoa' : 'pessoas'}`,
+          ),
+        },
+      );
     } else {
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, period },
+        { ...fields, dueDate: values.dueDate, period, personId },
         { onSuccess: done('Lançamento adicionado') },
       );
     }
@@ -477,6 +543,7 @@ function TransactionDialog({
         key={editing?.id ?? 'new'}
         idPrefix={editing?.id ?? 'new'}
         categories={categories}
+        people={people}
         initial={editing ?? undefined}
         submitLabel={
           editing
@@ -487,9 +554,9 @@ function TransactionDialog({
               ? 'Adicionando…'
               : 'Adicionar'
         }
-        pending={mutation.isPending}
-        error={mutation.error}
-        onSubmit={submit}
+        pending={mutation.isPending || person.isPending}
+        error={person.error ?? mutation.error}
+        onSubmit={(values) => void submit(values)}
         onCancel={() => onOpenChange(false)}
         allowRepeat={!editing}
       />
@@ -505,7 +572,10 @@ export function TransactionsPage() {
   const today = todayIso();
   const categories = useCategories(workspaceId);
   const transactions = useTransactions(workspaceId, period);
-  const ready = categories.isSuccess && transactions.isSuccess;
+  const people = usePeople(workspaceId);
+  const ready = categories.isSuccess && transactions.isSuccess && people.isSuccess;
+  const personName = (personId: string | null) =>
+    (personId && people.data?.find((item) => item.id === personId)?.name) || null;
   const [form, setForm] = useState({
     open: false,
     editing: null as Transaction | null,
@@ -537,7 +607,7 @@ export function TransactionsPage() {
       >
         <PeriodNav period={period} />
       </PageHeader>
-      <QueryState queries={[categories, transactions]} />
+      <QueryState queries={[categories, transactions, people]} />
       {ready &&
         (transactions.data.length === 0 ? (
           // Says what is missing and points to the page's main action, already on screen; it
@@ -580,6 +650,11 @@ export function TransactionsPage() {
                         category={categories.data.find(
                           (item) => item.id === transaction.categoryId,
                         )}
+                        personName={personName(transaction.personId)}
+                        // The shares of a split debit are credits of the same competência.
+                        sharedWith={transactions.data
+                          .filter((item) => item.splitOfId === transaction.id)
+                          .map((item) => personName(item.personId) ?? 'alguém')}
                         canEdit={canEdit}
                         today={today}
                         onEdit={openForm}
@@ -600,6 +675,7 @@ export function TransactionsPage() {
             workspaceId={workspaceId}
             period={period}
             categories={categories.data}
+            people={people.data}
             editing={form.editing}
             open={form.open}
             onOpenChange={(open) => setForm((current) => ({ ...current, open }))}

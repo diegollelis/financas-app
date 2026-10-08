@@ -5,20 +5,25 @@ import {
   parseReais,
   splitInstallments,
   isoDateSchema,
+  PERSON_NAME_MAX_LENGTH,
   reaisInputSchema,
   type Category,
+  type Person,
   type Transaction,
   type TransactionType,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch, type Control } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { apiErrorMessage } from '@/lib/error-message';
+import { shareCents } from './split';
+import { SplitFields, type SplitFormFields } from './split-fields';
 
 /**
  * What the form edits: the shared rules for description and notes, plus the fields typed as
@@ -44,8 +49,54 @@ const transactionFormSchema = plainTransactionInputSchema
     installments: z.string(),
     /** Of installments: whether the amount typed is the whole purchase or each installment. */
     amountIs: z.enum(['TOTAL', 'INSTALLMENT']),
+    /** A receber de / a pagar para (ADR 0042): a name; a new one becomes a person on save. */
+    person: z
+      .string()
+      .trim()
+      .max(PERSON_NAME_MAX_LENGTH, `Use no máximo ${PERSON_NAME_MAX_LENGTH} caracteres.`),
+    /** Only when creating a debit: "Dividir com alguém" (ADR 0042). */
+    splitOn: z.boolean(),
+    shareMode: z.enum(['REAIS', 'PERCENT']),
+    shares: z.array(z.object({ name: z.string(), value: z.string() })),
   })
   .superRefine((values, ctx) => {
+    if (values.splitOn && values.type === 'DEBIT' && values.repeat === 'NONE') {
+      const seen = new Set<string>();
+      let others = 0;
+      values.shares.forEach((share, index) => {
+        const name = share.name.trim().toLocaleLowerCase('pt-BR');
+        if (!name) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['shares', index, 'name'],
+            message: 'Informe o nome.',
+          });
+        } else if (seen.has(name)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['shares', index, 'name'],
+            message: 'Esta pessoa já está na divisão.',
+          });
+        }
+        seen.add(name);
+        const cents = shareCents(values.amount, share.value, values.shareMode);
+        if (cents === null) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['shares', index, 'value'],
+            message: values.shareMode === 'REAIS' ? 'Informe o valor.' : 'De 0 a 100%.',
+          });
+        }
+        others += cents ?? 0;
+      });
+      if (others > values.amount) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['shares'],
+          message: 'As partes dos outros passam do valor do lançamento.',
+        });
+      }
+    }
     if (values.repeat !== 'INSTALLMENTS') return;
     const count = installmentCountSchema.safeParse(Number(values.installments));
     if (!count.success) {
@@ -110,6 +161,7 @@ function installmentsPreview(
 export function TransactionForm({
   idPrefix,
   categories,
+  people = [],
   initial,
   submitLabel,
   pending,
@@ -121,6 +173,8 @@ export function TransactionForm({
   /** Keeps the field ids unique when several forms are on the page. */
   idPrefix: string;
   categories: Category[];
+  /** The workspace's people, suggested in the "Pessoa" and "Dividir" fields (ADR 0042). */
+  people?: Person[];
   initial?: Transaction;
   submitLabel: string;
   pending: boolean;
@@ -147,6 +201,10 @@ export function TransactionForm({
       amountKind: 'FIXED',
       installments: '',
       amountIs: 'TOTAL',
+      person: people.find((person) => person.id === initial?.personId)?.name ?? '',
+      splitOn: false,
+      shareMode: 'REAIS',
+      shares: [{ name: '', value: '' }],
     },
   });
   // useWatch rather than watch(): the hook form is safe for the React Compiler.
@@ -156,6 +214,16 @@ export function TransactionForm({
   const amountIs = useWatch({ control, name: 'amountIs' });
   const typedAmount = useWatch({ control, name: 'amount' });
   const typedInstallments = useWatch({ control, name: 'installments' });
+  const splitOn = useWatch({ control, name: 'splitOn' });
+  // Splitting is for a new debit launched once; the rest may name one person (ADR 0042).
+  const canSplit = allowRepeat && type === 'DEBIT' && repeat === 'NONE';
+  const splitting = canSplit && splitOn;
+  const showPerson = (!allowRepeat || repeat === 'NONE') && !splitting;
+  const peopleListId = `${idPrefix}-people`;
+  const totalCents = (() => {
+    const cents = parseReais(typedAmount ?? '');
+    return cents !== null && cents > 0 ? cents : null;
+  })();
   const variable = repeat === 'MONTHLY' && amountKind === 'VARIABLE';
   const installments = repeat === 'INSTALLMENTS';
   const amountLabel = variable
@@ -239,6 +307,61 @@ export function TransactionForm({
       >
         <Input autoComplete="off" {...register('notes')} />
       </FormField>
+      {/* The names already listed, suggested as the person types (a new one becomes a person). */}
+      <datalist id={peopleListId}>
+        {people
+          .filter((person) => !person.archived)
+          .map((person) => (
+            <option key={person.id} value={person.name} />
+          ))}
+      </datalist>
+      {showPerson && (
+        <FormField
+          id={id('person')}
+          label={type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'}
+          error={formState.errors.person?.message}
+        >
+          <Input list={peopleListId} autoComplete="off" {...register('person')} />
+        </FormField>
+      )}
+      {canSplit && (
+        <div className="grid gap-3">
+          <Controller
+            control={control}
+            name="splitOn"
+            render={({ field }) => (
+              <div className="flex items-center gap-1">
+                {/* A 44px target on the phone (ADR 0036), pulled left to line up with the fields. */}
+                <label
+                  htmlFor={id('split')}
+                  className="-ml-3.5 flex size-11 shrink-0 cursor-pointer items-center justify-center md:-ml-1 md:size-6"
+                >
+                  <Checkbox
+                    id={id('split')}
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                </label>
+                <label htmlFor={id('split')} className="cursor-pointer text-sm font-medium">
+                  Dividir com alguém
+                </label>
+              </div>
+            )}
+          />
+          {splitting && (
+            <SplitFields
+              idPrefix={idPrefix}
+              // The split fields are a slice of this form; their names match it.
+              control={control as unknown as Control<SplitFormFields>}
+              register={register}
+              setValue={setValue as never}
+              errors={formState.errors}
+              totalCents={totalCents}
+              peopleListId={peopleListId}
+            />
+          )}
+        </div>
+      )}
       {allowRepeat && (
         <div className="grid gap-2">
           <p aria-hidden className="text-sm font-medium">
