@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useParams, useSearchParams } from 'react-router';
+import { NavLink, Outlet, useLocation, useMatches, useParams, useSearchParams } from 'react-router';
 import { AppBrand } from '@/components/brand-logo';
 import { ListSkeleton, QueryState } from '@/components/query-state';
 import {
@@ -170,6 +170,10 @@ export function WorkspaceLayout() {
   const user = useCurrentUser();
   const workspace = useWorkspace(workspaceId);
   const desktop = useMediaQuery(DESKTOP_QUERY);
+  // Lists and forms keep a reading width; a page of blocks side by side (the dashboard) asks
+  // for more with `handle: { wide: true }` on its route (ADR 0045).
+  const wide = useMatches().some((match) => (match.handle as { wide?: boolean } | undefined)?.wide);
+  const width = wide ? 'max-w-6xl' : 'max-w-3xl';
   const opened = workspace.isSuccess ? workspace.data.id : null;
   useEffect(() => {
     // Only a workspace that loaded: a 404 must not become where "/" goes next time.
@@ -207,7 +211,7 @@ export function WorkspaceLayout() {
         <main
           id="conteudo"
           tabIndex={-1}
-          className="grid max-w-3xl flex-1 content-start gap-6 pt-5 outline-none md:pt-8"
+          className={cn('grid flex-1 content-start gap-6 pt-5 outline-none md:pt-8', width)}
         >
           {/* On every page until confirmed; not blocking (ADR 0022). */}
           {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
@@ -220,7 +224,7 @@ export function WorkspaceLayout() {
             <QueryState queries={[workspace]} skeleton={<ListSkeleton />} />
           )}
         </main>
-        <AppFooter className="mt-12 max-w-3xl" />
+        <AppFooter className={cn('mt-12', width)} />
       </div>
       {!desktop && sections}
     </div>

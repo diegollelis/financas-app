@@ -41,12 +41,16 @@ export function CreditsBar({ summary }: { summary: Summary }) {
         ))}
       </div>
       <figcaption>
-        <ul className="grid gap-1 sm:grid-cols-3">
+        {/* In a row from sm; back to one per line from xl, where the dashboard puts the chart in
+            half of the width (ADR 0045). */}
+        <ul className="grid gap-1 sm:grid-cols-3 xl:grid-cols-1">
           {segments.map((segment) => (
             <li key={segment.label} className="flex items-center gap-2">
               <span aria-hidden className={cn('size-2.5 shrink-0 rounded-full', segment.color)} />
               <span className="text-muted-foreground">{segment.label}</span>
-              <span className="ml-auto tabular-nums sm:ml-0">{formatCents(segment.cents)}</span>
+              <span className="ml-auto tabular-nums sm:ml-0 xl:ml-auto">
+                {formatCents(segment.cents)}
+              </span>
             </li>
           ))}
         </ul>
