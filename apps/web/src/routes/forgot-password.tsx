@@ -2,8 +2,8 @@ import { forgotPasswordInputSchema, type ForgotPasswordInput } from '@financas/s
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { FormField } from '@/components/form-field';
+import { SubmitButton } from '@/components/submit-button';
 import { TextLink } from '@/components/text-link';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
@@ -42,9 +42,11 @@ export function ForgotPasswordPage() {
               {authErrorMessage(requestReset.error)}
             </p>
           )}
-          <Button type="submit" disabled={requestReset.isPending}>
-            {requestReset.isPending ? 'Enviando…' : 'Enviar link'}
-          </Button>
+          <SubmitButton
+            pending={requestReset.isPending}
+            label="Enviar link"
+            pendingLabel="Enviando…"
+          />
         </form>
       )}
     </AuthCard>

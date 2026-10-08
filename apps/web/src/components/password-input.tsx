@@ -23,7 +23,7 @@ export function PasswordInput({ className, ...props }: Omit<ComponentProps<'inpu
         aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}
         aria-controls={props.id}
         onClick={() => setVisible((shown) => !shown)}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg outline-none focus-visible:ring-3 md:w-8"
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg outline-none focus-visible:ring-3 focus-visible:ring-inset md:w-8"
       >
         {visible ? (
           <EyeOff aria-hidden className="size-5 md:size-4" />

@@ -4,8 +4,8 @@ import { useForm } from 'react-hook-form';
 import { useLocation, useSearchParams } from 'react-router';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
+import { SubmitButton } from '@/components/submit-button';
 import { TextLink } from '@/components/text-link';
-import { Button } from '@/components/ui/button';
 import { PasswordInput } from '@/components/password-input';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
@@ -70,9 +70,7 @@ export function SignInPage() {
             {authErrorMessage(signIn.error)}
           </p>
         )}
-        <Button type="submit" disabled={signIn.isPending}>
-          {signIn.isPending ? 'Entrando…' : 'Entrar'}
-        </Button>
+        <SubmitButton pending={signIn.isPending} label="Entrar" pendingLabel="Entrando…" />
       </form>
       <GoogleButton />
     </AuthCard>
