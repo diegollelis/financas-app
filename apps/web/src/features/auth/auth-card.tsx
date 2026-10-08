@@ -20,8 +20,10 @@ export function AuthCard({
   children: ReactNode;
 }) {
   return (
-    <main className="flex min-h-svh flex-col px-4 pt-[calc(env(safe-area-inset-top)+2rem)] pb-8 text-base sm:items-center sm:justify-center sm:px-6 md:text-sm">
-      <div className="mx-auto grid w-full max-w-sm gap-6">
+    <main className="flex min-h-svh flex-col px-4 pt-[calc(env(safe-area-inset-top)+2rem)] pb-8 text-base sm:px-6 md:text-sm">
+      {/* Takes the height left, so the footer sits at the bottom of the screen on a short page;
+          from sm the form is centered in that space. */}
+      <div className="mx-auto grid w-full max-w-sm flex-1 content-start gap-6 sm:content-center">
         {/* The logo is the only name on these pages: its alt says it (ADR 0043). Large enough
             for the art's "FINANÇAS" to be read (an eighth of the logo's height). */}
         <BrandLogo variant="horizontal" className="h-14 justify-self-center py-1 sm:h-16" />
@@ -33,8 +35,8 @@ export function AuthCard({
           <div>{children}</div>
         </div>
         <div className="text-muted-foreground text-center">{footer}</div>
-        <AppFooter center className="mt-4" />
       </div>
+      <AppFooter center className="mx-auto mt-10 w-full max-w-sm" />
     </main>
   );
 }
