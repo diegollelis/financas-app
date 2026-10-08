@@ -1,9 +1,14 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { resetThemeStore } from '@/lib/theme';
 import { stubPrefersDark } from './match-media';
+
+// findBy… and waitFor wait 3s instead of 1s: on a busy machine (the whole suite in parallel) a
+// page can take longer than a second to render, and a correct test would fail. A broken test
+// still fails, just 2s later.
+configure({ asyncUtilTimeout: 3000 });
 
 // The edge proxy tests (apps/web/edge) run in Node: no window there.
 const inBrowser = typeof window !== 'undefined';
