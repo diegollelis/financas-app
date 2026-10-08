@@ -27,7 +27,7 @@ export function AccountPage() {
   return (
     <div className="min-h-svh">
       <SkipLink />
-      <AppHeader title={<span className="font-semibold">Finanças</span>} />
+      <AppHeader title={<span className="font-semibold md:hidden">Finanças</span>} />
       <main
         id="conteudo"
         tabIndex={-1}
