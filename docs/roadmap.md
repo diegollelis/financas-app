@@ -139,6 +139,16 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - "Despesas e meta" vazio com ação ("Definir renda");
   - axe zerado no Painel: listas `<dl>`, os nomes do seletor de espaço, do de mês e dos meses (WCAG 2.5.3);
   - os indicadores ficam sem ícone, e a paleta dos gráficos continua a do ADR 0032.
+- [x] Orçamento editado no Painel, num modal ([ADR 0046](adr/0046-orcamento-no-painel.md)):
+  - a página saiu, e o endereço antigo leva ao Painel;
+  - a renda líquida aparece em "Orçamento por destino";
+  - "Despesas e meta" foi incorporado a esse bloco;
+  - Análise passa a ser aba no celular.
+- [ ] **Orçamento real por destino** (ADR próprio, decidido em 2026-10-09):
+  - [ ] Orçamento começa vazio, sem o padrão 60/20/15/5. "Definir orçamento" fica destacado até o primeiro ser salvo, e depois cada mês herda o anterior (ADR 0030).
+  - [ ] Cada categoria de débito pertence a um destino (despesas, investimentos, reserva, viagens). As categorias padrão ganham "Investimentos" e "Reserva de emergência".
+  - [ ] Efetivado de cada destino = débitos pagos nas categorias dele. Previsto = todos os débitos dele no mês. % realizado = efetivado ÷ meta.
+  - [ ] Hoje "Previsto" e "Efetivado" são o percentual aplicado aos créditos, e não o dinheiro movido. Repensar o "Resultado", que desconta essas metas calculadas.
 - [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada

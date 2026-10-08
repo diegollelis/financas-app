@@ -1,40 +1,15 @@
 import { formatBasisPoints, formatCents, type Summary } from '@financas/shared';
-import { Link } from 'react-router';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 /**
  * The month's debits against the expenses goal (net income × expenses %). The track is a light
- * step of the fill's own color; over the goal, the fill turns red and the text says so.
+ * step of the fill's own color; over the goal, the fill turns red and the text says so. Nothing
+ * without a net income: there is no goal yet (the budget block offers to set it, ADR 0046).
  */
-export function ExpensesMeter({
-  summary,
-  budgetLink,
-  canEdit,
-}: {
-  summary: Summary;
-  /** The budget of the same competência, where the net income is set. */
-  budgetLink: string;
-  /** EDITORs and OWNERs set it; a VIEWER can only look. */
-  canEdit: boolean;
-}) {
+export function ExpensesMeter({ summary }: { summary: Summary }) {
   const goal = summary.shares.find((share) => share.key === 'expensesBp');
   const goalCents = goal?.targetCents ?? 0;
-  if (!goal || goalCents === 0) {
-    // An empty state with its action (ADR 0036), not just a sentence.
-    return (
-      <div className="grid justify-items-start gap-3 rounded-xl border border-dashed p-4">
-        <p className="text-muted-foreground">
-          {canEdit
-            ? 'Defina a renda líquida no orçamento para acompanhar a meta de despesas.'
-            : 'A meta de despesas aparece quando a renda líquida for definida no orçamento.'}
-        </p>
-        <Button asChild variant={canEdit ? 'default' : 'outline'}>
-          <Link to={budgetLink}>{canEdit ? 'Definir renda' : 'Ver orçamento'}</Link>
-        </Button>
-      </div>
-    );
-  }
+  if (!goal || goalCents === 0) return null;
   const spent = summary.debits.totalCents;
   const over = summary.expensesLeftCents < 0;
 

@@ -155,8 +155,8 @@ describe('WorkspaceLayout', () => {
 
     const { router } = renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-11`);
 
-    await userEvent.click(within(await sectionsNav()).getByRole('link', { name: 'Orçamento' }));
-    expect(router.state.location.pathname).toBe(`/espacos/${houseId}/orcamento`);
+    await userEvent.click(within(await sectionsNav()).getByRole('link', { name: 'Painel' }));
+    expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);
     expect(router.state.location.search).toBe('?competencia=2026-11');
     // Categories have no competência.
     expect(within(await sectionsNav()).getByRole('link', { name: 'Categorias' })).toHaveAttribute(
@@ -175,7 +175,7 @@ describe('WorkspaceLayout', () => {
       within(sheet)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Análise', 'Recorrências', 'Pessoas', 'Importar', 'Categorias', 'Membros']);
+    ).toEqual(['Recorrências', 'Pessoas', 'Importar', 'Categorias', 'Membros']);
     await userEvent.click(within(sheet).getByRole('link', { name: 'Categorias' }));
 
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/categorias`);

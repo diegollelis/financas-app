@@ -16,7 +16,7 @@ import { WorkspaceLayout } from '@/features/workspaces/workspace-layout';
 import { AnalysisPage } from '@/routes/analysis';
 import { ImportPage } from '@/routes/import';
 import { RecurrencesPage } from '@/routes/recurrences';
-import { BudgetPage } from '@/routes/budget';
+import { BudgetRedirect } from '@/routes/budget';
 import { CategoriesPage } from '@/routes/categories';
 import { DashboardPage } from '@/routes/dashboard';
 import { ForgotPasswordPage } from '@/routes/forgot-password';
@@ -63,7 +63,8 @@ export const routes: RouteObject[] = [
               { path: 'categorias', element: <CategoriesPage /> },
               // The competência travels as ?competencia=YYYY-MM (default: this month).
               { path: 'lancamentos', element: <TransactionsPage /> },
-              { path: 'orcamento', element: <BudgetPage /> },
+              // The budget page became a dialog on the dashboard (ADR 0046): old links land there.
+              { path: 'orcamento', element: <BudgetRedirect /> },
               // A dashboard of blocks side by side: the wide column (ADR 0045).
               { path: 'painel', element: <DashboardPage />, handle: { wide: true } },
               // The range and filters travel in the address (ADR 0037).

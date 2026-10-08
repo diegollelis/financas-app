@@ -267,7 +267,7 @@ describe('AnalysisPage', () => {
     expect(within(ranking).queryByText('Outras 3 categorias')).not.toBeInTheDocument();
   });
 
-  it('is under "Mais" on the phone', async () => {
+  it('is a tab of the bottom bar on the phone (ADR 0046)', async () => {
     mockApi({
       'GET /api/me': { body: verifiedUser },
       'GET /api/workspaces': { body: [house] },
@@ -278,8 +278,8 @@ describe('AnalysisPage', () => {
     });
     const { router } = renderApp(`/espacos/${houseId}`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Mais' }));
-    await userEvent.click(await screen.findByRole('link', { name: 'Análise' }));
+    const sections = await screen.findByRole('navigation', { name: 'Seções do espaço' });
+    await userEvent.click(within(sections).getByRole('link', { name: 'Análise' }));
 
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/analise`);
     expect(await screen.findByRole('heading', { name: 'Análise' })).toBeInTheDocument();

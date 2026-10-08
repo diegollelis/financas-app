@@ -99,7 +99,7 @@ describe('DashboardPage', () => {
     expect(nbsp(within(chart).getByRole('img').getAttribute('aria-label'))).toBe(
       'Créditos de R$ 6.000,00: débitos pagos R$ 350,00, débitos a pagar R$ 2.159,90, saldo previsto R$ 3.490,10.',
     );
-    const goal = await section('Despesas e meta');
+    const goal = await section('Orçamento por destino');
     expect(goal).toHaveTextContent('R$ 2.509,90 de R$ 3.000,00 (meta de 60% da renda)');
     expect(goal).toHaveTextContent('Folga de R$ 490,10.');
     const destinations = await section('Orçamento por destino');
@@ -146,19 +146,16 @@ describe('DashboardPage', () => {
     renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
 
     expect(await screen.findByText('Nenhum lançamento nesta competência.')).toBeInTheDocument();
-    // A VIEWER cannot set the net income: the goal says when it shows, and links to the budget.
-    expect(
-      screen.getByText(
-        'A meta de despesas aparece quando a renda líquida for definida no orçamento.',
-      ),
-    ).toBeInTheDocument();
+    // No net income, so no goal; a VIEWER cannot set it.
+    expect(await section('Orçamento por destino')).toHaveTextContent('Renda líquida: não definida');
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    for (const link of screen.getAllByRole('link', { name: 'Ver orçamento' })) {
-      expect(link).toHaveAttribute('href', `/espacos/${houseId}/orcamento?competencia=2026-11`);
-    }
+    // Nothing that changes the budget (ADR 0046).
+    expect(screen.queryByRole('button', { name: 'Definir renda' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar orçamento' })).not.toBeInTheDocument();
   });
 
-  it('offers whoever edits to set the net income, from the empty goal', async () => {
+  it('offers whoever edits to set the net income, in the budget block', async () => {
     mockDashboard(
       summarizePeriod([], { ...budget, period: '2026-11', netIncomeCents: 0 }, today),
       '2026-11',
@@ -167,15 +164,10 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
 
-    expect(
-      await screen.findByText(
-        'Defina a renda líquida no orçamento para acompanhar a meta de despesas.',
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Definir renda' })).toHaveAttribute(
-      'href',
-      `/espacos/${houseId}/orcamento?competencia=2026-11`,
-    );
+    const destinations = await section('Orçamento por destino');
+    // It opens the budget dialog (tested in budget.spec.tsx).
+    expect(within(destinations).getByRole('button', { name: 'Definir renda' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar orçamento' })).not.toBeInTheDocument();
   });
 
   it('is reached from the sections of the workspace, on this month', async () => {

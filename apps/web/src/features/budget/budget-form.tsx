@@ -66,6 +66,7 @@ export function BudgetForm({
   pending,
   error,
   onSubmit,
+  onCancel,
 }: {
   initial: Budget;
   submitLabel: string;
@@ -73,6 +74,8 @@ export function BudgetForm({
   error: unknown;
   /** Rejects when saving fails; the page shows that through `error`. */
   onSubmit: (input: BudgetInput) => Promise<unknown>;
+  /** In a dialog: closes it without saving. */
+  onCancel?: () => void;
 }) {
   const { register, handleSubmit, formState, control, reset, getValues } = useForm<
     FormInput,
@@ -173,7 +176,12 @@ export function BudgetForm({
           {apiErrorMessage(error)}
         </p>
       )}
-      <div>
+      <div className={onCancel ? 'flex justify-end gap-2' : undefined}>
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+        )}
         <Button type="submit" disabled={pending}>
           {submitLabel}
         </Button>

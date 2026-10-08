@@ -345,7 +345,15 @@ async function main() {
       open: /^Escolher competência/,
       opens: 'dialog' as const,
     },
-    { name: 'orcamento', path: `/espacos/${workspaceId}/orcamento`, signedIn: true },
+    {
+      // The budget is a dialog on the dashboard (ADR 0046).
+      name: 'orcamento',
+      path: `/espacos/${workspaceId}/painel`,
+      signedIn: true,
+      // "Definir renda" until the net income is set, "Editar orçamento" after.
+      open: /^(Editar orçamento|Definir renda)$/,
+      opens: 'dialog' as const,
+    },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
     { name: 'recorrencias', path: `/espacos/${workspaceId}/recorrencias`, signedIn: true },
     { name: 'pessoas', path: `/espacos/${workspaceId}/pessoas`, signedIn: true },
