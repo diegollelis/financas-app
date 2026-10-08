@@ -1,4 +1,26 @@
+import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
+
+/**
+ * The app's mark inside the app (ADR 0044): the official CL symbol and the product name as
+ * text, large enough to read on any screen. Every CodeLélis app signs the same way ([CL] Agenda,
+ * [CL] Estudos…); the full artwork stays at the entrance (the auth pages). A link to "/", which
+ * opens the last workspace.
+ */
+export function AppBrand({ className }: { className?: string }) {
+  return (
+    <Link
+      to="/"
+      className={cn(
+        'focus-visible:ring-ring/50 inline-flex min-h-11 items-center gap-2 rounded-lg outline-none focus-visible:ring-3 md:min-h-0',
+        className,
+      )}
+    >
+      <BrandLogo variant="symbol" alt="" className="h-7" />
+      <span className="text-lg font-semibold tracking-tight">Finanças</span>
+    </Link>
+  );
+}
 
 type BrandFile = { src: string; width: number; height: number };
 

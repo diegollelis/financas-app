@@ -47,3 +47,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0041](0041-termos-exportacao-e-exclusao-de-conta.md) | Termos com aceite, exportação em JSON e exclusão de conta por link                | Aceita |
 | [0042](0042-pessoas-e-rateio.md)                      | Pessoas, valores a receber e a pagar, e rateio de lançamentos                     | Aceita |
 | [0043](0043-identidade-visual-codelelis.md)           | Identidade visual <CodeLélis/> Finanças: arquivos derivados, tokens mantidos      | Aceita |
+| [0044](0044-marca-do-produto-e-moldura.md)            | Marca do produto no app ([CL] Finanças), barra lateral inteira e rodapé           | Aceita |

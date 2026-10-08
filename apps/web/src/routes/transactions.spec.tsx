@@ -167,7 +167,7 @@ describe('TransactionsPage', () => {
     ).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Novo lançamento' }));
     expect(await screen.findByRole('dialog', { name: 'Novo lançamento' })).toHaveTextContent(
-      'Competência de novembro de 2026.',
+      'Competência de novembro de 2026 em Casa.',
     );
   });
 

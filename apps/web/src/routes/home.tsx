@@ -1,7 +1,6 @@
 import type { Workspace } from '@financas/shared';
 import { Navigate, useLocation } from 'react-router';
 import { ListSkeleton, QueryState } from '@/components/query-state';
-import { Skeleton } from '@/components/ui/skeleton';
 import { AppHeader } from '@/features/shell/app-header';
 import { readLastWorkspace } from '@/features/workspaces/last-workspace';
 import { useWorkspaces } from '@/features/workspaces/use-workspaces';
@@ -18,7 +17,7 @@ function pickWorkspace(workspaces: Workspace[]) {
 
 /**
  * "/" is not a page: it opens a workspace's dashboard (ADR 0036). Workspaces are switched and
- * created in the header, so every page keeps the sections nav. The query string goes along: the
+ * created in the workspace layout (ADR 0044), so every page keeps the sections nav. The query string goes along: the
  * e-mail confirmation link comes back here with `?error=`, which the notice reads.
  */
 export function HomePage() {
@@ -29,7 +28,7 @@ export function HomePage() {
   if (target) return <Navigate to={`/espacos/${target.id}/painel${search}`} replace />;
   return (
     <div className="min-h-svh">
-      <AppHeader title={workspaces.isPending && <Skeleton className="h-5 w-32" />} />
+      <AppHeader />
       <main
         id="conteudo"
         tabIndex={-1}

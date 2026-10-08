@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { DeleteAccountSection } from '@/features/account/delete-account-section';
 import { useDataExport } from '@/features/account/use-data-export';
 import { useCurrentUser } from '@/features/auth/use-me';
+import { AppFooter } from '@/features/shell/app-footer';
 import { AppHeader, SkipLink } from '@/features/shell/app-header';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -27,7 +28,7 @@ export function AccountPage() {
   return (
     <div className="min-h-svh">
       <SkipLink />
-      <AppHeader title={<span className="font-semibold md:hidden">Finanças</span>} />
+      <AppHeader />
       <main
         id="conteudo"
         tabIndex={-1}
@@ -95,6 +96,7 @@ export function AccountPage() {
           <DeleteAccountSection />
         </div>
       </main>
+      <AppFooter className="mx-4 mt-6 mb-8 max-w-3xl sm:mx-6" />
     </div>
   );
 }

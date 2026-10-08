@@ -433,6 +433,8 @@ function TransactionDialog({
   /** The button that opened the form, to get the focus back on close. */
   returnFocusTo: HTMLElement | null;
 }) {
+  // Where it goes (ADR 0044): the workspace by name, where a mistake would cost the most.
+  const { name: workspaceName } = useCurrentWorkspace();
   const create = useCreateTransaction(workspaceId);
   const createRecurrence = useCreateRecurrence(workspaceId);
   const createPlan = useCreateInstallmentPlan(workspaceId);
@@ -538,10 +540,10 @@ function TransactionDialog({
       description={
         // Editing one generated month or one installment changes only it (ADR 0038).
         editing?.recurrenceId
-          ? `Competência de ${formatPeriod(editing.period)}. Repete todo mês: esta mudança vale só para este mês.`
+          ? `Competência de ${formatPeriod(editing.period)} em ${workspaceName}. Repete todo mês: esta mudança vale só para este mês.`
           : editing?.installment
-            ? `Competência de ${formatPeriod(editing.period)}. Parcela ${editing.installment.number} de ${editing.installment.count}: esta mudança vale só para esta parcela.`
-            : `Competência de ${formatPeriod(editing?.period ?? period)}.`
+            ? `Competência de ${formatPeriod(editing.period)} em ${workspaceName}. Parcela ${editing.installment.number} de ${editing.installment.count}: esta mudança vale só para esta parcela.`
+            : `Competência de ${formatPeriod(editing?.period ?? period)} em ${workspaceName}.`
       }
     >
       <TransactionForm

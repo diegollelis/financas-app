@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { fakeUser, mockApi, noSession } from '@/test/mock-api';
@@ -100,7 +100,9 @@ describe('InvitationPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Aceitar convite' }));
 
     expect(await screen.findByRole('heading', { name: 'Membros' })).toBeInTheDocument();
-    expect(within(screen.getByRole('banner')).getByText('Casa')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Trocar de espaço (atual: Casa)' }),
+    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}`);
     expect(fetchMock).toHaveBeenCalledWith(
       new URL(`/api/invitations/${token}/accept`, 'http://api.test'),

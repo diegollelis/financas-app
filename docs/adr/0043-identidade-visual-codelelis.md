@@ -129,7 +129,7 @@ No tema escuro, três oficiais servem como estão e não precisam de derivado:
 
 **Barra lateral:** no tom da superfície de cada tema, clara no claro e marinho no escuro, com a logo no topo e o azul da marca no item ativo.
 
-**Nota (PR da moldura):** na arte horizontal, "FINANÇAS" ocupa um oitavo da altura da logo e só fica legível a partir de uns 56 px de altura. Por isso:
+**Nota (PR da moldura; a barra de 288 px foi substituída pelo [ADR 0044](0044-marca-do-produto-e-moldura.md)):** na arte horizontal, "FINANÇAS" ocupa um oitavo da altura da logo e só fica legível a partir de uns 56 px de altura. Por isso:
 
 - do lg em diante, a barra lateral tem 288 px e o cabeçalho, 72 px;
 - no tablet, ela continua com 224 px, e "FINANÇAS" fica miúdo;
