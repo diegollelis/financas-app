@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { periodSchema } from './money-and-dates.ts';
-import { createTransactionInputSchema } from './transaction.ts';
+import { plainTransactionInputSchema } from './transaction.ts';
 
 // Importação da planilha (ADR 0040): the browser reads the .xlsx and sends only the transactions
 // the person confirmed; the file never reaches the API. One import is one row in `imports`, and
@@ -11,7 +11,7 @@ export const MAX_IMPORT_TRANSACTIONS = 2000;
 
 export const createImportInputSchema = z.object({
   transactions: z
-    .array(createTransactionInputSchema)
+    .array(plainTransactionInputSchema)
     .min(1, 'Escolha ao menos um lançamento para importar.')
     .max(
       MAX_IMPORT_TRANSACTIONS,

@@ -21,6 +21,7 @@ export const DEFAULT_CATEGORIES: Record<TransactionType, readonly string[]> = {
     'Consórcio',
     'Saque-aniversário FGTS',
     'Restituição IRPF',
+    'Reembolso',
     'Outros',
   ],
   DEBIT: [

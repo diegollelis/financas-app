@@ -73,6 +73,16 @@ Escolhidos com o dono do projeto: **contatos por nome (opção 2)**, **valor a r
 - **"Enviar para Ana":** para uma pessoa cadastrada com e-mail que usa o app, um pedido que ela aceita e registra no espaço dela, sem sincronização automática entre os dois lados.
 - **Divisão das contas da casa por percentual** entre os membros de um espaço.
 
+**Privacidade: ninguém enxerga ninguém fora de um espaço compartilhado**
+
+- **Uma pessoa é um contato digitado, não uma busca de usuários.** O app não tem diretório de quem o usa e nunca diz se um nome ou e-mail tem conta. Cadastrar "Ana" não liga a nenhuma conta, e a Ana não fica sabendo.
+- **A ligação a um membro só lista os membros daquele espaço** (ADR [0027](0027-convites-por-email.md)): gente que entrou por convite aceito. No espaço pessoal, a lista é vazia.
+- **As pessoas e os lançamentos ligados a elas ficam no espaço onde foram criados,** sob a mesma RLS das outras tabelas de negócio ([ADR 0028](0028-row-level-security.md)). Só os membros desse espaço os veem.
+- **O futuro "Enviar para Ana" segue as mesmas regras:**
+  - a resposta é a mesma para qualquer e-mail, como no cadastro ([ADR 0022](0022-envio-de-email.md));
+  - quem recebe decide se registra, e em qual espaço;
+  - cada lado fica só com o próprio lançamento, sem ver os dados do outro.
+
 ## Consequências
 
 - O que estava escondido no texto da descrição passa a ter dono, valor e status: dá para saber, por pessoa, quanto falta receber.

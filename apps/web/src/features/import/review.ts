@@ -1,5 +1,5 @@
 import {
-  createTransactionInputSchema,
+  plainTransactionInputSchema,
   normalizeName,
   type Category,
   type CreateTransactionInput,
@@ -101,7 +101,7 @@ export function toTransaction(
   categoryId: string | null,
 ): { ok: true; transaction: CreateTransactionInput } | { ok: false; problems: string[] } {
   if (!categoryId) return { ok: false, problems: ['Escolha a categoria.'] };
-  const result = createTransactionInputSchema.safeParse({
+  const result = plainTransactionInputSchema.safeParse({
     type: row.type,
     description: row.description,
     notes: row.notes,
