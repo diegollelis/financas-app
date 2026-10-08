@@ -6,7 +6,7 @@ import {
   type Summary,
 } from '@financas/shared';
 import { TriangleAlert } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
@@ -16,6 +16,7 @@ import { shareLabels } from '@/features/budget/share-labels';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import { CreditsBar } from '@/features/summary/credits-bar';
+import { BudgetDialog } from '@/features/budget/budget-dialog';
 import { ExpensesMeter } from '@/features/summary/expenses-meter';
 import { useSummary } from '@/features/summary/use-summary';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
@@ -167,7 +168,7 @@ function DestinationTable({ summary }: { summary: Summary }) {
   );
 }
 
-type PageLinks = { transactions: string; budget: string };
+type PageLinks = { transactions: string };
 
 /**
  * The month on one screen (ADRs 0031, 0045). One column up to xl; from there, two: the balance
@@ -177,11 +178,12 @@ type PageLinks = { transactions: string; budget: string };
 function Dashboard({
   summary,
   links,
-  canEdit,
+  onEditBudget,
 }: {
   summary: Summary;
   links: PageLinks;
-  canEdit: boolean;
+  /** Opens the budget dialog; absent for a VIEWER, who cannot change it. */
+  onEditBudget?: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const { credits, debits } = summary;
   const desktop = useMediaQuery(DESKTOP_QUERY);
@@ -244,14 +246,26 @@ function Dashboard({
         <CreditsBar summary={summary} />
       </Section>
       <Section title="Despesas e meta">
-        <ExpensesMeter summary={summary} budgetLink={links.budget} canEdit={canEdit} />
+        <ExpensesMeter summary={summary} onSetIncome={onEditBudget} />
       </Section>
       <Section title="Orçamento por destino">
-        <div className="grid justify-items-start gap-1">
+        <div className="grid justify-items-start gap-2">
+          {/* The net income the goals are a share of: shown here now that the budget has no
+              page of its own (ADR 0046). */}
+          <p>
+            Renda líquida:{' '}
+            <span className="font-medium tabular-nums">
+              {summary.budget.netIncomeCents > 0
+                ? formatCents(summary.budget.netIncomeCents)
+                : 'não definida'}
+            </span>
+          </p>
           <p className="text-muted-foreground">{budgetOrigin(summary)}</p>
-          <Button asChild variant="link" className="px-0 md:px-0">
-            <Link to={links.budget}>Ver orçamento</Link>
-          </Button>
+          {onEditBudget && (
+            <Button variant="outline" onClick={onEditBudget}>
+              Editar orçamento
+            </Button>
+          )}
         </div>
         {desktop ? <DestinationTable summary={summary} /> : <DestinationCards summary={summary} />}
         <p className="text-muted-foreground">
@@ -285,11 +299,20 @@ export function DashboardPage() {
   const workspace = useCurrentWorkspace();
   const period = usePeriod();
   const summary = useSummary(workspace.id, period);
-  // The other pages of the same competência.
+  // The other page of the same competência.
   const links: PageLinks = {
     transactions: `/espacos/${workspace.id}/lancamentos?competencia=${period}`,
-    budget: `/espacos/${workspace.id}/orcamento?competencia=${period}`,
   };
+  // The budget is edited here, in a dialog (ADR 0046); focus goes back to whichever button
+  // opened it ("Editar orçamento" or "Definir renda").
+  const [budgetOpener, setBudgetOpener] = useState<HTMLElement | null>(null);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const editBudget = hasRole(workspace.role, 'EDITOR')
+    ? (event: MouseEvent<HTMLButtonElement>) => {
+        setBudgetOpener(event.currentTarget);
+        setBudgetOpen(true);
+      }
+    : undefined;
 
   return (
     <>
@@ -298,10 +321,15 @@ export function DashboardPage() {
       </PageHeader>
       <QueryState queries={[summary]} skeleton={<DashboardSkeleton />} />
       {summary.isSuccess && (
-        <Dashboard
-          summary={summary.data}
-          links={links}
-          canEdit={hasRole(workspace.role, 'EDITOR')}
+        <Dashboard summary={summary.data} links={links} onEditBudget={editBudget} />
+      )}
+      {editBudget && (
+        <BudgetDialog
+          workspaceId={workspace.id}
+          period={period}
+          open={budgetOpen}
+          onOpenChange={setBudgetOpen}
+          returnFocusTo={budgetOpener}
         />
       )}
     </>

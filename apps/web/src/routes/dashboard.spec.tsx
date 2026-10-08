@@ -153,9 +153,9 @@ describe('DashboardPage', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    for (const link of screen.getAllByRole('link', { name: 'Ver orçamento' })) {
-      expect(link).toHaveAttribute('href', `/espacos/${houseId}/orcamento?competencia=2026-11`);
-    }
+    // Nothing that changes the budget (ADR 0046).
+    expect(screen.queryByRole('button', { name: 'Definir renda' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar orçamento' })).not.toBeInTheDocument();
   });
 
   it('offers whoever edits to set the net income, from the empty goal', async () => {
@@ -172,10 +172,8 @@ describe('DashboardPage', () => {
         'Defina a renda líquida no orçamento para acompanhar a meta de despesas.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Definir renda' })).toHaveAttribute(
-      'href',
-      `/espacos/${houseId}/orcamento?competencia=2026-11`,
-    );
+    // It opens the budget dialog (tested in budget.spec.tsx).
+    expect(screen.getByRole('button', { name: 'Definir renda' })).toBeInTheDocument();
   });
 
   it('is reached from the sections of the workspace, on this month', async () => {

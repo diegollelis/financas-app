@@ -2,7 +2,6 @@ import { periodSchema } from '@financas/shared';
 import {
   ArrowLeftRight,
   ChartColumn,
-  ChartPie,
   FileUp,
   HandCoins,
   Ellipsis,
@@ -50,8 +49,8 @@ type Section = {
 const sections: Section[] = [
   { path: 'painel', label: 'Painel', icon: LayoutDashboard, byPeriod: true },
   { path: 'lancamentos', label: 'Lançamentos', icon: ArrowLeftRight, byPeriod: true },
-  { path: 'orcamento', label: 'Orçamento', icon: ChartPie, byPeriod: true },
-  { path: 'analise', label: 'Análise', icon: ChartColumn, more: true },
+  // The budget is a dialog on the dashboard (ADR 0046); Análise took its tab.
+  { path: 'analise', label: 'Análise', icon: ChartColumn },
   { path: 'recorrencias', label: 'Recorrências', icon: Repeat, more: true },
   { path: 'pessoas', label: 'Pessoas', icon: HandCoins, more: true },
   { path: 'importar', label: 'Importar', icon: FileUp, more: true },

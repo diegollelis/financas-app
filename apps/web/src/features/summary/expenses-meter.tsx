@@ -1,5 +1,5 @@
 import { formatBasisPoints, formatCents, type Summary } from '@financas/shared';
-import { Link } from 'react-router';
+import type { MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -9,14 +9,11 @@ import { cn } from '@/lib/utils';
  */
 export function ExpensesMeter({
   summary,
-  budgetLink,
-  canEdit,
+  onSetIncome,
 }: {
   summary: Summary;
-  /** The budget of the same competência, where the net income is set. */
-  budgetLink: string;
-  /** EDITORs and OWNERs set it; a VIEWER can only look. */
-  canEdit: boolean;
+  /** Opens the budget dialog (ADR 0046); absent for a VIEWER, who cannot set the income. */
+  onSetIncome?: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const goal = summary.shares.find((share) => share.key === 'expensesBp');
   const goalCents = goal?.targetCents ?? 0;
@@ -25,13 +22,11 @@ export function ExpensesMeter({
     return (
       <div className="grid justify-items-start gap-3 rounded-xl border border-dashed p-4">
         <p className="text-muted-foreground">
-          {canEdit
+          {onSetIncome
             ? 'Defina a renda líquida no orçamento para acompanhar a meta de despesas.'
             : 'A meta de despesas aparece quando a renda líquida for definida no orçamento.'}
         </p>
-        <Button asChild variant={canEdit ? 'default' : 'outline'}>
-          <Link to={budgetLink}>{canEdit ? 'Definir renda' : 'Ver orçamento'}</Link>
-        </Button>
+        {onSetIncome && <Button onClick={onSetIncome}>Definir renda</Button>}
       </div>
     );
   }
