@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
+import { PasswordInput } from '@/components/password-input';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/auth-card';
 import { GoogleButton } from '@/features/auth/google-button';
@@ -59,7 +60,7 @@ export function SignInPage() {
           <Input type="email" autoComplete="email" {...register('email')} />
         </FormField>
         <FormField id="password" label="Senha" error={formState.errors.password?.message}>
-          <Input type="password" autoComplete="current-password" {...register('password')} />
+          <PasswordInput autoComplete="current-password" {...register('password')} />
         </FormField>
         <TextLink to="/esqueci-senha" className="-my-2 justify-self-end text-sm">
           Esqueci minha senha

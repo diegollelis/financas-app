@@ -9,7 +9,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { FormField } from '@/components/form-field';
 import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/password-input';
 import { AuthCard } from '@/features/auth/auth-card';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
 import { useResetPassword } from '@/features/auth/use-auth-mutations';
@@ -68,14 +68,14 @@ export function ResetPasswordPage() {
           label={`Nova senha (mínimo de ${PASSWORD_MIN_LENGTH} caracteres)`}
           error={formState.errors.password?.message}
         >
-          <Input type="password" autoComplete="new-password" {...register('password')} />
+          <PasswordInput autoComplete="new-password" {...register('password')} />
         </FormField>
         <FormField
           id="confirmPassword"
           label="Repita a nova senha"
           error={formState.errors.confirmPassword?.message}
         >
-          <Input type="password" autoComplete="new-password" {...register('confirmPassword')} />
+          <PasswordInput autoComplete="new-password" {...register('confirmPassword')} />
         </FormField>
         {resetPassword.isError && (
           <p role="alert" className="text-destructive text-sm">
