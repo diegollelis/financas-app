@@ -157,7 +157,7 @@ export function CategoryRanking({
     : undefined;
 
   return (
-    <section aria-labelledby="analysis-categories-title" className="grid gap-3">
+    <section aria-labelledby="analysis-categories-title" className="grid content-start gap-3">
       <h2 id="analysis-categories-title" className="font-medium">
         {title}
       </h2>

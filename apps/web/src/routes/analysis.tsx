@@ -77,19 +77,20 @@ function Totals({
       </dl>
     );
   }
+  // Two lists, not one: a <dl> holds only <dt>/<dd> groups, each in at most one <div>.
   return (
-    <dl className="grid gap-4">
-      <div className="grid gap-1">
+    <div className="grid gap-4">
+      <dl className="grid gap-1">
         <dt className="text-muted-foreground">Saldo do período</dt>
         <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
           <SignedCents cents={totals.balanceCents} />
         </dd>
-      </div>
-      <div className="grid sm:grid-cols-2 sm:gap-3">
+      </dl>
+      <dl className="grid sm:grid-cols-2 sm:gap-3">
         <Stat label="Recebido">{formatCents(totals.creditsCents)}</Stat>
         <Stat label="Gasto">{formatCents(totals.debitsCents)}</Stat>
-      </div>
-    </dl>
+      </dl>
+    </div>
   );
 }
 
@@ -214,10 +215,13 @@ function Results({
   onToggle: () => void;
 }) {
   const series = monthlySeries(analysis, settings);
+  // One column up to xl; from there, month by month beside the categories (ADR 0045).
   return (
-    <>
-      <Totals totals={seriesTotals(series)} type={settings.type} />
-      <section aria-labelledby="analysis-monthly" className="grid gap-3">
+    <div className="grid gap-6 xl:grid-cols-2 xl:gap-x-10 xl:gap-y-8">
+      <div className="xl:col-span-2">
+        <Totals totals={seriesTotals(series)} type={settings.type} />
+      </div>
+      <section aria-labelledby="analysis-monthly" className="grid content-start gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="analysis-monthly" className="font-medium">
             Mês a mês
@@ -242,6 +246,6 @@ function Results({
         categories={categories}
         onChange={onChange}
       />
-    </>
+    </div>
   );
 }
