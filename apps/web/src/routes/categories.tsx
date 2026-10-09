@@ -1,19 +1,22 @@
 import {
   createCategoryInputSchema,
   hasRole,
+  normalizeName,
   type Category,
+  type CreateCategoryInput,
   type TransactionType,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Copy, Ellipsis } from 'lucide-react';
+import { Copy, Ellipsis, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { SegmentedControl } from '@/components/segmented-control';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,59 +69,57 @@ function confirmWith(change: Promise<unknown>, message: string) {
   );
 }
 
-function AddCategoryForm({
-  workspaceId,
-  type,
-  singular,
-}: {
-  workspaceId: string;
-  type: TransactionType;
-  singular: string;
-}) {
-  const create = useCreateCategory(workspaceId);
-  const { register, handleSubmit, formState, reset } = useForm<NameInput>({
-    resolver: zodResolver(nameSchema),
-    defaultValues: { name: '' },
-  });
-  const submit = ({ name }: NameInput) =>
-    create.mutate(
-      { name, type },
-      {
-        onSuccess: () => {
-          reset();
-          toast.success('Categoria adicionada');
-        },
-      },
-    );
+const typeOptions = [
+  { value: 'DEBIT', label: 'Débito' },
+  { value: 'CREDIT', label: 'Crédito' },
+] as const;
 
-  // One column on the phone; field and button side by side from sm.
+/** Inside the dialog: mounted on each opening, so it starts empty and without errors. */
+function NewCategoryForm({ workspaceId, onDone }: { workspaceId: string; onDone: () => void }) {
+  const create = useCreateCategory(workspaceId);
+  const { register, handleSubmit, formState, control } = useForm<CreateCategoryInput>({
+    resolver: zodResolver(createCategoryInputSchema),
+    // Debit: most categories are of spending.
+    defaultValues: { name: '', type: 'DEBIT' },
+  });
+  const submit = (input: CreateCategoryInput) =>
+    create.mutate(input, {
+      onSuccess: () => {
+        toast.success('Categoria adicionada');
+        onDone();
+      },
+    });
+
   return (
-    <form
-      noValidate
-      className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-start"
-      onSubmit={(event) => void handleSubmit(submit)(event)}
-    >
-      <FormField
-        id={`new-category-${type}`}
-        label={`Nova categoria de ${singular}`}
-        error={formState.errors.name?.message}
-      >
+    <form noValidate className="grid gap-4" onSubmit={(event) => void handleSubmit(submit)(event)}>
+      <Controller
+        control={control}
+        name="type"
+        render={({ field }) => (
+          <SegmentedControl
+            label="Tipo"
+            options={typeOptions}
+            value={field.value}
+            onChange={field.onChange}
+          />
+        )}
+      />
+      <FormField id="new-category-name" label="Nome" error={formState.errors.name?.message}>
         <Input autoComplete="off" {...register('name')} />
       </FormField>
-      <Button
-        type="submit"
-        variant="outline"
-        // Lines up with the input: the label above it is 14px tall plus the 8px gap.
-        className="sm:mt-[1.375rem]"
-        disabled={create.isPending}
-      >
-        {create.isPending ? 'Adicionando…' : 'Adicionar'}
-      </Button>
       {create.isError && (
-        <p role="alert" className="text-destructive sm:col-span-2">
+        <p role="alert" className="text-destructive">
           {apiErrorMessage(create.error)}
         </p>
       )}
+      <div className="grid gap-2 sm:flex sm:flex-row-reverse sm:justify-start">
+        <Button type="submit" disabled={create.isPending}>
+          {create.isPending ? 'Adicionando…' : 'Adicionar'}
+        </Button>
+        <Button type="button" variant="outline" onClick={onDone}>
+          Cancelar
+        </Button>
+      </div>
     </form>
   );
 }
@@ -312,34 +313,52 @@ function CategoryList({
   );
 }
 
+/** A name matches when it contains what was typed, ignoring case and accents. */
+const matches = (category: Category, search: string) =>
+  normalizeName(category.name).includes(normalizeName(search));
+
 function CategorySection({
   workspaceId,
   type,
   title,
   singular,
   categories,
+  search,
   canEdit,
 }: (typeof sections)[number] & {
   workspaceId: string;
   categories: Category[];
+  search: string;
   canEdit: boolean;
 }) {
-  const active = categories.filter((category) => !category.archived);
-  const archived = categories.filter((category) => category.archived);
+  const searching = normalizeName(search) !== '';
+  const shown = searching ? categories.filter((category) => matches(category, search)) : categories;
+  const active = shown.filter((category) => !category.archived);
+  const archived = shown.filter((category) => category.archived);
   const titleId = sectionTitleId(type);
+  const total = categories.length;
+  const count = `${total} ${total === 1 ? 'categoria' : 'categorias'}`;
 
   return (
     <section aria-labelledby={titleId} className="grid gap-3">
-      {/* Focusable from script: where focus goes after a delete. */}
-      <h2 id={titleId} tabIndex={-1} className="font-medium outline-none">
-        {title}
-      </h2>
+      <div className="flex items-baseline justify-between gap-3">
+        {/* Focusable from script: where focus goes after a delete. */}
+        <h2 id={titleId} tabIndex={-1} className="font-medium outline-none">
+          {title}
+        </h2>
+        <p className="text-muted-foreground text-sm tabular-nums">
+          {searching ? `${shown.length} de ${count}` : count}
+        </p>
+      </div>
       {active.length === 0 ? (
-        <p className="text-muted-foreground">Nenhuma categoria de {singular} ativa.</p>
+        <p className="text-muted-foreground">
+          {searching
+            ? `Nenhuma categoria de ${singular} ativa com “${search.trim()}”.`
+            : `Nenhuma categoria de ${singular} ativa.`}
+        </p>
       ) : (
         <CategoryList workspaceId={workspaceId} categories={active} canEdit={canEdit} />
       )}
-      {canEdit && <AddCategoryForm workspaceId={workspaceId} type={type} singular={singular} />}
       {archived.length > 0 && (
         <div className="grid gap-2">
           <h3 className="text-muted-foreground font-medium">Arquivadas</h3>
@@ -362,22 +381,53 @@ export function CategoriesPage() {
   const sources = (workspaces.data ?? []).filter((other) => other.id !== workspace.id);
   const [copyOpen, setCopyOpen] = useState(false);
   const copyButton = useRef<HTMLButtonElement>(null);
+  const [creating, setCreating] = useState(false);
+  const newButton = useRef<HTMLButtonElement>(null);
+  const [search, setSearch] = useState('');
 
   return (
     <>
       <PageHeader
         title="Categorias"
-        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada."
+        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada. As de destino do orçamento mudam junto com o destino, no orçamento do Painel."
       >
-        {canEdit && categories.isSuccess && sources.length > 0 && (
+        {/* At the top, so adding never needs scrolling past a long list. */}
+        {canEdit && categories.isSuccess && (
           <div className="flex flex-wrap gap-2">
-            <Button ref={copyButton} variant="outline" onClick={() => setCopyOpen(true)}>
-              <Copy aria-hidden />
-              Copiar de outro espaço
+            <Button ref={newButton} onClick={() => setCreating(true)}>
+              <Plus aria-hidden />
+              Nova categoria
             </Button>
+            {sources.length > 0 && (
+              <Button ref={copyButton} variant="outline" onClick={() => setCopyOpen(true)}>
+                <Copy aria-hidden />
+                Copiar de outro espaço
+              </Button>
+            )}
           </div>
         )}
+        {categories.isSuccess && (
+          <FormField id="category-search" label="Buscar categoria">
+            <Input
+              type="search"
+              autoComplete="off"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </FormField>
+        )}
       </PageHeader>
+      {canEdit && (
+        <ResponsiveDialog
+          open={creating}
+          onOpenChange={setCreating}
+          returnFocusTo={newButton}
+          title="Nova categoria"
+          description="Débito para o que sai, crédito para o que entra."
+        >
+          <NewCategoryForm workspaceId={workspace.id} onDone={() => setCreating(false)} />
+        </ResponsiveDialog>
+      )}
       {canEdit && categories.isSuccess && sources.length > 0 && (
         <CopyCategoriesDialog
           workspaceId={workspace.id}
@@ -397,6 +447,7 @@ export function CategoriesPage() {
             {...section}
             workspaceId={workspace.id}
             categories={categories.data.filter((category) => category.type === section.type)}
+            search={search}
             canEdit={canEdit}
           />
         ))}

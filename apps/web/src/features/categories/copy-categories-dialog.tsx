@@ -38,8 +38,9 @@ const copiedMessage = ({ copied }: CopyCategoriesResult) =>
     : `${copied} ${copied === 1 ? 'categoria copiada' : 'categorias copiadas'}`;
 
 /**
- * The source's categories that can be copied, each with a checkbox, the new ones checked from the
- * start. Those already here are listed, unchecked and disabled, so nothing seems to be missing.
+ * The source's new categories, each with a checkbox, all checked from the start. Those already
+ * here are only named, folded away: often they are most of the list, and the new ones would be
+ * lost among them.
  */
 function SourcePicker({
   workspaceId,
@@ -80,6 +81,7 @@ function SourcePicker({
     (category) => !category.archived && !category.destinationId,
   );
   const fresh = candidates.filter((category) => !taken.has(sameKey(category)));
+  const existing = candidates.filter((category) => taken.has(sameKey(category)));
   const chosen = picked ?? new Set(fresh.map((category) => category.id));
   const allChosen = fresh.length > 0 && fresh.every((category) => chosen.has(category.id));
   const toggle = (id: string, on: boolean) => {
@@ -123,31 +125,28 @@ function SourcePicker({
         {allChosen ? 'Desmarcar todas' : 'Marcar todas'}
       </Button>
       {groups.map(({ type, title }) => {
-        const items = candidates.filter((category) => category.type === type);
+        const items = fresh.filter((category) => category.type === type);
         if (items.length === 0) return null;
         return (
           <fieldset key={type} className="grid gap-1">
             <legend className="mb-1 font-medium">{title}</legend>
             <ul className="grid">
               {items.map((category) => {
-                const exists = taken.has(sameKey(category));
                 const id = `${idPrefix}-${category.id}`;
                 return (
-                  <li key={category.id} className="flex items-center justify-between gap-3">
+                  <li key={category.id}>
                     {/* The whole row is the target: 44px on the phone (ADR 0036). */}
                     <label
                       htmlFor={id}
-                      className="flex min-h-11 flex-1 cursor-pointer items-center gap-3 has-disabled:cursor-default md:min-h-9"
+                      className="flex min-h-11 cursor-pointer items-center gap-3 md:min-h-9"
                     >
                       <Checkbox
                         id={id}
-                        checked={!exists && chosen.has(category.id)}
-                        disabled={exists}
+                        checked={chosen.has(category.id)}
                         onCheckedChange={(checked) => toggle(category.id, checked === true)}
                       />
                       {category.name}
                     </label>
-                    {exists && <span className="text-muted-foreground text-sm">Já existe</span>}
                   </li>
                 );
               })}
@@ -155,6 +154,16 @@ function SourcePicker({
           </fieldset>
         );
       })}
+      {existing.length > 0 && (
+        <details className="rounded-xl border px-4 py-2">
+          <summary className="cursor-pointer py-2 font-medium">
+            Já existem aqui ({existing.length})
+          </summary>
+          <p className="text-muted-foreground pb-2">
+            {existing.map((category) => category.name).join(', ')}.
+          </p>
+        </details>
+      )}
       {copy.isError && (
         <p role="alert" className="text-destructive">
           {apiErrorMessage(copy.error)}

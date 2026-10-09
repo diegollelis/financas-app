@@ -301,6 +301,16 @@ async function main() {
     await seed(auth.request, workspaceId, monthsBefore(period, monthsAgo), monthsAgo);
   }
   await seedSeries(auth.request, workspaceId, period);
+  // A second workspace, to copy categories into from the personal one (ADR 0048); "Pet" is new
+  // there, the defaults already exist. A repeated name answers 409, which is fine here.
+  let houseId = workspaces.find((w) => !w.isPersonal)?.id;
+  if (!houseId) {
+    const created = await auth.request.post(`${API}/api/workspaces`, { data: { name: 'Casa' } });
+    houseId = ((await created.json()) as Workspace).id;
+  }
+  await auth.request.post(`${API}/api/workspaces/${workspaceId}/categories`, {
+    data: { name: 'Pet', type: 'DEBIT' },
+  });
   const storageState = await auth.storageState();
   await auth.close();
 
@@ -363,6 +373,21 @@ async function main() {
       opens: 'dialog' as const,
     },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
+    {
+      name: 'categorias-nova',
+      path: `/espacos/${workspaceId}/categorias`,
+      signedIn: true,
+      open: /^Nova categoria$/,
+      opens: 'dialog' as const,
+    },
+    {
+      // In the shared workspace, copying from the personal one (ADR 0048).
+      name: 'categorias-copiar',
+      path: `/espacos/${houseId}/categorias`,
+      signedIn: true,
+      open: /^Copiar de outro espaço$/,
+      opens: 'dialog' as const,
+    },
     { name: 'recorrencias', path: `/espacos/${workspaceId}/recorrencias`, signedIn: true },
     { name: 'pessoas', path: `/espacos/${workspaceId}/pessoas`, signedIn: true },
     { name: 'importar', path: `/espacos/${workspaceId}/importar`, signedIn: true },

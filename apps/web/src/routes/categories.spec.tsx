@@ -102,33 +102,59 @@ describe('CategoriesPage', () => {
     expect(screen.getByRole('button', { name: 'Ações de Mercado' })).toBeInTheDocument();
   });
 
-  it('adds a category to the right type', async () => {
+  it('counts each section and finds a category by name, ignoring accents', async () => {
+    mockCategories();
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    const credits = await section('Créditos');
+    const debits = await section('Débitos');
+    expect(credits).toHaveTextContent('2 categorias');
+    expect(debits).toHaveTextContent('3 categorias');
+
+    await userEvent.type(screen.getByLabelText('Buscar categoria'), 'consorcio');
+    expect(credits).toHaveTextContent('1 de 2 categorias');
+    expect(within(credits).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(debits).getByText('Consórcio')).toBeInTheDocument();
+    expect(within(debits).queryByText('Mercado')).not.toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText('Buscar categoria'));
+    await userEvent.type(screen.getByLabelText('Buscar categoria'), 'sal');
+    expect(debits).toHaveTextContent('Nenhuma categoria de débito ativa com “sal”.');
+    expect(within(credits).getByText('Salário')).toBeInTheDocument();
+  });
+
+  it('adds a category from the top of the page, of the chosen type', async () => {
     const fetchMock = mockCategories({
-      [`POST ${base}`]: { status: 201, body: category(6, 'Pet', 'DEBIT') },
+      [`POST ${base}`]: { status: 201, body: category(6, 'Aluguel recebido', 'CREDIT') },
     });
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const debits = await section('Débitos');
-    await userEvent.type(within(debits).getByLabelText('Nova categoria de débito'), ' Pet ');
-    await userEvent.click(within(debits).getByRole('button', { name: 'Adicionar' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Nova categoria' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nova categoria' });
+    // Debit first: most categories are of spending.
+    expect(within(dialog).getByRole('radio', { name: 'Débito' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Crédito' }));
+    await userEvent.type(within(dialog).getByLabelText('Nome'), ' Aluguel recebido ');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
 
     await expectCall(fetchMock, base, {
       method: 'POST',
-      body: JSON.stringify({ name: 'Pet', type: 'DEBIT' }),
+      body: JSON.stringify({ name: 'Aluguel recebido', type: 'CREDIT' }),
     });
-    await vi.waitFor(() =>
-      expect(within(debits).getByLabelText('Nova categoria de débito')).toHaveValue(''),
-    );
+    expect(await screen.findByText('Categoria adicionada')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Nova categoria' })).toHaveFocus();
   });
 
   it('validates the name before calling the API', async () => {
     const fetchMock = mockCategories();
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const credits = await section('Créditos');
-    await userEvent.click(within(credits).getByRole('button', { name: 'Adicionar' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Nova categoria' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nova categoria' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
 
-    expect(await within(credits).findByText('Dê um nome à categoria.')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Dê um nome à categoria.')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith(
       new URL(base, 'http://api.test'),
       expect.objectContaining({ method: 'POST' }),
@@ -147,11 +173,12 @@ describe('CategoriesPage', () => {
     });
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const debits = await section('Débitos');
-    await userEvent.type(within(debits).getByLabelText('Nova categoria de débito'), 'ipva');
-    await userEvent.click(within(debits).getByRole('button', { name: 'Adicionar' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Nova categoria' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nova categoria' });
+    await userEvent.type(within(dialog).getByLabelText('Nome'), 'ipva');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
 
-    expect(await within(debits).findByRole('alert')).toHaveTextContent(
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Já existe uma categoria com esse nome.',
     );
   });
@@ -266,10 +293,10 @@ describe('CategoriesPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Copiar de outro espaço' });
     // The only other workspace is already chosen; its new categories start checked.
     expect(await within(dialog).findByRole('checkbox', { name: 'Pet' })).toBeChecked();
-    // Already here, ignoring case: listed, but not copied.
-    expect(within(dialog).getByRole('checkbox', { name: 'mercado' })).toBeDisabled();
-    expect(within(dialog).getByRole('checkbox', { name: 'Salário' })).toBeDisabled();
-    expect(within(dialog).getAllByText('Já existe')).toHaveLength(2);
+    // Already here, ignoring case: only named, folded away, never offered.
+    expect(within(dialog).getAllByRole('checkbox')).toHaveLength(1);
+    expect(within(dialog).getByText('Já existem aqui (2)')).toBeInTheDocument();
+    expect(within(dialog).getByText('Salário, mercado.')).toBeInTheDocument();
     // Archived ones and a saving destination's are never copied (ADR 0048).
     expect(within(dialog).queryByText('Antiga')).not.toBeInTheDocument();
     expect(within(dialog).queryByText('Investimentos')).not.toBeInTheDocument();
@@ -321,7 +348,7 @@ describe('CategoriesPage', () => {
     const debits = await section('Débitos');
     expect(within(debits).getByText('Mercado')).toBeInTheDocument();
     expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Nova categoria/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nova categoria' })).not.toBeInTheDocument();
   });
 
   it('answers "not found" for a workspace that is not yours', async () => {
