@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { budgetDestinationKindSchema } from './budget-destination.ts';
-import { budgetSchema, shareOfIncome, type Budget } from './budget.ts';
+import { budgetSchema, FULL_BASIS_POINTS, shareOfIncome, type Budget } from './budget.ts';
 import { periodSchema } from './money-and-dates.ts';
 import { transactionStatus, type Transaction } from './transaction.ts';
 
@@ -57,6 +57,13 @@ export const summarySchema = z.object({
   available: twoViewsSchema,
   budget: budgetSchema,
   destinations: z.array(destinationSummarySchema),
+  /**
+   * What the saving destinations leave without a destination, when their shares add up to less
+   * than 100%: the missing share and what is available minus their goals, so the cents add up.
+   */
+  unallocated: z
+    .object({ basisPoints: z.number().int(), targetCents: z.number().int() })
+    .default({ basisPoints: 0, targetCents: 0 }),
   /** Expenses goal − all expenses: positive while within the goal, negative when over it. */
   expensesLeftCents: z.number().int(),
   /**
@@ -165,6 +172,11 @@ export function summarizePeriod(
   const expensesTarget =
     destinations.find((destination) => destination.kind === 'EXPENSES')?.targetCents ?? 0;
   const appliedSide = side(applications, today);
+  const savings = destinations.filter((destination) => destination.kind === 'SAVINGS');
+  const unallocatedBasisPoints = Math.max(
+    0,
+    FULL_BASIS_POINTS - savings.reduce((sum, destination) => sum + destination.basisPoints, 0),
+  );
 
   return {
     period: budget.period,
@@ -179,6 +191,13 @@ export function summarizePeriod(
     available,
     budget,
     destinations,
+    unallocated: {
+      basisPoints: unallocatedBasisPoints,
+      targetCents:
+        unallocatedBasisPoints > 0
+          ? savingBase - savings.reduce((sum, destination) => sum + destination.targetCents, 0)
+          : 0,
+    },
     expensesLeftCents: expensesTarget - expenses.totalCents,
     estimatedCents: transactions
       .filter((transaction) => transaction.amountEstimated && !transaction.settledAt)
