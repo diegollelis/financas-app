@@ -372,6 +372,20 @@ async function main() {
       open: /^Aplicar em Investimentos$/,
       opens: 'dialog' as const,
     },
+    {
+      // Opening the app while the session is checked: the CL breathing (BrandLoader). /api/me
+      // never answers here; after 3 s the loader says it is waiting for the server.
+      name: 'carregando',
+      path: `/espacos/${workspaceId}/painel`,
+      signedIn: true,
+      holdSessionMs: 800,
+    },
+    {
+      name: 'carregando-lento',
+      path: `/espacos/${workspaceId}/painel`,
+      signedIn: true,
+      holdSessionMs: 3500,
+    },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
     {
       name: 'categorias-nova',
@@ -439,7 +453,14 @@ async function main() {
     for (const target of pages) {
       if (target.phoneOnly && viewport.width >= 768) continue;
       const page = await (target.signedIn ? context : guest).newPage();
-      await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
+      if ('holdSessionMs' in target && target.holdSessionMs) {
+        // The request stays pending, so the network never goes idle: wait by time instead.
+        await page.route('**/api/me', () => {});
+        await page.goto(`${WEB}${target.path}`, { waitUntil: 'load' });
+        await page.waitForTimeout(target.holdSessionMs);
+      } else {
+        await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
+      }
       if (target.open && target.opens) {
         await page.getByRole('button', { name: target.open }).first().click();
         await page.getByRole(target.opens).waitFor();

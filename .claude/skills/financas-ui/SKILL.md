@@ -52,7 +52,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 
 ## States (every query-driven view)
 
-- **Loading:** `Skeleton` shaped like the content. After about 3 s, add "Acordando o servidor… isso pode levar até um minuto." (the API sleeps on Render's free plan, ADR 0033).
+- **Loading:** `Skeleton` shaped like the content. After about 3 s, add "Aguardando o servidor… isso pode levar até um minuto." (the API sleeps on Render's free plan, ADR 0033).
 - **Empty:** say what is missing and how to act ("Nenhum lançamento em outubro."). When the page already shows a persistent main action (e.g. "Novo lançamento"), point to it in words; never repeat the button. Otherwise, offer the action in the empty state.
 - **Error:** say what failed and how to fix it, plus a "Tentar de novo" button (`refetch`). Errors from our routes go through `apiErrorMessage` (`lib/error-message.ts`). Errors never apologize.
 - **404 of a workspace:** "Espaço não encontrado." with a way back.

@@ -9,7 +9,7 @@ function SlowServerNotice() {
   if (!slow) return null;
   return (
     <p className="text-muted-foreground text-center text-sm">
-      Acordando o servidor… isso pode levar até um minuto.
+      Aguardando o servidor… isso pode levar até um minuto.
     </p>
   );
 }

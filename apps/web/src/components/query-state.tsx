@@ -30,7 +30,7 @@ export function LoadingState({ children }: { children: ReactNode }) {
         <span className="sr-only">Carregando…</span>
         {slow && (
           <p className="text-muted-foreground">
-            Acordando o servidor… isso pode levar até um minuto.
+            Aguardando o servidor… isso pode levar até um minuto.
           </p>
         )}
       </div>

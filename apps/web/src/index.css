@@ -5,6 +5,22 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* The CL symbol while a whole page loads (BrandLoader): a slow breath, not a spinner. */
+@theme {
+  --animate-breathe: breathe 1.6s ease-in-out infinite alternate;
+
+  @keyframes breathe {
+    from {
+      opacity: 0.6;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Inter Variable', system-ui, sans-serif;

@@ -1,13 +1,21 @@
 import { TERMS_VERSION } from '@financas/shared';
 import { Navigate, Outlet, useLocation } from 'react-router';
+import { BrandLoader } from '@/components/brand-loader';
+import { Button } from '@/components/ui/button';
 import { AcceptTerms } from './accept-terms';
 import { useReturnTo, withReturnTo } from './return-to';
 import { useMe } from './use-me';
 
-function FullPageMessage({ children }: { children: string }) {
+/** The session could not be checked: the server did not answer. Say so and offer to try again. */
+function ConnectionError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
   return (
-    <main className="text-muted-foreground flex min-h-svh items-center justify-center p-6 text-sm">
-      {children}
+    <main className="flex min-h-svh items-center justify-center p-6">
+      <div role="alert" className="grid justify-items-center gap-3 text-center">
+        <p className="text-destructive">Não foi possível falar com o servidor.</p>
+        <Button variant="outline" onClick={onRetry} disabled={retrying}>
+          {retrying ? 'Tentando…' : 'Tentar de novo'}
+        </Button>
+      </div>
     </main>
   );
 }
@@ -21,11 +29,9 @@ export function RequireAuth() {
   const me = useMe();
   const location = useLocation();
 
-  if (me.isPending) return <FullPageMessage>Carregando…</FullPageMessage>;
+  if (me.isPending) return <BrandLoader />;
   if (me.isError) {
-    return (
-      <FullPageMessage>Não foi possível falar com o servidor. Recarregue a página.</FullPageMessage>
-    );
+    return <ConnectionError onRetry={() => void me.refetch()} retrying={me.isFetching} />;
   }
   if (!me.data) {
     const here = location.pathname + location.search;
@@ -44,7 +50,7 @@ export function GuestOnly() {
   const me = useMe();
   const returnTo = useReturnTo();
 
-  if (me.isPending) return <FullPageMessage>Carregando…</FullPageMessage>;
+  if (me.isPending) return <BrandLoader />;
   if (me.data) return <Navigate to={returnTo} replace />;
   return <Outlet />;
 }

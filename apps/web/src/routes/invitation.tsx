@@ -1,6 +1,7 @@
 import { TERMS_VERSION, type InvitationPreview } from '@financas/shared';
 import { useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
+import { BrandLoader } from '@/components/brand-loader';
 import { TextLink } from '@/components/text-link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { AcceptTerms } from '@/features/auth/accept-terms';
@@ -102,13 +103,7 @@ export function InvitationPage() {
   const me = useMe();
   const [searchParams] = useSearchParams();
 
-  if (preview.isPending || me.isPending) {
-    return (
-      <AuthCard title="Convite" footer={homeLink}>
-        <p className="text-muted-foreground text-sm">Carregando…</p>
-      </AuthCard>
-    );
-  }
+  if (preview.isPending || me.isPending) return <BrandLoader />;
   if (preview.isError || me.isError) {
     return (
       <AuthCard title="Convite" footer={homeLink}>
