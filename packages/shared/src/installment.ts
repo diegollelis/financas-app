@@ -58,6 +58,14 @@ export const installmentPlanSchema = z.object({
   endedAt: z.iso.datetime().nullable(),
   /** How many installments were already settled. */
   settledCount: z.number().int(),
+  /**
+   * What is still to pay: the installments not settled yet, their sum and the competência of the
+   * last one (null when none is left). Counted from the transactions, so an installment deleted
+   * on its own is not counted.
+   */
+  pendingCount: z.number().int().default(0),
+  pendingCents: z.number().int().default(0),
+  lastPendingPeriod: periodSchema.nullable().default(null),
 });
 
 export type InstallmentPlan = z.infer<typeof installmentPlanSchema>;

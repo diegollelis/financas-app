@@ -14,7 +14,15 @@ import type { InstallmentPlan as PlanRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
 
-function toResponse(plan: PlanRow, settledCount: number): InstallmentPlan {
+type Pending = { count: number; cents: number; lastPeriod: string | null };
+
+const NOTHING_PENDING: Pending = { count: 0, cents: 0, lastPeriod: null };
+
+function toResponse(
+  plan: PlanRow,
+  settledCount: number,
+  pending: Pending = NOTHING_PENDING,
+): InstallmentPlan {
   return {
     id: plan.id,
     type: plan.type,
@@ -27,6 +35,9 @@ function toResponse(plan: PlanRow, settledCount: number): InstallmentPlan {
     dueDay: plan.dueDay,
     endedAt: plan.endedAt?.toISOString() ?? null,
     settledCount,
+    pendingCount: pending.count,
+    pendingCents: pending.cents,
+    lastPendingPeriod: pending.lastPeriod,
   };
 }
 
@@ -39,10 +50,10 @@ function toResponse(plan: PlanRow, settledCount: number): InstallmentPlan {
 export class InstallmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Running ones first, then by description; each with how many were settled. */
+  /** Running ones first, then by description; each with what was settled and what is left. */
   async list(workspaceId: string): Promise<InstallmentPlan[]> {
     const db = this.prisma.forWorkspace(workspaceId);
-    const [plans, settled] = await Promise.all([
+    const [plans, settled, pending] = await Promise.all([
       db.installmentPlan.findMany({
         where: { workspaceId },
         orderBy: [{ endedAt: { sort: 'desc', nulls: 'first' } }, { description: 'asc' }],
@@ -52,11 +63,33 @@ export class InstallmentsService {
         where: { workspaceId, installmentPlanId: { not: null }, settledAt: { not: null } },
         _count: { _all: true },
       }),
+      db.transaction.groupBy({
+        by: ['installmentPlanId'],
+        where: { workspaceId, installmentPlanId: { not: null }, settledAt: null },
+        _count: { _all: true },
+        _sum: { amountCents: true },
+        _max: { period: true },
+      }),
     ]);
     const settledByPlan = new Map(
       settled.map((row) => [row.installmentPlanId, row._count._all] as const),
     );
-    return plans.map((plan) => toResponse(plan, settledByPlan.get(plan.id) ?? 0));
+    const pendingByPlan = new Map(
+      pending.map(
+        (row) =>
+          [
+            row.installmentPlanId,
+            {
+              count: row._count._all,
+              cents: row._sum.amountCents ?? 0,
+              lastPeriod: row._max.period,
+            },
+          ] as const,
+      ),
+    );
+    return plans.map((plan) =>
+      toResponse(plan, settledByPlan.get(plan.id) ?? 0, pendingByPlan.get(plan.id)),
+    );
   }
 
   /**
@@ -97,7 +130,12 @@ export class InstallmentsService {
         },
       },
     });
-    return toResponse(plan, 0);
+    // Just created: every installment is still to pay.
+    return toResponse(plan, 0, {
+      count: amounts.length,
+      cents: totalCents,
+      lastPeriod: shiftPeriod(input.firstPeriod, amounts.length - 1),
+    });
   }
 
   /**

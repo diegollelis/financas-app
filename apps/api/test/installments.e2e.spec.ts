@@ -95,7 +95,14 @@ describe('installments', () => {
 
     const plan = await create(fridge());
 
-    expect(plan).toMatchObject({ totalCents: 100_000, installments: 3, settledCount: 0 });
+    expect(plan).toMatchObject({
+      totalCents: 100_000,
+      installments: 3,
+      settledCount: 0,
+      pendingCount: 3,
+      pendingCents: 100_000,
+      lastPendingPeriod: month(2),
+    });
     const months = await Promise.all([0, 1, 2, 3].map((offset) => transactionsOf(month(offset))));
     expect(months.map((transactions) => transactions.map((t) => t.amountCents))).toEqual([
       [33_333],
@@ -125,7 +132,7 @@ describe('installments', () => {
     });
   });
 
-  it('counts the settled installments', async () => {
+  it('counts the settled installments and what is left to pay', async () => {
     const { create, fridge, transactionsOf, plans, base, browser } = await setUp();
     await create(fridge());
     const [first] = await transactionsOf(thisMonth);
@@ -135,7 +142,16 @@ describe('installments', () => {
       .send({ settledAt: `${thisMonth}-15` })
       .expect(200);
 
-    expect(await plans()).toEqual([expect.objectContaining({ settledCount: 1, endedAt: null })]);
+    // What is left: the other two, with the leftover cents of the last, until its month.
+    expect(await plans()).toEqual([
+      expect.objectContaining({
+        settledCount: 1,
+        pendingCount: 2,
+        pendingCents: 66_667,
+        lastPendingPeriod: month(2),
+        endedAt: null,
+      }),
+    ]);
   });
 
   it('ends it: pending installments from this month on go, settled and past ones stay', async () => {
