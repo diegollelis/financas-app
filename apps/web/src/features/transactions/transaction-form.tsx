@@ -13,6 +13,7 @@ import {
   type TransactionType,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { Controller, useForm, useWatch, type Control } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
@@ -263,7 +264,17 @@ export function TransactionForm({
       category.type === type && (!category.archived || category.id === initial?.categoryId),
   );
   const id = (field: string) => `${idPrefix}-${field}`;
+  // Opened from the start when the transaction being edited uses one of them.
+  const [moreOpen, setMoreOpen] = useState(Boolean(initial?.notes || initial?.personId));
   const application = initial ? undefined : preset?.applicationTo;
+  // What "Mais opções" holds, named on it so nothing is hidden by surprise.
+  const moreContents = [
+    'observações',
+    showPerson && !application && 'pessoa',
+    canSplit && !application && 'dividir',
+  ]
+    .filter(Boolean)
+    .join(', ');
   const fixedCategory = application
     ? (categories.find((category) => category.id === preset?.categoryId)?.name ?? application)
     : null;
@@ -272,7 +283,12 @@ export function TransactionForm({
     <form
       noValidate
       className="grid gap-4"
-      onSubmit={(event) => void handleSubmit(onSubmit)(event)}
+      onSubmit={(event) =>
+        void handleSubmit(onSubmit, (errors) => {
+          // A mistake in a folded field must be seen.
+          if (errors.notes || errors.person || errors.shares) setMoreOpen(true);
+        })(event)
+      }
     >
       {fixedCategory !== null ? (
         <p className="text-muted-foreground text-sm">
@@ -335,68 +351,6 @@ export function TransactionForm({
           <Input type="date" {...register('dueDate')} />
         </FormField>
       </div>
-      <FormField
-        id={id('notes')}
-        label="Observações (opcional)"
-        error={formState.errors.notes?.message}
-      >
-        <Input autoComplete="off" {...register('notes')} />
-      </FormField>
-      {/* The names already listed, suggested as the person types (a new one becomes a person). */}
-      <datalist id={peopleListId}>
-        {people
-          .filter((person) => !person.archived)
-          .map((person) => (
-            <option key={person.id} value={person.name} />
-          ))}
-      </datalist>
-      {showPerson && !application && (
-        <FormField
-          id={id('person')}
-          label={type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'}
-          error={formState.errors.person?.message}
-        >
-          <Input list={peopleListId} autoComplete="off" {...register('person')} />
-        </FormField>
-      )}
-      {canSplit && !application && (
-        <div className="grid gap-3">
-          <Controller
-            control={control}
-            name="splitOn"
-            render={({ field }) => (
-              <div className="flex items-center gap-1">
-                {/* A 44px target on the phone (ADR 0036), pulled left to line up with the fields. */}
-                <label
-                  htmlFor={id('split')}
-                  className="-ml-3.5 flex size-11 shrink-0 cursor-pointer items-center justify-center md:-ml-1 md:size-6"
-                >
-                  <Checkbox
-                    id={id('split')}
-                    checked={field.value}
-                    onCheckedChange={(checked) => field.onChange(checked === true)}
-                  />
-                </label>
-                <label htmlFor={id('split')} className="cursor-pointer text-sm font-medium">
-                  Dividir com alguém
-                </label>
-              </div>
-            )}
-          />
-          {splitting && (
-            <SplitFields
-              idPrefix={idPrefix}
-              // The split fields are a slice of this form; their names match it.
-              control={control as unknown as Control<SplitFormFields>}
-              register={register}
-              setValue={setValue as never}
-              errors={formState.errors}
-              totalCents={totalCents}
-              peopleListId={peopleListId}
-            />
-          )}
-        </div>
-      )}
       {allowRepeat && (
         <div className="grid gap-2">
           <p aria-hidden className="text-sm font-medium">
@@ -489,6 +443,80 @@ export function TransactionForm({
           </p>
         </div>
       )}
+      {/* The common path stays short (ADR 0036): notes, a person and a split wait in here. */}
+      <details
+        open={moreOpen}
+        onToggle={(event) => setMoreOpen(event.currentTarget.open)}
+        className="rounded-xl border px-4 py-2"
+      >
+        <summary className="cursor-pointer py-2 font-medium">
+          Mais opções <span className="text-muted-foreground font-normal">({moreContents})</span>
+        </summary>
+        <div className="grid gap-4 pt-2 pb-3">
+          <FormField
+            id={id('notes')}
+            label="Observações (opcional)"
+            error={formState.errors.notes?.message}
+          >
+            <Input autoComplete="off" {...register('notes')} />
+          </FormField>
+          {/* The names already listed, suggested as the person types (a new one becomes a person). */}
+          <datalist id={peopleListId}>
+            {people
+              .filter((person) => !person.archived)
+              .map((person) => (
+                <option key={person.id} value={person.name} />
+              ))}
+          </datalist>
+          {showPerson && !application && (
+            <FormField
+              id={id('person')}
+              label={type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'}
+              error={formState.errors.person?.message}
+            >
+              <Input list={peopleListId} autoComplete="off" {...register('person')} />
+            </FormField>
+          )}
+          {canSplit && !application && (
+            <div className="grid gap-3">
+              <Controller
+                control={control}
+                name="splitOn"
+                render={({ field }) => (
+                  <div className="flex items-center gap-1">
+                    {/* A 44px target on the phone (ADR 0036), pulled left to line up with the fields. */}
+                    <label
+                      htmlFor={id('split')}
+                      className="-ml-3.5 flex size-11 shrink-0 cursor-pointer items-center justify-center md:-ml-1 md:size-6"
+                    >
+                      <Checkbox
+                        id={id('split')}
+                        checked={field.value}
+                        onCheckedChange={(checked) => field.onChange(checked === true)}
+                      />
+                    </label>
+                    <label htmlFor={id('split')} className="cursor-pointer text-sm font-medium">
+                      Dividir com alguém
+                    </label>
+                  </div>
+                )}
+              />
+              {splitting && (
+                <SplitFields
+                  idPrefix={idPrefix}
+                  // The split fields are a slice of this form; their names match it.
+                  control={control as unknown as Control<SplitFormFields>}
+                  register={register}
+                  setValue={setValue as never}
+                  errors={formState.errors}
+                  totalCents={totalCents}
+                  peopleListId={peopleListId}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </details>
       {Boolean(error) && (
         <p role="alert" className="text-destructive">
           {apiErrorMessage(error)}

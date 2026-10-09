@@ -783,6 +783,36 @@ describe('TransactionsPage', () => {
     expect(await screen.findByText('Lançamento e partes excluídos')).toBeInTheDocument();
   });
 
+  it('keeps notes, the person and the split in "Mais opções", open when they are in use', async () => {
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Ana: parte de Jantar',
+      categoryId: salaryCategory.id,
+      amountCents: 15_000,
+      personId: ana.id,
+    });
+    mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`GET ${base}`]: { body: [share, light] },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    // A new one: the common path, with the rest folded and named.
+    await userEvent.click(await screen.findByRole('button', { name: 'Novo lançamento' }));
+    let form = await screen.findByRole('dialog', { name: 'Novo lançamento' });
+    const more = () => within(form).getByText(/^Mais opções/);
+    expect(more()).toHaveTextContent('Mais opções (observações, pessoa, dividir)');
+    expect(more().closest('details')).not.toHaveAttribute('open');
+    await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
+
+    // Editing one linked to a person: open, so nothing seems lost.
+    const menu = await openActions('Ana: parte de Jantar');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    expect(more().closest('details')).toHaveAttribute('open');
+    expect(within(form).getByLabelText('A receber de (opcional)')).toHaveValue('Ana');
+  });
+
   it('is read-only for a VIEWER', async () => {
     mockTransactions({
       [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } },
