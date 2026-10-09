@@ -165,6 +165,11 @@ export type TransactionPreset = {
   description: string;
   /** null leaves the amount empty. */
   amountCents: number | null;
+  /**
+   * An application to this saving destination (ADR 0047): the type and the category are fixed,
+   * or it would quietly stop being one; no person, no split, no installments.
+   */
+  applicationTo?: string;
 };
 
 export function TransactionForm({
@@ -258,6 +263,10 @@ export function TransactionForm({
       category.type === type && (!category.archived || category.id === initial?.categoryId),
   );
   const id = (field: string) => `${idPrefix}-${field}`;
+  const application = initial ? undefined : preset?.applicationTo;
+  const fixedCategory = application
+    ? (categories.find((category) => category.id === preset?.categoryId)?.name ?? application)
+    : null;
 
   return (
     <form
@@ -265,22 +274,28 @@ export function TransactionForm({
       className="grid gap-4"
       onSubmit={(event) => void handleSubmit(onSubmit)(event)}
     >
-      <Controller
-        control={control}
-        name="type"
-        render={({ field }) => (
-          <SegmentedControl
-            label="Tipo"
-            options={typeOptions}
-            value={field.value}
-            onChange={(value) => {
-              field.onChange(value);
-              // The category belongs to one type: changing the type asks for a new one.
-              setValue('categoryId', '');
-            }}
-          />
-        )}
-      />
+      {fixedCategory !== null ? (
+        <p className="text-muted-foreground text-sm">
+          Débito na categoria <span className="text-foreground font-medium">{fixedCategory}</span>.
+        </p>
+      ) : (
+        <Controller
+          control={control}
+          name="type"
+          render={({ field }) => (
+            <SegmentedControl
+              label="Tipo"
+              options={typeOptions}
+              value={field.value}
+              onChange={(value) => {
+                field.onChange(value);
+                // The category belongs to one type: changing the type asks for a new one.
+                setValue('categoryId', '');
+              }}
+            />
+          )}
+        />
+      )}
       <FormField
         id={id('description')}
         label="Descrição"
@@ -288,15 +303,17 @@ export function TransactionForm({
       >
         <Input autoComplete="off" {...register('description')} />
       </FormField>
-      <Controller
-        control={control}
-        name="categoryId"
-        render={({ field, fieldState }) => (
-          <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
-            <CategorySelect value={field.value} onChange={field.onChange} options={options} />
-          </FormField>
-        )}
-      />
+      {fixedCategory === null && (
+        <Controller
+          control={control}
+          name="categoryId"
+          render={({ field, fieldState }) => (
+            <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
+              <CategorySelect value={field.value} onChange={field.onChange} options={options} />
+            </FormField>
+          )}
+        />
+      )}
       {/* One column on the phone, two from sm. */}
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField id={id('amount')} label={amountLabel} error={formState.errors.amount?.message}>
@@ -331,7 +348,7 @@ export function TransactionForm({
             <option key={person.id} value={person.name} />
           ))}
       </datalist>
-      {showPerson && (
+      {showPerson && !application && (
         <FormField
           id={id('person')}
           label={type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'}
@@ -340,7 +357,7 @@ export function TransactionForm({
           <Input list={peopleListId} autoComplete="off" {...register('person')} />
         </FormField>
       )}
-      {canSplit && (
+      {canSplit && !application && (
         <div className="grid gap-3">
           <Controller
             control={control}
@@ -389,7 +406,12 @@ export function TransactionForm({
             render={({ field }) => (
               <SegmentedControl
                 label="Repetir"
-                options={repeatOptions}
+                // An application repeats every month at most: installments make no sense here.
+                options={
+                  application
+                    ? repeatOptions.filter((option) => option.value !== 'INSTALLMENTS')
+                    : repeatOptions
+                }
                 value={field.value}
                 onChange={field.onChange}
               />

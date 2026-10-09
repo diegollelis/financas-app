@@ -145,7 +145,13 @@ export function TransactionDialog({
       open={open}
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
-      title={editing ? 'Editar lançamento' : 'Novo lançamento'}
+      title={
+        editing
+          ? 'Editar lançamento'
+          : preset?.applicationTo
+            ? `Aplicação em ${preset.applicationTo}`
+            : 'Novo lançamento'
+      }
       description={
         // Editing one generated month or one installment changes only it (ADR 0038).
         editing?.recurrenceId
