@@ -329,8 +329,8 @@ function PersonRow({
   const toList = () => document.getElementById(LIST_TITLE_ID)?.focus();
 
   return (
-    // As a transaction row: who on the left; the amounts and the menu on the right, on the line
-    // of the name.
+    // As a transaction row: who on the left, the amounts on the right; the menu below them on the
+    // phone, where the width is short, and beside them, on the line of the name, from md.
     <li className="flex items-start gap-3 py-3">
       <span className="grid min-w-0 flex-1 justify-items-start">
         <span className="font-medium break-words">{person.name}</span>
@@ -343,7 +343,7 @@ function PersonRow({
           Ver lançamentos
         </button>
       </span>
-      <span className="flex shrink-0 items-start gap-1">
+      <span className="grid shrink-0 justify-items-end gap-1 md:flex md:items-start">
         <span className="font-semibold md:pt-0.5">
           <Balance person={person} />
         </span>
