@@ -1,7 +1,8 @@
-import type {
-  BudgetDestination,
-  CreateBudgetDestinationInput,
-  UpdateBudgetDestinationInput,
+import {
+  currentPeriod,
+  type BudgetDestination,
+  type CreateBudgetDestinationInput,
+  type UpdateBudgetDestinationInput,
 } from '@financas/shared';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
@@ -96,7 +97,10 @@ export class BudgetDestinationsService {
     }
   }
 
-  /** Renames and/or archives a saving destination, and its category along with it. */
+  /**
+   * Renames and/or archives a saving destination, and its category along with it. Archiving
+   * takes effect from this competência on: see `releaseShares`.
+   */
   async update(
     workspaceId: string,
     destinationId: string,
@@ -116,6 +120,9 @@ export class BudgetDestinationsService {
         }
         let archivedAt: Date | null | undefined;
         if (input.archived === true) archivedAt = current.archivedAt ?? new Date();
+        if (input.archived === true && current.archivedAt === null) {
+          await this.releaseShares(tx, workspaceId, destinationId, currentPeriod());
+        }
         if (input.archived === false) archivedAt = null;
         await tx.category.update({
           where: { id: current.categoryId, workspaceId },
@@ -163,6 +170,50 @@ export class BudgetDestinationsService {
       }
       throw error;
     }
+  }
+
+  /**
+   * An archived destination leaves the budget from `period` on (ADR 0047, note of 2026-10-09):
+   * its share goes from this competência's budget and from every later saved one, and becomes
+   * "Sem destino". Earlier competências keep theirs, so their dashboards do not change. When
+   * this competência only inherits a budget that gives the destination a share, it is saved now,
+   * as a copy of the inherited one without that share.
+   */
+  private async releaseShares(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    destinationId: string,
+    period: string,
+  ) {
+    const effective = await tx.budgetConfig.findFirst({
+      where: { workspaceId, period: { lte: period } },
+      orderBy: { period: 'desc' },
+      include: { shares: true },
+    });
+    const inherited =
+      effective !== null &&
+      effective.period < period &&
+      effective.shares.some(
+        (share) => share.destinationId === destinationId && share.basisPoints > 0,
+      );
+    if (inherited) {
+      const own = await tx.budgetConfig.create({
+        data: { workspaceId, period, netIncomeCents: effective.netIncomeCents },
+      });
+      await tx.budgetShare.createMany({
+        data: effective.shares
+          .filter((share) => share.destinationId !== destinationId)
+          .map((share) => ({
+            workspaceId,
+            budgetConfigId: own.id,
+            destinationId: share.destinationId,
+            basisPoints: share.basisPoints,
+          })),
+      });
+    }
+    await tx.budgetShare.deleteMany({
+      where: { workspaceId, destinationId, budgetConfig: { period: { gte: period } } },
+    });
   }
 
   /**

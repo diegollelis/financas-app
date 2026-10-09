@@ -225,6 +225,12 @@ describe('Budget dialog (on the dashboard)', () => {
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ações de Investimentos' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Arquivar' }));
+    // It changes the budget from this month on: asked first.
+    const confirm = await screen.findByRole('alertdialog', { name: 'Arquivar Investimentos?' });
+    expect(confirm).toHaveTextContent(
+      'Investimentos sai do orçamento a partir de outubro de 2026, e o percentual dele fica sem destino. Os meses anteriores não mudam.',
+    );
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Arquivar' }));
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         new URL(`${destinationsBase}/${investimentos}`, 'http://api.test'),

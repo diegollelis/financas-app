@@ -1,6 +1,8 @@
 import {
   budgetDestinationListResponseSchema,
   budgetSchema,
+  currentPeriod,
+  shiftPeriod,
   workspaceSchema,
   type BudgetDestination,
 } from '@financas/shared';
@@ -230,6 +232,35 @@ describe('budget', () => {
       'Reserva de emergência',
       'Viagens',
     ]);
+  });
+
+  it('archiving takes a destination out of the budget from this competência on, never before', async () => {
+    const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+    const { named } = await destinations(browser, id);
+    const now = currentPeriod();
+    const before = shiftPeriod(now, -1);
+    const later = shiftPeriod(now, 2);
+    await save(browser, id, before, september(named));
+    await save(browser, id, later, september(named));
+    const viagens = `/api/workspaces/${id}/budget-destinations/${named('Viagens').id}`;
+
+    await browser.patch(viagens).send({ archived: true }).expect(200);
+
+    // An earlier competência keeps its share: its dashboard does not change.
+    expect(percentages(await get(browser, id, before))).toMatchObject({ Viagens: 2_000 });
+    // This one only inherited: it is saved now, the same budget without Viagens.
+    const thisMonth = await get(browser, id, now);
+    expect(thisMonth).toMatchObject({ source: 'SAVED', netIncomeCents: 500_000 });
+    expect(percentages(thisMonth)).toEqual({
+      Despesas: 5_000,
+      Investimentos: 5_000,
+      'Reserva de emergência': 3_000,
+    });
+    // A later saved one loses it too.
+    expect(percentages(await get(browser, id, later))).not.toHaveProperty('Viagens');
+    // Reactivated, it comes back with 0%.
+    await browser.patch(viagens).send({ archived: false }).expect(200);
+    expect(percentages(await get(browser, id, now))).toMatchObject({ Viagens: 0 });
   });
 
   it('refuses an invalid competência in the address', async () => {

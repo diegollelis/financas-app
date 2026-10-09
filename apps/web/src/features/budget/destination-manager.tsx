@@ -1,4 +1,9 @@
-import { budgetDestinationNameSchema, type BudgetDestination } from '@financas/shared';
+import {
+  budgetDestinationNameSchema,
+  currentPeriod,
+  formatPeriod,
+  type BudgetDestination,
+} from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Ellipsis } from 'lucide-react';
 import { useState } from 'react';
@@ -6,6 +11,16 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -95,6 +110,7 @@ function DestinationRow({
 }) {
   const update = useUpdateBudgetDestination(workspaceId);
   const [renaming, setRenaming] = useState(false);
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
   const { name } = destination;
   const setArchived = (archived: boolean) =>
     update.mutate(
@@ -146,13 +162,33 @@ function DestinationRow({
           ) : (
             <>
               <DropdownMenuItem onSelect={() => setRenaming(true)}>Renomear</DropdownMenuItem>
-              <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(true)}>
+              <DropdownMenuItem
+                disabled={update.isPending}
+                onSelect={() => setConfirmingArchive(true)}
+              >
                 Arquivar
               </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {/* Archiving changes the budget from this month on (ADR 0047): say so before doing it. */}
+      <AlertDialog open={confirmingArchive} onOpenChange={setConfirmingArchive}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Arquivar {name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {name} sai do orçamento a partir de {formatPeriod(currentPeriod())}, e o percentual
+              dele fica sem destino. Os meses anteriores não mudam. A categoria {name} é arquivada
+              junto e continua nos lançamentos antigos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setArchived(true)}>Arquivar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </li>
   );
 }
