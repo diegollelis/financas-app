@@ -10,6 +10,7 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { FormField } from '@/components/form-field';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CategorySelect } from '@/features/categories/category-picker';
@@ -144,6 +145,29 @@ export function ImportReview({
   const nameOf = (id: string | null) =>
     categories.find((category) => category.id === id)?.name ?? null;
   const editingRow = rows.find((row) => row.line === editing);
+  /** What keeps a row out, if anything. "Escolha a categoria" is answered above, for every row
+   * of that name at once, so it is not repeated on each row. */
+  const check = (row: ReviewRow) => {
+    const categoryId = resolveCategory(row, categories, matches);
+    const result = toTransaction(row, categoryId);
+    const problems = result.ok
+      ? []
+      : result.problems.filter((problem) => !(problem === 'Escolha a categoria.' && row.type));
+    return { categoryId, problems };
+  };
+  // The check before importing (avaliação externa): what goes in, adding up, and what does not.
+  const credits = ready
+    .filter((transaction) => transaction.type === 'CREDIT')
+    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+  const debits = ready
+    .filter((transaction) => transaction.type === 'DEBIT')
+    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+  const withProblems = rows.filter((row) => check(row).problems.length > 0);
+  const waitingForCategory = unmatched.reduce((sum, entry) => sum + entry.rowCount, 0);
+  // Hides rows from the view only: nothing leaves the import because of it.
+  const [onlyProblems, setOnlyProblems] = useState(false);
+  const filtering = onlyProblems && withProblems.length > 0;
+  const visible = filtering ? withProblems : rows;
 
   const update = (line: number, change: (row: ReviewRow) => ReviewRow) =>
     setRows((current) => current.map((row) => (row.line === line ? change(row) : row)));
@@ -164,9 +188,13 @@ export function ImportReview({
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p role="status">
-          {rows.length} {rows.length === 1 ? 'linha lida' : 'linhas lidas'} da planilha.{' '}
-          {ready.length} {ready.length === 1 ? 'pronta' : 'prontas'} para importar.
+        <p role="status" className="tabular-nums">
+          {ready.length} de {rows.length} {rows.length === 1 ? 'linha pronta' : 'linhas prontas'}{' '}
+          para importar: créditos {formatCents(credits)}, débitos {formatCents(debits)}.
+          {withProblems.length > 0 &&
+            ` ${withProblems.length} ${withProblems.length === 1 ? 'linha com problema' : 'linhas com problema'}.`}
+          {waitingForCategory > 0 &&
+            ` ${waitingForCategory} ${waitingForCategory === 1 ? 'linha espera' : 'linhas esperam'} a associação de uma categoria.`}
         </p>
         <Button variant="outline" onClick={onChooseAnother}>
           Escolher outro arquivo
@@ -219,7 +247,20 @@ export function ImportReview({
         </section>
       )}
 
-      {groupByPeriod(rows).map(({ period, rows: grouped }) => {
+      {withProblems.length > 0 && (
+        <SegmentedControl
+          label="Mostrar"
+          options={[
+            { value: 'all', label: 'Todas' },
+            { value: 'problems', label: 'Com problemas' },
+          ]}
+          value={onlyProblems ? 'problems' : 'all'}
+          onChange={(value) => setOnlyProblems(value === 'problems')}
+          className="sm:justify-self-start"
+        />
+      )}
+
+      {groupByPeriod(visible).map(({ period, rows: grouped }) => {
         const totals = groupTotals(grouped);
         const titleId = `import-period-${period ?? 'sem'}`;
         return (
@@ -234,14 +275,7 @@ export function ImportReview({
             </div>
             <ul className="divide-y rounded-xl border px-2 md:px-4">
               {grouped.map((row) => {
-                const categoryId = resolveCategory(row, categories, matches);
-                const result = toTransaction(row, categoryId);
-                // "Escolha a categoria" is answered above, for every row of that name at once.
-                const problems = result.ok
-                  ? []
-                  : result.problems.filter(
-                      (problem) => !(problem === 'Escolha a categoria.' && row.type),
-                    );
+                const { categoryId, problems } = check(row);
                 return (
                   <RowItem
                     key={row.line}
@@ -274,6 +308,10 @@ export function ImportReview({
             As linhas das categorias sem correspondência só entram depois de escolher uma.
           </p>
         )}
+        <p className="text-muted-foreground text-sm">
+          Tudo ou nada: se algum lançamento falhar, nenhum entra. Dá para desfazer a importação
+          depois.
+        </p>
         {/* Fixed above the tab bar on the phone, within reach of the thumb (ADR 0036). */}
         <Button
           onClick={submit}
