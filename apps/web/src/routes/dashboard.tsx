@@ -124,13 +124,9 @@ function ApplyButton({
 }) {
   if (!onApply || destination.kind !== 'SAVINGS') return null;
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      aria-label={`Registrar aplicação em ${destination.name}`}
-      onClick={(event) => onApply(destination, event)}
-    >
-      Aplicar
+    <Button variant="outline" size="sm" onClick={(event) => onApply(destination, event)}>
+      {/* The visible word starts the accessible name, so voice control finds it. */}
+      Aplicar <span className="sr-only">em {destination.name}</span>
     </Button>
   );
 }

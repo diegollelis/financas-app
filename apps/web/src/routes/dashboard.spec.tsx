@@ -198,10 +198,10 @@ describe('DashboardPage', () => {
     const destinations = await section('Orçamento por destino');
     // Despesas has no category to apply to: only the saving destinations have the button.
     expect(
-      within(destinations).queryByRole('button', { name: 'Registrar aplicação em Despesas' }),
+      within(destinations).queryByRole('button', { name: 'Aplicar em Despesas' }),
     ).not.toBeInTheDocument();
     await userEvent.click(
-      within(destinations).getByRole('button', { name: 'Registrar aplicação em Investimentos' }),
+      within(destinations).getByRole('button', { name: 'Aplicar em Investimentos' }),
     );
 
     const form = await screen.findByRole('dialog', { name: 'Novo lançamento' });
@@ -219,7 +219,7 @@ describe('DashboardPage', () => {
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
     await section('Orçamento por destino');
-    expect(screen.queryByRole('button', { name: /^Registrar aplicação/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Aplicar/ })).not.toBeInTheDocument();
   });
 
   it('is reached from the sections of the workspace, on this month', async () => {
