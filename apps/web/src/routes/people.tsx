@@ -3,6 +3,7 @@ import {
   formatCents,
   formatPeriod,
   hasRole,
+  normalizeName,
   todayIso,
   transactionStatus,
   type Person,
@@ -51,6 +52,17 @@ const nameSchema = createPersonInputSchema.pick({ name: true });
 type NameInput = z.infer<typeof nameSchema>;
 
 const LIST_TITLE_ID = 'people-title';
+
+/** From this many people on, a search over the list. */
+const SEARCH_FROM = 9;
+
+const hasPending = (person: Person) => person.receivableCents > 0 || person.payableCents > 0;
+
+/** Who has something pending first, then who is "Em dia"; each in the API's order (by name). */
+const pendingFirst = (people: Person[]) => [
+  ...people.filter(hasPending),
+  ...people.filter((person) => !hasPending(person)),
+];
 
 /**
  * Toast after a change. mutateAsync, not mutate's callbacks: archiving, reactivating and deleting
@@ -317,7 +329,8 @@ function PersonRow({
   const toList = () => document.getElementById(LIST_TITLE_ID)?.focus();
 
   return (
-    // As a transaction row: who on the left, the amounts on the right with the menu below them.
+    // As a transaction row: who on the left; the amounts and the menu on the right, on the line
+    // of the name.
     <li className="flex items-start gap-3 py-3">
       <span className="grid min-w-0 flex-1 justify-items-start">
         <span className="font-medium break-words">{person.name}</span>
@@ -330,8 +343,8 @@ function PersonRow({
           Ver lançamentos
         </button>
       </span>
-      <span className="grid shrink-0 justify-items-end gap-1">
-        <span className="font-semibold">
+      <span className="flex shrink-0 items-start gap-1">
+        <span className="font-semibold md:pt-0.5">
           <Balance person={person} />
         </span>
         {canEdit && (
@@ -418,8 +431,16 @@ export function PeoplePage() {
   const people = usePeople(workspace.id);
   const canEdit = hasRole(workspace.role, 'EDITOR');
   const [history, setHistory] = useState<{ person: Person; trigger: HTMLElement } | null>(null);
-  const active = people.data?.filter((person) => !person.archived) ?? [];
-  const archived = people.data?.filter((person) => person.archived) ?? [];
+  const [search, setSearch] = useState('');
+  const everyone = people.data ?? [];
+  const searchable = everyone.length >= SEARCH_FROM;
+  const shown = searchable
+    ? everyone.filter((person) => normalizeName(person.name).includes(normalizeName(search)))
+    : everyone;
+  const active = pendingFirst(shown.filter((person) => !person.archived));
+  const archived = shown.filter((person) => person.archived);
+  const receivable = everyone.reduce((sum, person) => sum + person.receivableCents, 0);
+  const payable = everyone.reduce((sum, person) => sum + person.payableCents, 0);
   const row = (person: Person) => (
     <PersonRow
       key={person.id}
@@ -444,7 +465,25 @@ export function PeoplePage() {
           <h2 id={LIST_TITLE_ID} tabIndex={-1} className="font-medium outline-none">
             Pessoas
           </h2>
-          {active.length === 0 ? (
+          {everyone.length > 0 && (
+            // Everyone at once: how much is still to come in and to go out.
+            <p className="tabular-nums">
+              A receber: {formatCents(receivable)}. A pagar: {formatCents(payable)}.
+            </p>
+          )}
+          {searchable && (
+            <FormField id="people-search" label="Buscar pessoa">
+              <Input
+                type="search"
+                autoComplete="off"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </FormField>
+          )}
+          {active.length === 0 && search.trim() !== '' ? (
+            <p className="text-muted-foreground">Nenhuma pessoa com “{search.trim()}”.</p>
+          ) : active.length === 0 ? (
             <p className="text-muted-foreground rounded-xl border border-dashed p-5">
               Ninguém ainda. Adicione uma pessoa aqui, ou use "A receber de" e "Dividir com alguém"
               ao lançar.

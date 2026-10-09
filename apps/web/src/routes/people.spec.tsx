@@ -52,6 +52,38 @@ describe('PeoplePage', () => {
     expect(screen.getByRole('region', { name: 'Arquivadas' })).toHaveTextContent('Dani');
   });
 
+  it('adds up what is pending and lists who has something pending first', async () => {
+    // Carlos is "Em dia", so he comes after Bruno even though the API sends him first.
+    mockPeople({ [`GET ${base}`]: { body: [carlos, ana, bruno, dani] } });
+    renderApp(page);
+
+    const list = await screen.findByRole('region', { name: 'Pessoas' });
+    expect(text(list)).toContain('A receber: R$ 450,00. A pagar: R$ 400,00.');
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) =>
+          ['Ana', 'Bruno', 'Carlos'].find((name) => item.textContent?.startsWith(name)),
+        ),
+    ).toEqual(['Ana', 'Bruno', 'Carlos']);
+    // Few people: no search.
+    expect(screen.queryByLabelText('Buscar pessoa')).not.toBeInTheDocument();
+  });
+
+  it('offers a search once the list grows', async () => {
+    const many = ['Ana', 'Bia', 'Caio', 'Davi', 'Edu', 'Fábio', 'Gil', 'Hugo', 'Íris'].map(
+      (name, index) => person(10 + index, name),
+    );
+    mockPeople({ [`GET ${base}`]: { body: many } });
+    renderApp(page);
+
+    await userEvent.type(await screen.findByLabelText('Buscar pessoa'), 'fabio');
+
+    const list = screen.getByRole('region', { name: 'Pessoas' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(list).toHaveTextContent('Fábio');
+  });
+
   it('adds a person by name', async () => {
     const fetchMock = mockPeople({ [`POST ${base}`]: { status: 201, body: person(5, 'Edu') } });
     renderApp(page);
