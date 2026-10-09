@@ -7,7 +7,8 @@ import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 /**
  * Sets the workspace for Row Level Security (ADR 0028) until the end of the transaction. For
  * interactive transactions that must touch protected tables, e.g. creating a workspace with its
- * default categories; everything else uses `PrismaService.forWorkspace`.
+ * default categories, and for the writes that change a budget destination and its category
+ * together (ADR 0047); everything else uses `PrismaService.forWorkspace`.
  */
 export function setWorkspaceContext(
   client: Pick<Prisma.TransactionClient, '$executeRaw'>,

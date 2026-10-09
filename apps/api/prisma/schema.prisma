@@ -18,21 +18,22 @@ datasource db {
 // Owner of all financial data (ADR 0008). The personal workspace is created with the user, is
 // never shared nor deleted, and there is exactly one per user (ADR 0024).
 model Workspace {
-  id               String                 @id @default(uuid(7)) @db.Uuid
-  name             String                 @db.VarChar(100)
-  isPersonal       Boolean                @default(false) @map("is_personal")
-  members          Member[]
-  invitations      Invitation[]
-  categories       Category[]
-  transactions     Transaction[]
-  budgetConfigs    BudgetConfig[]
-  recurrences      Recurrence[]
-  installmentPlans InstallmentPlan[]
-  imports          TransactionImport[]
-  occurrences      RecurrenceOccurrence[]
-  people           Person[]
-  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                 String                 @id @default(uuid(7)) @db.Uuid
+  name               String                 @db.VarChar(100)
+  isPersonal         Boolean                @default(false) @map("is_personal")
+  members            Member[]
+  invitations        Invitation[]
+  categories         Category[]
+  transactions       Transaction[]
+  budgetConfigs      BudgetConfig[]
+  recurrences        Recurrence[]
+  installmentPlans   InstallmentPlan[]
+  imports            TransactionImport[]
+  occurrences        RecurrenceOccurrence[]
+  people             Person[]
+  budgetDestinations BudgetDestination[]
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("workspaces")
 }
@@ -190,22 +191,60 @@ enum TransactionType {
 // Classifies transactions, per type. New workspaces get the default ones; a category in use is
 // archived, not deleted (docs/dominio/modelo.md).
 model Category {
-  id               String            @id @default(uuid(7)) @db.Uuid
-  workspaceId      String            @map("workspace_id") @db.Uuid
-  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name             String            @db.VarChar(50)
+  id               String             @id @default(uuid(7)) @db.Uuid
+  workspaceId      String             @map("workspace_id") @db.Uuid
+  workspace        Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String             @db.VarChar(50)
   type             TransactionType
-  archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  archivedAt       DateTime?          @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   transactions     Transaction[]
   recurrences      Recurrence[]
   installmentPlans InstallmentPlan[]
+  // Set when the category is a saving destination's own (ADR 0047).
+  destination      BudgetDestination?
 
   @@unique([workspaceId, type, name])
   // Target of the composite foreign key of transactions (ADR 0029).
   @@unique([id, workspaceId, type])
+  // Target of the composite foreign key of budget destinations (ADR 0047).
+  @@unique([id, workspaceId])
   @@map("categories")
+}
+
+enum BudgetDestinationKind {
+  EXPENSES
+  SAVINGS
+
+  @@map("budget_destination_kind")
+}
+
+// Destino do orçamento (ADR 0047). One EXPENSES per workspace, created with it: its goal is a
+// share of the net income and it has no category (every debit outside the saving categories is
+// an expense). The SAVINGS ones (Investimentos, Reserva de emergência, Viagens and the ones
+// people create) each own a debit category, created with it: a debit in it is an application,
+// money put into that destination. The category is referenced with (category_id, workspace_id),
+// so it is always of the same workspace; a CHECK added by hand keeps EXPENSES without one and
+// SAVINGS with one.
+model BudgetDestination {
+  id          String                @id @default(uuid(7)) @db.Uuid
+  workspaceId String                @map("workspace_id") @db.Uuid
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String                @db.VarChar(50)
+  kind        BudgetDestinationKind
+  // The order they are shown in; new ones go last.
+  position    Int
+  categoryId  String?               @map("category_id") @db.Uuid
+  category    Category?             @relation(fields: [categoryId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  archivedAt  DateTime?             @map("archived_at") @db.Timestamptz(3)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([workspaceId, name])
+  // One destination per category.
+  @@unique([categoryId, workspaceId])
+  @@map("budget_destinations")
 }
 
 // Lançamento: a credit or debit of one competência (ADR 0010). The category is referenced with
