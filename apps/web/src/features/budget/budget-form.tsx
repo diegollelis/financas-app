@@ -181,7 +181,8 @@ export function BudgetForm({
         <fieldset className="grid gap-3">
           <legend className="mb-1 font-medium">Destinos de guardar</legend>
           <p className="text-muted-foreground text-sm">
-            Percentual do que sobrar no mês depois das despesas.
+            Percentual do que sobrar no mês depois das despesas. O que ficar sem destino aparece
+            como &quot;Sem destino&quot; no Painel.
           </p>
           {savings.map(shareField)}
           {savingTotal !== null && (

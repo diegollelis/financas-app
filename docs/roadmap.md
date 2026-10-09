@@ -157,6 +157,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada
   - [x] Lista do axe zerada: a Análise na coluna larga, com os totais em duas listas de definição, e os menus não modais
   - [ ] Avaliação externa tela a tela, com um pacote de revisão (capturas, o que já foi feito e decidido, onde focar): Painel, Lançamentos, Análise, Recorrências, Pessoas, Importar, Membros, Minha conta, Convite e entrada
+    - [x] Painel: o saldo explicado junto do número, uma frase de abertura em cada bloco do orçamento, "Agendado" e "Falta" no lugar de "A aplicar", e as metas de guardar fechando no centavo
 - [x] Carregamento com o símbolo CL animado (`components/brand-loader.tsx`, pedido em 2026-10-09):
   - **Onde:** nas telas de carregamento da página inteira: a abertura do app enquanto confere a sessão (que pode levar até um minuto com a API dormindo), Entrar e Cadastro, "/" e o convite. As listas continuam com esqueletos.
   - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).

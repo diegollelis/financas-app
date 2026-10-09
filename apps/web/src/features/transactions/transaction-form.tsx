@@ -276,7 +276,9 @@ export function TransactionForm({
     >
       {fixedCategory !== null ? (
         <p className="text-muted-foreground text-sm">
-          Débito na categoria <span className="text-foreground font-medium">{fixedCategory}</span>.
+          Será lançado um débito na categoria{' '}
+          <span className="text-foreground font-medium">{fixedCategory}</span>. Nenhum dinheiro é
+          movido: é só o registro da aplicação.
         </p>
       ) : (
         <Controller

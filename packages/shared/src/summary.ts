@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { budgetDestinationKindSchema } from './budget-destination.ts';
-import { budgetSchema, FULL_BASIS_POINTS, shareOfIncome, type Budget } from './budget.ts';
+import {
+  budgetSchema,
+  FULL_BASIS_POINTS,
+  shareOfIncome,
+  splitShares,
+  type Budget,
+} from './budget.ts';
 import { periodSchema } from './money-and-dates.ts';
 import { transactionStatus, type Transaction } from './transaction.ts';
 
@@ -142,6 +148,15 @@ export function summarizePeriod(
   };
   // Nothing to set aside when expenses pass the credits: the goals are zero, not negative.
   const savingBase = Math.max(0, available.plannedCents);
+  // Split together, so the goals add up to the cent (and the "Sem destino" rest is exact).
+  const savingShares = budget.shares.filter((share) => share.kind === 'SAVINGS');
+  const savingParts = splitShares(
+    savingBase,
+    savingShares.map((share) => share.basisPoints),
+  );
+  const savingTargets = new Map(
+    savingShares.map((share, index) => [share.destinationId, savingParts[index] ?? 0]),
+  );
 
   const destinations = budget.shares.map((share) => {
     if (share.kind === 'EXPENSES') {
@@ -164,7 +179,7 @@ export function summarizePeriod(
       name: share.name,
       kind: share.kind,
       basisPoints: share.basisPoints,
-      targetCents: shareOfIncome(savingBase, share.basisPoints),
+      targetCents: savingTargets.get(share.destinationId) ?? 0,
       appliedCents: own.settledCents,
       pendingCents: own.pendingCents,
     };

@@ -152,6 +152,16 @@ describe('summarizePeriod', () => {
     expect(summary.unallocated).toEqual({ basisPoints: 1_000, targetCents: 34_901 });
   });
 
+  it('splits what is available so the saving goals add up to the cent', () => {
+    // 2.214,85 left: 50%, 30% and 20% rounded one by one would add up to 2.214,86.
+    const tight = [credit(540_000), debit(318_515, null)];
+    const { destinations } = summarizePeriod(tight, budget, today);
+
+    const goals = destinations.slice(1).map((destination) => destination.targetCents);
+    expect(goals).toEqual([110_743, 66_445, 44_297]);
+    expect(goals.reduce((sum, goal) => sum + goal, 0)).toBe(221_485);
+  });
+
   it('applying more never lowers the saving goals', () => {
     const before = summarizePeriod(month, budget, today).destinations[1]!.targetCents;
     const more = [...month, debit(100_000, null, '2026-10-12', investimentosCategory)];
