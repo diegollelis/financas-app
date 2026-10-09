@@ -189,6 +189,14 @@ describe('ImportPage', () => {
     const row = (await screen.findByText('Conta de luz')).closest('li')!;
     expect(row).toHaveTextContent('Sem valor');
     expect(screen.getByRole('button', { name: 'Importar 1 lançamento' })).toBeInTheDocument();
+    // The check before importing: what goes in, adding up, and what does not.
+    expect(screen.getByRole('status').textContent?.replaceAll(' ', ' ')).toBe(
+      '1 de 2 linhas prontas para importar: créditos R$ 5.200,00, débitos R$ 0,00. 1 linha com problema.',
+    );
+    // Only the rows with a problem on screen; the others stay in the import.
+    await userEvent.click(screen.getByRole('radio', { name: 'Com problemas' }));
+    expect(screen.queryByRole('checkbox', { name: 'Importar Salário' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Importar 1 lançamento' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Corrigir Conta de luz' }));
     const dialog = await screen.findByRole('dialog', { name: 'Linha 3 da planilha' });
     await userEvent.type(within(dialog).getByLabelText('Valor (R$)'), '189,90');
