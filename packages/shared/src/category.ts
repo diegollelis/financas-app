@@ -52,6 +52,11 @@ export const categorySchema = z.object({
    * deleted with the destination, and a transaction in it is an application.
    */
   destinationId: z.uuid().nullable().optional(),
+  /**
+   * Whether anything uses it, in any competência: transactions, recurrences or installment plans.
+   * Only one never used can be deleted. Sent by the list only.
+   */
+  inUse: z.boolean().optional(),
 });
 
 export type Category = z.infer<typeof categorySchema>;

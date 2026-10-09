@@ -228,6 +228,33 @@ describe('categories', () => {
     });
   });
 
+  describe('in use', () => {
+    it('says which categories have anything in them, in any competência', async () => {
+      const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+      const pet = await create(browser, id, { name: 'Pet', type: 'DEBIT' });
+      const mercado = (await list(browser, id)).find((c) => c.name === 'Mercado')!;
+      // A year ago: "in use" is not only the recent months.
+      await browser
+        .post(`/api/workspaces/${id}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'Compras do mês',
+          categoryId: mercado.id,
+          amountCents: 45_000,
+          period: shiftPeriod(currentPeriod(), -12),
+        })
+        .expect(201);
+
+      const categories = await list(browser, id);
+
+      expect(categories.find((c) => c.id === mercado.id)?.inUse).toBe(true);
+      expect(categories.find((c) => c.id === pet.id)?.inUse).toBe(false);
+      // Never used: deleted directly, without archiving first.
+      await browser.delete(`/api/workspaces/${id}/categories/${pet.id}`).expect(204);
+      await browser.delete(`/api/workspaces/${id}/categories/${mercado.id}`).expect(409);
+    });
+  });
+
   describe('deleting', () => {
     it('removes the category', async () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);

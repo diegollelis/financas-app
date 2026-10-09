@@ -49,6 +49,8 @@ export const budgetDestinationSchema = z.object({
   archived: z.boolean(),
   /** The order they are shown in. */
   position: z.number().int().nonnegative(),
+  /** Whether its category has anything in it: only one never applied to can be deleted. */
+  inUse: z.boolean().optional(),
 });
 
 export type BudgetDestination = z.infer<typeof budgetDestinationSchema>;

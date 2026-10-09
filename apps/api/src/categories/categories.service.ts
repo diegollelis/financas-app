@@ -14,11 +14,13 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { z } from 'zod';
 import { Prisma, type Category as CategoryRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { categoriesInUse, categoryInUse } from './categories-in-use.js';
 
 function toResponse(
   category: CategoryRow,
   recentUses = 0,
   destinationId: string | null = null,
+  inUse?: boolean,
 ): Category {
   return {
     id: category.id,
@@ -27,6 +29,7 @@ function toResponse(
     archived: category.archivedAt !== null,
     recentUses,
     destinationId,
+    ...(inUse !== undefined && { inUse }),
   };
 }
 
@@ -67,7 +70,7 @@ export class CategoriesService {
   async list(workspaceId: string): Promise<Category[]> {
     const db = this.prisma.forWorkspace(workspaceId);
     const now = currentPeriod();
-    const [categories, usage] = await Promise.all([
+    const [categories, usage, used] = await Promise.all([
       db.category.findMany({
         where: { workspaceId },
         include: { destination: { select: { id: true } } },
@@ -81,12 +84,18 @@ export class CategoriesService {
         },
         _count: { _all: true },
       }),
+      categoriesInUse(db, workspaceId),
     ]);
     const uses = new Map(usage.map((row) => [row.categoryId, row._count._all]));
     return categories
       .sort((a, b) => typeOrder[a.type] - typeOrder[b.type] || collator.compare(a.name, b.name))
       .map((category) =>
-        toResponse(category, uses.get(category.id) ?? 0, category.destination?.id ?? null),
+        toResponse(
+          category,
+          uses.get(category.id) ?? 0,
+          category.destination?.id ?? null,
+          used.has(category.id),
+        ),
       );
   }
 
@@ -96,7 +105,8 @@ export class CategoriesService {
       const category = await this.prisma
         .forWorkspace(workspaceId)
         .category.create({ data: { workspaceId, name: input.name, type: input.type } });
-      return toResponse(category);
+      // Just created: nothing uses it yet.
+      return toResponse(category, 0, null, false);
     } catch (error) {
       // Two simultaneous requests with the same name: the unique index decides.
       if (isPrismaError(error, 'P2002')) throw categoryExists();
@@ -171,7 +181,8 @@ export class CategoriesService {
         where: { id: categoryId, workspaceId },
         data: { name: input.name, archivedAt },
       });
-      return toResponse(category);
+      const db = this.prisma.forWorkspace(workspaceId);
+      return toResponse(category, 0, null, await categoryInUse(db, workspaceId, categoryId));
     } catch (error) {
       if (isPrismaError(error, 'P2002')) throw categoryExists();
       // Deleted by someone else between the read and the update.
