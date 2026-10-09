@@ -43,6 +43,7 @@ import {
   usePersonTransactions,
   useUpdatePerson,
 } from '@/features/people/use-people';
+import { useUpdateTransaction } from '@/features/transactions/use-transactions';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -117,18 +118,26 @@ function AddPersonForm({ workspaceId }: { workspaceId: string }) {
 }
 
 /** A person's transactions of any month, read-only: settle and edit them in Lançamentos. */
+/**
+ * Every transaction with one person, of any month. A pending one can be marked as received or
+ * paid right here: the same settling as "Efetivar" in Lançamentos, with today's date, where the
+ * debt is seen. An estimated amount still goes to Lançamentos, which asks for the real one.
+ */
 function PersonHistory({
   workspaceId,
   person,
+  canEdit,
   onClose,
   returnFocusTo,
 }: {
   workspaceId: string;
   person: Person | null;
+  canEdit: boolean;
   onClose: () => void;
   returnFocusTo: HTMLElement | null;
 }) {
   const transactions = usePersonTransactions(workspaceId, person?.id ?? null);
+  const settle = useUpdateTransaction(workspaceId);
   const today = todayIso();
 
   return (
@@ -137,7 +146,7 @@ function PersonHistory({
       onOpenChange={(open) => !open && onClose()}
       returnFocusTo={returnFocusTo}
       title={person ? `Lançamentos com ${person.name}` : 'Lançamentos'}
-      description="De todos os meses, do mais recente ao mais antigo. Para efetivar ou mudar, use Lançamentos."
+      description="De todos os meses, do mais recente ao mais antigo. Para mudar um lançamento, use Lançamentos."
     >
       {/* Its own states, not QueryState's: a 404 here is a person gone, not the workspace. */}
       {transactions.isPending && <p className="text-muted-foreground">Carregando…</p>}
@@ -183,6 +192,39 @@ function PersonHistory({
                         <Badge variant="outline">Pendente</Badge>
                       )}
                     </span>
+                    {canEdit &&
+                      status !== 'SETTLED' &&
+                      (transaction.amountEstimated ? (
+                        <span className="text-muted-foreground text-sm">
+                          Valor estimado: efetive em Lançamentos, informando o valor real.
+                        </span>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="justify-self-start"
+                          disabled={settle.isPending}
+                          onClick={() =>
+                            settle.mutate(
+                              { id: transaction.id, settledAt: today },
+                              {
+                                onSuccess: () =>
+                                  toast.success(
+                                    transaction.type === 'CREDIT'
+                                      ? 'Marcado como recebido'
+                                      : 'Marcado como pago',
+                                  ),
+                                onError: (error) => toast.error(apiErrorMessage(error)),
+                              },
+                            )
+                          }
+                        >
+                          {transaction.type === 'CREDIT'
+                            ? 'Marcar como recebido'
+                            : 'Marcar como pago'}{' '}
+                          <span className="sr-only">({transaction.description})</span>
+                        </Button>
+                      ))}
                   </span>
                   <span className="shrink-0 font-semibold tabular-nums">
                     {formatCents(transaction.amountCents)}
@@ -423,6 +465,7 @@ export function PeoplePage() {
       <PersonHistory
         workspaceId={workspace.id}
         person={history?.person ?? null}
+        canEdit={canEdit}
         onClose={() => setHistory(null)}
         returnFocusTo={history?.trigger ?? null}
       />

@@ -66,8 +66,22 @@ describe('PeoplePage', () => {
     );
   });
 
-  it("opens a person's transactions of every month", async () => {
-    mockPeople({
+  it("opens a person's transactions of every month, and settles a pending one there", async () => {
+    const fetchMock = mockPeople({
+      [`PATCH /api/workspaces/${houseId}/transactions/01920000-0000-7000-8000-000000000401`]: {
+        body: {
+          id: '01920000-0000-7000-8000-000000000401',
+          type: 'CREDIT',
+          description: 'Ana: parte de Jantar',
+          notes: null,
+          categoryId: '01920000-0000-7000-8000-000000000101',
+          amountCents: 15_000,
+          period: '2026-10',
+          dueDate: null,
+          settledAt: '2026-10-15',
+          personId: ana.id,
+        },
+      },
       [`GET ${base}/${ana.id}/transactions`]: {
         body: [
           {
@@ -105,6 +119,27 @@ describe('PeoplePage', () => {
     const items = within(history).getAllByRole('listitem');
     expect(text(items[0]!)).toContain('Ana: parte de Jantaroutubro de 2026A receberPendente');
     expect(text(items[1]!)).toContain('Casa de praiajulho de 2026A pagarPago');
+    // Only the pending one can be marked, with the same settling as "Efetivar".
+    expect(within(items[1]!).queryByRole('button')).not.toBeInTheDocument();
+    await userEvent.click(
+      within(items[0]!).getByRole('button', {
+        name: 'Marcar como recebido (Ana: parte de Jantar)',
+      }),
+    );
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        new URL(
+          `/api/workspaces/${houseId}/transactions/01920000-0000-7000-8000-000000000401`,
+          'http://api.test',
+        ),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: expect.stringMatching(/^\{"settledAt":"\d{4}-\d{2}-\d{2}"\}$/) as string,
+        }),
+      ),
+    );
+    expect(await screen.findByText('Marcado como recebido')).toBeInTheDocument();
   });
 
   it('says so when the history cannot load, without the workspace "not found" notice', async () => {
