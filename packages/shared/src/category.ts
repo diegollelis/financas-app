@@ -47,6 +47,11 @@ export const categorySchema = z.object({
    * "Mais usadas" group of the category picker. 0 where it is not counted (create, update).
    */
   recentUses: z.number().int().nonnegative().default(0),
+  /**
+   * Set when it is a saving destination's category (ADR 0047): it is renamed, archived and
+   * deleted with the destination, and a transaction in it is an application.
+   */
+  destinationId: z.uuid().nullable().optional(),
 });
 
 export type Category = z.infer<typeof categorySchema>;

@@ -12,13 +12,18 @@ import { z } from 'zod';
 import { Prisma, type Category as CategoryRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-function toResponse(category: CategoryRow, recentUses = 0): Category {
+function toResponse(
+  category: CategoryRow,
+  recentUses = 0,
+  destinationId: string | null = null,
+): Category {
   return {
     id: category.id,
     name: category.name,
     type: category.type,
     archived: category.archivedAt !== null,
     recentUses,
+    destinationId,
   };
 }
 
@@ -60,7 +65,10 @@ export class CategoriesService {
     const db = this.prisma.forWorkspace(workspaceId);
     const now = currentPeriod();
     const [categories, usage] = await Promise.all([
-      db.category.findMany({ where: { workspaceId } }),
+      db.category.findMany({
+        where: { workspaceId },
+        include: { destination: { select: { id: true } } },
+      }),
       // One count per category, on the (workspace_id, period) index.
       db.transaction.groupBy({
         by: ['categoryId'],
@@ -74,7 +82,9 @@ export class CategoriesService {
     const uses = new Map(usage.map((row) => [row.categoryId, row._count._all]));
     return categories
       .sort((a, b) => typeOrder[a.type] - typeOrder[b.type] || collator.compare(a.name, b.name))
-      .map((category) => toResponse(category, uses.get(category.id) ?? 0));
+      .map((category) =>
+        toResponse(category, uses.get(category.id) ?? 0, category.destination?.id ?? null),
+      );
   }
 
   async create(workspaceId: string, input: CreateCategoryInput): Promise<Category> {

@@ -83,10 +83,13 @@ describe('budget destinations', () => {
     expect(list[0]!.categoryId).toBeNull();
     const debitCategories = (await categories(browser, base)).filter((c) => c.type === 'DEBIT');
     for (const destination of list.slice(1)) {
-      expect(debitCategories.find((c) => c.id === destination.categoryId)?.name).toBe(
-        destination.name,
-      );
+      expect(debitCategories.find((c) => c.id === destination.categoryId)).toMatchObject({
+        name: destination.name,
+        // The categories list says whose it is, so the page can mark it.
+        destinationId: destination.id,
+      });
     }
+    expect(debitCategories.find((c) => c.name === 'Mercado')?.destinationId).toBeNull();
     // The expense category "Viagem" (spending on a trip) stays apart from "Viagens".
     expect(debitCategories.some((c) => c.name === 'Viagem')).toBe(true);
   });

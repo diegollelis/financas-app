@@ -82,6 +82,26 @@ describe('CategoriesPage', () => {
     expect(await menuOf('IPVA')).toEqual(['Reativar', 'Excluir']);
   });
 
+  it("marks a saving destination's category, which changes only with its destination", async () => {
+    const investimentos = {
+      ...category(6, 'Investimentos', 'DEBIT'),
+      destinationId: '01920000-0000-7000-8000-0000000000d2',
+    };
+    mockCategories({ [`GET ${base}`]: { body: [...categories, investimentos] } });
+
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    const debits = await section('Débitos');
+    const row = within(debits)
+      .getAllByRole('listitem')
+      .find((item) => item.textContent?.startsWith('Investimentos'));
+    expect(row).toHaveTextContent('Destino do orçamento');
+    expect(
+      screen.queryByRole('button', { name: 'Ações de Investimentos' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ações de Mercado' })).toBeInTheDocument();
+  });
+
   it('adds a category to the right type', async () => {
     const fetchMock = mockCategories({
       [`POST ${base}`]: { status: 201, body: category(6, 'Pet', 'DEBIT') },
