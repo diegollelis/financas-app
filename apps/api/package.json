@@ -37,9 +37,9 @@
     "@nestjs/schematics": "^12.0.6",
     "@nestjs/testing": "^12.1.2",
     "@types/express": "^5.0.6",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "@types/supertest": "^7.2.1",
-    "supertest": "^7.3.0",
+    "supertest": "^7.3.1",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
