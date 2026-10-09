@@ -135,6 +135,23 @@ describe('summarizePeriod', () => {
     ]);
   });
 
+  it('leaves nothing without a destination when the saving shares add up to 100%', () => {
+    expect(summarizePeriod(month, budget, today).unallocated).toEqual({
+      basisPoints: 0,
+      targetCents: 0,
+    });
+  });
+
+  it('says what the saving shares leave without a destination, adding up to what is available', () => {
+    const shares = budget.shares.map((share) =>
+      share.name === 'Viagens' ? { ...share, basisPoints: 1_000 } : share,
+    );
+    const summary = summarizePeriod(month, { ...budget, shares }, today);
+
+    // 349.010 − (174.505 + 104.703 + 34.901): the goals and the rest are what is available.
+    expect(summary.unallocated).toEqual({ basisPoints: 1_000, targetCents: 34_901 });
+  });
+
   it('applying more never lowers the saving goals', () => {
     const before = summarizePeriod(month, budget, today).destinations[1]!.targetCents;
     const more = [...month, debit(100_000, null, '2026-10-12', investimentosCategory)];

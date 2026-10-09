@@ -48,21 +48,39 @@ function StatTile({ label, children }: { label: string; children: ReactNode }) {
 
 function Section({
   title,
+  level = 2,
   className,
   children,
 }: {
   title: string;
+  /** 3 for the blocks inside "Orçamento por destino". */
+  level?: 2 | 3;
   className?: string;
   children: ReactNode;
 }) {
   const id = `dashboard-${title.toLowerCase().replace(/\W+/g, '-')}`;
+  const Heading = level === 2 ? 'h2' : 'h3';
   return (
     <section aria-labelledby={id} className={cn('grid content-start gap-3', className)}>
-      <h2 id={id} className="font-medium">
+      <Heading id={id} className="font-medium">
         {title}
-      </h2>
+      </Heading>
       {children}
     </section>
+  );
+}
+
+/** Label left, value right, one per line. */
+function AmountRows({ rows }: { rows: readonly (readonly [label: string, value: ReactNode])[] }) {
+  return (
+    <dl className="grid tabular-nums">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex justify-between gap-3 border-b py-2">
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -103,18 +121,15 @@ function budgetOrigin(summary: Summary) {
   return 'Nenhum orçamento definido até aqui.';
 }
 
-/** Applied ÷ goal, as a percentage; nothing to compare with a goal of zero. */
-function realized(destination: DestinationSummary) {
-  if (destination.targetCents <= 0) return '—';
-  return formatBasisPoints(
-    Math.round((destination.appliedCents / destination.targetCents) * FULL_BASIS_POINTS),
-  );
+/** Part ÷ goal, as a percentage; nothing to compare with a goal of zero. */
+function shareOfGoal(cents: number, goalCents: number) {
+  if (goalCents <= 0) return '—';
+  return formatBasisPoints(Math.round((cents / goalCents) * FULL_BASIS_POINTS));
 }
 
 /** Opens "Registrar aplicação" for a saving destination (ADR 0047); absent for a VIEWER. */
 type OnApply = (destination: DestinationSummary, event: MouseEvent<HTMLButtonElement>) => void;
 
-/** The button of a saving destination: Despesas has no category to apply to. */
 function ApplyButton({
   destination,
   onApply,
@@ -122,7 +137,7 @@ function ApplyButton({
   destination: DestinationSummary;
   onApply?: OnApply;
 }) {
-  if (!onApply || destination.kind !== 'SAVINGS') return null;
+  if (!onApply) return null;
   return (
     <Button variant="outline" size="sm" onClick={(event) => onApply(destination, event)}>
       {/* The visible word starts the accessible name, so voice control finds it. */}
@@ -131,48 +146,141 @@ function ApplyButton({
   );
 }
 
-/** What each destination's numbers mean, under the table or the cards. */
-const destinationsNote =
-  'Despesas: meta sobre a renda líquida; aplicado é o que já foi gasto. Destinos de guardar: meta sobre o que sobra depois das despesas; aplicado é o que já foi lançado na categoria do destino.';
-
-/** Each destination as a card on the phone: a six-column table does not fit in 360px. */
-function DestinationCards({ summary, onApply }: { summary: Summary; onApply?: OnApply }) {
+/**
+ * Despesas, apart from the saving destinations (ADR 0047): its goal is a share of the net
+ * income, and what counts is everything spent or still to pay, so "Usado da meta" matches the
+ * meter.
+ */
+function ExpensesBlock({ summary }: { summary: Summary }) {
+  const goal = summary.destinations.find((destination) => destination.kind === 'EXPENSES');
+  if (!goal) return null;
+  const { expenses } = summary;
   return (
-    <ul className="grid gap-3">
-      {summary.destinations.map((destination) => (
-        <li key={destination.destinationId} className="grid gap-2 rounded-xl border p-4">
-          <p className="flex items-baseline justify-between gap-3">
-            <span className="font-medium">{destination.name}</span>
-            <span className="text-muted-foreground">
-              {formatBasisPoints(destination.basisPoints)}
-            </span>
-          </p>
-          <dl className="grid grid-cols-2 gap-2 text-sm tabular-nums">
-            {(
-              [
-                ['Meta', formatCents(destination.targetCents)],
-                ['Aplicado', formatCents(destination.appliedCents)],
-                ['A aplicar', formatCents(destination.pendingCents)],
-                ['Realizado', realized(destination)],
-              ] as const
-            ).map(([label, value]) => (
-              <div key={label} className="grid gap-0.5">
-                <dt className="text-muted-foreground">{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <div className="empty:hidden">
-            <ApplyButton destination={destination} onApply={onApply} />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <Section title="Despesas" level={3}>
+      {goal.targetCents > 0 ? (
+        <ExpensesMeter summary={summary} />
+      ) : (
+        <p className="text-muted-foreground">
+          Sem meta: defina a renda líquida e o percentual de despesas no orçamento.
+        </p>
+      )}
+      <AmountRows
+        rows={[
+          ['Pago', formatCents(expenses.settledCents)],
+          ['A pagar', formatCents(expenses.pendingCents)],
+          ['Usado da meta', shareOfGoal(expenses.totalCents, goal.targetCents)],
+        ]}
+      />
+      <p className="text-muted-foreground">
+        Meta: o percentual de despesas sobre a renda líquida. Usado da meta: o que já foi pago e o
+        que falta pagar.
+      </p>
+    </Section>
   );
 }
 
-/** From md, where the columns fit: the same numbers, compared down each column. */
-function DestinationTable({ summary, onApply }: { summary: Summary; onApply?: OnApply }) {
+/** The base of the saving goals, as a sum: where "Disponível para guardar" comes from. */
+function AvailableBlock({ summary }: { summary: Summary }) {
+  return (
+    <Section title="O que sobra para guardar" level={3}>
+      <AmountRows
+        rows={[
+          ['Créditos previstos', formatCents(summary.credits.totalCents)],
+          ['Despesas previstas', `− ${formatCents(summary.expenses.totalCents)}`],
+          [
+            'Disponível para guardar',
+            <span key="available" className="font-semibold">
+              <SignedCents cents={summary.available.plannedCents} />
+            </span>,
+          ],
+        ]}
+      />
+      <p className="text-muted-foreground">
+        Os destinos de guardar dividem este valor. As aplicações não entram na conta: guardar mais
+        não diminui as metas.
+      </p>
+    </Section>
+  );
+}
+
+/** The saving destinations' numbers, in the order of the table's columns. */
+const savingCells = (destination: DestinationSummary) =>
+  [
+    ['Meta', formatCents(destination.targetCents)],
+    ['Aplicado', formatCents(destination.appliedCents)],
+    ['A aplicar', formatCents(destination.pendingCents)],
+    ['Realizado', shareOfGoal(destination.appliedCents, destination.targetCents)],
+  ] as const;
+
+/** Each saving destination as a card on the phone: the table's columns do not fit in 360px. */
+function SavingsCards({
+  savings,
+  summary,
+  onApply,
+}: {
+  savings: DestinationSummary[];
+  summary: Summary;
+  onApply?: OnApply;
+}) {
+  return (
+    <>
+      <ul className="grid gap-3">
+        {savings.map((destination) => (
+          <li key={destination.destinationId} className="grid gap-2 rounded-xl border p-4">
+            <p className="flex items-baseline justify-between gap-3">
+              <span className="font-medium">{destination.name}</span>
+              <span className="text-muted-foreground">
+                {formatBasisPoints(destination.basisPoints)}
+              </span>
+            </p>
+            <dl className="grid grid-cols-2 gap-2 text-sm tabular-nums">
+              {savingCells(destination).map(([label, value]) => (
+                <div key={label} className="grid gap-0.5">
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="empty:hidden">
+              <ApplyButton destination={destination} onApply={onApply} />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {summary.unallocated.basisPoints > 0 && (
+        // Not a destination: a plain line, not a card.
+        <AmountRows
+          rows={[
+            [
+              `Sem destino (${formatBasisPoints(summary.unallocated.basisPoints)})`,
+              formatCents(summary.unallocated.targetCents),
+            ],
+          ]}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * From md, where the columns fit. "Sem destino" closes the shares at 100%, so the total of the
+ * goals is what is available.
+ */
+function SavingsTable({
+  savings,
+  summary,
+  onApply,
+}: {
+  savings: DestinationSummary[];
+  summary: Summary;
+  onApply?: OnApply;
+}) {
+  const { unallocated } = summary;
+  // What the goals are a share of, not their sum: each goal is rounded, and the sum can miss
+  // what is available by a cent.
+  const totalTarget = Math.max(0, summary.available.plannedCents);
+  const totalApplied = summary.applied.settledCents;
+  const actions = onApply ? <td className="py-2 pl-4" /> : null;
   return (
     <table className="w-full tabular-nums">
       <thead className="text-muted-foreground">
@@ -180,21 +288,11 @@ function DestinationTable({ summary, onApply }: { summary: Summary; onApply?: On
           <th scope="col" className="py-2 text-left font-normal">
             Destino
           </th>
-          <th scope="col" className="py-2 text-right font-normal">
-            %
-          </th>
-          <th scope="col" className="py-2 text-right font-normal">
-            Meta
-          </th>
-          <th scope="col" className="py-2 text-right font-normal">
-            Aplicado
-          </th>
-          <th scope="col" className="py-2 text-right font-normal">
-            A aplicar
-          </th>
-          <th scope="col" className="py-2 text-right font-normal">
-            Realizado
-          </th>
+          {['%', 'Meta', 'Aplicado', 'A aplicar', 'Realizado'].map((label) => (
+            <th key={label} scope="col" className="py-2 text-right font-normal">
+              {label}
+            </th>
+          ))}
           {onApply && (
             <th scope="col" className="py-2 pl-4 text-right font-normal">
               <span className="sr-only">Ações</span>
@@ -203,16 +301,17 @@ function DestinationTable({ summary, onApply }: { summary: Summary; onApply?: On
         </tr>
       </thead>
       <tbody>
-        {summary.destinations.map((destination) => (
-          <tr key={destination.destinationId} className="border-b last:border-b-0">
+        {savings.map((destination) => (
+          <tr key={destination.destinationId} className="border-b">
             <th scope="row" className="py-2 text-left font-normal">
               {destination.name}
             </th>
             <td className="py-2 text-right">{formatBasisPoints(destination.basisPoints)}</td>
-            <td className="py-2 text-right">{formatCents(destination.targetCents)}</td>
-            <td className="py-2 text-right">{formatCents(destination.appliedCents)}</td>
-            <td className="py-2 text-right">{formatCents(destination.pendingCents)}</td>
-            <td className="py-2 text-right">{realized(destination)}</td>
+            {savingCells(destination).map(([label, value]) => (
+              <td key={label} className="py-2 text-right">
+                {value}
+              </td>
+            ))}
             {onApply && (
               <td className="py-2 pl-4 text-right">
                 <ApplyButton destination={destination} onApply={onApply} />
@@ -220,8 +319,69 @@ function DestinationTable({ summary, onApply }: { summary: Summary; onApply?: On
             )}
           </tr>
         ))}
+        {unallocated.basisPoints > 0 && (
+          <tr className="text-muted-foreground border-b">
+            <th scope="row" className="py-2 text-left font-normal">
+              Sem destino
+            </th>
+            <td className="py-2 text-right">{formatBasisPoints(unallocated.basisPoints)}</td>
+            <td className="py-2 text-right">{formatCents(unallocated.targetCents)}</td>
+            <td colSpan={3} />
+            {actions}
+          </tr>
+        )}
       </tbody>
+      <tfoot className="font-medium">
+        <tr>
+          <th scope="row" className="py-2 text-left font-medium">
+            Total
+          </th>
+          <td className="py-2 text-right">
+            {formatBasisPoints(
+              savings.reduce((sum, destination) => sum + destination.basisPoints, 0) +
+                unallocated.basisPoints,
+            )}
+          </td>
+          <td className="py-2 text-right">{formatCents(totalTarget)}</td>
+          <td className="py-2 text-right">{formatCents(totalApplied)}</td>
+          <td className="py-2 text-right">
+            {formatCents(summary.applied.plannedCents - totalApplied)}
+          </td>
+          <td className="py-2 text-right">{shareOfGoal(totalApplied, totalTarget)}</td>
+          {actions}
+        </tr>
+      </tfoot>
     </table>
+  );
+}
+
+/** The saving destinations, each a share of what is left after expenses (ADR 0047). */
+function SavingsBlock({
+  summary,
+  desktop,
+  onApply,
+}: {
+  summary: Summary;
+  desktop: boolean;
+  onApply?: OnApply;
+}) {
+  const savings = summary.destinations.filter((destination) => destination.kind === 'SAVINGS');
+  if (savings.length === 0) return null;
+  return (
+    <Section title="Destinos de guardar" level={3} className="xl:col-span-2">
+      {summary.available.plannedCents <= 0 && (
+        <p>Nada sobrou para guardar este mês: as despesas previstas alcançaram os créditos.</p>
+      )}
+      {desktop ? (
+        <SavingsTable savings={savings} summary={summary} onApply={onApply} />
+      ) : (
+        <SavingsCards savings={savings} summary={summary} onApply={onApply} />
+      )}
+      <p className="text-muted-foreground">
+        Meta: o percentual de cada destino sobre o disponível para guardar. Aplicado: o que já foi
+        lançado na categoria do destino.
+      </p>
+    </Section>
   );
 }
 
@@ -328,14 +488,13 @@ function Dashboard({
               </Button>
             ))}
         </div>
-        {/* The expenses goal, drawn: the one destination with a limit to watch. */}
-        <ExpensesMeter summary={summary} />
-        {desktop ? (
-          <DestinationTable summary={summary} onApply={onApply} />
-        ) : (
-          <DestinationCards summary={summary} onApply={onApply} />
-        )}
-        <p className="text-muted-foreground">{destinationsNote}</p>
+        {/* Two bases (ADR 0047): Despesas on the income, then what is left, split among the
+            saving destinations. Side by side from xl, the destinations across. */}
+        <div className="grid gap-6 xl:grid-cols-2 xl:gap-x-10">
+          <ExpensesBlock summary={summary} />
+          <AvailableBlock summary={summary} />
+          <SavingsBlock summary={summary} desktop={desktop} onApply={onApply} />
+        </div>
       </Section>
     </div>
   );
