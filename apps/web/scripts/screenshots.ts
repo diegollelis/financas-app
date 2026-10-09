@@ -354,6 +354,14 @@ async function main() {
       open: /^(Editar orçamento|Definir orçamento)$/,
       opens: 'dialog' as const,
     },
+    {
+      // An application to a saving destination: type and category fixed (ADR 0047).
+      name: 'painel-aplicar',
+      path: `/espacos/${workspaceId}/painel`,
+      signedIn: true,
+      open: /^Aplicar em Investimentos$/,
+      opens: 'dialog' as const,
+    },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },
     { name: 'recorrencias', path: `/espacos/${workspaceId}/recorrencias`, signedIn: true },
     { name: 'pessoas', path: `/espacos/${workspaceId}/pessoas`, signedIn: true },

@@ -408,6 +408,8 @@ function applicationPreset(summary: Summary, destination: DestinationSummary): T
     categoryId,
     description: `Aplicação em ${destination.name}`,
     amountCents: missing > 0 ? missing : null,
+    // Without its category the form cannot fix it: then it is chosen as in any transaction.
+    applicationTo: categoryId ? destination.name : undefined,
   };
 }
 

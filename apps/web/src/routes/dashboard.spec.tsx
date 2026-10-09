@@ -182,7 +182,19 @@ describe('DashboardPage', () => {
 
   it('registers an application to a saving destination, for what is missing to its goal', async () => {
     stubPrefersDark(false, { desktop: true });
-    mockApi({
+    const created = {
+      id: '01920000-0000-7000-8000-0000000000f1',
+      type: 'DEBIT',
+      description: 'Aplicação em Investimentos',
+      notes: null,
+      categoryId: investimentos,
+      amountCents: 124_505,
+      period: '2026-10',
+      dueDate: null,
+      settledAt: null,
+    };
+    const fetchMock = mockApi({
+      [`POST /api/workspaces/${houseId}/transactions`]: { status: 201, body: created },
       'GET /api/me': { body: verifiedUser },
       [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'EDITOR' } },
       [`GET /api/workspaces/${houseId}/summary/2026-10`]: {
@@ -204,12 +216,38 @@ describe('DashboardPage', () => {
       within(destinations).getByRole('button', { name: 'Aplicar em Investimentos' }),
     );
 
-    const form = await screen.findByRole('dialog', { name: 'Novo lançamento' });
+    const form = await screen.findByRole('dialog', { name: 'Aplicação em Investimentos' });
     expect(within(form).getByLabelText('Descrição')).toHaveValue('Aplicação em Investimentos');
     // Goal 1.745,05 − 500,00 applied.
     expect(within(form).getByLabelText('Valor (R$)')).toHaveValue('1.245,05');
-    expect(within(form).getByRole('combobox', { name: 'Categoria' })).toHaveTextContent(
-      'Investimentos',
+    // Type and category are fixed: changing them would make it something else.
+    expect(within(form).getByText(/^Débito na categoria/)).toHaveTextContent(
+      'Débito na categoria Investimentos.',
+    );
+    expect(within(form).queryByRole('radiogroup', { name: 'Tipo' })).not.toBeInTheDocument();
+    expect(within(form).queryByRole('combobox', { name: 'Categoria' })).not.toBeInTheDocument();
+    // An application has no person and no split; it repeats every month at most.
+    expect(within(form).queryByLabelText(/A pagar para/)).not.toBeInTheDocument();
+    expect(within(form).queryByLabelText('Dividir com alguém')).not.toBeInTheDocument();
+    const repeat = within(form).getByRole('radiogroup', { name: 'Repetir' });
+    expect(
+      within(repeat)
+        .getAllByRole('radio')
+        .map((radio) => radio.textContent),
+    ).toEqual(['Não repetir', 'Todo mês']);
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        new URL(`/api/workspaces/${houseId}/transactions`, 'http://api.test'),
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining(
+            `"type":"DEBIT","description":"Aplicação em Investimentos","notes":null,"categoryId":"${investimentos}","amountCents":124505`,
+          ) as string,
+        }),
+      ),
     );
   });
 
