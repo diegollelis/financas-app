@@ -40,3 +40,10 @@ Onde calcular:
 - O painel no front só exibe: não refaz conta nenhuma.
 - Lançar, efetivar ou mudar o orçamento deixa o painel desatualizado. O front precisa invalidar o resumo nesses casos.
 - Se um dia o volume crescer, a soma pode ir para o SQL (`GROUP BY`), mantendo o mesmo formato de resposta.
+
+## Nota (2026-10-09, ADR 0047)
+
+- **"Meta", "Previsto" e "Efetivado" por destino** davam um percentual aplicado à renda ou aos créditos. Agora cada destino mostra **meta, aplicado e a aplicar**: o dinheiro de verdade, separado pela categoria.
+- **O "Resultado" saiu.** Em seu lugar entram "Disponível para guardar" (créditos − despesas) e "Aplicado".
+- **As duas visões, previsto e efetivado, continuam.**
+- **Detalhes:** [ADR 0047](0047-orcamento-real-por-destino.md).
