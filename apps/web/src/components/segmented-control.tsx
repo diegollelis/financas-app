@@ -1,4 +1,5 @@
 import { RadioGroup as RadioGroupPrimitive } from 'radix-ui';
+import { cn } from '@/lib/utils';
 
 /**
  * A choice between a few options as large segments, instead of small radio dots: 44px targets
@@ -10,9 +11,12 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  className,
 }: {
   /** Accessible name of the group (e.g. "Tipo"); the segments' own text names each option. */
   label: string;
+  /** E.g. two rows of segments on the phone, when four do not fit in 360px. */
+  className?: string;
   options: readonly { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
@@ -25,7 +29,7 @@ export function SegmentedControl<T extends string>({
         const option = options.find((item) => item.value === next);
         if (option) onChange(option.value);
       }}
-      className="bg-muted grid auto-cols-fr grid-flow-col gap-1 rounded-lg p-1"
+      className={cn('bg-muted grid auto-cols-fr grid-flow-col gap-1 rounded-lg p-1', className)}
     >
       {options.map((option) => (
         <RadioGroupPrimitive.Item

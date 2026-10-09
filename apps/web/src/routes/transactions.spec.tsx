@@ -142,7 +142,7 @@ describe('TransactionsPage', () => {
     await expectCall(fetchMock, `${base}?period=2026-10`, {});
     const credits = await section('Créditos');
     expect(credits).toHaveTextContent('Total: R$ 5.000,00');
-    expect(within(credits).getByText('Efetivado em 05/10/2026')).toBeInTheDocument();
+    expect(within(credits).getByText('Recebido em 05/10')).toBeInTheDocument();
     const debits = await section('Débitos');
     expect(debits).toHaveTextContent('Total: R$ 509,90');
     const lightItem = row(debits, 'Conta de luz');
@@ -151,6 +151,60 @@ describe('TransactionsPage', () => {
     expect(lightItem).toHaveTextContent('R$ 159,90');
     expect(lightItem).toHaveTextContent('Vencido');
     expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
+  });
+
+  it('finds a transaction by status or by what is typed; the status stays in the address', async () => {
+    mockTransactions();
+    // As the dashboard's overdue notice opens it.
+    const { router } = renderApp(
+      `/espacos/${houseId}/lancamentos?competencia=2026-10&situacao=vencidos`,
+    );
+
+    const debits = await section('Débitos');
+    expect(screen.getByRole('radio', { name: 'Vencidos' })).toBeChecked();
+    expect(row(debits, 'Conta de luz')).toBeInTheDocument();
+    expect(within(debits).queryByText('Compras da semana')).not.toBeInTheDocument();
+    // How many are shown, and the total of those.
+    expect(debits).toHaveTextContent('1 de 2');
+    expect(debits).toHaveTextContent('Total: R$ 159,90');
+    expect(await section('Créditos')).toHaveTextContent('Nenhum crédito com esse filtro.');
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Todos' }));
+    expect(router.state.location.search).toBe('?competencia=2026-10');
+    // By the category, without accents mattering.
+    await userEvent.type(screen.getByLabelText('Buscar lançamento'), 'MERCADO');
+    expect(row(debits, 'Compras da semana')).toBeInTheDocument();
+    expect(within(debits).queryByText('Conta de luz')).not.toBeInTheDocument();
+
+    // Another month keeps the status filter.
+    await userEvent.clear(screen.getByLabelText('Buscar lançamento'));
+    await userEvent.click(screen.getByRole('radio', { name: 'Pendentes' }));
+    await userEvent.click(
+      screen.getByRole('link', { name: 'Próxima competência: novembro de 2026' }),
+    );
+    expect(router.state.location.search).toBe('?competencia=2026-11&situacao=pendentes');
+  });
+
+  it('says "Pago" or "Recebido", with the year only when it is not the competência\'s', async () => {
+    const paid = { ...light, settledAt: '2026-10-08' };
+    const lateDecember = transaction(6, {
+      type: 'DEBIT',
+      description: 'Presentes de Natal',
+      categoryId: marketCategory.id,
+      amountCents: 40_000,
+      period: '2026-12',
+      settledAt: '2027-01-04',
+    });
+    mockTransactions({ [`GET ${base}`]: { body: [salary, paid, lateDecember] } });
+
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Débitos');
+    expect(row(debits, 'Conta de luz')).toHaveTextContent('Pago em 08/10');
+    expect(row(debits, 'Presentes de Natal')).toHaveTextContent('Pago em 04/01/2027');
+    expect(row(await section('Créditos'), 'Salário de outubro')).toHaveTextContent(
+      'Recebido em 05/10',
+    );
   });
 
   it('opens the competência of the address, and points to Novo lançamento when it is empty', async () => {
@@ -749,6 +803,36 @@ describe('TransactionsPage', () => {
 
     await expectCall(fetchMock, `${base}/${dinner.id}?withShares=true`, { method: 'DELETE' });
     expect(await screen.findByText('Lançamento e partes excluídos')).toBeInTheDocument();
+  });
+
+  it('keeps notes, the person and the split in "Mais opções", open when they are in use', async () => {
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Ana: parte de Jantar',
+      categoryId: salaryCategory.id,
+      amountCents: 15_000,
+      personId: ana.id,
+    });
+    mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`GET ${base}`]: { body: [share, light] },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    // A new one: the common path, with the rest folded and named.
+    await userEvent.click(await screen.findByRole('button', { name: 'Novo lançamento' }));
+    let form = await screen.findByRole('dialog', { name: 'Novo lançamento' });
+    const more = () => within(form).getByText(/^Mais opções/);
+    expect(more()).toHaveTextContent('Mais opções (observações, pessoa, dividir)');
+    expect(more().closest('details')).not.toHaveAttribute('open');
+    await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
+
+    // Editing one linked to a person: open, so nothing seems lost.
+    const menu = await openActions('Ana: parte de Jantar');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    expect(more().closest('details')).toHaveAttribute('open');
+    expect(within(form).getByLabelText('A receber de (opcional)')).toHaveValue('Ana');
   });
 
   it('is read-only for a VIEWER', async () => {

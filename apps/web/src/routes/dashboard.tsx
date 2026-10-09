@@ -605,7 +605,8 @@ export function DashboardPage() {
   const summary = useSummary(workspace.id, period);
   // The other page of the same competência.
   const links: PageLinks = {
-    transactions: `/espacos/${workspace.id}/lancamentos?competencia=${period}`,
+    // The overdue notice opens them already filtered.
+    transactions: `/espacos/${workspace.id}/lancamentos?competencia=${period}&situacao=vencidos`,
   };
   // The budget is edited here, in a dialog (ADR 0046); focus goes back to whichever button
   // opened it ("Definir orçamento" or "Editar orçamento").

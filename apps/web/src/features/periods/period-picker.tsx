@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { usePeriodLink } from './use-period';
 
 const monthShort = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' });
 
@@ -21,7 +22,7 @@ export function PeriodPicker({ period, onPick }: { period: string; onPick: () =>
   const thisMonth = currentPeriod();
   // Opens on the year of the competência on screen, not on this year.
   const [year, setYear] = useState(Number(period.slice(0, 4)));
-  const to = (target: string) => ({ search: `?competencia=${target}` });
+  const to = usePeriodLink();
 
   return (
     <div className="grid gap-4">
