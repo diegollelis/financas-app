@@ -173,6 +173,66 @@ describe('Budget dialog (on the dashboard)', () => {
     expect(await within(dialog).findByLabelText('Renda líquida (R$)')).toHaveValue('5.200,00');
   });
 
+  it('adds, renames and archives saving destinations from the dialog', async () => {
+    const destinationsBase = `/api/workspaces/${houseId}/budget-destinations`;
+    const list = testDestinations.map((destination, position) => ({
+      id: destination.destinationId,
+      name: destination.name,
+      kind: destination.kind,
+      categoryId: destination.categoryId,
+      archived: false,
+      position,
+    }));
+    const viagensRow = list[3]!;
+    const fetchMock = mockBudget({
+      [`GET ${destinationsBase}`]: { body: list },
+      [`POST ${destinationsBase}`]: {
+        body: { ...viagensRow, id: '01920000-0000-7000-8000-0000000000d5', name: 'Reforma' },
+      },
+      [`PATCH ${destinationsBase}/${viagens}`]: { body: { ...viagensRow, name: 'Férias' } },
+    });
+    renderApp(`/espacos/${houseId}/painel`);
+
+    const dialog = await openDialog();
+    await userEvent.click(within(dialog).getByText('Gerenciar destinos de guardar'));
+    // Despesas is fixed: only the saving destinations are listed.
+    expect(await within(dialog).findByText('Investimentos')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Ações de Despesas' })).toBeNull();
+
+    await userEvent.type(within(dialog).getByLabelText('Novo destino'), 'Reforma');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        new URL(destinationsBase, 'http://api.test'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'Reforma' }) }),
+      ),
+    );
+    expect(await screen.findByText('Destino adicionado')).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ações de Viagens' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Renomear' }));
+    const rename = within(dialog).getByLabelText('Novo nome para Viagens');
+    await userEvent.clear(rename);
+    await userEvent.type(rename, 'Férias');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        new URL(`${destinationsBase}/${viagens}`, 'http://api.test'),
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ name: 'Férias' }) }),
+      ),
+    );
+    expect(await screen.findByText('Destino renomeado')).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ações de Investimentos' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Arquivar' }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        new URL(`${destinationsBase}/${investimentos}`, 'http://api.test'),
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ archived: true }) }),
+      ),
+    );
+  });
+
   it('offers no way to change it to a VIEWER', async () => {
     mockBudget({ [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
 
