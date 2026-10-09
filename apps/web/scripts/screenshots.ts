@@ -10,8 +10,11 @@
  *   pnpm --filter @financas/web screenshots -- painel  → only pages whose name contains "painel"
  */
 import { mkdirSync } from 'node:fs';
-import { TERMS_VERSION } from '@financas/shared';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { TEMPLATE_HEADERS, TERMS_VERSION } from '@financas/shared';
 import { fileURLToPath } from 'node:url';
+import writeXlsxFile from 'write-excel-file/node';
 import { chromium, type APIRequestContext, type Page } from 'playwright';
 
 const WEB = 'http://localhost:5173';
@@ -311,6 +314,25 @@ async function main() {
   await auth.request.post(`${API}/api/workspaces/${workspaceId}/categories`, {
     data: { name: 'Pet', type: 'DEBIT' },
   });
+  // A filled-in template to show the import review (ADR 0040), made here with fictitious rows and
+  // kept in the system's temporary folder: spreadsheets never go into the repository. One row
+  // has no amount and one a category the workspace does not have, so both cases show.
+  const sampleSheet = join(tmpdir(), 'financas-captura-importacao.xlsx');
+  const before = monthsBefore(period, 1);
+  await writeXlsxFile([
+    {
+      sheet: 'Lançamentos',
+      data: [
+        [...TEMPLATE_HEADERS],
+        [before, 'Crédito', 'Freelance de setembro', 'Freelance', 800, null, null, null],
+        [before, 'Débito', 'Academia', 'Academia', 120, null, null, null],
+        [before, 'Débito', 'Internet', 'Internet', 0, null, null, null],
+        [period, 'Crédito', 'Salário', 'Salário', 5200, null, null, null],
+        [period, 'Débito', 'Supermercado', 'Mercado', 640.35, null, null, null],
+        [period, 'Débito', 'Conta de luz', 'Energia', 189.9, null, null, null],
+      ],
+    },
+  ]).toFile(sampleSheet);
   const storageState = await auth.storageState();
   await auth.close();
 
@@ -405,6 +427,13 @@ async function main() {
     { name: 'recorrencias', path: `/espacos/${workspaceId}/recorrencias`, signedIn: true },
     { name: 'pessoas', path: `/espacos/${workspaceId}/pessoas`, signedIn: true },
     { name: 'importar', path: `/espacos/${workspaceId}/importar`, signedIn: true },
+    {
+      // The review, after choosing the generated spreadsheet.
+      name: 'importar-revisao',
+      path: `/espacos/${workspaceId}/importar`,
+      signedIn: true,
+      upload: sampleSheet,
+    },
     { name: 'analise', path: `/espacos/${workspaceId}/analise`, signedIn: true },
     {
       // On the phone the filters are behind a button; from md they are on the page.
@@ -460,6 +489,10 @@ async function main() {
         await page.waitForTimeout(target.holdSessionMs);
       } else {
         await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
+      }
+      if ('upload' in target && target.upload) {
+        await page.locator('#import-file-input').setInputFiles(target.upload);
+        await page.getByRole('heading', { name: '3. Revise e importe' }).waitFor();
       }
       if (target.open && target.opens) {
         await page.getByRole('button', { name: target.open }).first().click();
