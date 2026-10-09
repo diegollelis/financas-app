@@ -1,9 +1,8 @@
 import { formatPeriod, hasRole, type Import } from '@financas/shared';
-import { Download } from 'lucide-react';
+import { Download, FileUp } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import {
@@ -16,8 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { useCategories } from '@/features/categories/use-categories';
 import { ImportReview } from '@/features/import/import-review';
 import { startReview, type ReviewRow } from '@/features/import/review';
@@ -25,6 +23,7 @@ import { useImports, useUndoImport } from '@/features/import/use-imports';
 import { downloadTemplate, readTemplate, TemplateReadError } from '@/features/import/workbook';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
+import { cn } from '@/lib/utils';
 
 const PREVIOUS_TITLE_ID = 'previous-imports';
 
@@ -168,15 +167,16 @@ export function ImportPage() {
         description="Traga lançamentos de uma planilha. O arquivo é lido aqui, no seu aparelho: só os lançamentos que você confirmar são enviados."
       />
       <QueryState queries={[categories, imports]} />
+      {/* The steps, numbered: choosing the file only opens the review, nothing is imported. */}
       {ready && canEdit && !review && (
-        <section aria-labelledby="import-file" className="grid gap-4">
-          <h2 id="import-file" className="sr-only">
-            Planilha
-          </h2>
-          <div className="grid gap-2">
+        <>
+          <section aria-labelledby="import-step-template" className="grid gap-2">
+            <h2 id="import-step-template" className="font-medium">
+              1. Baixe o modelo
+            </h2>
             <p>
-              Use a planilha modelo: uma linha por lançamento, com competência, tipo, descrição,
-              categoria e valor. Ela já vem com um exemplo e a lista das categorias deste espaço.
+              Uma linha por lançamento, com competência, tipo, descrição, categoria e valor. A
+              planilha já vem com um exemplo e a lista das categorias deste espaço.
             </p>
             <Button variant="outline" className="justify-self-start" onClick={download}>
               <Download aria-hidden />
@@ -187,30 +187,52 @@ export function ImportPage() {
                 {fileError}
               </p>
             )}
-          </div>
-          <FormField
-            id="import-file-input"
-            label="Planilha preenchida (.xlsx)"
-            error={readError ?? undefined}
-          >
-            <Input
+          </section>
+          <section aria-labelledby="import-step-file" className="grid gap-2">
+            <h2 id="import-step-file" className="font-medium">
+              2. Escolha a planilha preenchida
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              O arquivo não é enviado: só os lançamentos que você confirmar na revisão.
+            </p>
+            {/* The native picker, hidden, behind a button in the app's style: the label opens it,
+                and keyboard focus on it shows on the button. */}
+            <input
+              id="import-file-input"
               type="file"
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               disabled={reading}
-              className="h-11 py-2 md:h-9 md:py-1"
+              className="peer sr-only"
+              aria-describedby={readError ? 'import-file-error' : undefined}
               onChange={(event) => {
                 void chooseFile(event.currentTarget.files?.[0]);
                 // The same file can be chosen again after fixing it.
                 event.currentTarget.value = '';
               }}
             />
-          </FormField>
-          {reading && <p role="status">Lendo a planilha…</p>}
-        </section>
+            <label
+              htmlFor="import-file-input"
+              className={cn(
+                buttonVariants({ variant: 'outline' }),
+                'peer-focus-visible:border-ring peer-focus-visible:ring-ring/50 cursor-pointer justify-self-start peer-focus-visible:ring-3 peer-disabled:cursor-default peer-disabled:opacity-50',
+              )}
+            >
+              <FileUp aria-hidden />
+              Escolher planilha (.xlsx)
+            </label>
+            {readError && (
+              <p id="import-file-error" role="alert" className="text-destructive">
+                {readError}
+              </p>
+            )}
+            {reading && <p role="status">Lendo a planilha…</p>}
+          </section>
+        </>
       )}
       {ready && !canEdit && (
         <p className="text-muted-foreground">Quem só visualiza o espaço não importa planilhas.</p>
       )}
+      {ready && review && <h2 className="font-medium">3. Revise e importe</h2>}
       {ready && review && (
         <ImportReview
           key={review.openings}

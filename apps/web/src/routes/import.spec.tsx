@@ -66,7 +66,7 @@ function mockImport(overrides: Record<string, { status?: number; body: unknown }
 }
 
 async function choose(file: File) {
-  await userEvent.upload(await screen.findByLabelText('Planilha preenchida (.xlsx)'), file);
+  await userEvent.upload(await screen.findByLabelText('Escolher planilha (.xlsx)'), file);
 }
 
 function expectCall(fetchMock: ReturnType<typeof mockApi>, path: string, init: object) {
@@ -93,7 +93,13 @@ describe('ImportPage', () => {
     });
     const { router } = renderApp(page);
 
+    // Numbered steps: choosing the file opens the review, it imports nothing yet.
+    expect(await screen.findByRole('heading', { name: '1. Baixe o modelo' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: '2. Escolha a planilha preenchida' }),
+    ).toBeInTheDocument();
     await choose(await spreadsheet([salaryRow, groceryRow]));
+    expect(await screen.findByRole('heading', { name: '3. Revise e importe' })).toBeInTheDocument();
 
     const august = await screen.findByRole('region', { name: 'agosto de 2026' });
     expect(august).toHaveTextContent('Créditos R$ 5.200,00, débitos R$ 640,35');
@@ -254,7 +260,7 @@ describe('ImportPage', () => {
     expect(
       await screen.findByText('Quem só visualiza o espaço não importa planilhas.'),
     ).toBeInTheDocument();
-    expect(screen.queryByLabelText('Planilha preenchida (.xlsx)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Escolher planilha (.xlsx)')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Desfazer/ })).not.toBeInTheDocument();
   });
 });
