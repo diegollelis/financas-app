@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { PeriodPicker } from './period-picker';
+import { usePeriodLink } from './use-period';
 
 /**
  * Previous / next competência on the same page, and the month itself opens a picker to jump far
@@ -19,7 +20,7 @@ export function PeriodNav({ period }: { period: string }) {
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const to = (target: string) => ({ search: `?competencia=${target}` });
+  const to = usePeriodLink();
   const previous = shiftPeriod(period, -1);
   const next = shiftPeriod(period, 1);
   const away = period !== thisMonth;

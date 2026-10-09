@@ -92,7 +92,8 @@ describe('DashboardPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Ver lançamentos' })).toHaveAttribute(
       'href',
-      `/espacos/${houseId}/lancamentos?competencia=2026-10`,
+      // Straight to the overdue ones.
+      `/espacos/${houseId}/lancamentos?competencia=2026-10&situacao=vencidos`,
     );
   });
 

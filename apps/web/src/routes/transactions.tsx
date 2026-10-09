@@ -12,8 +12,10 @@ import {
 import { CreditCard, Ellipsis, Plus, Repeat, Users } from 'lucide-react';
 import { useRef, useState, type RefObject } from 'react';
 import { toast } from 'sonner';
+import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
+import { SegmentedControl } from '@/components/segmented-control';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +28,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +39,12 @@ import { useCategories } from '@/features/categories/use-categories';
 import { useEndInstallmentPlan } from '@/features/installments/use-installments';
 import { useEndRecurrence } from '@/features/recurrences/use-recurrences';
 import { usePeople } from '@/features/people/use-people';
+import {
+  matchesSearch,
+  matchesStatus,
+  statusFilterOptions,
+  useStatusFilter,
+} from '@/features/transactions/filters';
 import { SettleWithAmount } from '@/features/transactions/settle-with-amount';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
@@ -422,6 +431,18 @@ export function TransactionsPage() {
   });
   const openForm = (editing: Transaction | null, returnFocusTo: HTMLElement | null) =>
     setForm((current) => ({ open: true, editing, returnFocusTo, openings: current.openings + 1 }));
+  // Finding one in a long month: by status (in the address) and by what was typed.
+  const [statusFilter, setStatusFilter] = useStatusFilter();
+  const [search, setSearch] = useState('');
+  const filtering = statusFilter !== 'todos' || search.trim() !== '';
+  const shown = (transaction: Transaction) =>
+    matchesStatus(transaction, statusFilter, today) &&
+    matchesSearch(
+      search,
+      transaction.description,
+      categories.data?.find((item) => item.id === transaction.categoryId)?.name,
+      personName(transaction.personId),
+    );
 
   return (
     <>
@@ -443,6 +464,24 @@ export function TransactionsPage() {
         }
       >
         <PeriodNav period={period} />
+        {ready && transactions.data.length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <FormField id="transactions-search" label="Buscar lançamento">
+              <Input
+                type="search"
+                autoComplete="off"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </FormField>
+            <SegmentedControl
+              label="Situação"
+              options={statusFilterOptions}
+              value={statusFilter}
+              onChange={setStatusFilter}
+            />
+          </div>
+        )}
       </PageHeader>
       <QueryState queries={[categories, transactions, people]} />
       {ready &&
@@ -459,7 +498,8 @@ export function TransactionsPage() {
           </div>
         ) : (
           sections.map(({ type, title, singular }) => {
-            const items = transactions.data.filter((item) => item.type === type);
+            const all = transactions.data.filter((item) => item.type === type);
+            const items = all.filter(shown);
             const total = items.reduce((sum, item) => sum + item.amountCents, 0);
             const titleId = sectionTitleId(type);
             return (
@@ -469,13 +509,20 @@ export function TransactionsPage() {
                   <h2 id={titleId} tabIndex={-1} className="font-medium outline-none">
                     {title}
                   </h2>
-                  <span className="text-muted-foreground tabular-nums">
-                    Total: {formatCents(total)}
+                  <span className="text-muted-foreground flex flex-wrap justify-end gap-x-3 tabular-nums">
+                    {filtering && (
+                      <span>
+                        {items.length} de {all.length}
+                      </span>
+                    )}
+                    <span>Total: {formatCents(total)}</span>
                   </span>
                 </div>
                 {items.length === 0 ? (
                   <p className="text-muted-foreground">
-                    Nenhum {singular} em {formatPeriod(period)}.
+                    {filtering
+                      ? `Nenhum ${singular} com esse filtro.`
+                      : `Nenhum ${singular} em ${formatPeriod(period)}.`}
                   </p>
                 ) : (
                   <ul className="divide-y rounded-xl border px-4">

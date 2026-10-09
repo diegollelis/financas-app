@@ -153,6 +153,38 @@ describe('TransactionsPage', () => {
     expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
   });
 
+  it('finds a transaction by status or by what is typed; the status stays in the address', async () => {
+    mockTransactions();
+    // As the dashboard's overdue notice opens it.
+    const { router } = renderApp(
+      `/espacos/${houseId}/lancamentos?competencia=2026-10&situacao=vencidos`,
+    );
+
+    const debits = await section('Débitos');
+    expect(screen.getByRole('radio', { name: 'Vencidos' })).toBeChecked();
+    expect(row(debits, 'Conta de luz')).toBeInTheDocument();
+    expect(within(debits).queryByText('Compras da semana')).not.toBeInTheDocument();
+    // How many are shown, and the total of those.
+    expect(debits).toHaveTextContent('1 de 2');
+    expect(debits).toHaveTextContent('Total: R$ 159,90');
+    expect(await section('Créditos')).toHaveTextContent('Nenhum crédito com esse filtro.');
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Todos' }));
+    expect(router.state.location.search).toBe('?competencia=2026-10');
+    // By the category, without accents mattering.
+    await userEvent.type(screen.getByLabelText('Buscar lançamento'), 'MERCADO');
+    expect(row(debits, 'Compras da semana')).toBeInTheDocument();
+    expect(within(debits).queryByText('Conta de luz')).not.toBeInTheDocument();
+
+    // Another month keeps the status filter.
+    await userEvent.clear(screen.getByLabelText('Buscar lançamento'));
+    await userEvent.click(screen.getByRole('radio', { name: 'Pendentes' }));
+    await userEvent.click(
+      screen.getByRole('link', { name: 'Próxima competência: novembro de 2026' }),
+    );
+    expect(router.state.location.search).toBe('?competencia=2026-11&situacao=pendentes');
+  });
+
   it('opens the competência of the address, and points to Novo lançamento when it is empty', async () => {
     const fetchMock = mockTransactions({ [`GET ${base}`]: { body: [] } });
 
