@@ -5,7 +5,7 @@ import {
   type TransactionType,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Ellipsis } from 'lucide-react';
+import { Copy, Ellipsis } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { CopyCategoriesDialog } from '@/features/categories/copy-categories-dialog';
 import {
   useCategories,
   useCreateCategory,
@@ -40,6 +41,7 @@ import {
   useUpdateCategory,
 } from '@/features/categories/use-categories';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
+import { useWorkspaces } from '@/features/workspaces/use-workspaces';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /** Only the name is typed in the forms; the type comes from the section. */
@@ -354,13 +356,39 @@ function CategorySection({
 export function CategoriesPage() {
   const workspace = useCurrentWorkspace();
   const categories = useCategories(workspace.id);
+  const workspaces = useWorkspaces();
+  const canEdit = hasRole(workspace.role, 'EDITOR');
+  // The person's other workspaces: copying needs one (ADR 0048).
+  const sources = (workspaces.data ?? []).filter((other) => other.id !== workspace.id);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const copyButton = useRef<HTMLButtonElement>(null);
 
   return (
     <>
       <PageHeader
         title="Categorias"
         description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada."
-      />
+      >
+        {canEdit && categories.isSuccess && sources.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Button ref={copyButton} variant="outline" onClick={() => setCopyOpen(true)}>
+              <Copy aria-hidden />
+              Copiar de outro espaço
+            </Button>
+          </div>
+        )}
+      </PageHeader>
+      {canEdit && categories.isSuccess && sources.length > 0 && (
+        <CopyCategoriesDialog
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          sources={sources}
+          here={categories.data}
+          open={copyOpen}
+          onOpenChange={setCopyOpen}
+          returnFocusTo={copyButton}
+        />
+      )}
       <QueryState queries={[categories]} />
       {categories.isSuccess &&
         sections.map((section) => (
@@ -369,7 +397,7 @@ export function CategoriesPage() {
             {...section}
             workspaceId={workspace.id}
             categories={categories.data.filter((category) => category.type === section.type)}
-            canEdit={hasRole(workspace.role, 'EDITOR')}
+            canEdit={canEdit}
           />
         ))}
     </>

@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { verifiedUser, mockApi } from '@/test/mock-api';
+import { personalWorkspace, verifiedUser, mockApi } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019).
@@ -237,6 +237,80 @@ describe('CategoriesPage', () => {
     expect(
       await screen.findByText('Esta categoria tem lançamentos: arquive-a em vez de excluir.'),
     ).toBeInTheDocument();
+  });
+
+  it('copies the chosen categories of another workspace, skipping those already here', async () => {
+    const personalBase = `/api/workspaces/${personalWorkspace.id}/categories`;
+    const pet = { ...category(11, 'Pet', 'DEBIT'), id: '01920000-0000-7000-8000-0000000002a1' };
+    const fetchMock = mockCategories({
+      'GET /api/workspaces': { body: [personalWorkspace, house] },
+      [`GET ${personalBase}`]: {
+        body: [
+          { ...salario, id: '01920000-0000-7000-8000-0000000002a2' },
+          { ...category(12, 'mercado', 'DEBIT'), id: '01920000-0000-7000-8000-0000000002a3' },
+          pet,
+          { ...category(13, 'Antiga', 'DEBIT', true), id: '01920000-0000-7000-8000-0000000002a4' },
+          {
+            ...category(14, 'Investimentos', 'DEBIT'),
+            id: '01920000-0000-7000-8000-0000000002a5',
+            destinationId: '01920000-0000-7000-8000-0000000000d2',
+          },
+        ],
+      },
+      [`POST ${base}/copy`]: { status: 201, body: { copied: 1, skipped: 0 } },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Copiar de outro espaço' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Copiar de outro espaço' });
+    // The only other workspace is already chosen; its new categories start checked.
+    expect(await within(dialog).findByRole('checkbox', { name: 'Pet' })).toBeChecked();
+    // Already here, ignoring case: listed, but not copied.
+    expect(within(dialog).getByRole('checkbox', { name: 'mercado' })).toBeDisabled();
+    expect(within(dialog).getByRole('checkbox', { name: 'Salário' })).toBeDisabled();
+    expect(within(dialog).getAllByText('Já existe')).toHaveLength(2);
+    // Archived ones and a saving destination's are never copied (ADR 0048).
+    expect(within(dialog).queryByText('Antiga')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Investimentos')).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Copiar 1 categoria' }));
+
+    await expectCall(fetchMock, `${base}/copy`, {
+      method: 'POST',
+      body: JSON.stringify({ sourceWorkspaceId: personalWorkspace.id, categoryIds: [pet.id] }),
+    });
+    expect(await screen.findByText('1 categoria copiada')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Copiar de outro espaço' })).toHaveFocus();
+  });
+
+  it('copies nothing until something is checked', async () => {
+    mockCategories({
+      'GET /api/workspaces': { body: [personalWorkspace, house] },
+      [`GET /api/workspaces/${personalWorkspace.id}/categories`]: {
+        body: [{ ...category(11, 'Pet', 'DEBIT'), id: '01920000-0000-7000-8000-0000000002a1' }],
+      },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Copiar de outro espaço' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Copiar de outro espaço' });
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Desmarcar todas' }));
+
+    expect(within(dialog).getByRole('button', { name: 'Copiar 0 categorias' })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar todas' }));
+    expect(within(dialog).getByRole('button', { name: 'Copiar 1 categoria' })).toBeEnabled();
+  });
+
+  it('offers no copy to whoever has a single workspace', async () => {
+    mockCategories({ 'GET /api/workspaces': { body: [house] } });
+
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    await section('Débitos');
+    expect(
+      screen.queryByRole('button', { name: 'Copiar de outro espaço' }),
+    ).not.toBeInTheDocument();
   });
 
   it('is read-only for a VIEWER', async () => {
