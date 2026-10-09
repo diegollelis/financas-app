@@ -1,5 +1,5 @@
 import { previousRange } from '@financas/shared';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stubPrefersDark } from '@/test/match-media';
@@ -137,6 +137,23 @@ describe('AnalysisPage', () => {
     expect(await stat('Saldo do período')).toBe('R$ 4.600,00');
     const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
     expect(within(ranking).queryByText('Investimentos')).not.toBeInTheDocument();
+  });
+
+  it('shows a tapped month against the one before', async () => {
+    mockAnalysis('2026-05', '2026-10');
+    renderApp(`/espacos/${houseId}/analise`);
+
+    await screen.findByText('Saldo do período');
+    // The tap targets cover each month; October is the last one.
+    const months = document.querySelectorAll('svg rect[fill="transparent"]');
+    fireEvent.pointerUp(months[months.length - 1]!);
+
+    // September's balance was R$ 2.600,00, October's R$ 2.500,00.
+    expect(
+      await screen.findByText('Saldo do mês: R$ 100,00 a menos que em setembro', {
+        normalizer: (text) => nbsp(text) ?? '',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('compares with the range of the same length right before', async () => {

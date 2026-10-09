@@ -303,7 +303,11 @@ function Results({
           <>
             <Legend type={settings.type} />
             <MonthlyChart series={series} type={settings.type} />
-            <p className="text-muted-foreground text-sm">Toque num mês para ver os valores.</p>
+            <p className="text-muted-foreground text-sm">
+              {settings.type === 'BOTH' &&
+                'Débitos: gastos e aplicações. Saldo do mês: créditos menos débitos de cada mês. '}
+              Toque num mês para ver os valores e a diferença para o mês anterior.
+            </p>
           </>
         )}
       </section>
