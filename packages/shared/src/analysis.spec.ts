@@ -6,6 +6,7 @@ import {
   defaultAnalysisFilters,
   monthlySeries,
   periodsBetween,
+  previousRange,
   seriesTotals,
   type Analysis,
   type AnalysisRow,
@@ -87,12 +88,14 @@ describe('monthlySeries', () => {
       period: '2026-08',
       creditsCents: 0,
       debitsCents: 0,
+      appliedCents: 0,
       balanceCents: 0,
     });
     expect(series[3]).toEqual({
       period: '2026-10',
       creditsCents: 520_000,
       debitsCents: 260_000,
+      appliedCents: 0,
       balanceCents: 260_000,
     });
   });
@@ -104,6 +107,7 @@ describe('monthlySeries', () => {
       period: '2026-10',
       creditsCents: 0,
       debitsCents: 40_000,
+      appliedCents: 0,
       balanceCents: -40_000,
     });
   });
@@ -123,8 +127,34 @@ describe('monthlySeries', () => {
     expect(seriesTotals(monthlySeries(analysis, defaultAnalysisFilters))).toEqual({
       creditsCents: 1_520_000,
       debitsCents: 760_000,
+      expensesCents: 760_000,
+      appliedCents: 0,
       balanceCents: 760_000,
     });
+  });
+
+  it('keeps applications apart from spending (ADR 0047)', () => {
+    // Fuel stands in for a saving destination's category here.
+    const saving = new Set([fuel]);
+    const totals = seriesTotals(monthlySeries(analysis, defaultAnalysisFilters, saving));
+
+    expect(totals).toMatchObject({
+      debitsCents: 760_000,
+      expensesCents: 750_000,
+      appliedCents: 10_000,
+      // The balance is after every debit, as on the dashboard.
+      balanceCents: 760_000,
+    });
+    expect(
+      categoryRanking(analysis, defaultAnalysisFilters, saving).map((s) => s.categoryId),
+    ).toEqual([rent, market]);
+  });
+});
+
+describe('previousRange', () => {
+  it('is the range of the same length right before, across the year', () => {
+    expect(previousRange('2026-01', '2026-06')).toEqual({ from: '2025-07', to: '2025-12' });
+    expect(previousRange('2026-10', '2026-10')).toEqual({ from: '2026-09', to: '2026-09' });
   });
 });
 

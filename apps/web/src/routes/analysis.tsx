@@ -2,6 +2,8 @@ import {
   formatCents,
   formatPeriod,
   monthlySeries,
+  periodsBetween,
+  previousRange,
   seriesTotals,
   type Analysis,
   type AnalysisFilters,
@@ -15,6 +17,7 @@ import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  activeFilterCount,
   describeRange,
   useAnalysisSettings,
   type AnalysisSettings,
@@ -22,7 +25,7 @@ import {
 import { CategoryRanking } from '@/features/analysis/category-ranking';
 import { FiltersPanel } from '@/features/analysis/filters-panel';
 import { MonthlyChart, MonthlyTable } from '@/features/analysis/monthly-chart';
-import { seriesStyles, visibleSeries } from '@/features/analysis/series';
+import { savingCategoryIds, seriesStyles, visibleSeries } from '@/features/analysis/series';
 import { useAnalysis } from '@/features/analysis/use-analysis';
 import { useCategories } from '@/features/categories/use-categories';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
@@ -51,28 +54,72 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b py-2 sm:grid sm:justify-start sm:gap-1 sm:rounded-xl sm:border sm:p-4">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-lg font-semibold">{children}</dd>
+      <dd className="grid justify-items-end gap-0.5 text-lg font-semibold sm:justify-items-start">
+        {children}
+      </dd>
     </div>
   );
 }
 
-/** The range's totals; the balance leads when both types are on screen (one hero per view). */
+type Totals = ReturnType<typeof seriesTotals>;
+
+/**
+ * "R$ 1.240,00 a mais que nos 6 meses anteriores": the same total over the range right before,
+ * with the same filters. Nothing when that range had no transactions at all.
+ */
+function Versus({ cents, before, months }: { cents: number; before?: number; months: number }) {
+  if (before === undefined) return null;
+  const span = months === 1 ? 'no mês anterior' : `nos ${months} meses anteriores`;
+  const diff = cents - before;
+  return (
+    <span className="text-muted-foreground text-sm font-normal">
+      {diff === 0
+        ? `O mesmo que ${span}.`
+        : `${formatCents(Math.abs(diff))} a ${diff > 0 ? 'mais' : 'menos'} que ${span}.`}
+    </span>
+  );
+}
+
+/**
+ * The range's totals; the balance leads when both types are on screen (one hero per view).
+ * Spending leaves out applications, shown apart, as on the dashboard (ADR 0047).
+ */
 function Totals({
   totals,
+  previous,
+  months,
   type,
 }: {
-  totals: ReturnType<typeof seriesTotals>;
+  totals: Totals;
+  /** The same totals over the range right before, when it had anything. */
+  previous: Totals | null;
+  months: number;
   type: AnalysisFilters['type'];
 }) {
   if (type !== 'BOTH') {
     const credit = type === 'CREDIT';
+    const cents = credit ? totals.creditsCents : totals.expensesCents;
     return (
       <dl className="grid gap-1">
         <dt className="text-muted-foreground">
           {credit ? 'Recebido no período' : 'Gasto no período'}
         </dt>
-        <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
-          {formatCents(credit ? totals.creditsCents : totals.debitsCents)}
+        <dd className="grid gap-1">
+          <span className="text-4xl font-semibold tracking-tight sm:text-5xl">
+            {formatCents(cents)}
+          </span>
+          <Versus
+            cents={cents}
+            before={
+              previous ? (credit ? previous.creditsCents : previous.expensesCents) : undefined
+            }
+            months={months}
+          />
+          {!credit && totals.appliedCents > 0 && (
+            <span className="text-muted-foreground">
+              Além disso, {formatCents(totals.appliedCents)} aplicados nos destinos de guardar.
+            </span>
+          )}
         </dd>
       </dl>
     );
@@ -86,9 +133,16 @@ function Totals({
           <SignedCents cents={totals.balanceCents} />
         </dd>
       </dl>
-      <dl className="grid sm:grid-cols-2 sm:gap-3">
-        <Stat label="Recebido">{formatCents(totals.creditsCents)}</Stat>
-        <Stat label="Gasto">{formatCents(totals.debitsCents)}</Stat>
+      <dl className="grid sm:grid-cols-3 sm:gap-3">
+        <Stat label="Recebido">
+          {formatCents(totals.creditsCents)}
+          <Versus cents={totals.creditsCents} before={previous?.creditsCents} months={months} />
+        </Stat>
+        <Stat label="Gasto">
+          {formatCents(totals.expensesCents)}
+          <Versus cents={totals.expensesCents} before={previous?.expensesCents} months={months} />
+        </Stat>
+        <Stat label="Aplicado">{formatCents(totals.appliedCents)}</Stat>
       </dl>
     </div>
   );
@@ -130,6 +184,9 @@ export function AnalysisPage() {
   const workspace = useCurrentWorkspace();
   const { settings, update } = useAnalysisSettings();
   const analysis = useAnalysis(workspace.id, settings.from, settings.to);
+  // The range right before, of the same length, to say if it went up or down.
+  const previous = previousRange(settings.from, settings.to);
+  const before = useAnalysis(workspace.id, previous.from, previous.to);
   const categories = useCategories(workspace.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -154,7 +211,9 @@ export function AnalysisPage() {
               disabled={!categories.isSuccess}
             >
               <SlidersHorizontal aria-hidden />
+              {/* Says a filter is on before the sheet is opened. */}
               Filtros
+              {activeFilterCount(settings) > 0 && ` (${activeFilterCount(settings)})`}
             </Button>
           )
         }
@@ -188,6 +247,7 @@ export function AnalysisPage() {
         ) : (
           <Results
             analysis={analysis.data}
+            before={before.isSuccess && before.data.rows.length > 0 ? before.data : null}
             settings={settings}
             categories={categories.data}
             onChange={update}
@@ -201,6 +261,7 @@ export function AnalysisPage() {
 
 function Results({
   analysis,
+  before,
   settings,
   categories,
   onChange,
@@ -208,18 +269,27 @@ function Results({
   onToggle,
 }: {
   analysis: Analysis;
+  /** The range right before, when it had anything; null otherwise or while it loads. */
+  before: Analysis | null;
   settings: AnalysisSettings;
   categories: Category[];
   onChange: (change: Partial<AnalysisSettings>) => void;
   asTable: boolean;
   onToggle: () => void;
 }) {
-  const series = monthlySeries(analysis, settings);
+  const saving = savingCategoryIds(categories);
+  const series = monthlySeries(analysis, settings, saving);
+  const previousTotals = before ? seriesTotals(monthlySeries(before, settings, saving)) : null;
   // One column up to xl; from there, month by month beside the categories (ADR 0045).
   return (
     <div className="grid gap-6 xl:grid-cols-2 xl:gap-x-10 xl:gap-y-8">
       <div className="xl:col-span-2">
-        <Totals totals={seriesTotals(series)} type={settings.type} />
+        <Totals
+          totals={seriesTotals(series)}
+          previous={previousTotals}
+          months={periodsBetween(analysis.from, analysis.to).length}
+          type={settings.type}
+        />
       </div>
       <section aria-labelledby="analysis-monthly" className="grid content-start gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -236,7 +306,11 @@ function Results({
           <>
             <Legend type={settings.type} />
             <MonthlyChart series={series} type={settings.type} />
-            <p className="text-muted-foreground text-sm">Toque num mês para ver os valores.</p>
+            <p className="text-muted-foreground text-sm">
+              {settings.type === 'BOTH' &&
+                'Débitos: gastos e aplicações. Saldo do mês: créditos menos débitos de cada mês. '}
+              Toque num mês para ver os valores e a diferença para o mês anterior.
+            </p>
           </>
         )}
       </section>

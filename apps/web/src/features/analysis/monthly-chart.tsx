@@ -71,6 +71,13 @@ export function MonthlyChart({
   // With narrow months, every other label, so they never collide.
   const labelEvery = band < 40 ? 2 : 1;
   const activePoint = active === null ? undefined : series[active];
+  // The month tapped against the one before: the balance with both types, else the one shown.
+  const compared = keys.includes('balance') ? 'balance' : keys[0];
+  const beforeActive = active === null || active === 0 ? undefined : series[active - 1];
+  const change =
+    activePoint && beforeActive && compared
+      ? valueOf(activePoint, compared) - valueOf(beforeActive, compared)
+      : null;
 
   return (
     <div ref={ref} className="overflow-x-auto">
@@ -222,6 +229,14 @@ export function MonthlyChart({
                 </span>
               </p>
             ))}
+            {change !== null && beforeActive && compared && (
+              <p className="text-muted-foreground border-t pt-1">
+                {seriesStyles[compared].label}:{' '}
+                {change === 0
+                  ? `igual a ${formatPeriod(beforeActive.period).split(' ')[0]}`
+                  : `${formatCents(Math.abs(change))} a ${change > 0 ? 'mais' : 'menos'} que em ${formatPeriod(beforeActive.period).split(' ')[0]}`}
+              </p>
+            )}
           </div>
         )}
       </div>

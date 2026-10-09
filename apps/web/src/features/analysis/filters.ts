@@ -78,6 +78,16 @@ function writeSettings(settings: AnalysisSettings): URLSearchParams {
   return params;
 }
 
+/** How many filters differ from the default, shown on the phone's "Filtros" button. */
+export function activeFilterCount(settings: AnalysisSettings): number {
+  return [
+    settings.preset !== DEFAULT_PRESET,
+    settings.view !== 'PLANNED',
+    settings.type !== 'BOTH',
+    settings.categoryIds.length > 0,
+  ].filter(Boolean).length;
+}
+
 export function useAnalysisSettings() {
   const [params, setParams] = useSearchParams();
   const settings = readSettings(params);

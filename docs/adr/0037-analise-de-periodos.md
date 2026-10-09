@@ -76,3 +76,12 @@ O [ADR 0032](0032-graficos-sem-biblioteca.md) desenhou os gráficos do Painel em
   - A categoria aberta fica no endereço (`?categoria=id`), então o botão "voltar" do navegador fecha a gaveta.
   - Ao fechar, o foco volta à linha que a abriu.
 - O gráfico mês a mês ganhou a linha de referência opcional (`reference`), reaproveitada aqui em vez de um segundo componente de gráfico.
+
+## Nota (2026-10-09): aplicações à parte e comparação com o período anterior
+
+Depois da avaliação externa da tela e do [ADR 0047](0047-orcamento-real-por-destino.md):
+
+- **Aplicação não é gasto.** Um débito na categoria de um destino de guardar é uma aplicação, como no Painel. "Gasto" passa a somar só as despesas, "Aplicado" aparece à parte, e "Gastos por categoria" deixa de fora as categorias de destino. O saldo continua sendo créditos menos todos os débitos, igual ao Painel, e a barra "Débitos" do gráfico continua com tudo o que saiu, o que a legenda diz. A API não muda: a lista de categorias já marca as de destino (`destinationId`), e as funções de `packages/shared/src/analysis.ts` recebem esse conjunto.
+- **Comparação com o período anterior.** A página busca também o intervalo de mesmo tamanho imediatamente antes (`previousRange`) e diz, sob Recebido e Gasto, quanto subiu ou desceu, com os mesmos filtros. Sem lançamentos no intervalo anterior, não diz nada.
+- **O mês tocado** no gráfico mostra a diferença para o mês anterior; a linha de saldo é o saldo de cada mês, na mesma escala das barras (são reais também), e a legenda passa a dizer "Saldo do mês".
+- **No celular**, o botão mostra quantos filtros estão fora do padrão: "Filtros (2)".

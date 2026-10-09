@@ -16,8 +16,10 @@ type MockResponse = { status?: number; body: unknown; headers?: Record<string, s
  */
 export function mockApi(routes: Record<string, MockResponse>) {
   const fetchMock = vi.fn((input: URL | string, init?: RequestInit) => {
-    const key = `${init?.method ?? 'GET'} ${new URL(input).pathname}`;
-    const route = routes[key];
+    const url = new URL(input);
+    const key = `${init?.method ?? 'GET'} ${url.pathname}`;
+    // A route with its query string wins over the bare path (e.g. two ranges of the analysis).
+    const route = routes[`${key}${url.search}`] ?? routes[key];
     if (!route) return Promise.reject(new Error(`Unexpected request: ${key}`));
     const response = { status: route.status ?? 200, headers: route.headers };
     // 204 No Content cannot carry a body: Response.json would throw.

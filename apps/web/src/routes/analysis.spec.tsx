@@ -1,4 +1,5 @@
-import { screen, within } from '@testing-library/react';
+import { previousRange } from '@financas/shared';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stubPrefersDark } from '@/test/match-media';
@@ -45,23 +46,44 @@ const rows = [
   row('2026-10', 'DEBIT', mercado.id, 70_000, 30_000),
 ];
 
-function mockAnalysis(from: string, to: string, body = { from, to, rows }) {
+function mockAnalysis(
+  from: string,
+  to: string,
+  body: { from: string; to: string; rows: unknown[] } = { from, to, rows },
+  before: unknown[] = [],
+  categories: unknown[] = [salario, aluguel, mercado],
+) {
+  // The range right before, compared with (empty unless a test gives it rows).
+  const previous = previousRange(body.from, body.to);
   const routes: Record<string, { status?: number; body: unknown }> = {
+    [`GET ${base}/analysis?from=${previous.from}&to=${previous.to}`]: {
+      body: { ...previous, rows: before },
+    },
     'GET /api/me': { body: verifiedUser },
     'GET /api/workspaces': { body: [house] },
     [`GET ${base}`]: { body: house },
-    [`GET ${base}/categories`]: { body: [salario, aluguel, mercado] },
+    [`GET ${base}/categories`]: { body: categories },
     [`GET ${base}/analysis`]: { body },
   };
   return mockApi(routes);
 }
 
-/** The query string of the analysis requests, in order. */
-const requestedRanges = (fetchMock: ReturnType<typeof mockApi>) =>
-  fetchMock.mock.calls
+/** The query string of the analysis requests, in order, without the ranges compared with. */
+function requestedRanges(fetchMock: ReturnType<typeof mockApi>) {
+  const urls = fetchMock.mock.calls
     .map(([url]) => new URL(url))
-    .filter((url) => url.pathname.endsWith('/analysis'))
-    .map((url) => url.search);
+    .filter((url) => url.pathname.endsWith('/analysis'));
+  const compared = new Set(
+    urls.map((url) => {
+      const range = previousRange(
+        url.searchParams.get('from') ?? '',
+        url.searchParams.get('to') ?? '',
+      );
+      return `?from=${range.from}&to=${range.to}`;
+    }),
+  );
+  return urls.map((url) => url.search).filter((search) => !compared.has(search));
+}
 
 /** The table of the monthly values, as rows of text. */
 async function monthlyTable() {
@@ -87,6 +109,72 @@ describe('AnalysisPage', () => {
     vi.useRealTimers();
   });
 
+  it('keeps applications apart from spending, as on the dashboard (ADR 0047)', async () => {
+    const investimentos = {
+      id: '01920000-0000-7000-8000-000000000104',
+      name: 'Investimentos',
+      type: 'DEBIT',
+      archived: false,
+      destinationId: '01920000-0000-7000-8000-0000000000d2',
+    };
+    const withApplication = [...rows, row('2026-10', 'DEBIT', investimentos.id, 50_000)];
+    mockAnalysis(
+      '2026-05',
+      '2026-10',
+      { from: '2026-05', to: '2026-10', rows: withApplication },
+      [],
+      [salario, aluguel, mercado, investimentos],
+    );
+
+    renderApp(`/espacos/${houseId}/analise`);
+
+    const stat = async (label: string) =>
+      nbsp((await screen.findByText(label, { selector: 'dt' })).nextElementSibling?.textContent);
+    // Spending is the expenses only; the application is shown apart.
+    expect(await stat('Gasto')).toBe('R$ 4.900,00');
+    expect(await stat('Aplicado')).toBe('R$ 500,00');
+    // The balance is after every debit, as on the dashboard.
+    expect(await stat('Saldo do período')).toBe('R$ 4.600,00');
+    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
+    expect(within(ranking).queryByText('Investimentos')).not.toBeInTheDocument();
+  });
+
+  it('shows a tapped month against the one before', async () => {
+    mockAnalysis('2026-05', '2026-10');
+    renderApp(`/espacos/${houseId}/analise`);
+
+    await screen.findByText('Saldo do período');
+    // The tap targets cover each month; October is the last one.
+    const months = document.querySelectorAll('svg rect[fill="transparent"]');
+    fireEvent.pointerUp(months[months.length - 1]!);
+
+    // September's balance was R$ 2.600,00, October's R$ 2.500,00.
+    expect(
+      await screen.findByText('Saldo do mês: R$ 100,00 a menos que em setembro', {
+        normalizer: (text) => nbsp(text) ?? '',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('compares with the range of the same length right before', async () => {
+    // May to October against November to April: R$ 4.900,00 spent now, R$ 4.000,00 before.
+    mockAnalysis('2026-05', '2026-10', undefined, [
+      row('2026-03', 'CREDIT', salario.id, 1_000_000),
+      row('2026-03', 'DEBIT', aluguel.id, 400_000),
+    ]);
+
+    renderApp(`/espacos/${houseId}/analise`);
+
+    const gasto = await screen.findByText('Gasto', { selector: 'dt' });
+    expect(nbsp(gasto.nextElementSibling?.textContent)).toBe(
+      'R$ 4.900,00R$ 900,00 a mais que nos 6 meses anteriores.',
+    );
+    const recebido = screen.getByText('Recebido', { selector: 'dt' });
+    expect(nbsp(recebido.nextElementSibling?.textContent)).toContain(
+      'O mesmo que nos 6 meses anteriores.',
+    );
+  });
+
   it('shows the last 6 months by default: totals, and every month even without transactions', async () => {
     const fetchMock = mockAnalysis('2026-05', '2026-10');
 
@@ -97,7 +185,7 @@ describe('AnalysisPage', () => {
     expect(nbsp(balance.nextElementSibling?.textContent)).toBe('R$ 5.100,00');
     expect(requestedRanges(fetchMock)).toEqual(['?from=2026-05&to=2026-10']);
     expect(await monthlyTable()).toEqual([
-      'CompetênciaCréditosDébitosSaldo',
+      'CompetênciaCréditosDébitosSaldo do mês',
       'maio de 2026R$ 0,00R$ 0,00R$ 0,00',
       'junho de 2026R$ 0,00R$ 0,00R$ 0,00',
       'julho de 2026R$ 0,00R$ 0,00R$ 0,00',
@@ -164,7 +252,8 @@ describe('AnalysisPage', () => {
     const fetchMock = mockAnalysis('2026-05', '2026-10');
     const { router } = renderApp(`/espacos/${houseId}/analise?tipo=debitos`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Filtros' }));
+    // One filter on (only debits): the button says so before the sheet is opened.
+    await userEvent.click(await screen.findByRole('button', { name: 'Filtros (1)' }));
     const dialog = await screen.findByRole('dialog', { name: 'Filtros' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Categorias' }));
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Mercado' }));
