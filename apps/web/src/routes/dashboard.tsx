@@ -157,6 +157,7 @@ function ExpensesBlock({ summary }: { summary: Summary }) {
   const { expenses } = summary;
   return (
     <Section title="Despesas" level={3}>
+      <p className="text-muted-foreground">Quanto da renda líquida você planeja gastar no mês.</p>
       {goal.targetCents > 0 ? (
         <ExpensesMeter summary={summary} />
       ) : (
@@ -171,9 +172,8 @@ function ExpensesBlock({ summary }: { summary: Summary }) {
           ['Usado da meta', shareOfGoal(expenses.totalCents, goal.targetCents)],
         ]}
       />
-      <p className="text-muted-foreground">
-        Meta: o percentual de despesas sobre a renda líquida. Usado da meta: o que já foi pago e o
-        que falta pagar.
+      <p className="text-muted-foreground text-sm">
+        Usado da meta: o que já foi pago mais o que falta pagar.
       </p>
     </Section>
   );
@@ -183,6 +183,10 @@ function ExpensesBlock({ summary }: { summary: Summary }) {
 function AvailableBlock({ summary }: { summary: Summary }) {
   return (
     <Section title="O que sobra para guardar" level={3}>
+      <p className="text-muted-foreground">
+        Os créditos previstos menos as despesas previstas: é sobre esse valor que as metas de
+        guardar são calculadas.
+      </p>
       <AmountRows
         rows={[
           ['Créditos previstos', formatCents(summary.credits.totalCents)],
@@ -195,22 +199,31 @@ function AvailableBlock({ summary }: { summary: Summary }) {
           ],
         ]}
       />
-      <p className="text-muted-foreground">
-        Os destinos de guardar dividem este valor. As aplicações não entram na conta: guardar mais
-        não diminui as metas.
+      <p className="text-muted-foreground text-sm">
+        As aplicações não entram na conta: guardar mais não diminui as metas.
       </p>
     </Section>
   );
 }
 
-/** The saving destinations' numbers, in the order of the table's columns. */
+/** What is still to be launched for the goal: neither applied nor scheduled. */
+const missingCents = (destination: DestinationSummary) =>
+  Math.max(0, destination.targetCents - destination.appliedCents - destination.pendingCents);
+
+/**
+ * The saving destinations' amounts, in the order of the table's columns. "Agendado" is launched
+ * and not paid yet; "Falta" is not launched at all ("A aplicar" was read as either).
+ */
 const savingCells = (destination: DestinationSummary) =>
   [
     ['Meta', formatCents(destination.targetCents)],
     ['Aplicado', formatCents(destination.appliedCents)],
-    ['A aplicar', formatCents(destination.pendingCents)],
-    ['Realizado', shareOfGoal(destination.appliedCents, destination.targetCents)],
+    ['Agendado', formatCents(destination.pendingCents)],
+    ['Falta', formatCents(missingCents(destination))],
   ] as const;
+
+const realized = (destination: DestinationSummary) =>
+  shareOfGoal(destination.appliedCents, destination.targetCents);
 
 /** Each saving destination as a card on the phone: the table's columns do not fit in 360px. */
 function SavingsCards({
@@ -241,6 +254,9 @@ function SavingsCards({
                 </div>
               ))}
             </dl>
+            <p className="text-sm tabular-nums">
+              <span className="text-muted-foreground">Realizado:</span> {realized(destination)}
+            </p>
             <div className="empty:hidden">
               <ApplyButton destination={destination} onApply={onApply} />
             </div>
@@ -288,7 +304,7 @@ function SavingsTable({
           <th scope="col" className="py-2 text-left font-normal">
             Destino
           </th>
-          {['%', 'Meta', 'Aplicado', 'A aplicar', 'Realizado'].map((label) => (
+          {['%', 'Meta', 'Aplicado', 'Agendado', 'Falta', 'Realizado'].map((label) => (
             <th key={label} scope="col" className="py-2 text-right font-normal">
               {label}
             </th>
@@ -312,6 +328,7 @@ function SavingsTable({
                 {value}
               </td>
             ))}
+            <td className="py-2 text-right">{realized(destination)}</td>
             {onApply && (
               <td className="py-2 pl-4 text-right">
                 <ApplyButton destination={destination} onApply={onApply} />
@@ -326,7 +343,7 @@ function SavingsTable({
             </th>
             <td className="py-2 text-right">{formatBasisPoints(unallocated.basisPoints)}</td>
             <td className="py-2 text-right">{formatCents(unallocated.targetCents)}</td>
-            <td colSpan={3} />
+            <td colSpan={4} />
             {actions}
           </tr>
         )}
@@ -346,6 +363,9 @@ function SavingsTable({
           <td className="py-2 text-right">{formatCents(totalApplied)}</td>
           <td className="py-2 text-right">
             {formatCents(summary.applied.plannedCents - totalApplied)}
+          </td>
+          <td className="py-2 text-right">
+            {formatCents(savings.reduce((sum, destination) => sum + missingCents(destination), 0))}
           </td>
           <td className="py-2 text-right">{shareOfGoal(totalApplied, totalTarget)}</td>
           {actions}
@@ -369,6 +389,10 @@ function SavingsBlock({
   if (savings.length === 0) return null;
   return (
     <Section title="Destinos de guardar" level={3} className="xl:col-span-2">
+      <p className="text-muted-foreground">
+        Como você divide o que sobra entre os seus objetivos. A meta de cada um é uma parte do
+        disponível para guardar, não da renda.
+      </p>
       {summary.available.plannedCents <= 0 && (
         <p>Nada sobrou para guardar este mês: as despesas previstas alcançaram os créditos.</p>
       )}
@@ -377,9 +401,9 @@ function SavingsBlock({
       ) : (
         <SavingsCards savings={savings} summary={summary} onApply={onApply} />
       )}
-      <p className="text-muted-foreground">
-        Meta: o percentual de cada destino sobre o disponível para guardar. Aplicado: o que já foi
-        lançado na categoria do destino.
+      <p className="text-muted-foreground text-sm">
+        Aplicado: já lançado e pago. Agendado: lançado, ainda não pago. Falta: o que ainda não foi
+        lançado. Realizado: quanto da meta já foi aplicado.
       </p>
     </Section>
   );
@@ -415,12 +439,17 @@ function Dashboard({
         {/* Planned: as if everything were settled. Settled: only what happened (ADR 0031). */}
         <div className="grid gap-4">
           {/* The one number the month leads with (dataviz skill: one hero per view). */}
-          <dl className="grid gap-1">
-            <dt className="text-muted-foreground">Saldo previsto</dt>
-            <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
-              <SignedCents cents={summary.balance.plannedCents} />
-            </dd>
-          </dl>
+          <div className="grid gap-1">
+            <dl className="grid gap-1">
+              <dt className="text-muted-foreground">Saldo previsto</dt>
+              <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
+                <SignedCents cents={summary.balance.plannedCents} />
+              </dd>
+            </dl>
+            <p className="text-muted-foreground">
+              Como o mês termina se tudo o que está previsto for recebido e pago.
+            </p>
+          </div>
           <dl className="grid sm:grid-cols-3 sm:gap-3">
             <StatTile label="Saldo efetivado">
               <SignedCents cents={summary.balance.settledCents} />
@@ -439,10 +468,9 @@ function Dashboard({
             Inclui {formatCents(summary.estimatedCents)} em valores estimados, de contas que variam.
           </p>
         )}
-        <p className="text-muted-foreground">
-          Previsto: como se tudo fosse efetivado. Efetivado: só o que já foi recebido ou pago.
-          Disponível para guardar: os créditos menos as despesas. Aplicado: o que já foi para os
-          destinos de guardar.
+        <p className="text-muted-foreground text-sm">
+          Efetivado: só o que já foi recebido ou pago. Disponível para guardar: os créditos menos as
+          despesas. Aplicado: o que já foi para os destinos de guardar.
         </p>
       </Section>
       <Section title="Créditos e débitos">

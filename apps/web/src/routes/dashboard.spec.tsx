@@ -120,12 +120,13 @@ describe('DashboardPage', () => {
       'Créditos previstosR$ 6.000,00Despesas previstas− R$ 2.509,90Disponível para guardarR$ 3.490,10',
     );
     // On the phone, a card per saving destination: the table's columns do not fit.
-    // Investimentos: 50% of 3.490,10 = 1.745,05; 500,00 applied, 28,65% of the goal.
+    // Investimentos: 50% of 3.490,10 = 1.745,05; 500,00 applied, nothing scheduled, 1.245,05
+    // still to launch, 28,65% of the goal.
     const investments = within(destinations)
       .getAllByRole('listitem')
       .find((item) => item.textContent?.startsWith('Investimentos'));
     expect(nbsp(investments?.textContent)).toBe(
-      'Investimentos50%MetaR$ 1.745,05AplicadoR$ 500,00A aplicarR$ 0,00Realizado28,65%',
+      'Investimentos50%MetaR$ 1.745,05AplicadoR$ 500,00AgendadoR$ 0,00FaltaR$ 1.245,05Realizado: 28,65%',
     );
     expect(within(destinations).queryByRole('table')).not.toBeInTheDocument();
     // Despesas is not one of the saving destinations.
@@ -147,11 +148,12 @@ describe('DashboardPage', () => {
 
     const savings = await section('Destinos de guardar');
     const investments = within(savings).getByRole('row', { name: /Investimentos/ });
-    expect(investments).toHaveTextContent('50%R$ 1.745,05R$ 500,00R$ 0,0028,65%');
+    expect(investments).toHaveTextContent('50%R$ 1.745,05R$ 500,00R$ 0,00R$ 1.245,0528,65%');
     expect(within(savings).queryByRole('row', { name: /Despesas/ })).not.toBeInTheDocument();
     // The goals add up to what is available.
     expect(within(savings).getByRole('row', { name: /Total/ })).toHaveTextContent(
-      '100%R$ 3.490,10R$ 500,00R$ 0,0014,33%',
+      // Falta: 1.245,05 + 1.047,03 + 698,02 still to launch.
+      '100%R$ 3.490,10R$ 500,00R$ 0,00R$ 2.990,1014,33%',
     );
   });
 
@@ -271,8 +273,9 @@ describe('DashboardPage', () => {
     // Goal 1.745,05 − 500,00 applied.
     expect(within(form).getByLabelText('Valor (R$)')).toHaveValue('1.245,05');
     // Type and category are fixed: changing them would make it something else.
-    expect(within(form).getByText(/^Débito na categoria/)).toHaveTextContent(
-      'Débito na categoria Investimentos.',
+    // Said plainly: a record, not money moved.
+    expect(within(form).getByText(/^Será lançado um débito/)).toHaveTextContent(
+      'Será lançado um débito na categoria Investimentos. Nenhum dinheiro é movido: é só o registro da aplicação.',
     );
     expect(within(form).queryByRole('radiogroup', { name: 'Tipo' })).not.toBeInTheDocument();
     expect(within(form).queryByRole('combobox', { name: 'Categoria' })).not.toBeInTheDocument();
