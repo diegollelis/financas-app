@@ -18,6 +18,10 @@ import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import { CreditsBar } from '@/features/summary/credits-bar';
 import { BudgetDialog } from '@/features/budget/budget-dialog';
+import { useCategories } from '@/features/categories/use-categories';
+import { usePeople } from '@/features/people/use-people';
+import { TransactionDialog } from '@/features/transactions/transaction-dialog';
+import type { TransactionPreset } from '@/features/transactions/transaction-form';
 import { ExpensesMeter } from '@/features/summary/expenses-meter';
 import { useSummary } from '@/features/summary/use-summary';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
@@ -107,12 +111,36 @@ function realized(destination: DestinationSummary) {
   );
 }
 
+/** Opens "Registrar aplicação" for a saving destination (ADR 0047); absent for a VIEWER. */
+type OnApply = (destination: DestinationSummary, event: MouseEvent<HTMLButtonElement>) => void;
+
+/** The button of a saving destination: Despesas has no category to apply to. */
+function ApplyButton({
+  destination,
+  onApply,
+}: {
+  destination: DestinationSummary;
+  onApply?: OnApply;
+}) {
+  if (!onApply || destination.kind !== 'SAVINGS') return null;
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      aria-label={`Registrar aplicação em ${destination.name}`}
+      onClick={(event) => onApply(destination, event)}
+    >
+      Aplicar
+    </Button>
+  );
+}
+
 /** What each destination's numbers mean, under the table or the cards. */
 const destinationsNote =
   'Despesas: meta sobre a renda líquida; aplicado é o que já foi gasto. Destinos de guardar: meta sobre o que sobra depois das despesas; aplicado é o que já foi lançado na categoria do destino.';
 
 /** Each destination as a card on the phone: a six-column table does not fit in 360px. */
-function DestinationCards({ summary }: { summary: Summary }) {
+function DestinationCards({ summary, onApply }: { summary: Summary; onApply?: OnApply }) {
   return (
     <ul className="grid gap-3">
       {summary.destinations.map((destination) => (
@@ -138,6 +166,9 @@ function DestinationCards({ summary }: { summary: Summary }) {
               </div>
             ))}
           </dl>
+          <div className="empty:hidden">
+            <ApplyButton destination={destination} onApply={onApply} />
+          </div>
         </li>
       ))}
     </ul>
@@ -145,7 +176,7 @@ function DestinationCards({ summary }: { summary: Summary }) {
 }
 
 /** From md, where the columns fit: the same numbers, compared down each column. */
-function DestinationTable({ summary }: { summary: Summary }) {
+function DestinationTable({ summary, onApply }: { summary: Summary; onApply?: OnApply }) {
   return (
     <table className="w-full tabular-nums">
       <thead className="text-muted-foreground">
@@ -168,6 +199,11 @@ function DestinationTable({ summary }: { summary: Summary }) {
           <th scope="col" className="py-2 text-right font-normal">
             Realizado
           </th>
+          {onApply && (
+            <th scope="col" className="py-2 pl-4 text-right font-normal">
+              <span className="sr-only">Ações</span>
+            </th>
+          )}
         </tr>
       </thead>
       <tbody>
@@ -181,6 +217,11 @@ function DestinationTable({ summary }: { summary: Summary }) {
             <td className="py-2 text-right">{formatCents(destination.appliedCents)}</td>
             <td className="py-2 text-right">{formatCents(destination.pendingCents)}</td>
             <td className="py-2 text-right">{realized(destination)}</td>
+            {onApply && (
+              <td className="py-2 pl-4 text-right">
+                <ApplyButton destination={destination} onApply={onApply} />
+              </td>
+            )}
           </tr>
         ))}
       </tbody>
@@ -199,11 +240,13 @@ function Dashboard({
   summary,
   links,
   onEditBudget,
+  onApply,
 }: {
   summary: Summary;
   links: PageLinks;
   /** Opens the budget dialog; absent for a VIEWER, who cannot change it. */
   onEditBudget?: (event: MouseEvent<HTMLButtonElement>) => void;
+  onApply?: OnApply;
 }) {
   const { credits, debits } = summary;
   const desktop = useMediaQuery(DESKTOP_QUERY);
@@ -291,7 +334,11 @@ function Dashboard({
         </div>
         {/* The expenses goal, drawn: the one destination with a limit to watch. */}
         <ExpensesMeter summary={summary} />
-        {desktop ? <DestinationTable summary={summary} /> : <DestinationCards summary={summary} />}
+        {desktop ? (
+          <DestinationTable summary={summary} onApply={onApply} />
+        ) : (
+          <DestinationCards summary={summary} onApply={onApply} />
+        )}
         <p className="text-muted-foreground">{destinationsNote}</p>
       </Section>
     </div>
@@ -316,6 +363,58 @@ function DashboardSkeleton() {
   );
 }
 
+/**
+ * "Registrar aplicação" (ADR 0047): a new debit in the destination's category, for what is
+ * still missing to reach its goal (paid and scheduled applications discounted). It loads the
+ * categories and people the form needs only when opened.
+ */
+function ApplyDialog({
+  workspaceId,
+  period,
+  preset,
+  returnFocusTo,
+  onClose,
+}: {
+  workspaceId: string;
+  period: string;
+  preset: TransactionPreset;
+  returnFocusTo: HTMLElement | null;
+  onClose: () => void;
+}) {
+  const categories = useCategories(workspaceId);
+  const people = usePeople(workspaceId);
+  if (!categories.isSuccess || !people.isSuccess) return null;
+  return (
+    <TransactionDialog
+      workspaceId={workspaceId}
+      period={period}
+      categories={categories.data}
+      people={people.data}
+      editing={null}
+      preset={preset}
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      returnFocusTo={returnFocusTo}
+    />
+  );
+}
+
+/** The new transaction an application starts from. */
+function applicationPreset(summary: Summary, destination: DestinationSummary): TransactionPreset {
+  const categoryId =
+    summary.budget.shares.find((share) => share.destinationId === destination.destinationId)
+      ?.categoryId ?? '';
+  const missing = destination.targetCents - destination.appliedCents - destination.pendingCents;
+  return {
+    type: 'DEBIT',
+    categoryId,
+    description: `Aplicação em ${destination.name}`,
+    amountCents: missing > 0 ? missing : null,
+  };
+}
+
 export function DashboardPage() {
   const workspace = useCurrentWorkspace();
   const period = usePeriod();
@@ -328,12 +427,25 @@ export function DashboardPage() {
   // opened it ("Definir orçamento" or "Editar orçamento").
   const [budgetOpener, setBudgetOpener] = useState<HTMLElement | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
-  const editBudget = hasRole(workspace.role, 'EDITOR')
+  const canEdit = hasRole(workspace.role, 'EDITOR');
+  const editBudget = canEdit
     ? (event: MouseEvent<HTMLButtonElement>) => {
         setBudgetOpener(event.currentTarget);
         setBudgetOpen(true);
       }
     : undefined;
+  const [application, setApplication] = useState<{
+    preset: TransactionPreset;
+    opener: HTMLElement;
+  } | null>(null);
+  const apply: OnApply | undefined =
+    canEdit && summary.isSuccess
+      ? (destination, event) =>
+          setApplication({
+            preset: applicationPreset(summary.data, destination),
+            opener: event.currentTarget,
+          })
+      : undefined;
 
   return (
     <>
@@ -342,7 +454,7 @@ export function DashboardPage() {
       </PageHeader>
       <QueryState queries={[summary]} skeleton={<DashboardSkeleton />} />
       {summary.isSuccess && (
-        <Dashboard summary={summary.data} links={links} onEditBudget={editBudget} />
+        <Dashboard summary={summary.data} links={links} onEditBudget={editBudget} onApply={apply} />
       )}
       {editBudget && (
         <BudgetDialog
@@ -351,6 +463,15 @@ export function DashboardPage() {
           open={budgetOpen}
           onOpenChange={setBudgetOpen}
           returnFocusTo={budgetOpener}
+        />
+      )}
+      {application && (
+        <ApplyDialog
+          workspaceId={workspace.id}
+          period={period}
+          preset={application.preset}
+          returnFocusTo={application.opener}
+          onClose={() => setApplication(null)}
         />
       )}
     </>
