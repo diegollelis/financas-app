@@ -160,6 +160,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
     - [x] Painel: o saldo explicado junto do número, uma frase de abertura em cada bloco do orçamento, "Agendado" e "Falta" no lugar de "A aplicar", e as metas de guardar fechando no centavo
     - [x] Lançamentos: busca por descrição, categoria ou pessoa; filtro por situação no endereço (o aviso de vencidos do Painel abre já filtrado); "Mais opções" no formulário; "Pago em" e "Recebido em"
     - [x] Análise: aplicações à parte do gasto (como no Painel), comparação com o período anterior, a diferença do mês tocado, "Saldo do mês" na legenda e "Filtros (2)" no celular
+    - [x] Recorrências: total por mês (a parte variável como estimativa), o que falta de cada parcelamento (parcelas, valor e mês da última) e a regra do passado em duas frases curtas
 - [x] Carregamento com o símbolo CL animado (`components/brand-loader.tsx`, pedido em 2026-10-09):
   - **Onde:** nas telas de carregamento da página inteira: a abertura do app enquanto confere a sessão (que pode levar até um minuto com a API dormindo), Entrar e Cadastro, "/" e o convite. As listas continuam com esqueletos.
   - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).
