@@ -46,3 +46,13 @@ Hoje só o Painel usa a coluna larga; a Análise deve entrar na rodada dela.
 - **O desktop largo é aproveitado** sem esticar linhas, e o celular não muda.
 - **Uma página nova de blocos** (a Análise, por exemplo) só precisa do `handle` e da sua própria grade.
 - **As capturas do Painel** passam a ser conferidas também em 1920 px.
+
+## Nota (2026-10-09): "Orçamento por destino" em três blocos
+
+Com o [ADR 0047](0047-orcamento-real-por-destino.md), Despesas e os destinos de guardar têm bases diferentes. Despesas é um percentual da renda líquida; cada destino de guardar é um percentual do que sobra depois das despesas. Uma tabela só, com uma coluna "%" para todos, levava a somar percentuais que não se somam. A seção passa a ter três blocos:
+
+1. **Despesas:** o medidor da meta, mais Pago, A pagar e **Usado da meta** (pago + a pagar, sobre a meta, o mesmo número do medidor).
+2. **O que sobra para guardar:** a conta Créditos previstos − Despesas previstas = Disponível para guardar, a base das metas de guardar.
+3. **Destinos de guardar:** a tabela (cartões no celular) só com eles. Uma linha **"Sem destino"** aparece quando a soma fica abaixo de 100%; o valor vem do resumo (`unallocated`, calculado em `summarizePeriod`). A linha **Total** mostra 100% e o próprio disponível, porque a soma das metas arredondadas pode errar por um centavo.
+
+Do xl em diante, os blocos 1 e 2 ficam lado a lado, e a tabela ocupa a largura toda embaixo.
