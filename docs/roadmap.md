@@ -163,7 +163,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 **Ideias futuras:**
 
 - **Página de apresentação do Finanças:** é para quem chega sem conta. Ela teria a arte grande, os recursos reais e capturas do app, e ficaria ligada ao `codelelis.com`. É o lugar de mostrar o produto; o login continua só com o formulário.
-- **Copiar categorias entre espaços** (pedido em 2026-10-09):
-  - **O que é:** "Copiar categorias de…" ao criar um espaço, e "Trazer categorias de outro espaço" na tela de Categorias. Você marca quais copiar, e as de mesmo nome são ignoradas. Os destinos do orçamento podem vir junto.
-  - **Por que copiar e não compartilhar:** cada espaço continua isolado (RLS, ADR 0028), e mudar uma categoria num espaço não mexe no outro.
-  - **Quem pode:** só servem de origem os espaços de que a pessoa participa, e só se grava num espaço em que ela edita.
+- [x] **Copiar categorias entre espaços** ([ADR 0048](adr/0048-copiar-categorias-entre-espacos.md)): "Copiar de outro espaço" na tela de Categorias. Você marca quais copiar; as de mesmo nome (sem diferenciar maiúsculas e acentos), as arquivadas e as de destinos do orçamento ficam de fora. Só servem de origem os espaços de que a pessoa participa, e só se grava num espaço em que ela edita.
+  - [x] Tela de Categorias: busca, contagem por seção e "Nova categoria" num modal no topo
+  - [ ] Oferecer a cópia ao criar um espaço
+  - [ ] Copiar também os destinos do orçamento
