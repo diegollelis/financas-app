@@ -43,7 +43,7 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **Toques de pelo menos 44 px** no celular e **valores com `tabular-nums`**.
 - **Formulários:** em _Sheet_ (gaveta que sobe de baixo) no celular e em _Dialog_ no desktop. A ação principal fica sempre ao alcance, como um "Novo lançamento" fixo.
 - **Estados obrigatórios:**
-  - carregando, com _skeleton_ e um aviso de "acordando o servidor" depois de alguns segundos;
+  - carregando, com _skeleton_ e um aviso de "aguardando o servidor" depois de alguns segundos;
   - vazio, com convite à ação;
   - erro, com a causa e um "tentar de novo".
 - **Retorno e segurança:** toast depois de cada mudança e confirmação (`AlertDialog`) antes de excluir.
@@ -77,7 +77,7 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
   - o _skip link_ "Pular para o conteúdo" e o `<main id="conteudo">`.
 - **O espaço é carregado uma vez, no layout.** Carregando, com 404 ou com erro, o próprio layout mostra o estado; as páginas só aparecem com o espaço carregado e o leem com `useCurrentWorkspace()`. Custo: as consultas da página começam depois da do espaço (uma ida e volta a mais), o que é aceitável perto do _cold start_.
 - **Trocar de seção mantém a competência** (`?competencia=`) entre Painel, Lançamentos e Orçamento.
-- **`QueryState`** (`components/query-state.tsx`) mostra o _skeleton_, o aviso de "Acordando o servidor…" depois de 3 s, "Espaço não encontrado." com o caminho de volta, ou o erro com "Tentar de novo". Substituiu o bloco repetido nas cinco páginas.
+- **`QueryState`** (`components/query-state.tsx`) mostra o _skeleton_, o aviso de "Aguardando o servidor…" depois de 3 s, "Espaço não encontrado." com o caminho de volta, ou o erro com "Tentar de novo". Substituiu o bloco repetido nas cinco páginas.
 - **`PeriodNav`** virou botões de 44 px (anterior, próxima e "Mês atual"), ainda como links, porque navegam.
 - **A página `/espacos/:workspaceId`** deixou de ser um índice de links e passou a ser "Membros". A lista de espaços da página inicial abre direto o Painel.
 

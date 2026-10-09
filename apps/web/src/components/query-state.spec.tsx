@@ -12,14 +12,14 @@ describe('LoadingState', () => {
     render(<LoadingState>conteúdo</LoadingState>);
 
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
-    expect(screen.queryByText(/Acordando o servidor/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Aguardando o servidor/)).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(SLOW_LOADING_MS);
     });
 
     expect(
-      screen.getByText('Acordando o servidor… isso pode levar até um minuto.'),
+      screen.getByText('Aguardando o servidor… isso pode levar até um minuto.'),
     ).toBeInTheDocument();
   });
 });

@@ -129,7 +129,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [x] Rodada de validação do login:
   - auditoria axe no script de capturas;
   - borda dos campos com 3:1;
-  - "Acordando o servidor…" ao enviar;
+  - "Aguardando o servidor…" ao enviar;
   - testes de teclado e autocomplete;
   - o "G" do Google no botão;
   - o rodapé na base da tela.
@@ -158,7 +158,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - **Onde:** nas telas de carregamento da página inteira, como a abertura do app enquanto confere a sessão (que pode levar até um minuto com a API dormindo) e o convite. As listas continuam com esqueletos.
   - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).
   - **Acessibilidade:** parada para quem pede menos movimento, e "Carregando…" só para leitores de tela.
-  - **A decidir:** se, depois de ~3 s, aparece "Acordando o servidor…" abaixo do símbolo.
+  - **A decidir:** se, depois de ~3 s, aparece "Aguardando o servidor…" abaixo do símbolo.
 
 **Ideias futuras:**
 
