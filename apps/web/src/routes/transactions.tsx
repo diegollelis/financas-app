@@ -485,6 +485,8 @@ export function TransactionsPage() {
               options={statusFilterOptions}
               value={statusFilter}
               onChange={setStatusFilter}
+              // Four do not fit in 360px: two rows of two on the phone, one row from sm.
+              className="grid-flow-row grid-cols-2 sm:grid-flow-col sm:grid-cols-none"
             />
           </div>
         )}
