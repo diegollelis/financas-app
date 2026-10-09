@@ -128,7 +128,7 @@ As aplicações **não entram na base**. É isso que tira a circularidade: aplic
 - **Exportação:** as duas tabelas novas entram em `EXPORTED_TABLES` ([ADR 0041](0041-termos-exportacao-e-exclusao-de-conta.md)).
 - **Importação ([ADR 0040](0040-importacao-da-planilha.md)):** a planilha modelo continua igual; uma linha na categoria de um destino é uma aplicação.
 - **O ADR 0031 muda** onde fala de meta, previsto, efetivado e resultado. O ADR 0030 muda na tabela e no padrão; a herança fica.
-- **Implementação em três PRs:**
-  1. destinos, percentuais por competência e a migração;
-  2. o resumo com aplicações e as duas bases;
-  3. as telas.
+- **Implementação em três PRs.** O web valida as respostas da API com os schemas compartilhados, então mudar o contrato do orçamento ou do resumo exige mudar a API e o web juntos:
+  1. **só acréscimos:** destinos, as suas categorias e a migração dos espaços existentes, sem mudar o orçamento nem o Painel;
+  2. **percentuais e resumo:** os percentuais por competência, copiados dos orçamentos atuais, e o resumo com aplicações e as duas bases, com a API e o web adaptados juntos;
+  3. **as telas novas.**

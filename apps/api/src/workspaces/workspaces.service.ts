@@ -13,6 +13,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { createDefaultDestinations } from '../budget-destinations/default-destinations.js';
 import { createDefaultCategories } from '../categories/default-categories.js';
 import type { Member, Workspace as WorkspaceRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -48,6 +49,7 @@ export class WorkspacesService {
         },
       });
       await createDefaultCategories(tx, workspace.id);
+      await createDefaultDestinations(tx, workspace.id);
     });
   }
 
@@ -67,6 +69,7 @@ export class WorkspacesService {
         data: { name: input.name, members: { create: { userId, role: 'OWNER' } } },
       });
       await createDefaultCategories(tx, created.id);
+      await createDefaultDestinations(tx, created.id);
       return created;
     });
     return { id: workspace.id, name: workspace.name, isPersonal: false, role: 'OWNER' };

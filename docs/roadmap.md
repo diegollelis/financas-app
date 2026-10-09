@@ -148,13 +148,22 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - **Duas bases:** Despesas é um % da renda líquida; os destinos de guardar são um % do disponível (créditos − despesas).
   - **Destinos personalizados,** cada destino de guardar com a sua categoria de débito. Um lançamento nela é uma aplicação.
   - **Orçamento vazio até o primeiro** ser salvo; depois cada mês herda o anterior.
-  - [ ] PR 1: destinos (`budget_destinations`), percentuais por competência (`budget_shares`) e a migração dos orçamentos atuais
-  - [ ] PR 2: o resumo com aplicações, as duas bases e o "Resultado" substituído
+  - [x] PR 1 (só acréscimos, o orçamento e o Painel seguem iguais): destinos (`budget_destinations`, rotas `/budget-destinations`), cada destino de guardar com a sua categoria, os padrão em todo espaço (os existentes pela migração) e a proteção das categorias de destino
+  - [ ] PR 2: percentuais por competência (`budget_shares`, copiados dos orçamentos atuais), o resumo com aplicações e as duas bases, e o "Resultado" substituído, com a API e o web juntos, porque muda o contrato
   - [ ] PR 3: telas. No Painel, meta, aplicado e % realizado, com "Registrar aplicação". No modal, os destinos e o "Definir orçamento" destacado.
 - [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada
+- [ ] Carregamento com o símbolo CL animado (pedido em 2026-10-09):
+  - **Onde:** nas telas de carregamento da página inteira, como a abertura do app enquanto confere a sessão (que pode levar até um minuto com a API dormindo) e o convite. As listas continuam com esqueletos.
+  - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).
+  - **Acessibilidade:** parada para quem pede menos movimento, e "Carregando…" só para leitores de tela.
+  - **A decidir:** se, depois de ~3 s, aparece "Acordando o servidor…" abaixo do símbolo.
 
 **Ideias futuras:**
 
 - **Página de apresentação do Finanças:** é para quem chega sem conta. Ela teria a arte grande, os recursos reais e capturas do app, e ficaria ligada ao `codelelis.com`. É o lugar de mostrar o produto; o login continua só com o formulário.
+- **Copiar categorias entre espaços** (pedido em 2026-10-09):
+  - **O que é:** "Copiar categorias de…" ao criar um espaço, e "Trazer categorias de outro espaço" na tela de Categorias. Você marca quais copiar, e as de mesmo nome são ignoradas. Os destinos do orçamento podem vir junto.
+  - **Por que copiar e não compartilhar:** cada espaço continua isolado (RLS, ADR 0028), e mudar uma categoria num espaço não mexe no outro.
+  - **Quem pode:** só servem de origem os espaços de que a pessoa participa, e só se grava num espaço em que ela edita.

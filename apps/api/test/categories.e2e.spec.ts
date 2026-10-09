@@ -1,4 +1,5 @@
 import {
+  DEFAULT_BUDGET_DESTINATIONS,
   CATEGORY_USAGE_MONTHS,
   categoryListResponseSchema,
   categorySchema,
@@ -34,7 +35,10 @@ const categoryRoutes: WorkspaceRoute[] = [
   { method: 'delete', path: (id) => `/api/workspaces/${id}/categories/${SOME_ID}` },
 ];
 
-const defaultCount = DEFAULT_CATEGORIES.CREDIT.length + DEFAULT_CATEGORIES.DEBIT.length;
+// The default categories, plus the debit category of each default saving destination (ADR 0047).
+const savingDestinations = DEFAULT_BUDGET_DESTINATIONS.filter((d) => d.kind === 'SAVINGS').length;
+const defaultCount =
+  DEFAULT_CATEGORIES.CREDIT.length + DEFAULT_CATEGORIES.DEBIT.length + savingDestinations;
 
 describe('categories', () => {
   let t: Awaited<ReturnType<typeof createTestApp>>;

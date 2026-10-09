@@ -54,6 +54,17 @@ const exportPersonSchema = z.object({
   createdAt: instant,
 });
 
+/** A destination of the budget (ADR 0047), with the category of its applications. */
+const exportBudgetDestinationSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  kind: z.enum(['EXPENSES', 'SAVINGS']),
+  position: z.number().int(),
+  categoryId: z.uuid().nullable(),
+  archivedAt: instant.nullable(),
+  createdAt: instant,
+});
+
 const exportBudgetSchema = z.object({
   period,
   netIncomeCents: z.number().int(),
@@ -134,6 +145,7 @@ const ownedWorkspaceSchema = z.object({
   people: z.array(exportPersonSchema),
   transactions: z.array(exportTransactionSchema),
   budgets: z.array(exportBudgetSchema),
+  budgetDestinations: z.array(exportBudgetDestinationSchema),
   recurrences: z.array(exportRecurrenceSchema),
   installmentPlans: z.array(exportInstallmentPlanSchema),
   imports: z.array(exportImportSchema),

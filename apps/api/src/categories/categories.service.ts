@@ -26,6 +26,13 @@ function toResponse(category: CategoryRow, recentUses = 0): Category {
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
 const typeOrder: Record<TransactionType, number> = { CREDIT: 0, DEBIT: 1 };
 
+const ownedByDestination = () =>
+  new ConflictException({
+    code: 'CATEGORY_OF_DESTINATION',
+    message:
+      'Esta categoria é de um destino do orçamento: renomeie, arquive ou exclua pelo destino.',
+  });
+
 const categoryExists = () =>
   new ConflictException({
     code: 'CATEGORY_EXISTS',
@@ -90,6 +97,7 @@ export class CategoriesService {
     input: UpdateCategoryInput,
   ): Promise<Category> {
     const current = await this.find(workspaceId, categoryId);
+    await this.ensureNotOwnedByDestination(workspaceId, categoryId);
     if (input.name !== undefined) {
       await this.ensureNameIsFree(workspaceId, current.type, input.name, categoryId);
     }
@@ -117,6 +125,7 @@ export class CategoriesService {
    */
   async remove(workspaceId: string, categoryId: string): Promise<void> {
     if (!z.uuid().safeParse(categoryId).success) throw new NotFoundException();
+    await this.ensureNotOwnedByDestination(workspaceId, categoryId);
     try {
       const { count } = await this.prisma
         .forWorkspace(workspaceId)
@@ -132,6 +141,14 @@ export class CategoriesService {
       }
       throw error;
     }
+  }
+
+  /** A saving destination's category is renamed, archived and deleted with it (ADR 0047). */
+  private async ensureNotOwnedByDestination(workspaceId: string, categoryId: string) {
+    const destination = await this.prisma
+      .forWorkspace(workspaceId)
+      .budgetDestination.findFirst({ where: { workspaceId, categoryId } });
+    if (destination) throw ownedByDestination();
   }
 
   /** An id that is not a uuid, or that belongs to another workspace, is simply not found. */
