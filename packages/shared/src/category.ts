@@ -61,3 +61,31 @@ export const CATEGORY_USAGE_MONTHS = 6;
 
 /** `GET /workspaces/:workspaceId/categories`: all of them, archived too, by type and name. */
 export const categoryListResponseSchema = z.array(categorySchema);
+
+/** More than any workspace has: the defaults are about 40. */
+export const MAX_CATEGORIES_TO_COPY = 500;
+
+/**
+ * `POST /workspaces/:workspaceId/categories/copy` (ADR 0048): categories of another workspace the
+ * person is a member of, chosen by id, created here with the same name and type.
+ */
+export const copyCategoriesInputSchema = z.object({
+  sourceWorkspaceId: z.uuid(),
+  categoryIds: z
+    .array(z.uuid())
+    .min(1, 'Escolha ao menos uma categoria.')
+    .max(MAX_CATEGORIES_TO_COPY, `Escolha no máximo ${MAX_CATEGORIES_TO_COPY} categorias.`),
+});
+
+export type CopyCategoriesInput = z.infer<typeof copyCategoriesInputSchema>;
+
+/**
+ * How many were created, and how many were not: already here (same type and name, ignoring case
+ * and accents, archived too), archived there, a saving destination's, or not found there.
+ */
+export const copyCategoriesResultSchema = z.object({
+  copied: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+});
+
+export type CopyCategoriesResult = z.infer<typeof copyCategoriesResultSchema>;
