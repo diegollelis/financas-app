@@ -1,6 +1,8 @@
 import {
   categoryListResponseSchema,
   categorySchema,
+  copyCategoriesResultSchema,
+  type CopyCategoriesInput,
   type CreateCategoryInput,
   type UpdateCategoryInput,
 } from '@financas/shared';
@@ -31,6 +33,16 @@ export function useCreateCategory(workspaceId: string) {
   return useMutation({
     mutationFn: (input: CreateCategoryInput) =>
       apiPost(`/api/workspaces/${workspaceId}/categories`, input, categorySchema),
+    onSuccess,
+  });
+}
+
+/** Copies categories of another of the person's workspaces into this one (ADR 0048). */
+export function useCopyCategories(workspaceId: string) {
+  const onSuccess = useInvalidateCategories(workspaceId);
+  return useMutation({
+    mutationFn: (input: CopyCategoriesInput) =>
+      apiPost(`/api/workspaces/${workspaceId}/categories/copy`, input, copyCategoriesResultSchema),
     onSuccess,
   });
 }

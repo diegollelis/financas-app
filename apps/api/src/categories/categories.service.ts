@@ -1,8 +1,11 @@
 import {
   CATEGORY_USAGE_MONTHS,
   currentPeriod,
+  normalizeName,
   shiftPeriod,
   type Category,
+  type CopyCategoriesInput,
+  type CopyCategoriesResult,
   type CreateCategoryInput,
   type TransactionType,
   type UpdateCategoryInput,
@@ -99,6 +102,54 @@ export class CategoriesService {
       if (isPrismaError(error, 'P2002')) throw categoryExists();
       throw error;
     }
+  }
+
+  /**
+   * Copies categories of another workspace the person is a member of (ADR 0048). Only active
+   * ones, never a saving destination's (it belongs to the destination, ADR 0047), and none whose
+   * name is already here for the same type, ignoring case and accents, archived ones too. The
+   * source is read in its own RLS context, after checking the membership; this workspace is
+   * written in its own. A source that is not the person's answers 404, as any other workspace.
+   */
+  async copy(
+    workspaceId: string,
+    userId: string,
+    input: CopyCategoriesInput,
+  ): Promise<CopyCategoriesResult> {
+    const member = await this.prisma.member.findUnique({
+      where: { workspaceId_userId: { workspaceId: input.sourceWorkspaceId, userId } },
+    });
+    if (!member) throw new NotFoundException();
+    const requested = new Set(input.categoryIds);
+    const [source, here] = await Promise.all([
+      this.prisma.forWorkspace(input.sourceWorkspaceId).category.findMany({
+        where: {
+          workspaceId: input.sourceWorkspaceId,
+          id: { in: [...requested] },
+          archivedAt: null,
+          destination: { is: null },
+        },
+        select: { name: true, type: true },
+      }),
+      this.prisma
+        .forWorkspace(workspaceId)
+        .category.findMany({ where: { workspaceId }, select: { name: true, type: true } }),
+    ]);
+    const key = (category: { name: string; type: TransactionType }) =>
+      `${category.type}:${normalizeName(category.name)}`;
+    const taken = new Set(here.map(key));
+    const data = source.flatMap((category) => {
+      if (taken.has(key(category))) return [];
+      taken.add(key(category));
+      return [{ workspaceId, name: category.name, type: category.type }];
+    });
+    // Someone creating the same name meanwhile: the unique index skips it.
+    const { count } = data.length
+      ? await this.prisma
+          .forWorkspace(workspaceId)
+          .category.createMany({ data, skipDuplicates: true })
+      : { count: 0 };
+    return { copied: count, skipped: requested.size - count };
   }
 
   async update(

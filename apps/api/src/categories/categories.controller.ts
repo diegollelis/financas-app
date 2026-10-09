@@ -1,9 +1,13 @@
 import {
   categoryListResponseSchema,
   categorySchema,
+  copyCategoriesInputSchema,
+  copyCategoriesResultSchema,
   createCategoryInputSchema,
   updateCategoryInputSchema,
   type Category,
+  type CopyCategoriesInput,
+  type CopyCategoriesResult,
   type CreateCategoryInput,
   type UpdateCategoryInput,
 } from '@financas/shared';
@@ -20,6 +24,8 @@ import {
   type SchemaObject,
 } from '@nestjs/swagger';
 import { z } from 'zod';
+import type { AuthSession } from '../auth/auth.js';
+import { CurrentUser } from '../auth/current-user.decorator.js';
 import {
   CurrentMembership,
   RequireRole,
@@ -59,6 +65,24 @@ export class CategoriesController {
     @Body({ schema: createCategoryInputSchema }) input: CreateCategoryInput,
   ): Promise<Category> {
     return this.categories.create(membership.workspaceId, input);
+  }
+
+  @Post('copy')
+  @RequireRole('EDITOR')
+  @ApiBody({ schema: openApi(copyCategoriesInputSchema) })
+  @ApiCreatedResponse({
+    description:
+      "Copied from another of the person's workspaces (ADR 0048): how many were created and skipped.",
+    schema: openApi(copyCategoriesResultSchema),
+  })
+  @ApiBadRequestResponse({ description: 'Invalid input (code INVALID_INPUT).' })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  copy(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @CurrentUser() user: AuthSession['user'],
+    @Body({ schema: copyCategoriesInputSchema }) input: CopyCategoriesInput,
+  ): Promise<CopyCategoriesResult> {
+    return this.categories.copy(membership.workspaceId, user.id, input);
   }
 
   @Patch(':categoryId')

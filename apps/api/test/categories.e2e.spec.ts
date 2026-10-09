@@ -33,6 +33,11 @@ const categoryRoutes: WorkspaceRoute[] = [
     body: { archived: true },
   },
   { method: 'delete', path: (id) => `/api/workspaces/${id}/categories/${SOME_ID}` },
+  {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/categories/copy`,
+    body: { sourceWorkspaceId: SOME_ID, categoryIds: [SOME_ID] },
+  },
 ];
 
 // The default categories, plus the debit category of each default saving destination (ADR 0047).
@@ -233,6 +238,154 @@ describe('categories', () => {
 
       await browser.delete(path).expect(404);
       expect(await list(browser, personalWorkspaceId)).not.toContainEqual(pet);
+    });
+  });
+
+  describe('copying from another workspace (ADR 0048)', () => {
+    /** Maria with her personal workspace and a shared one, "Casa". */
+    async function twoWorkspaces() {
+      const signedUp = await t.signUp(maria);
+      const created = await signedUp.browser
+        .post('/api/workspaces')
+        .send({ name: 'Casa' })
+        .expect(201);
+      return { ...signedUp, houseId: workspaceSchema.parse(created.body).id };
+    }
+
+    function copy(
+      browser: ReturnType<typeof t.http>,
+      workspaceId: string,
+      body: { sourceWorkspaceId: string; categoryIds: string[] },
+    ) {
+      return browser.post(`/api/workspaces/${workspaceId}/categories/copy`).send(body);
+    }
+
+    it('creates the chosen ones with the same name and type', async () => {
+      const { browser, personalWorkspaceId, houseId } = await twoWorkspaces();
+      const pet = await create(browser, personalWorkspaceId, { name: 'Pet', type: 'DEBIT' });
+      const aluguel = await create(browser, personalWorkspaceId, {
+        name: 'Aluguel recebido',
+        type: 'CREDIT',
+      });
+
+      const response = await copy(browser, houseId, {
+        sourceWorkspaceId: personalWorkspaceId,
+        categoryIds: [pet.id, aluguel.id],
+      }).expect(201);
+
+      expect(response.body).toEqual({ copied: 2, skipped: 0 });
+      const house = await list(browser, houseId);
+      expect(house).toContainEqual(expect.objectContaining({ name: 'Pet', type: 'DEBIT' }));
+      expect(house).toContainEqual(
+        expect.objectContaining({ name: 'Aluguel recebido', type: 'CREDIT', archived: false }),
+      );
+    });
+
+    it('skips names already here, ignoring case and accents, archived ones too', async () => {
+      const { browser, personalWorkspaceId, houseId } = await twoWorkspaces();
+      const agua = await create(browser, personalWorkspaceId, { name: 'Água', type: 'DEBIT' });
+      const pet = await create(browser, personalWorkspaceId, { name: 'Pet', type: 'DEBIT' });
+      await create(browser, houseId, { name: 'agua', type: 'DEBIT' });
+      const archived = await create(browser, houseId, { name: 'PET', type: 'DEBIT' });
+      await browser
+        .patch(`/api/workspaces/${houseId}/categories/${archived.id}`)
+        .send({ archived: true })
+        .expect(200);
+      const before = (await list(browser, houseId)).length;
+
+      const response = await copy(browser, houseId, {
+        sourceWorkspaceId: personalWorkspaceId,
+        categoryIds: [agua.id, pet.id],
+      }).expect(201);
+
+      expect(response.body).toEqual({ copied: 0, skipped: 2 });
+      expect(await list(browser, houseId)).toHaveLength(before);
+    });
+
+    it("never copies archived ones or a saving destination's", async () => {
+      const { browser, personalWorkspaceId, houseId } = await twoWorkspaces();
+      const old = await create(browser, personalWorkspaceId, { name: 'Antiga', type: 'DEBIT' });
+      await browser
+        .patch(`/api/workspaces/${personalWorkspaceId}/categories/${old.id}`)
+        .send({ archived: true })
+        .expect(200);
+      const reforma = await browser
+        .post(`/api/workspaces/${personalWorkspaceId}/budget-destinations`)
+        .send({ name: 'Reforma' })
+        .expect(201);
+
+      const response = await copy(browser, houseId, {
+        sourceWorkspaceId: personalWorkspaceId,
+        categoryIds: [old.id, (reforma.body as { categoryId: string }).categoryId],
+      }).expect(201);
+
+      expect(response.body).toEqual({ copied: 0, skipped: 2 });
+      const names = (await list(browser, houseId)).map((category) => category.name);
+      expect(names).not.toContain('Antiga');
+      expect(names).not.toContain('Reforma');
+    });
+
+    it('answers 404 for a source workspace the person is not a member of', async () => {
+      const { browser, houseId } = await twoWorkspaces();
+      const other = await t.signUp(joao);
+      const [theirs] = await list(other.browser, other.personalWorkspaceId);
+
+      await copy(browser, houseId, {
+        sourceWorkspaceId: other.personalWorkspaceId,
+        categoryIds: [theirs!.id],
+      }).expect(404);
+    });
+
+    it("ignores ids of another workspace's categories", async () => {
+      const { browser, personalWorkspaceId, houseId } = await twoWorkspaces();
+      const other = await t.signUp(joao);
+      const theirs = await create(other.browser, other.personalWorkspaceId, {
+        name: 'Do João',
+        type: 'DEBIT',
+      });
+
+      const response = await copy(browser, houseId, {
+        sourceWorkspaceId: personalWorkspaceId,
+        categoryIds: [theirs.id],
+      }).expect(201);
+
+      expect(response.body).toEqual({ copied: 0, skipped: 1 });
+      expect((await list(browser, houseId)).map((c) => c.name)).not.toContain('Do João');
+    });
+
+    it('lets a VIEWER of the source copy into a workspace where they edit, not the opposite', async () => {
+      const owner = await t.signUp(maria);
+      const created = await owner.browser
+        .post('/api/workspaces')
+        .send({ name: 'Casa' })
+        .expect(201);
+      const houseId = workspaceSchema.parse(created.body).id;
+      const pet = await create(owner.browser, houseId, { name: 'Pet', type: 'DEBIT' });
+      const viewer = await t.signUp(joao);
+      await t.prisma.member.create({
+        data: { workspaceId: houseId, userId: viewer.userId, role: 'VIEWER' },
+      });
+      const [own] = await list(viewer.browser, viewer.personalWorkspaceId);
+
+      await copy(viewer.browser, viewer.personalWorkspaceId, {
+        sourceWorkspaceId: houseId,
+        categoryIds: [pet.id],
+      }).expect(201);
+      await copy(viewer.browser, houseId, {
+        sourceWorkspaceId: viewer.personalWorkspaceId,
+        categoryIds: [own!.id],
+      }).expect(403);
+    });
+
+    it('validates the input with the shared schema', async () => {
+      const { browser, personalWorkspaceId, houseId } = await twoWorkspaces();
+
+      const response = await copy(browser, houseId, {
+        sourceWorkspaceId: personalWorkspaceId,
+        categoryIds: [],
+      }).expect(400);
+
+      expect(response.body).toMatchObject({ code: 'INVALID_INPUT' });
     });
   });
 
