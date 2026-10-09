@@ -32,6 +32,7 @@ model Workspace {
   occurrences        RecurrenceOccurrence[]
   people             Person[]
   budgetDestinations BudgetDestination[]
+  budgetShares       BudgetShare[]
   createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -241,7 +242,11 @@ model BudgetDestination {
   createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  shares BudgetShare[]
+
   @@unique([workspaceId, name])
+  // Target of the composite foreign key of budget shares.
+  @@unique([id, workspaceId])
   // One destination per category.
   @@unique([categoryId, workspaceId])
   @@map("budget_destinations")
@@ -413,23 +418,40 @@ model RecurrenceOccurrence {
   @@map("recurrence_occurrences")
 }
 
-// Budget of one competência: income and the share of it for each destination, in basis points
-// (ADR 0010). Only competências someone saved have a row; the others inherit the latest earlier
-// one (ADR 0030). The CHECKs (ranges, sum <= 100%) are in the migration.
+// Budget of one competência (ADRs 0030, 0047): the net income, base of the expenses goal, and
+// one share per destination (BudgetShare). Only competências someone saved have a row; the
+// others inherit the latest earlier one. The CHECKs are in the migrations.
 model BudgetConfig {
-  id                 String    @id @default(uuid(7)) @db.Uuid
-  workspaceId        String    @map("workspace_id") @db.Uuid
-  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  period             String    @db.Char(7)
-  netIncomeCents     Int       @map("net_income_cents")
-  grossIncomeCents   Int?      @map("gross_income_cents")
-  expensesBp         Int       @map("expenses_bp")
-  investmentsBp      Int       @map("investments_bp")
-  emergencyReserveBp Int       @map("emergency_reserve_bp")
-  travelBp           Int       @map("travel_bp")
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id             String        @id @default(uuid(7)) @db.Uuid
+  workspaceId    String        @map("workspace_id") @db.Uuid
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  period         String        @db.Char(7)
+  netIncomeCents Int           @map("net_income_cents")
+  shares         BudgetShare[]
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([workspaceId, period])
   @@map("budget_configs")
+}
+
+// The share of one destination in one saved budget, in basis points (ADR 0047): Despesas of the
+// net income, a saving destination of what is left after expenses. A destination without a row
+// has 0%. Deleting the budget deletes its shares; the destination is referenced with
+// (destination_id, workspace_id), so it is always of the same workspace.
+model BudgetShare {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  workspaceId    String            @map("workspace_id") @db.Uuid
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  budgetConfigId String            @map("budget_config_id") @db.Uuid
+  budgetConfig   BudgetConfig      @relation(fields: [budgetConfigId], references: [id], onDelete: Cascade)
+  destinationId  String            @map("destination_id") @db.Uuid
+  destination    BudgetDestination @relation(fields: [destinationId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  basisPoints    Int               @map("basis_points")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([budgetConfigId, destinationId])
+  @@index([destinationId])
+  @@map("budget_shares")
 }

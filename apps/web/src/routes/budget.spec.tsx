@@ -2,26 +2,24 @@ import { summarizePeriod, type Budget } from '@financas/shared';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { verifiedUser, mockApi } from '@/test/mock-api';
+import { testBudget, testDestinations, verifiedUser, mockApi } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
-// Fictitious data (ADR 0019). The budget is edited in a dialog on the dashboard (ADR 0046).
+// Fictitious data (ADR 0019). The budget is edited in a dialog on the dashboard (ADR 0046), one
+// share per destination (ADR 0047).
 const houseId = '01920000-0000-7000-8000-000000000002';
 const house = { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' };
 const base = `/api/workspaces/${houseId}/budget`;
 const today = '2026-10-15';
 
-const inherited: Budget = {
+// Despesas 60% of the income; Investimentos 50%, Reserva 30%, Viagens 20% of what is left.
+const inherited = testBudget({
   period: '2026-10',
   netIncomeCents: 500_000,
-  grossIncomeCents: null,
-  expensesBp: 6_000,
-  investmentsBp: 2_000,
-  emergencyReserveBp: 1_500,
-  travelBp: 500,
   source: 'INHERITED',
   inheritedFrom: '2026-09',
-};
+  basisPoints: [6_000, 5_000, 3_000, 2_000],
+});
 
 /** The dashboard of a competência, and the budget the dialog loads for it. */
 const monthRoutes = (budget: Budget) => ({
@@ -45,6 +43,8 @@ const openDialog = async () => {
   return screen.findByRole('dialog', { name: 'Orçamento de outubro de 2026' });
 };
 
+const [despesas, investimentos, reserva, viagens] = testDestinations.map((d) => d.destinationId);
+
 describe('Budget dialog (on the dashboard)', () => {
   beforeEach(() => {
     // Only Date is faked: "today" is Oct 15th, 2026 in São Paulo; timers stay real.
@@ -56,7 +56,7 @@ describe('Budget dialog (on the dashboard)', () => {
     vi.useRealTimers();
   });
 
-  it('shows the net income on the dashboard, and opens the budget with where it came from', async () => {
+  it('opens the budget with where it came from, one percentage per destination', async () => {
     mockBudget();
 
     renderApp(`/espacos/${houseId}/painel`);
@@ -70,56 +70,42 @@ describe('Budget dialog (on the dashboard)', () => {
       ),
     ).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Renda líquida (R$)')).toHaveValue('5.000,00');
-    expect(within(dialog).getByLabelText('Renda bruta (R$, opcional)')).toHaveValue('');
+    // Despesas: a share of the net income, shown in reais as it is typed.
     expect(within(dialog).getByLabelText('Despesas (%)')).toHaveValue('60');
     expect(within(dialog).getByText('R$ 3.000,00')).toBeInTheDocument();
-    expect(within(dialog).getByText('R$ 250,00')).toBeInTheDocument();
+    // The saving destinations: shares of what is left after expenses.
+    expect(within(dialog).getByLabelText('Investimentos (%)')).toHaveValue('50');
     expect(within(dialog).getByText('Soma: 100%')).toBeInTheDocument();
   });
 
-  it('explains the defaults when no competência was ever saved', async () => {
-    const defaults: Budget = {
-      ...inherited,
-      period: '2026-11',
-      netIncomeCents: 0,
-      source: 'DEFAULT',
-      inheritedFrom: null,
-    };
-    mockBudget(monthRoutes(defaults));
+  it('highlights "Definir orçamento" while there is none, and starts empty', async () => {
+    const none = testBudget({ period: '2026-11' });
+    mockBudget(monthRoutes(none));
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
 
-    // No net income yet: the button says what is missing.
-    await userEvent.click(await screen.findByRole('button', { name: 'Definir renda' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Definir orçamento' }));
     const dialog = await screen.findByRole('dialog', { name: 'Orçamento de novembro de 2026' });
     expect(
-      await within(dialog).findByText(/^Percentuais padrão: nenhuma competência até aqui/),
+      await within(dialog).findByText(/^Nenhuma competência até aqui tem orçamento salvo/),
     ).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Despesas (%)')).toHaveValue('0');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Definir orçamento' })).toHaveFocus();
   });
 
-  it('saves the whole configuration for the competência, then closes', async () => {
+  it('saves the net income and every share for the competência, then closes', async () => {
     const fetchMock = mockBudget({
-      [`PUT ${base}/2026-10`]: {
-        body: {
-          ...inherited,
-          travelBp: 250,
-          grossIncomeCents: 650_000,
-          source: 'SAVED',
-          inheritedFrom: null,
-        },
-      },
+      [`PUT ${base}/2026-10`]: { body: { ...inherited, source: 'SAVED', inheritedFrom: null } },
     });
     renderApp(`/espacos/${houseId}/painel`);
 
     const dialog = await openDialog();
-    await userEvent.type(
-      await within(dialog).findByLabelText('Renda bruta (R$, opcional)'),
-      '6.500',
-    );
-    const travel = within(dialog).getByLabelText('Viagens (%)');
+    const travel = await within(dialog).findByLabelText('Viagens (%)');
     await userEvent.clear(travel);
-    await userEvent.type(travel, '2,5');
-    expect(within(dialog).getByText('Soma: 97,5%. Sem destino: 2,5%')).toBeInTheDocument();
+    await userEvent.type(travel, '10');
+    expect(within(dialog).getByText('Soma: 90%. Sem destino: 10%')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar orçamento' }));
 
     await vi.waitFor(() =>
@@ -129,11 +115,12 @@ describe('Budget dialog (on the dashboard)', () => {
           method: 'PUT',
           body: JSON.stringify({
             netIncomeCents: 500_000,
-            grossIncomeCents: 650_000,
-            expensesBp: 6_000,
-            investmentsBp: 2_000,
-            emergencyReserveBp: 1_500,
-            travelBp: 250,
+            shares: [
+              { destinationId: despesas, basisPoints: 6_000 },
+              { destinationId: investimentos, basisPoints: 5_000 },
+              { destinationId: reserva, basisPoints: 3_000 },
+              { destinationId: viagens, basisPoints: 1_000 },
+            ],
           }),
         }),
       ),
@@ -144,38 +131,24 @@ describe('Budget dialog (on the dashboard)', () => {
     expect(screen.getByRole('button', { name: 'Editar orçamento' })).toHaveFocus();
   });
 
-  it('refuses percentages adding up to more than 100% before calling the API', async () => {
+  it('refuses saving destinations adding up to more than 100% before calling the API', async () => {
     const fetchMock = mockBudget();
     renderApp(`/espacos/${houseId}/painel`);
 
     const dialog = await openDialog();
     const travel = await within(dialog).findByLabelText('Viagens (%)');
     await userEvent.clear(travel);
-    await userEvent.type(travel, '10');
-    expect(within(dialog).getByText('Soma: 105%')).toBeInTheDocument();
+    await userEvent.type(travel, '30');
+    expect(within(dialog).getByText('Soma: 110%')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar orçamento' }));
 
     expect(
-      await within(dialog).findByText('A soma dos percentuais não pode passar de 100%.'),
+      await within(dialog).findByText('A soma dos destinos de guardar não pode passar de 100%.'),
     ).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ method: 'PUT' }),
     );
-  });
-
-  it('opens as "Definir renda" when the net income is not set', async () => {
-    const noIncome: Budget = { ...inherited, netIncomeCents: 0 };
-    mockBudget(monthRoutes(noIncome));
-    renderApp(`/espacos/${houseId}/painel`);
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Definir renda' }));
-
-    const dialog = await screen.findByRole('dialog', { name: 'Orçamento de outubro de 2026' });
-    expect(await within(dialog).findByLabelText('Renda líquida (R$)')).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
-    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Definir renda' })).toHaveFocus();
   });
 
   it('another competência starts fresh, with its own values', async () => {

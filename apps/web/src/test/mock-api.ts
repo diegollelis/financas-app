@@ -1,9 +1,10 @@
 import {
   currentPeriod,
-  DEFAULT_BUDGET_SHARES,
   summarizePeriod,
   TERMS_VERSION,
   todayIso,
+  type Budget,
+  type BudgetSource,
 } from '@financas/shared';
 import { vi } from 'vitest';
 
@@ -53,20 +54,66 @@ export const personalWorkspace = {
   role: 'OWNER',
 };
 
+/** The default destinations of a workspace's budget (ADR 0047), with fictitious ids. */
+export const testDestinations = [
+  {
+    destinationId: '01920000-0000-7000-8000-0000000000d1',
+    name: 'Despesas',
+    kind: 'EXPENSES' as const,
+    categoryId: null,
+  },
+  {
+    destinationId: '01920000-0000-7000-8000-0000000000d2',
+    name: 'Investimentos',
+    kind: 'SAVINGS' as const,
+    categoryId: '01920000-0000-7000-8000-0000000000c2',
+  },
+  {
+    destinationId: '01920000-0000-7000-8000-0000000000d3',
+    name: 'Reserva de emergência',
+    kind: 'SAVINGS' as const,
+    categoryId: '01920000-0000-7000-8000-0000000000c3',
+  },
+  {
+    destinationId: '01920000-0000-7000-8000-0000000000d4',
+    name: 'Viagens',
+    kind: 'SAVINGS' as const,
+    categoryId: '01920000-0000-7000-8000-0000000000c4',
+  },
+];
+
+/**
+ * A budget with the default destinations: `basisPoints` in their order (Despesas of the net
+ * income, then the saving ones of what is left). Nothing set: an empty one (`NONE`).
+ */
+export function testBudget({
+  period,
+  netIncomeCents = 0,
+  source = 'NONE',
+  inheritedFrom = null,
+  basisPoints = [0, 0, 0, 0],
+}: {
+  period: string;
+  netIncomeCents?: number;
+  source?: BudgetSource;
+  inheritedFrom?: string | null;
+  basisPoints?: number[];
+}): Budget {
+  return {
+    period,
+    netIncomeCents,
+    source,
+    inheritedFrom,
+    shares: testDestinations.map((destination, index) => ({
+      ...destination,
+      basisPoints: basisPoints[index] ?? 0,
+    })),
+  };
+}
+
 /** An empty month of the personal workspace, for the dashboard that "/" opens. */
 const thisMonth = currentPeriod();
-const emptyDashboard = summarizePeriod(
-  [],
-  {
-    period: thisMonth,
-    netIncomeCents: 0,
-    grossIncomeCents: null,
-    ...DEFAULT_BUDGET_SHARES,
-    source: 'DEFAULT',
-    inheritedFrom: null,
-  },
-  todayIso(),
-);
+const emptyDashboard = summarizePeriod([], testBudget({ period: thisMonth }), todayIso());
 
 /** The rest of a signed-in landing: the workspaces, and "/" opens the personal one's dashboard. */
 export const landingRoutes = {

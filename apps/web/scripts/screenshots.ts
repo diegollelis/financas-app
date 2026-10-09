@@ -350,8 +350,8 @@ async function main() {
       name: 'orcamento',
       path: `/espacos/${workspaceId}/painel`,
       signedIn: true,
-      // "Definir renda" until the net income is set, "Editar orçamento" after.
-      open: /^(Editar orçamento|Definir renda)$/,
+      // "Definir orçamento" until the workspace has one (ADR 0047), "Editar orçamento" after.
+      open: /^(Editar orçamento|Definir orçamento)$/,
       opens: 'dialog' as const,
     },
     { name: 'categorias', path: `/espacos/${workspaceId}/categorias`, signedIn: true },

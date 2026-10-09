@@ -20,6 +20,7 @@ export const EXPORTED_TABLES: Record<string, string> = {
   transactions: 'transactions',
   budget_configs: 'budgets',
   budget_destinations: 'budgetDestinations',
+  budget_shares: 'budgets[].shares',
   recurrences: 'recurrences',
   recurrence_occurrences: 'recurrences[].generatedPeriods',
   installment_plans: 'installmentPlans',
@@ -121,7 +122,7 @@ export class DataExportService {
         include: { occurrence: { select: { recurrenceId: true } } },
         orderBy: [{ period: 'asc' }, { createdAt: 'asc' }],
       }),
-      db.budgetConfig.findMany({ where, orderBy: { period: 'asc' } }),
+      db.budgetConfig.findMany({ where, include: { shares: true }, orderBy: { period: 'asc' } }),
       db.budgetDestination.findMany({
         where,
         orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
@@ -194,11 +195,10 @@ export class DataExportService {
       budgets: budgets.map((budget) => ({
         period: budget.period,
         netIncomeCents: budget.netIncomeCents,
-        grossIncomeCents: budget.grossIncomeCents,
-        expensesBp: budget.expensesBp,
-        investmentsBp: budget.investmentsBp,
-        emergencyReserveBp: budget.emergencyReserveBp,
-        travelBp: budget.travelBp,
+        shares: budget.shares.map((share) => ({
+          destinationId: share.destinationId,
+          basisPoints: share.basisPoints,
+        })),
         updatedAt: iso(budget.updatedAt),
       })),
       budgetDestinations: budgetDestinations.map((destination) => ({

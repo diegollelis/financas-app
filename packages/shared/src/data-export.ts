@@ -68,11 +68,8 @@ const exportBudgetDestinationSchema = z.object({
 const exportBudgetSchema = z.object({
   period,
   netIncomeCents: z.number().int(),
-  grossIncomeCents: z.number().int().nullable(),
-  expensesBp: z.number().int(),
-  investmentsBp: z.number().int(),
-  emergencyReserveBp: z.number().int(),
-  travelBp: z.number().int(),
+  /** The share of each destination, in basis points (ADR 0047); one left out had 0%. */
+  shares: z.array(z.object({ destinationId: z.uuid(), basisPoints: z.number().int() })),
   updatedAt: instant,
 });
 

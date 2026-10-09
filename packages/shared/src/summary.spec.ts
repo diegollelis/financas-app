@@ -1,16 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BUDGET_SHARES, type Budget } from './budget.ts';
+import type { Budget } from './budget.ts';
 import { summarizePeriod } from './summary.ts';
 
 // Fictitious data (ADR 0019). "Today" is Oct 15th, 2026.
 const today = '2026-10-15';
+const id = (n: number) => `01920000-0000-7000-8000-${String(n).padStart(12, '0')}`;
+const mercado = id(101); // an expense category
+const investimentosCategory = id(102);
+const reservaCategory = id(103);
+const viagensCategory = id(104);
+
+// Despesas: 60% of the net income. Saving: 50% + 30% + 20% of what is left after expenses.
 const budget: Budget = {
   period: '2026-10',
   netIncomeCents: 500_000,
-  grossIncomeCents: null,
-  ...DEFAULT_BUDGET_SHARES,
   source: 'SAVED',
   inheritedFrom: null,
+  shares: [
+    {
+      destinationId: id(1),
+      name: 'Despesas',
+      kind: 'EXPENSES',
+      categoryId: null,
+      basisPoints: 6_000,
+    },
+    {
+      destinationId: id(2),
+      name: 'Investimentos',
+      kind: 'SAVINGS',
+      categoryId: investimentosCategory,
+      basisPoints: 5_000,
+    },
+    {
+      destinationId: id(3),
+      name: 'Reserva de emergência',
+      kind: 'SAVINGS',
+      categoryId: reservaCategory,
+      basisPoints: 3_000,
+    },
+    {
+      destinationId: id(4),
+      name: 'Viagens',
+      kind: 'SAVINGS',
+      categoryId: viagensCategory,
+      basisPoints: 2_000,
+    },
+  ],
 };
 
 const credit = (amountCents: number, settledAt: string | null = null) => ({
@@ -18,88 +53,116 @@ const credit = (amountCents: number, settledAt: string | null = null) => ({
   amountCents,
   dueDate: null,
   settledAt,
+  categoryId: id(200),
 });
-const debit = (amountCents: number, dueDate: string | null, settledAt: string | null = null) => ({
-  type: 'DEBIT' as const,
-  amountCents,
-  dueDate,
-  settledAt,
-});
+const debit = (
+  amountCents: number,
+  dueDate: string | null,
+  settledAt: string | null = null,
+  categoryId = mercado,
+) => ({ type: 'DEBIT' as const, amountCents, dueDate, settledAt, categoryId });
 
 const month = [
   credit(500_000, '2026-10-05'), // salary, received
   credit(100_000), // freelance, still to receive
-  debit(15_990, '2026-10-10'), // past its due date
-  debit(35_000, null, '2026-10-08'), // paid
-  debit(200_000, '2026-10-20'), // due later
+  debit(15_990, '2026-10-10'), // expense past its due date
+  debit(35_000, null, '2026-10-08'), // expense paid
+  debit(200_000, '2026-10-20'), // expense due later
+  debit(50_000, null, '2026-10-06', investimentosCategory), // applied to Investimentos
+  debit(20_000, '2026-10-25', null, reservaCategory), // to apply to the reserve
 ];
 
 describe('summarizePeriod', () => {
-  it('splits credits and debits into settled, pending and overdue', () => {
+  it('splits the debits into expenses and applications, by category', () => {
     const summary = summarizePeriod(month, budget, today);
 
-    expect(summary.credits).toEqual({
-      totalCents: 600_000,
-      settledCents: 500_000,
-      pendingCents: 100_000,
-      overdueCents: 0,
-      overdueCount: 0,
-    });
-    expect(summary.debits).toEqual({
+    expect(summary.debits.totalCents).toBe(320_990);
+    expect(summary.expenses).toEqual({
       totalCents: 250_990,
       settledCents: 35_000,
       pendingCents: 215_990,
       overdueCents: 15_990,
       overdueCount: 1,
     });
+    expect(summary.applied).toEqual({ plannedCents: 70_000, settledCents: 50_000 });
   });
 
-  it('gives the balance in both views: as if everything were settled, and settled so far', () => {
+  it('gives the balance after expenses and applications, in both views', () => {
+    // Planned: 600.000 − 320.990. Settled: 500.000 − (35.000 + 50.000).
     expect(summarizePeriod(month, budget, today).balance).toEqual({
+      plannedCents: 279_010,
+      settledCents: 415_000,
+    });
+  });
+
+  it('gives what is available to set aside: credits − expenses, never minus applications', () => {
+    expect(summarizePeriod(month, budget, today).available).toEqual({
       plannedCents: 349_010,
       settledCents: 465_000,
     });
   });
 
-  it('applies each percentage to the net income, to all credits and to the credits received', () => {
-    const { shares } = summarizePeriod(month, budget, today);
+  it('sets the expenses goal on the net income and the saving goals on what is available', () => {
+    const { destinations } = summarizePeriod(month, budget, today);
 
-    expect(shares[0]).toEqual({
-      key: 'expensesBp',
-      basisPoints: 6_000,
-      targetCents: 300_000,
-      plannedCents: 360_000,
-      settledCents: 300_000,
-    });
-    expect(shares.map((share) => share.key)).toEqual([
-      'expensesBp',
-      'investmentsBp',
-      'emergencyReserveBp',
-      'travelBp',
+    expect(destinations).toEqual([
+      // 60% of 500.000; applied = expenses paid, pending = expenses to pay.
+      expect.objectContaining({
+        name: 'Despesas',
+        targetCents: 300_000,
+        appliedCents: 35_000,
+        pendingCents: 215_990,
+      }),
+      // 50% of 349.010.
+      expect.objectContaining({
+        name: 'Investimentos',
+        targetCents: 174_505,
+        appliedCents: 50_000,
+        pendingCents: 0,
+      }),
+      expect.objectContaining({
+        name: 'Reserva de emergência',
+        targetCents: 104_703,
+        appliedCents: 0,
+        pendingCents: 20_000,
+      }),
+      expect.objectContaining({
+        name: 'Viagens',
+        targetCents: 69_802,
+        appliedCents: 0,
+        pendingCents: 0,
+      }),
     ]);
   });
 
-  it('compares the debits with the expenses goal', () => {
+  it('applying more never lowers the saving goals', () => {
+    const before = summarizePeriod(month, budget, today).destinations[1]!.targetCents;
+    const more = [...month, debit(100_000, null, '2026-10-12', investimentosCategory)];
+
+    expect(summarizePeriod(more, budget, today).destinations[1]!.targetCents).toBe(before);
+  });
+
+  it('compares the expenses, not the applications, with the expenses goal', () => {
     expect(summarizePeriod(month, budget, today).expensesLeftCents).toBe(49_010);
     expect(summarizePeriod([...month, debit(100_000, null)], budget, today).expensesLeftCents).toBe(
       -50_990,
     );
   });
 
-  it('gives what is left after the debits and setting aside the other destinations', () => {
-    // Planned: 600.000 − 250.990 − (120.000 + 90.000 + 30.000).
-    // Settled: 500.000 − 35.000 − (100.000 + 75.000 + 25.000).
-    expect(summarizePeriod(month, budget, today).result).toEqual({
-      plannedCents: 109_010,
-      settledCents: 265_000,
-    });
+  it('sets the saving goals to zero when expenses pass the credits', () => {
+    const summary = summarizePeriod([...month, debit(400_000, null)], budget, today);
+
+    expect(summary.available.plannedCents).toBe(-50_990);
+    expect(summary.destinations.slice(1).every((d) => d.targetCents === 0)).toBe(true);
   });
 
-  it('an empty month is all zeros, not an error', () => {
-    const summary = summarizePeriod([], { ...budget, netIncomeCents: 0 }, today);
+  it('an empty month without a budget is all zeros, not an error', () => {
+    const none: Budget = { ...budget, netIncomeCents: 0, source: 'NONE', shares: [] };
+    const summary = summarizePeriod([], none, today);
 
     expect(summary.balance).toEqual({ plannedCents: 0, settledCents: 0 });
-    expect(summary.result).toEqual({ plannedCents: 0, settledCents: 0 });
+    expect(summary.available).toEqual({ plannedCents: 0, settledCents: 0 });
+    expect(summary.destinations).toEqual([]);
     expect(summary.expensesLeftCents).toBe(0);
   });
 
