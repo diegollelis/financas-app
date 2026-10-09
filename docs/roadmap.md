@@ -154,6 +154,11 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 - [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada
+- [ ] Carregamento com o símbolo CL animado (pedido em 2026-10-09):
+  - **Onde:** nas telas de carregamento da página inteira, como a abertura do app enquanto confere a sessão (que pode levar até um minuto com a API dormindo) e o convite. As listas continuam com esqueletos.
+  - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).
+  - **Acessibilidade:** parada para quem pede menos movimento, e "Carregando…" só para leitores de tela.
+  - **A decidir:** se, depois de ~3 s, aparece "Acordando o servidor…" abaixo do símbolo.
 
 **Ideias futuras:**
 
