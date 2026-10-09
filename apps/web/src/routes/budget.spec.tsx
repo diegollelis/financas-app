@@ -239,6 +239,45 @@ describe('Budget dialog (on the dashboard)', () => {
     );
   });
 
+  it('deletes a saving destination never applied to, after asking', async () => {
+    const destinationsBase = `/api/workspaces/${houseId}/budget-destinations`;
+    const list = testDestinations.map((destination, position) => ({
+      id: destination.destinationId,
+      name: destination.name,
+      kind: destination.kind,
+      categoryId: destination.categoryId,
+      archived: false,
+      position,
+      // Investimentos has applications; the others were never used.
+      inUse: destination.name === 'Investimentos' || destination.kind === 'EXPENSES',
+    }));
+    const fetchMock = mockBudget({
+      [`GET ${destinationsBase}`]: { body: list },
+      [`DELETE ${destinationsBase}/${viagens}`]: { status: 204, body: null },
+    });
+    renderApp(`/espacos/${houseId}/painel`);
+
+    const dialog = await openDialog();
+    await userEvent.click(within(dialog).getByText('Gerenciar destinos de guardar'));
+    await userEvent.click(
+      await within(dialog).findByRole('button', { name: 'Ações de Investimentos' }),
+    );
+    expect(screen.queryByRole('menuitem', { name: 'Excluir' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ações de Viagens' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Excluir' }));
+    const confirm = await screen.findByRole('alertdialog', { name: 'Excluir Viagens?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Excluir' }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        new URL(`${destinationsBase}/${viagens}`, 'http://api.test'),
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
+    expect(await screen.findByText('Destino excluído')).toBeInTheDocument();
+  });
+
   it('offers no way to change it to a VIEWER', async () => {
     mockBudget({ [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
 

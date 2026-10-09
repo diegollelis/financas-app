@@ -179,6 +179,10 @@ describe('budget destinations', () => {
       })
       .expect(201);
 
+    // The list says which ones were applied to: only the others can be deleted.
+    const listed = await destinations(browser, base);
+    expect(listed.find((d) => d.id === viagens.id)?.inUse).toBe(true);
+    expect(listed.find((d) => d.id === reforma.id)?.inUse).toBe(false);
     await browser.delete(`${base}/budget-destinations/${reforma.id}`).expect(204);
     const inUse = await browser.delete(`${base}/budget-destinations/${viagens.id}`).expect(409);
 

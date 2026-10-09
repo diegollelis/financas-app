@@ -177,10 +177,10 @@ function RenameForm({
 }
 
 /**
- * One category and, for EDITORs, what can be done with it in a menu (ADR 0036). Deleting is
- * offered only once it is archived: two deliberate steps, and the natural path for a category
- * in use, which can only be archived. A saving destination's category is marked and has no
- * menu: it changes with its destination, in the budget (ADR 0047).
+ * One category and, for EDITORs, what can be done with it in a menu (ADR 0036). One never used
+ * can be deleted right away: the defaults are a starting point, not a must. One in use can only
+ * be archived, and is never offered for deletion. A saving destination's category is marked and
+ * has no menu: it changes with its destination, in the budget (ADR 0047).
  */
 function CategoryItem({
   workspaceId,
@@ -197,6 +197,8 @@ function CategoryItem({
   const update = useUpdateCategory(workspaceId);
   const remove = useDeleteCategory(workspaceId);
   const { name } = category;
+  // Never used: deleted right away. In use: never (the API refuses). Unknown: only once archived.
+  const deletable = category.inUse === false || (category.archived && category.inUse !== true);
   const setArchived = (archived: boolean) =>
     void confirmWith(
       update.mutateAsync({ id: category.id, archived }),
@@ -233,12 +235,14 @@ function CategoryItem({
                   <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(false)}>
                     Reativar
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => setConfirmingDelete(true)}
-                  >
-                    Excluir
-                  </DropdownMenuItem>
+                  {deletable && (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => setConfirmingDelete(true)}
+                    >
+                      Excluir
+                    </DropdownMenuItem>
+                  )}
                 </>
               ) : (
                 <>
@@ -246,6 +250,14 @@ function CategoryItem({
                   <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(true)}>
                     Arquivar
                   </DropdownMenuItem>
+                  {deletable && (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => setConfirmingDelete(true)}
+                    >
+                      Excluir
+                    </DropdownMenuItem>
+                  )}
                 </>
               )}
             </DropdownMenuContent>

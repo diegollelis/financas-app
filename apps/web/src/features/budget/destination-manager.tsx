@@ -33,6 +33,7 @@ import { apiErrorMessage } from '@/lib/error-message';
 import {
   useBudgetDestinations,
   useCreateBudgetDestination,
+  useDeleteBudgetDestination,
   useUpdateBudgetDestination,
 } from './use-budget-destinations';
 
@@ -111,6 +112,13 @@ function DestinationRow({
   const update = useUpdateBudgetDestination(workspaceId);
   const [renaming, setRenaming] = useState(false);
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const remove = useDeleteBudgetDestination(workspaceId);
+  const deleteIt = () =>
+    remove.mutate(destination.id, {
+      onSuccess: () => toast.success('Destino excluído'),
+      onError: (error) => toast.error(apiErrorMessage(error)),
+    });
   const { name } = destination;
   const setArchived = (archived: boolean) =>
     update.mutate(
@@ -156,9 +164,16 @@ function DestinationRow({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {destination.archived ? (
-            <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(false)}>
-              Reativar
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(false)}>
+                Reativar
+              </DropdownMenuItem>
+              {destination.inUse === false && (
+                <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
+                  Excluir
+                </DropdownMenuItem>
+              )}
+            </>
           ) : (
             <>
               <DropdownMenuItem onSelect={() => setRenaming(true)}>Renomear</DropdownMenuItem>
@@ -168,6 +183,12 @@ function DestinationRow({
               >
                 Arquivar
               </DropdownMenuItem>
+              {/* Never applied to: it can go for good, with its category. */}
+              {destination.inUse === false && (
+                <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
+                  Excluir
+                </DropdownMenuItem>
+              )}
             </>
           )}
         </DropdownMenuContent>
@@ -186,6 +207,24 @@ function DestinationRow({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => setArchived(true)}>Arquivar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O destino e a categoria {name} deixam de existir. Se ele tiver percentual em algum
+              orçamento salvo, esse percentual fica sem destino, também nos meses anteriores. Não é
+              possível desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={deleteIt}>
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

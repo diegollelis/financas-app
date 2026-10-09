@@ -7,9 +7,10 @@ import {
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma, type BudgetDestination as DestinationRow } from '../generated/prisma/client.js';
+import { categoriesInUse } from '../categories/categories-in-use.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 
-function toResponse(destination: DestinationRow): BudgetDestination {
+function toResponse(destination: DestinationRow, inUse?: boolean): BudgetDestination {
   return {
     id: destination.id,
     name: destination.name,
@@ -17,6 +18,7 @@ function toResponse(destination: DestinationRow): BudgetDestination {
     categoryId: destination.categoryId,
     archived: destination.archivedAt !== null,
     position: destination.position,
+    ...(inUse !== undefined && { inUse }),
   };
 }
 
@@ -54,13 +56,20 @@ function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
 export class BudgetDestinationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** All of them, archived too, in the order they are shown. */
+  /** All of them, archived too, in the order they are shown, each saying if it was used. */
   async list(workspaceId: string): Promise<BudgetDestination[]> {
-    const destinations = await this.prisma.forWorkspace(workspaceId).budgetDestination.findMany({
-      where: { workspaceId },
-      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-    });
-    return destinations.map(toResponse);
+    const db = this.prisma.forWorkspace(workspaceId);
+    const [destinations, used] = await Promise.all([
+      db.budgetDestination.findMany({
+        where: { workspaceId },
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+      }),
+      categoriesInUse(db, workspaceId),
+    ]);
+    return destinations.map((destination) =>
+      // Despesas has no category: it is fixed anyway.
+      toResponse(destination, destination.categoryId ? used.has(destination.categoryId) : true),
+    );
   }
 
   /** A saving destination, last in the order, with its debit category of the same name. */

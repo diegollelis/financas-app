@@ -82,6 +82,25 @@ describe('CategoriesPage', () => {
     expect(await menuOf('IPVA')).toEqual(['Reativar', 'Excluir']);
   });
 
+  it('offers to delete a category never used right away, and never one in use', async () => {
+    mockCategories({
+      [`GET ${base}`]: {
+        body: [
+          { ...mercado, inUse: true },
+          { ...consorcioDebit, inUse: false },
+          { ...ipva, inUse: true },
+        ],
+      },
+    });
+
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    expect(await menuOf('Consórcio')).toEqual(['Renomear', 'Arquivar', 'Excluir']);
+    expect(await menuOf('Mercado')).toEqual(['Renomear', 'Arquivar']);
+    // Archived but in use: the API would refuse, so it is not offered.
+    expect(await menuOf('IPVA')).toEqual(['Reativar']);
+  });
+
   it("marks a saving destination's category, which changes only with its destination", async () => {
     const investimentos = {
       ...category(6, 'Investimentos', 'DEBIT'),
