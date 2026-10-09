@@ -65,7 +65,12 @@ describe('WorkspacePage', () => {
     await userEvent.type(await screen.findByLabelText('E-mail da pessoa'), 'Pedro@Example.com');
     const access = screen.getByRole('radiogroup', { name: 'Acesso' });
     expect(within(access).getByRole('radio', { name: 'Pode editar' })).toBeChecked();
+    // What each access allows, under the choice.
+    expect(screen.getByText(/^Pode editar: lança, efetiva e muda/)).toBeInTheDocument();
     await userEvent.click(within(access).getByRole('radio', { name: 'Só visualizar' }));
+    expect(screen.getByText(/^Só visualizar: vê tudo, sem mudar nada\./)).toHaveTextContent(
+      'Só o dono convida, remove pessoas e exclui o espaço.',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Enviar convite' }));
 
     expect(await screen.findByText('Convite enviado para pedro@example.com')).toBeInTheDocument();
@@ -302,6 +307,11 @@ describe('WorkspacePage', () => {
     expect(await screen.findByText(/Este é o seu espaço pessoal/)).toBeInTheDocument();
     expect(screen.queryByLabelText('E-mail da pessoa')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Excluir espaço' })).not.toBeInTheDocument();
+    // The way to share, right here: the same dialog as the workspace switcher.
+    await userEvent.click(screen.getByRole('button', { name: 'Criar espaço compartilhado' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Novo espaço compartilhado' }),
+    ).toBeInTheDocument();
   });
 
   it('answers "not found" for a workspace that is not yours', async () => {
