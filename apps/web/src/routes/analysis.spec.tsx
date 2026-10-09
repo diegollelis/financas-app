@@ -252,7 +252,8 @@ describe('AnalysisPage', () => {
     const fetchMock = mockAnalysis('2026-05', '2026-10');
     const { router } = renderApp(`/espacos/${houseId}/analise?tipo=debitos`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Filtros' }));
+    // One filter on (only debits): the button says so before the sheet is opened.
+    await userEvent.click(await screen.findByRole('button', { name: 'Filtros (1)' }));
     const dialog = await screen.findByRole('dialog', { name: 'Filtros' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Categorias' }));
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Mercado' }));

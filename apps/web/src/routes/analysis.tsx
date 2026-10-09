@@ -17,6 +17,7 @@ import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  activeFilterCount,
   describeRange,
   useAnalysisSettings,
   type AnalysisSettings,
@@ -210,7 +211,9 @@ export function AnalysisPage() {
               disabled={!categories.isSuccess}
             >
               <SlidersHorizontal aria-hidden />
+              {/* Says a filter is on before the sheet is opened. */}
               Filtros
+              {activeFilterCount(settings) > 0 && ` (${activeFilterCount(settings)})`}
             </Button>
           )
         }
