@@ -16,6 +16,19 @@ function periodIndex(period: string): number {
   return (year ?? 0) * 12 + (month ?? 1) - 1;
 }
 
+/**
+ * The range of the same length right before this one, to compare with: the 6 months before the
+ * last 6, the month before a single one.
+ */
+export function previousRange(from: string, to: string): { from: string; to: string } {
+  const months = periodsBetween(from, to).length;
+  const end = periodIndex(from) - 1;
+  const start = end - months + 1;
+  const name = (index: number) =>
+    `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
+  return { from: name(start), to: name(end) };
+}
+
 /** Every competência from `from` to `to`, both included: ('2026-11', '2027-01') → 3 months. */
 export function periodsBetween(from: string, to: string): string[] {
   const start = periodIndex(from);
@@ -86,17 +99,30 @@ function matches(row: AnalysisRow, filters: AnalysisFilters) {
 export interface MonthlyPoint {
   period: string;
   creditsCents: number;
+  /** Every debit: expenses and applications (ADR 0047). */
   debitsCents: number;
+  /** The debits in a saving destination's category: money put aside, not spent. */
+  appliedCents: number;
   /** Credits minus debits of the competência. */
   balanceCents: number;
 }
 
-/** One point per competência of the range, months without transactions included as zeros. */
-export function monthlySeries(analysis: Analysis, filters: AnalysisFilters): MonthlyPoint[] {
+/** No saving destination: every debit is an expense. */
+const NONE: ReadonlySet<string> = new Set();
+
+/**
+ * One point per competência of the range, months without transactions included as zeros.
+ * `savingCategoryIds`: the saving destinations' categories, whose debits are applications.
+ */
+export function monthlySeries(
+  analysis: Analysis,
+  filters: AnalysisFilters,
+  savingCategoryIds: ReadonlySet<string> = NONE,
+): MonthlyPoint[] {
   const points = new Map(
     periodsBetween(analysis.from, analysis.to).map((period) => [
       period,
-      { period, creditsCents: 0, debitsCents: 0, balanceCents: 0 },
+      { period, creditsCents: 0, debitsCents: 0, appliedCents: 0, balanceCents: 0 },
     ]),
   );
   for (const row of analysis.rows) {
@@ -105,16 +131,27 @@ export function monthlySeries(analysis: Analysis, filters: AnalysisFilters): Mon
     const cents = amountOf(row, filters.view);
     if (row.type === 'CREDIT') point.creditsCents += cents;
     else point.debitsCents += cents;
+    if (row.type === 'DEBIT' && savingCategoryIds.has(row.categoryId)) point.appliedCents += cents;
     point.balanceCents = point.creditsCents - point.debitsCents;
   }
   return [...points.values()];
 }
 
-/** The whole range: received, spent and what was left. */
+/**
+ * The whole range: received, spent (expenses only), applied, and what was left after every
+ * debit, as on the dashboard (ADR 0047).
+ */
 export function seriesTotals(series: MonthlyPoint[]) {
   const creditsCents = series.reduce((sum, point) => sum + point.creditsCents, 0);
   const debitsCents = series.reduce((sum, point) => sum + point.debitsCents, 0);
-  return { creditsCents, debitsCents, balanceCents: creditsCents - debitsCents };
+  const appliedCents = series.reduce((sum, point) => sum + point.appliedCents, 0);
+  return {
+    creditsCents,
+    debitsCents,
+    expensesCents: debitsCents - appliedCents,
+    appliedCents,
+    balanceCents: creditsCents - debitsCents,
+  };
 }
 
 export interface CategoryShare {
@@ -127,15 +164,21 @@ export interface CategoryShare {
 }
 
 /**
- * Where the money went: the debit categories of the range, largest first. With the type filter
- * on credits, the credit categories instead (where it came from).
+ * Where the money went: the debit categories of the range, largest first, without the saving
+ * destinations' (an application is not spending, ADR 0047). With the type filter on credits, the
+ * credit categories instead (where it came from).
  */
-export function categoryRanking(analysis: Analysis, filters: AnalysisFilters): CategoryShare[] {
+export function categoryRanking(
+  analysis: Analysis,
+  filters: AnalysisFilters,
+  savingCategoryIds: ReadonlySet<string> = NONE,
+): CategoryShare[] {
   const type: TransactionType = filters.type === 'CREDIT' ? 'CREDIT' : 'DEBIT';
   const months = periodsBetween(analysis.from, analysis.to).length;
   const totals = new Map<string, number>();
   for (const row of analysis.rows) {
     if (row.type !== type || !matches(row, { ...filters, type })) continue;
+    if (type === 'DEBIT' && savingCategoryIds.has(row.categoryId)) continue;
     totals.set(row.categoryId, (totals.get(row.categoryId) ?? 0) + amountOf(row, filters.view));
   }
   const grand = [...totals.values()].reduce((sum, cents) => sum + cents, 0);
