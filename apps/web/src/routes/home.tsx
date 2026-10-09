@@ -1,5 +1,6 @@
 import type { Workspace } from '@financas/shared';
 import { Navigate, useLocation } from 'react-router';
+import { BrandLoader } from '@/components/brand-loader';
 import { ListSkeleton, QueryState } from '@/components/query-state';
 import { AppHeader } from '@/features/shell/app-header';
 import { readLastWorkspace } from '@/features/workspaces/last-workspace';
@@ -26,6 +27,8 @@ export function HomePage() {
   const target = workspaces.isSuccess ? pickWorkspace(workspaces.data) : undefined;
 
   if (target) return <Navigate to={`/espacos/${target.id}/painel${search}`} replace />;
+  // A moment before the dashboard: the mark, not a skeleton shaped like another page.
+  if (workspaces.isPending) return <BrandLoader />;
   return (
     <div className="min-h-svh">
       <AppHeader />
