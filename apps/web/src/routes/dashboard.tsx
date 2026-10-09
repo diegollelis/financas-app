@@ -292,8 +292,7 @@ function SavingsTable({
   onApply?: OnApply;
 }) {
   const { unallocated } = summary;
-  // What the goals are a share of, not their sum: each goal is rounded, and the sum can miss
-  // what is available by a cent.
+  // What the goals are a share of: they and "Sem destino" add up to it, to the cent.
   const totalTarget = Math.max(0, summary.available.plannedCents);
   const totalApplied = summary.applied.settledCents;
   const actions = onApply ? <td className="py-2 pl-4" /> : null;

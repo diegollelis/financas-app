@@ -13,6 +13,31 @@ export function shareOfIncome(incomeCents: number, basisPoints: number): number 
   return Math.round((incomeCents * basisPoints) / FULL_BASIS_POINTS);
 }
 
+/**
+ * Splits an amount by several percentages so that the parts add up, to the cent, to the amount
+ * at their total percentage: each part is rounded down, and the cents left go to the largest
+ * remainders (the first one on a tie). Rounding each part on its own can miss the total by a
+ * cent: R$ 2.214,85 at 50%, 30% and 20% would be 1.107,43 + 664,46 + 442,97 = 2.214,86.
+ */
+export function splitShares(amountCents: number, basisPoints: readonly number[]): number[] {
+  const exact = basisPoints.map((points) => amountCents * points);
+  const parts = exact.map((value) => Math.floor(value / FULL_BASIS_POINTS));
+  const total = shareOfIncome(
+    amountCents,
+    basisPoints.reduce((sum, points) => sum + points, 0),
+  );
+  let left = total - parts.reduce((sum, part) => sum + part, 0);
+  const byRemainder = exact
+    .map((value, index) => ({ index, remainder: value % FULL_BASIS_POINTS }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+  for (const { index } of byRemainder) {
+    if (left <= 0) break;
+    parts[index] = (parts[index] ?? 0) + 1;
+    left -= 1;
+  }
+  return parts;
+}
+
 export const basisPointsSchema = z
   .number('Informe o percentual.')
   .int('Use no máximo duas casas decimais no percentual.')
