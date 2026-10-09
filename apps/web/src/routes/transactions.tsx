@@ -70,8 +70,14 @@ const showError = (error: unknown) => toast.error(apiErrorMessage(error));
 function StatusBadge({ transaction, today }: { transaction: Transaction; today: string }) {
   const status = transactionStatus(transaction, today);
   if (status === 'SETTLED') {
+    // What happened, in its own word; the year only when it is not the competência's.
+    const date = formatIsoDate(transaction.settledAt ?? '');
+    const sameYear = transaction.settledAt?.slice(0, 4) === transaction.period.slice(0, 4);
     return (
-      <Badge variant="success">Efetivado em {formatIsoDate(transaction.settledAt ?? '')}</Badge>
+      <Badge variant="success">
+        {transaction.type === 'CREDIT' ? 'Recebido' : 'Pago'} em{' '}
+        {sameYear ? date.slice(0, 5) : date}
+      </Badge>
     );
   }
   if (status === 'OVERDUE') return <Badge variant="destructive">Vencido</Badge>;

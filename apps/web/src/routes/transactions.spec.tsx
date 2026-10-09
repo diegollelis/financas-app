@@ -142,7 +142,7 @@ describe('TransactionsPage', () => {
     await expectCall(fetchMock, `${base}?period=2026-10`, {});
     const credits = await section('Créditos');
     expect(credits).toHaveTextContent('Total: R$ 5.000,00');
-    expect(within(credits).getByText('Efetivado em 05/10/2026')).toBeInTheDocument();
+    expect(within(credits).getByText('Recebido em 05/10')).toBeInTheDocument();
     const debits = await section('Débitos');
     expect(debits).toHaveTextContent('Total: R$ 509,90');
     const lightItem = row(debits, 'Conta de luz');
@@ -183,6 +183,28 @@ describe('TransactionsPage', () => {
       screen.getByRole('link', { name: 'Próxima competência: novembro de 2026' }),
     );
     expect(router.state.location.search).toBe('?competencia=2026-11&situacao=pendentes');
+  });
+
+  it('says "Pago" or "Recebido", with the year only when it is not the competência\'s', async () => {
+    const paid = { ...light, settledAt: '2026-10-08' };
+    const lateDecember = transaction(6, {
+      type: 'DEBIT',
+      description: 'Presentes de Natal',
+      categoryId: marketCategory.id,
+      amountCents: 40_000,
+      period: '2026-12',
+      settledAt: '2027-01-04',
+    });
+    mockTransactions({ [`GET ${base}`]: { body: [salary, paid, lateDecember] } });
+
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Débitos');
+    expect(row(debits, 'Conta de luz')).toHaveTextContent('Pago em 08/10');
+    expect(row(debits, 'Presentes de Natal')).toHaveTextContent('Pago em 04/01/2027');
+    expect(row(await section('Créditos'), 'Salário de outubro')).toHaveTextContent(
+      'Recebido em 05/10',
+    );
   });
 
   it('opens the competência of the address, and points to Novo lançamento when it is empty', async () => {
