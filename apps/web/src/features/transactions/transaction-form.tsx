@@ -158,11 +158,21 @@ function installmentsPreview(
   return `${count.data} parcelas: ${count.data - 1} de ${formatCents(first)} e a última de ${formatCents(last)}, total ${formatCents(total)}.`;
 }
 
+/** Values a new transaction starts from, e.g. an application to a budget destination. */
+export type TransactionPreset = {
+  type: TransactionType;
+  categoryId: string;
+  description: string;
+  /** null leaves the amount empty. */
+  amountCents: number | null;
+};
+
 export function TransactionForm({
   idPrefix,
   categories,
   people = [],
   initial,
+  preset,
   submitLabel,
   pending,
   error,
@@ -176,6 +186,8 @@ export function TransactionForm({
   /** The workspace's people, suggested in the "Pessoa" and "Dividir" fields (ADR 0042). */
   people?: Person[];
   initial?: Transaction;
+  /** For a new transaction: what it starts with. Ignored when editing. */
+  preset?: TransactionPreset;
   submitLabel: string;
   pending: boolean;
   error: unknown;
@@ -191,11 +203,15 @@ export function TransactionForm({
   >({
     resolver: zodResolver(transactionFormSchema),
     defaultValues: {
-      type: initial?.type ?? 'DEBIT',
-      description: initial?.description ?? '',
+      type: initial?.type ?? preset?.type ?? 'DEBIT',
+      description: initial?.description ?? preset?.description ?? '',
       notes: initial?.notes ?? '',
-      categoryId: initial?.categoryId ?? '',
-      amount: initial ? amountText.format(initial.amountCents / 100) : '',
+      categoryId: initial?.categoryId ?? preset?.categoryId ?? '',
+      amount: initial
+        ? amountText.format(initial.amountCents / 100)
+        : preset?.amountCents
+          ? amountText.format(preset.amountCents / 100)
+          : '',
       dueDate: initial?.dueDate ?? '',
       repeat: 'NONE',
       amountKind: 'FIXED',

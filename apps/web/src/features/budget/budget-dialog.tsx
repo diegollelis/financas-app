@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { ListSkeleton, QueryState } from '@/components/query-state';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { BudgetForm } from './budget-form';
+import { DestinationManager } from './destination-manager';
 import { useBudget, useSaveBudget } from './use-budget';
 
 /** Where the values in the form came from, and what saving does (ADR 0030). */
@@ -33,7 +34,10 @@ function BudgetDialogBody({
       {budget.isSuccess && (
         <div className="grid gap-4">
           <p className="text-muted-foreground">{budgetSourceText(budget.data)}</p>
+          <DestinationManager workspaceId={workspaceId} />
           <BudgetForm
+            // A destination added, renamed or archived changes the fields: start again.
+            key={budget.data.shares.map((share) => `${share.destinationId}:${share.name}`).join()}
             initial={budget.data}
             submitLabel={save.isPending ? 'Salvando…' : 'Salvar orçamento'}
             pending={save.isPending}

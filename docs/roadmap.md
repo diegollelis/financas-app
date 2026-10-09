@@ -144,13 +144,13 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - a renda líquida aparece em "Orçamento por destino";
   - "Despesas e meta" foi incorporado a esse bloco;
   - Análise passa a ser aba no celular.
-- [ ] **Orçamento real por destino** ([ADR 0047](adr/0047-orcamento-real-por-destino.md)):
+- [x] **Orçamento real por destino** ([ADR 0047](adr/0047-orcamento-real-por-destino.md)):
   - **Duas bases:** Despesas é um % da renda líquida; os destinos de guardar são um % do disponível (créditos − despesas).
   - **Destinos personalizados,** cada destino de guardar com a sua categoria de débito. Um lançamento nela é uma aplicação.
   - **Orçamento vazio até o primeiro** ser salvo; depois cada mês herda o anterior.
   - [x] PR 1 (só acréscimos, o orçamento e o Painel seguem iguais): destinos (`budget_destinations`, rotas `/budget-destinations`), cada destino de guardar com a sua categoria, os padrão em todo espaço (os existentes pela migração) e a proteção das categorias de destino
   - [x] PR 2: percentuais por competência (`budget_shares`, copiados dos orçamentos atuais), o resumo com aplicações e as duas bases, e o "Resultado" substituído, com a API e o web juntos, porque muda o contrato. O Painel já mostra meta, aplicado, a aplicar e % realizado, e o modal tem os percentuais por destino e o "Definir orçamento" destacado.
-  - [ ] PR 3: "Registrar aplicação" no Painel; criar, renomear e arquivar destinos no modal; a categoria de destino marcada na tela de Categorias
+  - [x] PR 3: "Aplicar" ("Registrar aplicação em …") em cada destino de guardar no Painel, com a categoria e o valor que falta para a meta; "Gerenciar destinos de guardar" no modal do orçamento (novo, renomear, arquivar e reativar); a categoria de destino marcada na tela de Categorias
 - [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada

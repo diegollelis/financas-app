@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -175,7 +176,8 @@ function RenameForm({
 /**
  * One category and, for EDITORs, what can be done with it in a menu (ADR 0036). Deleting is
  * offered only once it is archived: two deliberate steps, and the natural path for a category
- * in use, which can only be archived.
+ * in use, which can only be archived. A saving destination's category is marked and has no
+ * menu: it changes with its destination, in the budget (ADR 0047).
  */
 function CategoryItem({
   workspaceId,
@@ -205,8 +207,11 @@ function CategoryItem({
 
   return (
     <li className="flex min-h-14 items-center justify-between gap-3 py-1.5">
-      <span className="min-w-0 break-words">{name}</span>
-      {canEdit && (
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 break-words">
+        {name}
+        {category.destinationId && <Badge variant="secondary">Destino do orçamento</Badge>}
+      </span>
+      {canEdit && !category.destinationId && (
         <>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

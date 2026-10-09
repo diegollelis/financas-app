@@ -180,6 +180,48 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('button', { name: 'Editar orçamento' })).not.toBeInTheDocument();
   });
 
+  it('registers an application to a saving destination, for what is missing to its goal', async () => {
+    stubPrefersDark(false, { desktop: true });
+    mockApi({
+      'GET /api/me': { body: verifiedUser },
+      [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'EDITOR' } },
+      [`GET /api/workspaces/${houseId}/summary/2026-10`]: {
+        body: summarizePeriod(october, budget, today),
+      },
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [{ id: investimentos, name: 'Investimentos', type: 'DEBIT', archived: false }],
+      },
+      [`GET /api/workspaces/${houseId}/people`]: { body: [] },
+    });
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    const destinations = await section('Orçamento por destino');
+    // Despesas has no category to apply to: only the saving destinations have the button.
+    expect(
+      within(destinations).queryByRole('button', { name: 'Aplicar em Despesas' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(destinations).getByRole('button', { name: 'Aplicar em Investimentos' }),
+    );
+
+    const form = await screen.findByRole('dialog', { name: 'Novo lançamento' });
+    expect(within(form).getByLabelText('Descrição')).toHaveValue('Aplicação em Investimentos');
+    // Goal 1.745,05 − 500,00 applied.
+    expect(within(form).getByLabelText('Valor (R$)')).toHaveValue('1.245,05');
+    expect(within(form).getByRole('combobox', { name: 'Categoria' })).toHaveTextContent(
+      'Investimentos',
+    );
+  });
+
+  it('offers no application to a VIEWER', async () => {
+    mockDashboard(summarizePeriod(october, budget, today));
+
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    await section('Orçamento por destino');
+    expect(screen.queryByRole('button', { name: /^Aplicar/ })).not.toBeInTheDocument();
+  });
+
   it('is reached from the sections of the workspace, on this month', async () => {
     // Only Date is faked: "today" is Oct 15th, 2026 in São Paulo; timers stay real.
     vi.useFakeTimers({ toFake: ['Date'] });
