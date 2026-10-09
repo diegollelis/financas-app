@@ -311,14 +311,15 @@ function PlanItem({
           ? 'Encerrado'
           : plan.settledCount >= plan.installments
             ? 'Quitado'
-            : `Última em ${formatPeriod(lastPeriodOf(plan))}`,
+            : remaining(plan),
       ]}
       amount={formatCents(plan.totalCents)}
-      // "10 de R$ 99,90", or just how many when the leftover cents make the last one differ.
+      // The amount is the purchase's total: "total em 10 de R$ 99,90", or just how many when the
+      // leftover cents make the last one differ.
       amountNote={
         parts.at(-1) === first
-          ? `${plan.installments} de ${formatCents(first)}`
-          : `${plan.installments} parcelas`
+          ? `total em ${plan.installments} de ${formatCents(first)}`
+          : `total em ${plan.installments} parcelas`
       }
       menu={
         canEdit &&
@@ -348,6 +349,40 @@ function PlanItem({
   );
 }
 
+/** "Faltam 2 parcelas: R$ 666,67, até dezembro de 2026": what is still to pay. */
+function remaining(plan: InstallmentPlan) {
+  if (plan.pendingCount === 0 || plan.lastPendingPeriod === null) {
+    return `Última em ${formatPeriod(lastPeriodOf(plan))}`;
+  }
+  const count =
+    plan.pendingCount === 1 ? 'Falta 1 parcela' : `Faltam ${plan.pendingCount} parcelas`;
+  return `${count}: ${formatCents(plan.pendingCents)}, até ${formatPeriod(plan.lastPendingPeriod)}`;
+}
+
+/**
+ * What the active recurrences add up to each month, by type: "Por mês: R$ 224,90 em débitos, dos
+ * quais R$ 180,00 estimados." The variable ones are only an estimate, and it says so.
+ */
+function monthlyTotal(recurrences: Recurrence[]) {
+  const sides = (['DEBIT', 'CREDIT'] as const).flatMap((type) => {
+    const items = recurrences.filter((item) => item.type === type);
+    if (items.length === 0) return [];
+    const total = items.reduce((sum, item) => sum + item.amountCents, 0);
+    const estimated = items
+      .filter((item) => item.variableAmount)
+      .reduce((sum, item) => sum + item.amountCents, 0);
+    const noun = type === 'DEBIT' ? 'débitos' : 'créditos';
+    const part =
+      estimated === 0
+        ? ''
+        : estimated === total
+          ? ', todos estimados'
+          : `, dos quais ${formatCents(estimated)} estimados`;
+    return [`${formatCents(total)} em ${noun}${part}`];
+  });
+  return sides.length === 0 ? null : `Por mês: ${sides.join('; ')}.`;
+}
+
 function Section({
   titleId,
   title,
@@ -355,10 +390,13 @@ function Section({
   active,
   pastTitle,
   past,
+  summary,
 }: {
   titleId: string;
   title: string;
   empty: string;
+  /** A line under the title, e.g. what the active ones add up to. */
+  summary?: string | null;
   active: ReactNode[];
   pastTitle: string;
   past: ReactNode[];
@@ -369,6 +407,7 @@ function Section({
       <h2 id={titleId} tabIndex={-1} className="font-medium outline-none">
         {title}
       </h2>
+      {summary && <p className="tabular-nums">{summary}</p>}
       {active.length === 0 ? (
         <p className="text-muted-foreground">{empty}</p>
       ) : (
@@ -415,7 +454,7 @@ export function RecurrencesPage() {
     <>
       <PageHeader
         title="Recorrências"
-        description="O que se repete todo mês e as compras parceladas. Mudar ou encerrar vale para os pendentes deste mês em diante; o que já passou ou foi efetivado fica."
+        description="O que se repete todo mês e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi efetivado não muda."
       />
       <QueryState queries={[recurrences, plans, categories]} />
       {ready &&
@@ -430,6 +469,7 @@ export function RecurrencesPage() {
               titleId={MONTHLY_TITLE_ID}
               title="Todo mês"
               empty="Nenhuma recorrência ativa."
+              summary={monthlyTotal(recurrences.data.filter((item) => item.endPeriod === null))}
               active={recurrences.data
                 .filter((item) => item.endPeriod === null)
                 .map(recurrenceItem)}

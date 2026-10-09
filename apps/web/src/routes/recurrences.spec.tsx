@@ -60,6 +60,10 @@ const geladeira = plan(1, {
   totalCents: 100_000,
   installments: 3,
   settledCount: 1,
+  // The two left, the leftover cents on the last.
+  pendingCount: 2,
+  pendingCents: 66_667,
+  lastPendingPeriod: '2026-11',
 });
 const sofa = plan(2, {
   description: 'Sofá',
@@ -67,6 +71,9 @@ const sofa = plan(2, {
   installments: 10,
   settledCount: 10,
 });
+
+// Intl separates "R$" from the number with a non-breaking space.
+const nbsp = (text: string | null | undefined) => text?.replace(/\u00a0/g, ' ');
 
 function mockRecurrences(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
@@ -107,6 +114,10 @@ describe('RecurrencesPage', () => {
     renderApp(page);
 
     const monthly = await section('Todo mês');
+    // What the active ones add up to; the variable one is an estimate. Academia ended.
+    expect(nbsp(monthly.textContent)).toContain(
+      'Por mês: R$ 1.689,90 em débitos, dos quais R$ 189,90 estimados.',
+    );
     const [active, ended] = within(monthly).getAllByRole('list');
     expect(rowsOf(active!)).toEqual([
       expect.stringMatching(/Aluguel.*Débito.*Moradia.*Vence dia 10.*Desde janeiro de 2026/),
@@ -120,9 +131,12 @@ describe('RecurrencesPage', () => {
     const plans = await section('Parcelamentos');
     const [running, over] = within(plans).getAllByRole('list');
     expect(rowsOf(running!)).toEqual([
-      expect.stringMatching(/Geladeira.*1 de 3 pagas.*Última em novembro de 2026.*3 parcelas/),
+      // What is left, and the amount named as the total.
+      expect.stringMatching(
+        /Geladeira.*1 de 3 pagas.*Faltam 2 parcelas: R\$.666,67, até novembro de 2026.*total em 3 parcelas/,
+      ),
     ]);
-    expect(rowsOf(over!)).toEqual([expect.stringMatching(/Sofá.*Quitado.*10 de R\$/)]);
+    expect(rowsOf(over!)).toEqual([expect.stringMatching(/Sofá.*Quitado.*total em 10 de R\$/)]);
     expect(screen.queryByRole('button', { name: 'Ações de Sofá' })).not.toBeInTheDocument();
   });
 
