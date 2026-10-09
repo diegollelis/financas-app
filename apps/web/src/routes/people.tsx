@@ -3,6 +3,7 @@ import {
   formatCents,
   formatPeriod,
   hasRole,
+  normalizeName,
   todayIso,
   transactionStatus,
   type Person,
@@ -43,6 +44,7 @@ import {
   usePersonTransactions,
   useUpdatePerson,
 } from '@/features/people/use-people';
+import { useUpdateTransaction } from '@/features/transactions/use-transactions';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -50,6 +52,17 @@ const nameSchema = createPersonInputSchema.pick({ name: true });
 type NameInput = z.infer<typeof nameSchema>;
 
 const LIST_TITLE_ID = 'people-title';
+
+/** From this many people on, a search over the list. */
+const SEARCH_FROM = 9;
+
+const hasPending = (person: Person) => person.receivableCents > 0 || person.payableCents > 0;
+
+/** Who has something pending first, then who is "Em dia"; each in the API's order (by name). */
+const pendingFirst = (people: Person[]) => [
+  ...people.filter(hasPending),
+  ...people.filter((person) => !hasPending(person)),
+];
 
 /**
  * Toast after a change. mutateAsync, not mutate's callbacks: archiving, reactivating and deleting
@@ -117,18 +130,26 @@ function AddPersonForm({ workspaceId }: { workspaceId: string }) {
 }
 
 /** A person's transactions of any month, read-only: settle and edit them in Lançamentos. */
+/**
+ * Every transaction with one person, of any month. A pending one can be marked as received or
+ * paid right here: the same settling as "Efetivar" in Lançamentos, with today's date, where the
+ * debt is seen. An estimated amount still goes to Lançamentos, which asks for the real one.
+ */
 function PersonHistory({
   workspaceId,
   person,
+  canEdit,
   onClose,
   returnFocusTo,
 }: {
   workspaceId: string;
   person: Person | null;
+  canEdit: boolean;
   onClose: () => void;
   returnFocusTo: HTMLElement | null;
 }) {
   const transactions = usePersonTransactions(workspaceId, person?.id ?? null);
+  const settle = useUpdateTransaction(workspaceId);
   const today = todayIso();
 
   return (
@@ -137,7 +158,7 @@ function PersonHistory({
       onOpenChange={(open) => !open && onClose()}
       returnFocusTo={returnFocusTo}
       title={person ? `Lançamentos com ${person.name}` : 'Lançamentos'}
-      description="De todos os meses, do mais recente ao mais antigo. Para efetivar ou mudar, use Lançamentos."
+      description="De todos os meses, do mais recente ao mais antigo. Para mudar um lançamento, use Lançamentos."
     >
       {/* Its own states, not QueryState's: a 404 here is a person gone, not the workspace. */}
       {transactions.isPending && <p className="text-muted-foreground">Carregando…</p>}
@@ -183,6 +204,39 @@ function PersonHistory({
                         <Badge variant="outline">Pendente</Badge>
                       )}
                     </span>
+                    {canEdit &&
+                      status !== 'SETTLED' &&
+                      (transaction.amountEstimated ? (
+                        <span className="text-muted-foreground text-sm">
+                          Valor estimado: efetive em Lançamentos, informando o valor real.
+                        </span>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="justify-self-start"
+                          disabled={settle.isPending}
+                          onClick={() =>
+                            settle.mutate(
+                              { id: transaction.id, settledAt: today },
+                              {
+                                onSuccess: () =>
+                                  toast.success(
+                                    transaction.type === 'CREDIT'
+                                      ? 'Marcado como recebido'
+                                      : 'Marcado como pago',
+                                  ),
+                                onError: (error) => toast.error(apiErrorMessage(error)),
+                              },
+                            )
+                          }
+                        >
+                          {transaction.type === 'CREDIT'
+                            ? 'Marcar como recebido'
+                            : 'Marcar como pago'}{' '}
+                          <span className="sr-only">({transaction.description})</span>
+                        </Button>
+                      ))}
                   </span>
                   <span className="shrink-0 font-semibold tabular-nums">
                     {formatCents(transaction.amountCents)}
@@ -275,7 +329,8 @@ function PersonRow({
   const toList = () => document.getElementById(LIST_TITLE_ID)?.focus();
 
   return (
-    // As a transaction row: who on the left, the amounts on the right with the menu below them.
+    // As a transaction row: who on the left, the amounts on the right; the menu below them on the
+    // phone, where the width is short, and beside them, on the line of the name, from md.
     <li className="flex items-start gap-3 py-3">
       <span className="grid min-w-0 flex-1 justify-items-start">
         <span className="font-medium break-words">{person.name}</span>
@@ -288,8 +343,8 @@ function PersonRow({
           Ver lançamentos
         </button>
       </span>
-      <span className="grid shrink-0 justify-items-end gap-1">
-        <span className="font-semibold">
+      <span className="grid shrink-0 justify-items-end gap-1 md:flex md:items-start">
+        <span className="font-semibold md:pt-0.5">
           <Balance person={person} />
         </span>
         {canEdit && (
@@ -376,8 +431,16 @@ export function PeoplePage() {
   const people = usePeople(workspace.id);
   const canEdit = hasRole(workspace.role, 'EDITOR');
   const [history, setHistory] = useState<{ person: Person; trigger: HTMLElement } | null>(null);
-  const active = people.data?.filter((person) => !person.archived) ?? [];
-  const archived = people.data?.filter((person) => person.archived) ?? [];
+  const [search, setSearch] = useState('');
+  const everyone = people.data ?? [];
+  const searchable = everyone.length >= SEARCH_FROM;
+  const shown = searchable
+    ? everyone.filter((person) => normalizeName(person.name).includes(normalizeName(search)))
+    : everyone;
+  const active = pendingFirst(shown.filter((person) => !person.archived));
+  const archived = shown.filter((person) => person.archived);
+  const receivable = everyone.reduce((sum, person) => sum + person.receivableCents, 0);
+  const payable = everyone.reduce((sum, person) => sum + person.payableCents, 0);
   const row = (person: Person) => (
     <PersonRow
       key={person.id}
@@ -402,7 +465,25 @@ export function PeoplePage() {
           <h2 id={LIST_TITLE_ID} tabIndex={-1} className="font-medium outline-none">
             Pessoas
           </h2>
-          {active.length === 0 ? (
+          {everyone.length > 0 && (
+            // Everyone at once: how much is still to come in and to go out.
+            <p className="tabular-nums">
+              A receber: {formatCents(receivable)}. A pagar: {formatCents(payable)}.
+            </p>
+          )}
+          {searchable && (
+            <FormField id="people-search" label="Buscar pessoa">
+              <Input
+                type="search"
+                autoComplete="off"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </FormField>
+          )}
+          {active.length === 0 && search.trim() !== '' ? (
+            <p className="text-muted-foreground">Nenhuma pessoa com “{search.trim()}”.</p>
+          ) : active.length === 0 ? (
             <p className="text-muted-foreground rounded-xl border border-dashed p-5">
               Ninguém ainda. Adicione uma pessoa aqui, ou use "A receber de" e "Dividir com alguém"
               ao lançar.
@@ -423,6 +504,7 @@ export function PeoplePage() {
       <PersonHistory
         workspaceId={workspace.id}
         person={history?.person ?? null}
+        canEdit={canEdit}
         onClose={() => setHistory(null)}
         returnFocusTo={history?.trigger ?? null}
       />
