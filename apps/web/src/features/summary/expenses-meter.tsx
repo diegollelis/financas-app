@@ -2,15 +2,16 @@ import { formatBasisPoints, formatCents, type Summary } from '@financas/shared';
 import { cn } from '@/lib/utils';
 
 /**
- * The month's debits against the expenses goal (net income × expenses %). The track is a light
- * step of the fill's own color; over the goal, the fill turns red and the text says so. Nothing
- * without a net income: there is no goal yet (the budget block offers to set it, ADR 0046).
+ * The month's expenses against their goal (net income × Despesas %). Expenses are the debits
+ * outside the saving destinations' categories (ADR 0047): putting money aside is not spending.
+ * The track is a light step of the fill's own color; over the goal, the fill turns red and the
+ * text says so. Nothing without a goal (no net income or 0%): the budget block offers to set it.
  */
 export function ExpensesMeter({ summary }: { summary: Summary }) {
-  const goal = summary.shares.find((share) => share.key === 'expensesBp');
+  const goal = summary.destinations.find((destination) => destination.kind === 'EXPENSES');
   const goalCents = goal?.targetCents ?? 0;
   if (!goal || goalCents === 0) return null;
-  const spent = summary.debits.totalCents;
+  const spent = summary.expenses.totalCents;
   const over = summary.expensesLeftCents < 0;
 
   return (

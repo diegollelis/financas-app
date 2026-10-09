@@ -2,7 +2,9 @@ import {
   formatBasisPoints,
   formatCents,
   formatPeriod,
+  FULL_BASIS_POINTS,
   hasRole,
+  type DestinationSummary,
   type Summary,
 } from '@financas/shared';
 import { TriangleAlert } from 'lucide-react';
@@ -12,7 +14,6 @@ import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { shareLabels } from '@/features/budget/share-labels';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import { CreditsBar } from '@/features/summary/credits-bar';
@@ -95,30 +96,45 @@ function budgetOrigin(summary: Summary) {
   if (budget.source === 'INHERITED' && budget.inheritedFrom) {
     return `Orçamento herdado de ${formatPeriod(budget.inheritedFrom)}.`;
   }
-  return 'Percentuais padrão: nenhum orçamento salvo até aqui.';
+  return 'Nenhum orçamento definido até aqui.';
 }
 
-/** Each destination as a card on the phone: a five-column table does not fit in 360px. */
+/** Applied ÷ goal, as a percentage; nothing to compare with a goal of zero. */
+function realized(destination: DestinationSummary) {
+  if (destination.targetCents <= 0) return '—';
+  return formatBasisPoints(
+    Math.round((destination.appliedCents / destination.targetCents) * FULL_BASIS_POINTS),
+  );
+}
+
+/** What each destination's numbers mean, under the table or the cards. */
+const destinationsNote =
+  'Despesas: meta sobre a renda líquida; aplicado é o que já foi gasto. Destinos de guardar: meta sobre o que sobra depois das despesas; aplicado é o que já foi lançado na categoria do destino.';
+
+/** Each destination as a card on the phone: a six-column table does not fit in 360px. */
 function DestinationCards({ summary }: { summary: Summary }) {
   return (
     <ul className="grid gap-3">
-      {summary.shares.map((share) => (
-        <li key={share.key} className="grid gap-2 rounded-xl border p-4">
+      {summary.destinations.map((destination) => (
+        <li key={destination.destinationId} className="grid gap-2 rounded-xl border p-4">
           <p className="flex items-baseline justify-between gap-3">
-            <span className="font-medium">{shareLabels[share.key]}</span>
-            <span className="text-muted-foreground">{formatBasisPoints(share.basisPoints)}</span>
+            <span className="font-medium">{destination.name}</span>
+            <span className="text-muted-foreground">
+              {formatBasisPoints(destination.basisPoints)}
+            </span>
           </p>
-          <dl className="grid grid-cols-3 gap-2 text-sm tabular-nums">
+          <dl className="grid grid-cols-2 gap-2 text-sm tabular-nums">
             {(
               [
-                ['Meta', share.targetCents],
-                ['Previsto', share.plannedCents],
-                ['Efetivado', share.settledCents],
+                ['Meta', formatCents(destination.targetCents)],
+                ['Aplicado', formatCents(destination.appliedCents)],
+                ['A aplicar', formatCents(destination.pendingCents)],
+                ['Realizado', realized(destination)],
               ] as const
-            ).map(([label, cents]) => (
+            ).map(([label, value]) => (
               <div key={label} className="grid gap-0.5">
                 <dt className="text-muted-foreground">{label}</dt>
-                <dd>{formatCents(cents)}</dd>
+                <dd>{value}</dd>
               </div>
             ))}
           </dl>
@@ -144,23 +160,27 @@ function DestinationTable({ summary }: { summary: Summary }) {
             Meta
           </th>
           <th scope="col" className="py-2 text-right font-normal">
-            Previsto
+            Aplicado
           </th>
           <th scope="col" className="py-2 text-right font-normal">
-            Efetivado
+            A aplicar
+          </th>
+          <th scope="col" className="py-2 text-right font-normal">
+            Realizado
           </th>
         </tr>
       </thead>
       <tbody>
-        {summary.shares.map((share) => (
-          <tr key={share.key} className="border-b last:border-b-0">
+        {summary.destinations.map((destination) => (
+          <tr key={destination.destinationId} className="border-b last:border-b-0">
             <th scope="row" className="py-2 text-left font-normal">
-              {shareLabels[share.key]}
+              {destination.name}
             </th>
-            <td className="py-2 text-right">{formatBasisPoints(share.basisPoints)}</td>
-            <td className="py-2 text-right">{formatCents(share.targetCents)}</td>
-            <td className="py-2 text-right">{formatCents(share.plannedCents)}</td>
-            <td className="py-2 text-right">{formatCents(share.settledCents)}</td>
+            <td className="py-2 text-right">{formatBasisPoints(destination.basisPoints)}</td>
+            <td className="py-2 text-right">{formatCents(destination.targetCents)}</td>
+            <td className="py-2 text-right">{formatCents(destination.appliedCents)}</td>
+            <td className="py-2 text-right">{formatCents(destination.pendingCents)}</td>
+            <td className="py-2 text-right">{realized(destination)}</td>
           </tr>
         ))}
       </tbody>
@@ -192,7 +212,7 @@ function Dashboard({
       <div className="empty:hidden xl:col-span-2">
         <OverdueNotice summary={summary} transactionsLink={links.transactions} />
       </div>
-      <Section title="Saldo e resultado" className="xl:col-span-2">
+      <Section title="Saldo do mês" className="xl:col-span-2">
         {/* Planned: as if everything were settled. Settled: only what happened (ADR 0031). */}
         <div className="grid gap-4">
           {/* The one number the month leads with (dataviz skill: one hero per view). */}
@@ -206,11 +226,11 @@ function Dashboard({
             <StatTile label="Saldo efetivado">
               <SignedCents cents={summary.balance.settledCents} />
             </StatTile>
-            <StatTile label="Resultado previsto">
-              <SignedCents cents={summary.result.plannedCents} />
+            <StatTile label="Disponível para guardar">
+              <SignedCents cents={summary.available.plannedCents} />
             </StatTile>
-            <StatTile label="Resultado efetivado">
-              <SignedCents cents={summary.result.settledCents} />
+            <StatTile label="Aplicado">
+              <SignedCents cents={summary.applied.settledCents} />
             </StatTile>
           </dl>
         </div>
@@ -222,7 +242,8 @@ function Dashboard({
         )}
         <p className="text-muted-foreground">
           Previsto: como se tudo fosse efetivado. Efetivado: só o que já foi recebido ou pago.
-          Resultado: o saldo depois de separar investimentos, reserva e viagens.
+          Disponível para guardar: os créditos menos as despesas. Aplicado: o que já foi para os
+          destinos de guardar.
         </p>
       </Section>
       <Section title="Créditos e débitos">
@@ -259,22 +280,19 @@ function Dashboard({
           </p>
           <p className="text-muted-foreground">{budgetOrigin(summary)}</p>
           {onEditBudget &&
-            // One button, named for what is missing: without a net income there are no goals.
-            (summary.budget.netIncomeCents > 0 ? (
+            // Highlighted until the workspace has a budget (ADR 0047), plain after.
+            (summary.budget.source === 'NONE' ? (
+              <Button onClick={onEditBudget}>Definir orçamento</Button>
+            ) : (
               <Button variant="outline" onClick={onEditBudget}>
                 Editar orçamento
               </Button>
-            ) : (
-              <Button onClick={onEditBudget}>Definir renda</Button>
             ))}
         </div>
         {/* The expenses goal, drawn: the one destination with a limit to watch. */}
         <ExpensesMeter summary={summary} />
         {desktop ? <DestinationTable summary={summary} /> : <DestinationCards summary={summary} />}
-        <p className="text-muted-foreground">
-          Meta: sobre a renda líquida. Previsto: sobre todos os créditos. Efetivado: sobre os
-          créditos recebidos.
-        </p>
+        <p className="text-muted-foreground">{destinationsNote}</p>
       </Section>
     </div>
   );
@@ -307,7 +325,7 @@ export function DashboardPage() {
     transactions: `/espacos/${workspace.id}/lancamentos?competencia=${period}`,
   };
   // The budget is edited here, in a dialog (ADR 0046); focus goes back to whichever button
-  // opened it ("Editar orçamento" or "Definir renda").
+  // opened it ("Definir orçamento" or "Editar orçamento").
   const [budgetOpener, setBudgetOpener] = useState<HTMLElement | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const editBudget = hasRole(workspace.role, 'EDITOR')

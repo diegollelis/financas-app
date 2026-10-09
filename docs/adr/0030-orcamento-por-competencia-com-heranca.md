@@ -34,3 +34,10 @@ Percentuais ficam em pontos-base inteiros ([ADR 0010](0010-dinheiro-e-datas.md))
 - Corrigir uma competência salva propaga a correção para as seguintes que ainda não foram salvas. É o comportamento esperado de "copiar a anterior", mas sem cópias desatualizadas.
 - A interface deve deixar claro quando a configuração é herdada ("herdada de setembro de 2026") e que salvar cria a configuração própria do mês.
 - Não há como "voltar a herdar" depois de salvar. Se fizer falta, será um `DELETE` na mesma rota.
+
+## Nota (2026-10-09, ADR 0047)
+
+- **A herança continua.**
+- **O padrão 60/20/15/5 saiu.** Sem nenhum orçamento salvo, o orçamento vem vazio (`source: NONE`).
+- **Os percentuais viraram linhas por destino** (`budget_shares`), e a renda bruta saiu.
+- **Detalhes:** [ADR 0047](0047-orcamento-real-por-destino.md).

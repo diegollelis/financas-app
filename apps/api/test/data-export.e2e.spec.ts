@@ -1,4 +1,5 @@
 import {
+  budgetDestinationListResponseSchema,
   categoryListResponseSchema,
   currentPeriod,
   dataExportSchema,
@@ -54,15 +55,14 @@ describe('data export', () => {
         dueDate: `${period}-10`,
       })
       .expect(201);
+    const [despesas] = budgetDestinationListResponseSchema.parse(
+      (await browser.get(`${base}/budget-destinations`).expect(200)).body,
+    );
     await browser
       .put(`${base}/budget/${period}`)
       .send({
         netIncomeCents: 500_000,
-        grossIncomeCents: null,
-        expensesBp: 5_000,
-        investmentsBp: 2_000,
-        emergencyReserveBp: 1_000,
-        travelBp: 1_000,
+        shares: [{ destinationId: despesas!.id, basisPoints: 5_000 }],
       })
       .expect(200);
     await browser
@@ -136,7 +136,19 @@ describe('data export', () => {
       { description: 'Internet de exemplo', generatedPeriods: [period] },
     ]);
     expect(personal!.installmentPlans).toMatchObject([{ totalCents: 300_000, installments: 3 }]);
-    expect(personal!.budgets).toMatchObject([{ period, netIncomeCents: 500_000 }]);
+    expect(personal!.budgets).toMatchObject([
+      {
+        period,
+        netIncomeCents: 500_000,
+        shares: [{ destinationId: despesas!.id, basisPoints: 5_000 }],
+      },
+    ]);
+    expect(personal!.budgetDestinations.map((d) => d.name)).toEqual([
+      'Despesas',
+      'Investimentos',
+      'Reserva de emergência',
+      'Viagens',
+    ]);
     expect(personal!.categories.length).toBeGreaterThan(0);
   });
 

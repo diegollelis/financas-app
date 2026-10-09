@@ -1,11 +1,6 @@
 import { z } from 'zod';
-import {
-  budgetSchema,
-  budgetShareKeys,
-  budgetShareKeySchema,
-  shareOfIncome,
-  type Budget,
-} from './budget.ts';
+import { budgetDestinationKindSchema } from './budget-destination.ts';
+import { budgetSchema, shareOfIncome, type Budget } from './budget.ts';
 import { periodSchema } from './money-and-dates.ts';
 import { transactionStatus, type Transaction } from './transaction.ts';
 
@@ -19,7 +14,7 @@ const twoViewsSchema = z.object({
   settledCents: z.number().int(),
 });
 
-/** One side of the month (credits or debits). `pendingCents` includes `overdueCents`. */
+/** One side of the month (credits, debits, expenses). `pendingCents` includes `overdueCents`. */
 const sideSchema = z.object({
   totalCents: z.number().int(),
   settledCents: z.number().int(),
@@ -28,31 +23,42 @@ const sideSchema = z.object({
   overdueCount: z.number().int(),
 });
 
-/** One budget destination: its percentage applied to three bases. */
-const shareSchema = z.object({
-  key: budgetShareKeySchema,
+/**
+ * One destination of the budget, with real money (ADR 0047): its goal, what was applied to it
+ * (paid) and what is still to apply (pending). For Despesas, the applications are the expenses.
+ */
+const destinationSummarySchema = z.object({
+  destinationId: z.uuid(),
+  name: z.string(),
+  kind: budgetDestinationKindSchema,
   basisPoints: z.number().int(),
-  /** Net income × percentage: the goal set in the budget. */
+  /** Despesas: net income × %. A saving destination: what is left after expenses (planned) × %. */
   targetCents: z.number().int(),
-  /** All credits × percentage. */
-  plannedCents: z.number().int(),
-  /** Credits received × percentage. */
-  settledCents: z.number().int(),
+  /** Paid: expenses for Despesas; transactions in the destination's category for the others. */
+  appliedCents: z.number().int(),
+  /** Pending, scheduled for this competência (recurrences and installments included). */
+  pendingCents: z.number().int(),
 });
+
+export type DestinationSummary = z.infer<typeof destinationSummarySchema>;
 
 /** `GET /workspaces/:workspaceId/summary/:period`: the month's dashboard, never stored. */
 export const summarySchema = z.object({
   period: periodSchema,
   credits: sideSchema,
   debits: sideSchema,
-  /** Credits − debits. */
+  /** Credits − debits: the money really free, after expenses and applications. */
   balance: twoViewsSchema,
+  /** The debits outside the saving destinations' categories. */
+  expenses: sideSchema,
+  /** The debits in the saving destinations' categories: money put aside. */
+  applied: twoViewsSchema,
+  /** Credits − expenses: the base of the saving destinations' goals (never minus applications). */
+  available: twoViewsSchema,
   budget: budgetSchema,
-  shares: z.array(shareSchema),
-  /** Expenses goal − all debits: positive while within the goal, negative when over it. */
+  destinations: z.array(destinationSummarySchema),
+  /** Expenses goal − all expenses: positive while within the goal, negative when over it. */
   expensesLeftCents: z.number().int(),
-  /** What is left after the debits and after setting aside every other destination. */
-  result: twoViewsSchema,
   /**
    * Of the pending amounts, how much is still an estimate of a variable recurrence (ADR 0038):
    * the planned view counts it, so the dashboard says so.
@@ -62,7 +68,10 @@ export const summarySchema = z.object({
 
 export type Summary = z.infer<typeof summarySchema>;
 
-type SummaryTransaction = Pick<Transaction, 'type' | 'amountCents' | 'dueDate' | 'settledAt'> & {
+type SummaryTransaction = Pick<
+  Transaction,
+  'type' | 'amountCents' | 'dueDate' | 'settledAt' | 'categoryId'
+> & {
   amountEstimated?: boolean;
 };
 
@@ -86,15 +95,25 @@ function side(transactions: SummaryTransaction[], today: string): Summary['credi
 }
 
 /**
- * The spreadsheet's indicators (docs/dominio/planilha-origem.md), computed from the competência's
- * transactions and budget. Pure: same input, same output, so it is tested without a database.
- * `today` is `YYYY-MM-DD` in São Paulo (`todayIso()`), for what is overdue.
+ * The month's indicators (ADRs 0031, 0047), computed from the competência's transactions and
+ * budget. Pure: same input, same output, so it is tested without a database. `today` is
+ * `YYYY-MM-DD` in São Paulo (`todayIso()`), for what is overdue.
+ *
+ * A debit in a saving destination's category is an application; every other debit is an
+ * expense. The saving goals are a share of credits − expenses, so applying never lowers its own
+ * goal; Despesas is a share of the net income set in the budget.
  */
 export function summarizePeriod(
   transactions: SummaryTransaction[],
   budget: Budget,
   today: string,
 ): Summary {
+  const savingCategories = new Set(
+    budget.shares.flatMap((share) => (share.categoryId ? [share.categoryId] : [])),
+  );
+  const isApplication = (transaction: SummaryTransaction) =>
+    transaction.type === 'DEBIT' && savingCategories.has(transaction.categoryId);
+
   const credits = side(
     transactions.filter((transaction) => transaction.type === 'CREDIT'),
     today,
@@ -103,16 +122,49 @@ export function summarizePeriod(
     transactions.filter((transaction) => transaction.type === 'DEBIT'),
     today,
   );
-  const shares = budgetShareKeys.map((key) => ({
-    key,
-    basisPoints: budget[key],
-    targetCents: shareOfIncome(budget.netIncomeCents, budget[key]),
-    plannedCents: shareOfIncome(credits.totalCents, budget[key]),
-    settledCents: shareOfIncome(credits.settledCents, budget[key]),
-  }));
-  // Expenses are the debits themselves; the other destinations are money set aside.
-  const setAside = shares.filter((share) => share.key !== 'expensesBp');
-  const expensesTarget = shares.find((share) => share.key === 'expensesBp')?.targetCents ?? 0;
+  const expenses = side(
+    transactions.filter(
+      (transaction) => transaction.type === 'DEBIT' && !isApplication(transaction),
+    ),
+    today,
+  );
+  const applications = transactions.filter(isApplication);
+  const available = {
+    plannedCents: credits.totalCents - expenses.totalCents,
+    settledCents: credits.settledCents - expenses.settledCents,
+  };
+  // Nothing to set aside when expenses pass the credits: the goals are zero, not negative.
+  const savingBase = Math.max(0, available.plannedCents);
+
+  const destinations = budget.shares.map((share) => {
+    if (share.kind === 'EXPENSES') {
+      return {
+        destinationId: share.destinationId,
+        name: share.name,
+        kind: share.kind,
+        basisPoints: share.basisPoints,
+        targetCents: shareOfIncome(budget.netIncomeCents, share.basisPoints),
+        appliedCents: expenses.settledCents,
+        pendingCents: expenses.pendingCents,
+      };
+    }
+    const own = side(
+      applications.filter((transaction) => transaction.categoryId === share.categoryId),
+      today,
+    );
+    return {
+      destinationId: share.destinationId,
+      name: share.name,
+      kind: share.kind,
+      basisPoints: share.basisPoints,
+      targetCents: shareOfIncome(savingBase, share.basisPoints),
+      appliedCents: own.settledCents,
+      pendingCents: own.pendingCents,
+    };
+  });
+  const expensesTarget =
+    destinations.find((destination) => destination.kind === 'EXPENSES')?.targetCents ?? 0;
+  const appliedSide = side(applications, today);
 
   return {
     period: budget.period,
@@ -122,19 +174,12 @@ export function summarizePeriod(
       plannedCents: credits.totalCents - debits.totalCents,
       settledCents: credits.settledCents - debits.settledCents,
     },
+    expenses,
+    applied: { plannedCents: appliedSide.totalCents, settledCents: appliedSide.settledCents },
+    available,
     budget,
-    shares,
-    expensesLeftCents: expensesTarget - debits.totalCents,
-    result: {
-      plannedCents:
-        credits.totalCents -
-        debits.totalCents -
-        setAside.reduce((sum, share) => sum + share.plannedCents, 0),
-      settledCents:
-        credits.settledCents -
-        debits.settledCents -
-        setAside.reduce((sum, share) => sum + share.settledCents, 0),
-    },
+    destinations,
+    expensesLeftCents: expensesTarget - expenses.totalCents,
     estimatedCents: transactions
       .filter((transaction) => transaction.amountEstimated && !transaction.settledAt)
       .reduce((sum, transaction) => sum + transaction.amountCents, 0),

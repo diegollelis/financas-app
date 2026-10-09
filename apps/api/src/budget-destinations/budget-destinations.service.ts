@@ -149,6 +149,7 @@ export class BudgetDestinationsService {
         });
         if (!current) throw new NotFoundException();
         if (current.kind === 'EXPENSES' || !current.categoryId) throw expensesFixed();
+        await tx.budgetShare.deleteMany({ where: { destinationId } });
         await tx.budgetDestination.delete({ where: { id: destinationId } });
         await tx.category.delete({ where: { id: current.categoryId } });
       });

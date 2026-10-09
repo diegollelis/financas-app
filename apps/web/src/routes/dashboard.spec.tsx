@@ -1,9 +1,9 @@
-import { DEFAULT_BUDGET_SHARES, summarizePeriod, type Budget } from '@financas/shared';
+import { summarizePeriod } from '@financas/shared';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { stubPrefersDark } from '@/test/match-media';
-import { verifiedUser, mockApi } from '@/test/mock-api';
+import { testBudget, testDestinations, verifiedUser, mockApi } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019). The API's answer is built with the same shared function it uses.
@@ -11,32 +11,36 @@ const houseId = '01920000-0000-7000-8000-000000000002';
 const house = { id: houseId, name: 'Casa', isPersonal: false, role: 'VIEWER' };
 const today = '2026-10-15';
 
-const budget: Budget = {
+// Despesas: 60% of R$ 5.000,00. Saving: 50%, 30% and 20% of what is left after expenses.
+const budget = testBudget({
   period: '2026-10',
   netIncomeCents: 500_000,
-  grossIncomeCents: null,
-  ...DEFAULT_BUDGET_SHARES,
   source: 'INHERITED',
   inheritedFrom: '2026-09',
-};
+  basisPoints: [6_000, 5_000, 3_000, 2_000],
+});
+const expenseCategory = '01920000-0000-7000-8000-0000000000e1';
+const investimentos = testDestinations[1]!.categoryId!;
 const credit = (amountCents: number, settledAt: string | null = null) => ({
   type: 'CREDIT' as const,
   amountCents,
   dueDate: null,
   settledAt,
+  categoryId: '01920000-0000-7000-8000-0000000000e2',
 });
-const debit = (amountCents: number, dueDate: string | null, settledAt: string | null = null) => ({
-  type: 'DEBIT' as const,
-  amountCents,
-  dueDate,
-  settledAt,
-});
+const debit = (
+  amountCents: number,
+  dueDate: string | null,
+  settledAt: string | null = null,
+  categoryId: string = expenseCategory,
+) => ({ type: 'DEBIT' as const, amountCents, dueDate, settledAt, categoryId });
 const october = [
   credit(500_000, '2026-10-05'),
   credit(100_000),
   debit(15_990, '2026-10-10'), // overdue
   debit(35_000, null, '2026-10-08'),
   debit(200_000, '2026-10-20'),
+  debit(50_000, null, '2026-10-06', investimentos), // applied to Investimentos
 ];
 
 function mockDashboard(summary: object, period = '2026-10', role = house.role) {
@@ -48,10 +52,10 @@ function mockDashboard(summary: object, period = '2026-10', role = house.role) {
 }
 
 const section = (name: string) => screen.findByRole('region', { name });
-// An indicator's value: the <dd> after its <dt>, in the "Saldo e resultado" section (the chart
+// An indicator's value: the <dd> after its <dt>, in the "Saldo do mês" section (the chart
 // legend also says "Saldo previsto").
 const tile = (label: string) =>
-  within(screen.getByRole('region', { name: 'Saldo e resultado' })).getByText(label, {
+  within(screen.getByRole('region', { name: 'Saldo do mês' })).getByText(label, {
     selector: 'dt',
   }).nextElementSibling;
 // Intl separates "R$" from the number with a non-breaking space.
@@ -64,23 +68,25 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const balance = await section('Saldo e resultado');
+    const balance = await section('Saldo do mês');
     expect(nbsp(balance.textContent)).toContain(
       'Inclui R$ 189,90 em valores estimados, de contas que variam.',
     );
   });
 
-  it('shows the balance and the result in both views, and what is overdue', async () => {
+  it('shows the balance, what is available to set aside and what was applied', async () => {
     mockDashboard(summarizePeriod(october, budget, today));
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
     expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
-    await section('Saldo e resultado');
-    expect(tile('Saldo previsto')).toHaveTextContent('R$ 3.490,10');
-    expect(tile('Saldo efetivado')).toHaveTextContent('R$ 4.650,00');
-    expect(tile('Resultado previsto')).toHaveTextContent('R$ 1.090,10');
-    expect(tile('Resultado efetivado')).toHaveTextContent('R$ 2.650,00');
+    await section('Saldo do mês');
+    // Credits − all debits: 6.000,00 − 3.009,90; settled: 5.000,00 − (350,00 + 500,00).
+    expect(tile('Saldo previsto')).toHaveTextContent('R$ 2.990,10');
+    expect(tile('Saldo efetivado')).toHaveTextContent('R$ 4.150,00');
+    // Credits − expenses (the application is not an expense): 6.000,00 − 2.509,90.
+    expect(tile('Disponível para guardar')).toHaveTextContent('R$ 3.490,10');
+    expect(tile('Aplicado')).toHaveTextContent('R$ 500,00');
     expect(nbsp(screen.getByRole('status').textContent)).toContain(
       '1 lançamento vencido (R$ 159,90).',
     );
@@ -97,19 +103,20 @@ describe('DashboardPage', () => {
 
     const chart = await section('Para onde vão os créditos');
     expect(nbsp(within(chart).getByRole('img').getAttribute('aria-label'))).toBe(
-      'Créditos de R$ 6.000,00: débitos pagos R$ 350,00, débitos a pagar R$ 2.159,90, saldo previsto R$ 3.490,10.',
+      'Créditos de R$ 6.000,00: débitos pagos R$ 850,00, débitos a pagar R$ 2.159,90, saldo previsto R$ 2.990,10.',
     );
     const goal = await section('Orçamento por destino');
     expect(goal).toHaveTextContent('R$ 2.509,90 de R$ 3.000,00 (meta de 60% da renda)');
     expect(goal).toHaveTextContent('Folga de R$ 490,10.');
     const destinations = await section('Orçamento por destino');
     expect(destinations).toHaveTextContent('Orçamento herdado de setembro de 2026.');
-    // On the phone, a card per destination: the table's five columns do not fit.
+    // On the phone, a card per destination: the table's six columns do not fit.
+    // Investimentos: 50% of 3.490,10 = 1.745,05; 500,00 applied, 28,65% of the goal.
     const investments = within(destinations)
       .getAllByRole('listitem')
       .find((item) => item.textContent?.startsWith('Investimentos'));
     expect(nbsp(investments?.textContent)).toBe(
-      'Investimentos20%MetaR$ 1.000,00PrevistoR$ 1.200,00EfetivadoR$ 1.000,00',
+      'Investimentos50%MetaR$ 1.745,05AplicadoR$ 500,00A aplicarR$ 0,00Realizado28,65%',
     );
     expect(within(destinations).queryByRole('table')).not.toBeInTheDocument();
   });
@@ -122,7 +129,7 @@ describe('DashboardPage', () => {
 
     const destinations = await section('Orçamento por destino');
     const investments = within(destinations).getByRole('row', { name: /Investimentos/ });
-    expect(investments).toHaveTextContent('20%R$ 1.000,00R$ 1.200,00R$ 1.000,00');
+    expect(investments).toHaveTextContent('50%R$ 1.745,05R$ 500,00R$ 0,0028,65%');
   });
 
   it('warns, in words, when debits pass the credits and the goal', async () => {
@@ -131,10 +138,10 @@ describe('DashboardPage', () => {
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
     expect(
-      await screen.findByText('Os débitos passam dos créditos em R$ 509,90.'),
+      await screen.findByText('Os débitos passam dos créditos em R$ 1.009,90.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Acima da meta em R$ 3.509,90.')).toBeInTheDocument();
-    expect(tile('Saldo previsto')).toHaveTextContent('-R$ 509,90');
+    expect(tile('Saldo previsto')).toHaveTextContent('-R$ 1.009,90');
   });
 
   it('an empty month without income says what is missing', async () => {
@@ -151,13 +158,13 @@ describe('DashboardPage', () => {
     expect(screen.queryByRole('meter')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     // Nothing that changes the budget (ADR 0046).
-    expect(screen.queryByRole('button', { name: 'Definir renda' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Definir orçamento' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar orçamento' })).not.toBeInTheDocument();
   });
 
-  it('offers whoever edits to set the net income, in the budget block', async () => {
+  it('highlights "Definir orçamento" to whoever edits, until there is a budget (ADR 0047)', async () => {
     mockDashboard(
-      summarizePeriod([], { ...budget, period: '2026-11', netIncomeCents: 0 }, today),
+      summarizePeriod([], testBudget({ period: '2026-11' }), today),
       '2026-11',
       'EDITOR',
     );
@@ -165,8 +172,11 @@ describe('DashboardPage', () => {
     renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
 
     const destinations = await section('Orçamento por destino');
+    expect(destinations).toHaveTextContent('Nenhum orçamento definido até aqui.');
     // It opens the budget dialog (tested in budget.spec.tsx).
-    expect(within(destinations).getByRole('button', { name: 'Definir renda' })).toBeInTheDocument();
+    expect(
+      within(destinations).getByRole('button', { name: 'Definir orçamento' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar orçamento' })).not.toBeInTheDocument();
   });
 
@@ -189,7 +199,7 @@ describe('DashboardPage', () => {
 
       expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);
       expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
-      expect(await section('Saldo e resultado')).toBeInTheDocument();
+      expect(await section('Saldo do mês')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
