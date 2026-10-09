@@ -148,8 +148,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - **Duas bases:** Despesas é um % da renda líquida; os destinos de guardar são um % do disponível (créditos − despesas).
   - **Destinos personalizados,** cada destino de guardar com a sua categoria de débito. Um lançamento nela é uma aplicação.
   - **Orçamento vazio até o primeiro** ser salvo; depois cada mês herda o anterior.
-  - [ ] PR 1: destinos (`budget_destinations`), percentuais por competência (`budget_shares`) e a migração dos orçamentos atuais
-  - [ ] PR 2: o resumo com aplicações, as duas bases e o "Resultado" substituído
+  - [x] PR 1 (só acréscimos, o orçamento e o Painel seguem iguais): destinos (`budget_destinations`, rotas `/budget-destinations`), cada destino de guardar com a sua categoria, os padrão em todo espaço (os existentes pela migração) e a proteção das categorias de destino
+  - [ ] PR 2: percentuais por competência (`budget_shares`, copiados dos orçamentos atuais), o resumo com aplicações e as duas bases, e o "Resultado" substituído, com a API e o web juntos, porque muda o contrato
   - [ ] PR 3: telas. No Painel, meta, aplicado e % realizado, com "Registrar aplicação". No modal, os destinos e o "Definir orçamento" destacado.
 - [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
