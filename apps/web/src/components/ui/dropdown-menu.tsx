@@ -6,8 +6,14 @@ import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 
 // Mobile first (ADR 0036): the trigger and items are 44px touch targets below md, compact from md.
-function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
+// Not modal by default: a modal menu hides the page from screen readers (aria-hidden) while its
+// buttons stay focusable, which axe flags (aria-hidden-focus). It still closes on Escape and on
+// a click outside, and the keyboard stays in it.
+function DropdownMenu({
+  modal = false,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
+  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" modal={modal} {...props} />;
 }
 
 function DropdownMenuPortal({

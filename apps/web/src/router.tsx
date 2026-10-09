@@ -68,7 +68,8 @@ export const routes: RouteObject[] = [
               // A dashboard of blocks side by side: the wide column (ADR 0045).
               { path: 'painel', element: <DashboardPage />, handle: { wide: true } },
               // The range and filters travel in the address (ADR 0037).
-              { path: 'analise', element: <AnalysisPage /> },
+              // Charts and the category ranking side by side from xl (ADR 0045).
+              { path: 'analise', element: <AnalysisPage />, handle: { wide: true } },
               // Recurrences and installment plans (ADR 0038).
               { path: 'recorrencias', element: <RecurrencesPage /> },
               { path: 'pessoas', element: <PeoplePage /> },

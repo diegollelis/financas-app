@@ -24,7 +24,7 @@ Esticar o conteúdo para a largura toda também seria ruim: as linhas de rótulo
 - o rodapé acompanha a mesma largura;
 - as outras páginas não mudam.
 
-Hoje só o Painel usa a coluna larga; a Análise deve entrar na rodada dela.
+O Painel e a Análise usam a coluna larga. Na Análise, do xl em diante, "Mês a mês" fica ao lado das categorias, com os totais em cima.
 
 **A grade do Painel:**
 
