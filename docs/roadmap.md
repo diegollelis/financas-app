@@ -151,6 +151,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] PR 1 (só acréscimos, o orçamento e o Painel seguem iguais): destinos (`budget_destinations`, rotas `/budget-destinations`), cada destino de guardar com a sua categoria, os padrão em todo espaço (os existentes pela migração) e a proteção das categorias de destino
   - [x] PR 2: percentuais por competência (`budget_shares`, copiados dos orçamentos atuais), o resumo com aplicações e as duas bases, e o "Resultado" substituído, com a API e o web juntos, porque muda o contrato. O Painel já mostra meta, aplicado, a aplicar e % realizado, e o modal tem os percentuais por destino e o "Definir orçamento" destacado.
   - [x] PR 3: "Aplicar" ("Registrar aplicação em …") em cada destino de guardar no Painel, com a categoria e o valor que falta para a meta; "Gerenciar destinos de guardar" no modal do orçamento (novo, renomear, arquivar e reativar); a categoria de destino marcada na tela de Categorias
+  - [x] Arquivar um destino vale a partir da competência atual (os meses anteriores não mudam); categorias e destinos nunca usados podem ser excluídos (`inUse` nas listas; nota de 2026-10-09 no ADR 0047)
 - [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada

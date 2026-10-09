@@ -132,3 +132,16 @@ As aplicações **não entram na base**. É isso que tira a circularidade: aplic
   1. **só acréscimos:** destinos, as suas categorias e a migração dos espaços existentes, sem mudar o orçamento nem o Painel;
   2. **percentuais e resumo:** os percentuais por competência, copiados dos orçamentos atuais, e o resumo com aplicações e as duas bases, com a API e o web adaptados juntos;
   3. **as telas novas.**
+
+## Nota (2026-10-09): arquivar vale daqui para a frente, e o que nunca foi usado pode ser excluído
+
+**O problema.** O orçamento mostrava um destino arquivado enquanto ele tivesse percentual. A ideia era não mexer no passado, mas os meses seguintes herdavam o percentual: arquivar não tinha efeito, e o destino continuava com meta no Painel. Além disso, quem começa recebe as categorias e os destinos padrão e só podia arquivá-los, nunca excluí-los.
+
+**A decisão:**
+
+- **Arquivar um destino vale a partir da competência atual.** Na mesma transação do arquivamento, o percentual dele sai do orçamento desta competência e de todos os posteriores já salvos, e vira "Sem destino". Se esta competência só herda um orçamento que dá percentual ao destino, ela é salva agora, como cópia do herdado sem esse percentual. As competências anteriores não mudam, e os seus painéis continuam iguais. O modal pede confirmação. Reativar traz o destino de volta com 0%.
+- **O que nunca foi usado pode ser excluído.** As listas de categorias e de destinos dizem se cada um tem lançamentos, recorrências ou parcelamentos, em qualquer competência (`inUse`).
+  - Uma categoria nunca usada oferece "Excluir" direto, mesmo ativa.
+  - Uma categoria em uso nunca oferece "Excluir", nem arquivada.
+  - Um destino de guardar nunca usado oferece "Excluir" no modal do orçamento, junto com a sua categoria. Se ele tiver percentual em algum orçamento salvo, esse percentual fica sem destino, também nas competências anteriores; como nada foi aplicado a ele, o passado só perde uma meta sem movimento.
+  - Despesas continua fixo.
