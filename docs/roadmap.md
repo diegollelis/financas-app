@@ -144,11 +144,13 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - a renda líquida aparece em "Orçamento por destino";
   - "Despesas e meta" foi incorporado a esse bloco;
   - Análise passa a ser aba no celular.
-- [ ] **Orçamento real por destino** (ADR próprio, decidido em 2026-10-09):
-  - [ ] Orçamento começa vazio, sem o padrão 60/20/15/5. "Definir orçamento" fica destacado até o primeiro ser salvo, e depois cada mês herda o anterior (ADR 0030).
-  - [ ] Cada categoria de débito pertence a um destino (despesas, investimentos, reserva, viagens). As categorias padrão ganham "Investimentos" e "Reserva de emergência".
-  - [ ] Efetivado de cada destino = débitos pagos nas categorias dele. Previsto = todos os débitos dele no mês. % realizado = efetivado ÷ meta.
-  - [ ] Hoje "Previsto" e "Efetivado" são o percentual aplicado aos créditos, e não o dinheiro movido. Repensar o "Resultado", que desconta essas metas calculadas.
+- [ ] **Orçamento real por destino** ([ADR 0047](adr/0047-orcamento-real-por-destino.md)):
+  - **Duas bases:** Despesas é um % da renda líquida; os destinos de guardar são um % do disponível (créditos − despesas).
+  - **Destinos personalizados,** cada destino de guardar com a sua categoria de débito. Um lançamento nela é uma aplicação.
+  - **Orçamento vazio até o primeiro** ser salvo; depois cada mês herda o anterior.
+  - [ ] PR 1: destinos (`budget_destinations`), percentuais por competência (`budget_shares`) e a migração dos orçamentos atuais
+  - [ ] PR 2: o resumo com aplicações, as duas bases e o "Resultado" substituído
+  - [ ] PR 3: telas. No Painel, meta, aplicado e % realizado, com "Registrar aplicação". No modal, os destinos e o "Definir orçamento" destacado.
 - [ ] Lançamentos: etiquetas de receita e despesa
 - [ ] E-mails e textos com o nome CodeLélis Finanças
 - [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada

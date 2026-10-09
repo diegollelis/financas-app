@@ -50,3 +50,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0044](0044-marca-do-produto-e-moldura.md)            | Marca do produto no app ([CL] Finanças), barra lateral inteira e rodapé           | Aceita |
 | [0045](0045-largura-por-pagina-e-grade-do-painel.md)  | Largura por página (handle wide) e grade de 2 colunas do Painel                   | Aceita |
 | [0046](0046-orcamento-no-painel.md)                   | Orçamento editado no Painel, num modal; Análise vira aba no celular               | Aceita |
+| [0047](0047-orcamento-real-por-destino.md)            | Orçamento real: duas bases, destinos personalizados e aplicações pela categoria   | Aceita |
