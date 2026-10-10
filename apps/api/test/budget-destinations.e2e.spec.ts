@@ -69,16 +69,15 @@ describe('budget destinations', () => {
     return budgetDestinationSchema.parse(response.body);
   }
 
-  it('gives every new workspace Despesas and three saving destinations, each with its category', async () => {
+  it('gives every new workspace Despesas and two saving destinations, each with its category', async () => {
     const { browser, base } = await setup();
 
     const list = await destinations(browser, base);
 
     expect(list.map(({ name, kind, position }) => ({ name, kind, position }))).toEqual([
       { name: 'Despesas', kind: 'EXPENSES', position: 0 },
-      { name: 'Investimentos', kind: 'SAVINGS', position: 1 },
-      { name: 'Reserva de emergência', kind: 'SAVINGS', position: 2 },
-      { name: 'Viagens', kind: 'SAVINGS', position: 3 },
+      { name: 'Reserva de emergência', kind: 'SAVINGS', position: 1 },
+      { name: 'Investimentos', kind: 'SAVINGS', position: 2 },
     ]);
     expect(list[0]!.categoryId).toBeNull();
     const debitCategories = (await categories(browser, base)).filter((c) => c.type === 'DEBIT');
@@ -90,8 +89,6 @@ describe('budget destinations', () => {
       });
     }
     expect(debitCategories.find((c) => c.name === 'Mercado')?.destinationId).toBeNull();
-    // The expense category "Viagem" (spending on a trip) stays apart from "Viagens".
-    expect(debitCategories.some((c) => c.name === 'Viagem')).toBe(true);
   });
 
   it('gives a new shared workspace its defaults too', async () => {
@@ -101,9 +98,8 @@ describe('budget destinations', () => {
 
     expect((await destinations(browser, base)).map((d) => d.name)).toEqual([
       'Despesas',
-      'Investimentos',
       'Reserva de emergência',
-      'Viagens',
+      'Investimentos',
     ]);
   });
 
@@ -112,7 +108,7 @@ describe('budget destinations', () => {
 
     const reforma = await create(browser, base, 'Reforma');
 
-    expect(reforma).toMatchObject({ name: 'Reforma', kind: 'SAVINGS', position: 4 });
+    expect(reforma).toMatchObject({ name: 'Reforma', kind: 'SAVINGS', position: 3 });
     const category = (await categories(browser, base)).find((c) => c.id === reforma.categoryId);
     expect(category).toMatchObject({ name: 'Reforma', type: 'DEBIT', archived: false });
   });
@@ -167,13 +163,15 @@ describe('budget destinations', () => {
   it('deletes an unused destination with its category, and refuses one in use', async () => {
     const { browser, base } = await setup();
     const reforma = await create(browser, base, 'Reforma');
-    const viagens = (await destinations(browser, base)).find((d) => d.name === 'Viagens')!;
+    const reserva = (await destinations(browser, base)).find(
+      (d) => d.name === 'Reserva de emergência',
+    )!;
     await browser
       .post(`${base}/transactions`)
       .send({
         type: 'DEBIT',
-        description: 'Guardar para as férias',
-        categoryId: viagens.categoryId,
+        description: 'Guardar para a reserva',
+        categoryId: reserva.categoryId,
         amountCents: 30_000,
         period: currentPeriod(),
       })
@@ -181,23 +179,25 @@ describe('budget destinations', () => {
 
     // The list says which ones were applied to: only the others can be deleted.
     const listed = await destinations(browser, base);
-    expect(listed.find((d) => d.id === viagens.id)?.inUse).toBe(true);
+    expect(listed.find((d) => d.id === reserva.id)?.inUse).toBe(true);
     expect(listed.find((d) => d.id === reforma.id)?.inUse).toBe(false);
     await browser.delete(`${base}/budget-destinations/${reforma.id}`).expect(204);
-    const inUse = await browser.delete(`${base}/budget-destinations/${viagens.id}`).expect(409);
+    const inUse = await browser.delete(`${base}/budget-destinations/${reserva.id}`).expect(409);
 
     expect(inUse.body).toMatchObject({ code: 'DESTINATION_IN_USE' });
     const names = (await destinations(browser, base)).map((d) => d.name);
     expect(names).not.toContain('Reforma');
-    expect(names).toContain('Viagens');
+    expect(names).toContain('Reserva de emergência');
     const categoryIds = (await categories(browser, base)).map((c) => c.id);
     expect(categoryIds).not.toContain(reforma.categoryId);
-    expect(categoryIds).toContain(viagens.categoryId);
+    expect(categoryIds).toContain(reserva.categoryId);
   });
 
   it("refuses to change a destination's category through the categories routes", async () => {
     const { browser, base } = await setup();
-    const investimentos = (await destinations(browser, base))[1]!;
+    const investimentos = (await destinations(browser, base)).find(
+      (d) => d.name === 'Investimentos',
+    )!;
 
     for (const request of [
       () => browser.patch(`${base}/categories/${investimentos.categoryId}`).send({ name: 'Outra' }),

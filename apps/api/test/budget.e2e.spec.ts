@@ -57,10 +57,19 @@ describe('budget', () => {
     return budgetSchema.parse(response.body);
   }
 
+  /**
+   * The workspace's destinations. These tests use three saving destinations: the two defaults
+   * and Viagens, which is created here the first time, as a person would.
+   */
   async function destinations(browser: Browser, workspaceId: string) {
-    const response = await browser
-      .get(`/api/workspaces/${workspaceId}/budget-destinations`)
-      .expect(200);
+    const path = `/api/workspaces/${workspaceId}/budget-destinations`;
+    let response = await browser.get(path).expect(200);
+    if (
+      !budgetDestinationListResponseSchema.parse(response.body).some((d) => d.name === 'Viagens')
+    ) {
+      await browser.post(path).send({ name: 'Viagens' }).expect(201);
+      response = await browser.get(path).expect(200);
+    }
     const list = budgetDestinationListResponseSchema.parse(response.body);
     const named = (name: string) => list.find((d) => d.name === name)!;
     return { list, named };
@@ -95,9 +104,8 @@ describe('budget', () => {
     });
     expect(percentages(budget)).toEqual({
       Despesas: 0,
-      Investimentos: 0,
       'Reserva de emergência': 0,
-      Viagens: 0,
+      Investimentos: 0,
     });
     expect(budget.shares[0]).toMatchObject({ kind: 'EXPENSES', categoryId: null });
   });

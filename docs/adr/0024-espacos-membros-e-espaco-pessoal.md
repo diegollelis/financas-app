@@ -45,3 +45,7 @@ O Better Auth oferece um _hook_ "depois de criar usuário", mas ele roda **depoi
 - O teste de concorrência só prova o _lock_ porque abre as conexões do pool antes. Sem isso, a primeira chamada termina antes de as outras conseguirem conexão e o teste passaria mesmo sem o _lock_. Isso foi verificado: removendo o `FOR UPDATE`, o teste falha com 10 espaços pessoais.
 - Apagar um usuário apaga os vínculos dele, mas os espaços compartilhados em que ele era o único membro ficam órfãos. A exclusão de conta (LGPD, fase 5) precisa tratar isso: transferir a posse ou excluir esses espaços.
 - A migração de dados depende de `uuidv7()`. O banco de produção (Neon) precisa ser PostgreSQL 18 ou mais novo.
+
+## Nota (padrões genéricos, 2026-10-10)
+
+As categorias padrão de um espaço novo vinham da planilha pessoal de origem: 14 de crédito e 26 de débito, como PLR, Lote, Inglês e IPVA. Antes da 1.0.0 ([ADR 0050](0050-versionamento.md)), elas foram trocadas por uma lista genérica, porque o app é para outras pessoas também. São 5 de crédito e 13 de débito, listadas em `DEFAULT_CATEGORIES` e em [modelo.md](../dominio/modelo.md#categorias-padrão). Cada pessoa cria as categorias da sua vida. Os espaços criados antes continuam com as categorias que receberam, e não houve migração.

@@ -71,7 +71,7 @@ describe('recurrences', () => {
     const energy = (overrides: Partial<CreateRecurrenceInput> = {}): CreateRecurrenceInput => ({
       type: 'DEBIT',
       description: 'Conta de luz',
-      categoryId: categoryId('Energia', 'DEBIT'),
+      categoryId: categoryId('Contas da casa', 'DEBIT'),
       amountCents: 18_000,
       dueDay: 10,
       startPeriod: thisMonth,
@@ -231,7 +231,7 @@ describe('recurrences', () => {
   it('keeps a category in use by a recurrence from being deleted', async () => {
     const { create, energy, categoryId, base, browser } = await setUp();
     await create(energy());
-    const energia = categoryId('Energia', 'DEBIT');
+    const energia = categoryId('Contas da casa', 'DEBIT');
     // Its generated transaction is deleted, so only the recurrence still uses the category.
     const [generated] = (await browser.get(`${base}/transactions?period=${thisMonth}`)).body as {
       id: string;
@@ -334,7 +334,7 @@ describe('recurrences', () => {
       const { create, energy, categoryId, transactionsOf, base, browser } = await setUp();
       await create(energy({ variableAmount: true }));
       await create(
-        energy({ description: 'Internet', categoryId: categoryId('Internet', 'DEBIT') }),
+        energy({ description: 'Internet', categoryId: categoryId('Assinaturas', 'DEBIT') }),
       );
 
       const transactions = await transactionsOf(thisMonth);

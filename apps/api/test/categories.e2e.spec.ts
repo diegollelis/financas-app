@@ -108,7 +108,7 @@ describe('categories', () => {
       const before = await list(browser, personalWorkspaceId);
       expect(before.every((category) => category.recentUses === 0)).toBe(true);
       const mercado = before.find((category) => category.name === 'Mercado')!;
-      const energia = before.find((category) => category.name === 'Energia')!;
+      const energia = before.find((category) => category.name === 'Contas da casa')!;
       const now = currentPeriod();
       const add = (categoryId: string, period: string) =>
         browser

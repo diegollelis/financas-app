@@ -69,12 +69,15 @@ Calculados na API a partir dos lançamentos, nunca armazenados, nas visões prev
 
 ## Categorias padrão
 
-Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras.
+Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras. A lista é genérica de propósito: cada pessoa cria as categorias da sua vida.
 
-**Créditos:** Salário · PLR · 13º salário · Férias · Benefício · Cashback · Freelance · Vendas · Empréstimo · Consórcio · Saque-aniversário FGTS · Restituição IRPF · Reembolso · Outros
+**Créditos:** Salário, Renda extra, Rendimentos, Reembolso, Outros
 
-**Débitos:** Cartão de crédito · Energia · Internet · Celular · Streaming · Mercado · Vale-alimentação · Combustível · Carro · Seguro do carro · IPVA · Lote · Consórcio · Empréstimo · Faculdade · Pós-graduação · Curso · Inglês · Concurso · Saúde · Farmácia · Suplemento · Roupas · Lazer · Viagem · Outros
+**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Educação, Lazer, Compras, Assinaturas, Cartão de crédito, Impostos e taxas, Outros
 
-Correções em relação à planilha: removidos "Energia" (estava em créditos) e "Salário + PLR" (usar dois lançamentos); "FreeLancer" → "Freelance"; "IRPF" → "Restituição IRPF".
+- **"Reembolso"** recebe as partes de uma divisão de contas ([ADR 0042](../adr/0042-pessoas-e-rateio.md)).
+- **Os destinos de guardar padrão** são Reserva de emergência e Investimentos, e cada um cria a sua categoria de débito com o mesmo nome ([ADR 0047](../adr/0047-orcamento-real-por-destino.md)).
+
+**Histórico:** até a versão 1.0.0, a lista vinha da planilha pessoal de origem, com 14 categorias de crédito e 26 de débito, como PLR, Lote, Inglês e IPVA. Ela foi trocada pela atual antes da 1.0.0 (nota de 2026-10-10 no [ADR 0024](../adr/0024-espacos-membros-e-espaco-pessoal.md)). Os espaços criados antes continuam com as categorias que receberam. "Viagem" saiu junto com o destino padrão "Viagens".
 
 > Observação: "Cartão de crédito" como categoria esconde o que foi comprado. Uma evolução futura é tratar o cartão como **conta/fatura** com itens categorizados (novo ADR).

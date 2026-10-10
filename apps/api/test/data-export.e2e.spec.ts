@@ -145,9 +145,8 @@ describe('data export', () => {
     ]);
     expect(personal!.budgetDestinations.map((d) => d.name)).toEqual([
       'Despesas',
-      'Investimentos',
       'Reserva de emergência',
-      'Viagens',
+      'Investimentos',
     ]);
     expect(personal!.categories.length).toBeGreaterThan(0);
   });

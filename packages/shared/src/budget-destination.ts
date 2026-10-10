@@ -59,15 +59,15 @@ export type BudgetDestination = z.infer<typeof budgetDestinationSchema>;
 export const budgetDestinationListResponseSchema = z.array(budgetDestinationSchema);
 
 /**
- * Every workspace starts with these (ADR 0047), in this order; the migration that created the
- * table gave them to the workspaces that already existed.
+ * Every workspace starts with these (ADR 0047), in this order: first the emergency fund, then
+ * investing. Generic on purpose: each person adds their own (Viagens, Carro…). Workspaces created
+ * before keep the ones they got.
  */
 export const DEFAULT_BUDGET_DESTINATIONS: readonly {
   name: string;
   kind: BudgetDestinationKind;
 }[] = [
   { name: 'Despesas', kind: 'EXPENSES' },
-  { name: 'Investimentos', kind: 'SAVINGS' },
   { name: 'Reserva de emergência', kind: 'SAVINGS' },
-  { name: 'Viagens', kind: 'SAVINGS' },
+  { name: 'Investimentos', kind: 'SAVINGS' },
 ];
