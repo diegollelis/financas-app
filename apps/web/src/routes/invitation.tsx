@@ -150,14 +150,16 @@ export function InvitationPage() {
   if (user && user.termsVersion !== TERMS_VERSION) return <AcceptTerms user={user} />;
   return (
     <AuthCard title="Convite" description={describe(invitation)} footer={homeLink}>
-      <WhatYouGet invitation={invitation} />
-      {!user ? (
-        <SignInFirst invitation={invitation} />
-      ) : user.email.toLowerCase() !== invitation.email ? (
-        <WrongAccount invitation={invitation} email={user.email} />
-      ) : (
-        <Accept token={token} onArrival={searchParams.has(ACCEPT_PARAM)} />
-      )}
+      <div className="grid gap-4">
+        <WhatYouGet invitation={invitation} />
+        {!user ? (
+          <SignInFirst invitation={invitation} />
+        ) : user.email.toLowerCase() !== invitation.email ? (
+          <WrongAccount invitation={invitation} email={user.email} />
+        ) : (
+          <Accept token={token} onArrival={searchParams.has(ACCEPT_PARAM)} />
+        )}
+      </div>
     </AuthCard>
   );
 }
