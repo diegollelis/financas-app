@@ -165,6 +165,8 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
     - [x] Importar: passos numerados, botão "Escolher planilha", resumo da revisão (o que entra, com créditos e débitos, e o que tem problema), filtro "Com problemas", nota de "tudo ou nada" e a revisão nas capturas
     - [x] Membros: o que cada acesso permite, os mesmos nomes de acesso em todo o app ("Pode editar" e "Só visualizar"), "Excluir espaço" numa área à parte e "Criar espaço compartilhado" no espaço pessoal
     - [x] Minha conta: a exportação explicada sem depender de "JSON", o próximo passo no bloqueio da exclusão e o contraste do link corrigido. Trocar nome, e-mail e senha e ver as sessões ficam para uma rodada própria, com ADR
+    - [x] Gerenciar a conta (ADR 0049), parte 1: trocar o nome, trocar a senha (os outros aparelhos saem), criar uma senha numa conta do Google e ver e encerrar os aparelhos conectados
+    - [ ] Gerenciar a conta (ADR 0049), parte 2: trocar o e-mail, confirmado pelo novo endereço, com aviso ao antigo
 - [x] Carregamento com o símbolo CL animado (`components/brand-loader.tsx`, pedido em 2026-10-09):
   - **Onde:** nas telas de carregamento da página inteira: a abertura do app enquanto confere a sessão (que pode levar até um minuto com a API dormindo), Entrar e Cadastro, "/" e o convite. As listas continuam com esqueletos.
   - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).
