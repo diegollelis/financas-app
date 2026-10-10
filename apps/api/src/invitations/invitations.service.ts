@@ -22,7 +22,7 @@ import { z } from 'zod';
 import type { Env } from '../config/env.js';
 import type { Invitation } from '../generated/prisma/client.js';
 import { Mailer } from '../mail/mailer.js';
-import { invitationEmail } from '../mail/templates.js';
+import { mailTemplates } from '../mail/templates.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { WorkspaceMembership } from '../workspaces/workspace-member.guard.js';
 
@@ -116,16 +116,14 @@ export class InvitationsService {
 
     // Sent in the background, like the auth e-mails (ADR 0022). If it fails, the OWNER can
     // invite again. The log never carries the message: its link is the token.
-    const url = new URL(
-      `${INVITATION_PATH}/${token}`,
-      this.config.get('WEB_ORIGIN', { infer: true }),
-    );
+    const web = this.config.get('WEB_ORIGIN', { infer: true });
+    const url = new URL(`${INVITATION_PATH}/${token}`, web);
     this.mailer
       .send(
-        invitationEmail(input.email, {
+        mailTemplates(web).invitationEmail(input.email, {
           inviterName: inviter.name,
           workspaceName,
-          canEdit: input.role === 'EDITOR',
+          role: input.role,
           url: url.toString(),
         }),
       )

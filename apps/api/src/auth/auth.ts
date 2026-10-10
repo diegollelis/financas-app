@@ -24,14 +24,7 @@ import { redactPrismaError } from '../common/error-reporting.js';
 import type { Env } from '../config/env.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Mailer, MailMessage } from '../mail/mailer.js';
-import {
-  changeEmailNoticeEmail,
-  changeEmailVerificationEmail,
-  deleteAccountEmail,
-  existingAccountEmail,
-  resetPasswordEmail,
-  verificationEmail,
-} from '../mail/templates.js';
+import { mailTemplates } from '../mail/templates.js';
 
 /** Every Better Auth route lives under this prefix (sign-up, sign-in, sign-out, get-session...). */
 export const AUTH_BASE_PATH = '/api/auth';
@@ -91,6 +84,15 @@ export function createAuth(
     beforeUserDeleted: (user: { id: string; email: string }) => Promise<void>;
   },
 ) {
+  const {
+    changeEmailNoticeEmail,
+    changeEmailVerificationEmail,
+    deleteAccountEmail,
+    existingAccountEmail,
+    resetPasswordEmail,
+    verificationEmail,
+  } = mailTemplates(env.WEB_ORIGIN);
+
   /**
    * Sends without making the request wait. Besides being faster, the response time no longer
    * depends on whether the e-mail exists (a slow send would reveal it). Failures are logged

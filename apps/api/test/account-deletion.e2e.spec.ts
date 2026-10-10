@@ -88,7 +88,7 @@ describe('account deletion', () => {
 
     await requestDeletion(browser, maria.email);
 
-    expect(t.mailer.sent[0]?.subject).toBe('Confirme a exclusão da sua conta no Finanças');
+    expect(t.mailer.sent[0]?.subject).toBe('Confirme a exclusão da sua conta');
     expect(await t.prisma.user.count({ where: { id: userId } })).toBe(1);
   });
 

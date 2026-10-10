@@ -55,10 +55,23 @@ Com o domínio verificado no Resend ([ADR 0039](0039-dominio-proprio.md)), os e-
 
 - **O cadastro não abre sessão.** A tela troca o formulário por "Confira seu e-mail", com "Reenviar e-mail" e "Usar outro e-mail". O link de confirmação entra na conta (`autoSignInAfterVerification`).
 - **Cadastro com um e-mail que já tem conta:** a resposta é igual à de um cadastro novo, no formato e no tempo; o Better Auth calcula o hash de uma senha mesmo assim. A mensagem "Já existe uma conta com este e-mail", que revelava quais e-mails têm conta, deixou de existir.
-  - O dono da conta recebe "Você já tem uma conta no Finanças", com links para entrar e para redefinir a senha (`onExistingUserSignUp`).
+  - O dono da conta recebe "Você já tem uma conta", com links para entrar e para redefinir a senha (`onExistingUserSignUp`).
   - Esse e-mail não verifica nada nem abre sessão.
 - **Login com a senha certa e o e-mail não verificado:** responde 403 `EMAIL_NOT_VERIFIED` e envia um link novo (`sendOnSignIn`). É o caminho de quem perdeu o primeiro e-mail. Com a senha errada, responde 401 e não envia nada: a senha é conferida antes.
 - **Redefinir a senha verifica o e-mail** (`onPasswordReset`): o link foi para aquele endereço, então quem o abriu é o dono, e não precisa de um segundo e-mail.
 - **O link volta à página de onde a pessoa veio.** O formulário envia o `?voltar=` como `callbackURL`, por exemplo `/convites/:token`. A API só aceita um caminho interno (`safeReturnTo`, agora em `packages/shared`); qualquer outro vira `/`.
 - **Sessões abertas antes da mudança** continuam valendo até expirar, e o aviso "Confirme seu e-mail" continua para elas. No próximo login por senha, a confirmação é exigida.
 - **Log:** o Better Auth registra em nível `info` o e-mail de um cadastro repetido. O nível ficou fixado em `warn`, o padrão dele, para uma atualização não passar a gravar e-mails ([ADR 0012](0012-privacidade-lgpd.md)).
+
+## Nota (e-mails com a marca, 2026-10-10)
+
+Os e-mails passaram a ter a identidade do CodeLélis Finanças ([ADR 0043](0043-identidade-visual-codelelis.md)), num layout único. Ele está em `mailTemplates`, em `apps/api/src/mail/templates.ts`, que recebe o `WEB_ORIGIN`.
+
+- **A marca fica no remetente, não no assunto.** O padrão de `MAIL_FROM_NAME` passou a ser "CodeLélis Finanças", e os assuntos ficaram curtos e começam pela ação ("Confirme seu e-mail", "Redefina sua senha"). No celular, a caixa de entrada mostra só uns 35 caracteres do assunto, e o remetente aparece sempre.
+- **Layout:**
+  - **Logo:** a oficial, no topo, servida pelo próprio site (`/brand/logo-horizontal-light.png`). O texto alternativo é o nome da marca, para os clientes que bloqueiam imagens.
+  - **Botão:** no azul da marca (`#0066ff`), com contraste de 4,8:1 com o texto branco. Abaixo dele, o endereço do link em texto, para quando o botão não abre.
+  - **Rodapé:** o motivo do e-mail, o aviso de que o endereço não recebe respostas e os links para o app e para a Política de privacidade.
+  - **Tema e prévia:** só o tema claro, declarado com `color-scheme`, e uma linha de prévia escondida para a caixa de entrada.
+- **O convite diz o acesso com as mesmas palavras das telas:** `roleLabels` e `roleDescriptions` saíram do app web para `packages/shared`, e o e-mail usa os dois ("Seu acesso: Pode editar. Lança, efetiva e muda…").
+- **Sem rastreamento:** nenhum pixel de abertura nem link rastreado ([ADR 0012](0012-privacidade-lgpd.md)). Um teste confere que todo link e toda imagem apontam para o app ou para o link do botão.

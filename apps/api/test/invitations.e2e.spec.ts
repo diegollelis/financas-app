@@ -76,7 +76,7 @@ describe('invitations', () => {
       expect(invitation).toMatchObject({ email: 'joao@example.com', role: 'EDITOR' });
       const link = t.mailer.lastLinkTo('joao@example.com');
       expect(`${link.origin}${link.pathname}`).toBe(`${testEnv.WEB_ORIGIN}/convites/${token}`);
-      expect(t.mailer.sent[0]?.subject).toBe('Maria Exemplo convidou você para "Casa" no Finanças');
+      expect(t.mailer.sent[0]?.subject).toBe('Maria Exemplo convidou você para "Casa"');
       const stored = await t.prisma.invitation.findFirstOrThrow();
       expect(stored.tokenHash).not.toContain(token);
     });

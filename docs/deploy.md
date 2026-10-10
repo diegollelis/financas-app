@@ -252,7 +252,7 @@ Faça os quatro itens em sequência, em poucos minutos: entre o 3 e o 4, o login
    - Com o DNS no Cloudflare, o caminho automático (**Sign in to Cloudflare**) cria os registros: o DKIM em `resend._domainkey` e o subdomínio `send`, que aponta para o Resend com o MX e o SPF.
    - Espere o status **Verified**.
 2. O DMARC não é do Resend: crie à mão em **Cloudflare → DNS → Records** um **TXT** `_dmarc` com `v=DMARC1; p=none;`.
-3. No Render, **crie** `MAIL_FROM_EMAIL` = `nao-responda@codelelis.com`. Sem ela, a API usa o padrão `onboarding@resend.dev`. Não é preciso criar essa caixa de e-mail: enviar não depende dela. O nome do remetente vem do padrão de `MAIL_FROM_NAME` ("Finanças").
+3. No Render, **crie** `MAIL_FROM_EMAIL` = `nao-responda@codelelis.com`. Sem ela, a API usa o padrão `onboarding@resend.dev`. Não é preciso criar essa caixa de e-mail: enviar não depende dela. O nome do remetente vem do padrão de `MAIL_FROM_NAME` ("CodeLélis Finanças"). Se essa variável existir no Render com outro valor, apague-a.
 4. **Confira:** peça **Esqueci a senha** e envie um convite para um e-mail que **não** é o da conta Resend. Os dois devem chegar.
    - **No começo, podem cair no spam:** um domínio novo ainda não tem reputação. Marque "Não é spam" nas caixas que você controla; a entrega melhora com o uso.
    - Se continuar no spam depois de algumas semanas, avalie o DMARC `p=quarantine` e o texto dos e-mails.

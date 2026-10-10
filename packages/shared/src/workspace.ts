@@ -49,6 +49,23 @@ export function hasRole(role: WorkspaceRole, minimum: WorkspaceRole): boolean {
   return roleRank[role] >= roleRank[minimum];
 }
 
+/**
+ * The name of each access, in the words of the invitation's choice: what the person can do, not
+ * a title (avaliação de Membros). The web pages and the invitation e-mail use the same ones.
+ */
+export const roleLabels: Record<WorkspaceRole, string> = {
+  OWNER: 'Dono',
+  EDITOR: 'Pode editar',
+  VIEWER: 'Só visualizar',
+};
+
+/** What each access allows, after its name: the invitation form, page and e-mail. */
+export const roleDescriptions: Record<WorkspaceRole, string> = {
+  OWNER: 'muda tudo, convida e remove pessoas e pode excluir o espaço.',
+  EDITOR: 'lança, efetiva e muda lançamentos, categorias, orçamento, pessoas e importações.',
+  VIEWER: 'vê tudo, sem mudar nada.',
+};
+
 /** A member of a workspace, as listed to the other members. */
 export const memberSchema = z.object({
   userId: z.uuid(),

@@ -1,4 +1,4 @@
-import type { Workspace } from '@financas/shared';
+import { roleLabels, type Workspace } from '@financas/shared';
 import { ChevronDown, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { NewWorkspaceDialog } from './new-workspace-dialog';
-import { roleLabels } from './roles';
 import { useWorkspaces } from './use-workspaces';
 
 /**

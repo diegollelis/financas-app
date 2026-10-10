@@ -153,7 +153,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] PR 3: "Aplicar" ("Registrar aplicação em …") em cada destino de guardar no Painel, com a categoria e o valor que falta para a meta; "Gerenciar destinos de guardar" no modal do orçamento (novo, renomear, arquivar e reativar); a categoria de destino marcada na tela de Categorias
   - [x] Arquivar um destino vale a partir da competência atual (os meses anteriores não mudam); categorias e destinos nunca usados podem ser excluídos (`inUse` nas listas; nota de 2026-10-09 no ADR 0047)
 - [x] Lançamentos: etiquetas de receita e despesa ("Pago em" e "Recebido em" no lugar de "Efetivado em")
-- [ ] E-mails e textos com o nome CodeLélis Finanças
+- [x] E-mails e textos com o nome CodeLélis Finanças
 - [x] Revisão de todas as telas em claro e escuro, com a lista do axe zerada
   - [x] Lista do axe zerada: a Análise na coluna larga, com os totais em duas listas de definição, e os menus não modais
   - [x] Avaliação externa tela a tela, com um pacote de revisão (capturas, o que já foi feito e decidido, onde focar): Painel, Lançamentos, Análise, Recorrências, Pessoas, Importar, Membros, Minha conta, Convite e entrada

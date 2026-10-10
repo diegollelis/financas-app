@@ -4,6 +4,8 @@ import {
   type CreateInvitationInput,
   type InvitationResponse,
   type MemberResponse,
+  roleDescriptions,
+  roleLabels,
   type Workspace,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,7 +35,6 @@ import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { NewWorkspaceDialog } from '@/features/workspaces/new-workspace-dialog';
-import { roleDescriptions, roleLabels } from '@/features/workspaces/roles';
 import {
   useCreateInvitation,
   useDeleteWorkspace,
