@@ -155,3 +155,61 @@ export function deletionBlockedMessage(names: string[]): string {
     ? `Antes de excluir a conta, resolva o espaço ${list}: remova os membros e os convites, ou exclua o espaço.`
     : `Antes de excluir a conta, resolva os espaços ${list}: remova os membros e os convites, ou exclua os espaços.`;
 }
+
+// Managing the account (ADR 0049).
+
+/** Body of `POST /api/auth/update-user`: only the name, with the sign-up's rule. */
+export const updateNameInputSchema = signUpInputSchema.pick({ name: true });
+
+export type UpdateNameInput = z.infer<typeof updateNameInputSchema>;
+
+/**
+ * Body of `POST /api/auth/change-password`. The API always signs the other devices out
+ * (`revokeOtherSessions`), whatever the request says.
+ */
+export const changePasswordInputSchema = z.object({
+  currentPassword: z.string().min(1, 'Informe a senha atual.'),
+  newPassword: passwordSchema,
+});
+
+export type ChangePasswordInput = z.infer<typeof changePasswordInputSchema>;
+
+/** The web form: the current password, and the new one typed twice. */
+export const changePasswordFormSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Informe a senha atual.'),
+    newPassword: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((input) => input.newPassword === input.confirmPassword, {
+    message: 'As senhas não conferem.',
+    path: ['confirmPassword'],
+  });
+
+export type ChangePasswordForm = z.infer<typeof changePasswordFormSchema>;
+
+/** One device the account is signed in on: never its token, never its IP (ADR 0049). */
+export const accountSessionSchema = z.object({
+  id: z.string(),
+  /** "Chrome", "Safari"…; "Navegador desconhecido" when the user-agent says nothing useful. */
+  browser: z.string(),
+  /** "Windows", "Android", "iOS"…; "Sistema desconhecido" likewise. */
+  os: z.string(),
+  createdAt: z.iso.datetime(),
+  lastActiveAt: z.iso.datetime(),
+  /** The session of the request itself: "Este aparelho". */
+  current: z.boolean(),
+});
+
+export type AccountSession = z.infer<typeof accountSessionSchema>;
+
+/**
+ * `GET /me/security`: whether the account has a password (one created with Google has not) and
+ * the devices it is signed in on, the current one first, then the most recent.
+ */
+export const accountSecuritySchema = z.object({
+  hasPassword: z.boolean(),
+  sessions: z.array(accountSessionSchema),
+});
+
+export type AccountSecurity = z.infer<typeof accountSecuritySchema>;
