@@ -3,6 +3,7 @@ import {
   FORGOT_PASSWORD_PATH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  changeEmailInputSchema,
   changePasswordInputSchema,
   RESET_PASSWORD_PATH,
   resetPasswordInputSchema,
@@ -24,6 +25,8 @@ import type { Env } from '../config/env.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Mailer, MailMessage } from '../mail/mailer.js';
 import {
+  changeEmailNoticeEmail,
+  changeEmailVerificationEmail,
   deleteAccountEmail,
   existingAccountEmail,
   resetPasswordEmail,
@@ -55,6 +58,7 @@ const bodySchemas: Record<string, z.ZodType<Record<string, unknown>>> = {
   '/reset-password': resetPasswordInputSchema,
   '/update-user': updateNameInputSchema,
   '/change-password': changePasswordInputSchema,
+  '/change-email': changeEmailInputSchema,
 };
 
 /**
@@ -65,6 +69,7 @@ const bodySchemas: Record<string, z.ZodType<Record<string, unknown>>> = {
 const strictBodies: Record<string, Record<string, unknown>> = {
   '/update-user': {},
   '/change-password': { revokeOtherSessions: true },
+  '/change-email': {},
 };
 
 const logger = new Logger('Auth');
@@ -156,6 +161,10 @@ export function createAuth(
       // the web app, which asks once more and sends the token back (POST /delete-user with
       // { token }): Better Auth's own GET callback would need a session in whatever browser
       // opened the e-mail, and would delete in a single tap.
+      // Changing the e-mail (ADR 0049): the link goes to the new address, through
+      // sendVerificationEmail below, and the e-mail changes only once it is opened. An address
+      // that already has an account gets the same answer and no e-mail (it would reveal it).
+      changeEmail: { enabled: true },
       deleteUser: {
         enabled: true,
         deleteTokenExpiresIn: 60 * 60,
@@ -230,8 +239,33 @@ export function createAuth(
       sendOnSignIn: true,
       autoSignInAfterVerification: true,
       expiresIn: 60 * 60,
-      sendVerificationEmail: ({ user, url }) =>
-        deliver('verification', verificationEmail(user.email, user.name, verificationLink(url))),
+      sendVerificationEmail: async ({ user, url }) => {
+        // A change of e-mail comes here with the new address as `user.email` (ADR 0049): it
+        // gets its own message, and the address in use hears of it at once.
+        const stored = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { email: true },
+        });
+        if (stored && stored.email !== user.email) {
+          await deliver(
+            'e-mail change',
+            changeEmailVerificationEmail(user.email, user.name, verificationLink(url)),
+          );
+          return deliver(
+            'e-mail change notice',
+            changeEmailNoticeEmail(
+              stored.email,
+              user.name,
+              user.email,
+              webPage(FORGOT_PASSWORD_PATH),
+            ),
+          );
+        }
+        return deliver(
+          'verification',
+          verificationEmail(user.email, user.name, verificationLink(url)),
+        );
+      },
     },
     // Brute force and e-mail flooding protection (ADR 0023): per client IP and route. A blocked
     // request gets 429 with an X-Retry-After header (seconds).
@@ -255,6 +289,8 @@ export function createAuth(
         '/delete-user': { window: 300, max: 3 },
         // Guessing the current password, as signing in (ADR 0049).
         '/change-password': { window: 300, max: 5 },
+        // Sends two e-mails (ADR 0049).
+        '/change-email': { window: 300, max: 3 },
       },
     },
     databaseHooks: {

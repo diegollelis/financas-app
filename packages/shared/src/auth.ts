@@ -213,3 +213,14 @@ export const accountSecuritySchema = z.object({
 });
 
 export type AccountSecurity = z.infer<typeof accountSecuritySchema>;
+
+/**
+ * Body of `POST /api/auth/change-email` (ADR 0049): the new address gets the confirmation link,
+ * and the e-mail changes only once it is opened. `callbackURL` is where the link leads.
+ */
+export const changeEmailInputSchema = z.object({
+  newEmail: emailSchema,
+  callbackURL: z.string().optional(),
+});
+
+export type ChangeEmailInput = z.infer<typeof changeEmailInputSchema>;

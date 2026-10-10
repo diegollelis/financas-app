@@ -63,6 +63,38 @@ describe('Managing the account', () => {
     expect(await screen.findByText('Nome alterado')).toBeInTheDocument();
   });
 
+  it('sends the link to the new e-mail, and says the account changes only once opened', async () => {
+    const fetchMock = mockAccount(
+      { hasPassword: true, sessions: [thisDevice] },
+      { 'POST /api/auth/change-email': { body: { status: true } } },
+    );
+    renderApp('/conta');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Trocar e-mail' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Trocar e-mail' });
+    const field = within(dialog).getByLabelText('Novo e-mail');
+    // The address already in use is refused before calling the API.
+    await userEvent.type(field, verifiedUser.email);
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Enviar link de confirmação' }),
+    );
+    expect(await within(dialog).findByText('Este já é o e-mail da sua conta.')).toBeInTheDocument();
+
+    await userEvent.clear(field);
+    await userEvent.type(field, 'maria.nova@example.com');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Enviar link de confirmação' }),
+    );
+
+    await expectCall(fetchMock, '/api/auth/change-email', {
+      newEmail: 'maria.nova@example.com',
+      callbackURL: '/conta',
+    });
+    expect(await within(dialog).findByRole('status')).toHaveTextContent(
+      `Enviamos um link para maria.nova@example.com. O e-mail da conta muda quando você abrir esse link; até lá, continua ${verifiedUser.email}.`,
+    );
+  });
+
   it('changes the password, saying the other devices sign out', async () => {
     const fetchMock = mockAccount(
       { hasPassword: true, sessions: [thisDevice, phone] },

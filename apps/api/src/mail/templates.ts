@@ -135,3 +135,51 @@ export function deleteAccountEmail(to: string, name: string, url: string): MailM
     ),
   };
 }
+
+/** Changing the account's e-mail (ADR 0049): the link goes to the new address. */
+export function changeEmailVerificationEmail(to: string, name: string, url: string): MailMessage {
+  const note =
+    'O link vale por 1 hora. Se você não pediu esta troca, ignore este e-mail: nada muda.';
+  return {
+    to,
+    subject: 'Confirme seu novo e-mail no Finanças',
+    text: `Olá, ${name}!\n\nVocê pediu para usar este endereço na sua conta do Finanças. Confirme abrindo o link abaixo:\n${url}\n\nAté confirmar, a conta continua com o e-mail de antes.\n\n${note}`,
+    html: layout(
+      [
+        `Olá, ${escapeHtml(name)}!`,
+        'Você pediu para usar este endereço na sua conta do Finanças.',
+        'Até confirmar, a conta continua com o e-mail de antes.',
+      ],
+      { label: 'Confirmar novo e-mail', url },
+      note,
+    ),
+  };
+}
+
+/**
+ * The notice to the address in use when someone asks to change it (ADR 0049): whoever owns it
+ * learns at once, and can act if it was not them.
+ */
+export function changeEmailNoticeEmail(
+  to: string,
+  name: string,
+  newEmail: string,
+  resetPasswordUrl: string,
+): MailMessage {
+  const note =
+    'A troca só acontece se o novo endereço for confirmado. Se foi você, não precisa fazer nada.';
+  return {
+    to,
+    subject: 'Pedido de troca do e-mail da sua conta no Finanças',
+    text: `Olá, ${name}!\n\nFoi pedida a troca do e-mail da sua conta no Finanças para ${newEmail}.\n\nSe não foi você, troque sua senha agora: ${resetPasswordUrl}\n\n${note}`,
+    html: layout(
+      [
+        `Olá, ${escapeHtml(name)}!`,
+        `Foi pedida a troca do e-mail da sua conta no Finanças para <strong>${escapeHtml(newEmail)}</strong>.`,
+        'Se não foi você, troque sua senha agora.',
+      ],
+      { label: 'Trocar senha', url: resetPasswordUrl },
+      note,
+    ),
+  };
+}
