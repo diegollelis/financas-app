@@ -10,6 +10,7 @@ import { withReturnTo } from '@/features/auth/return-to';
 import { useSignOut } from '@/features/auth/use-auth-mutations';
 import { useMe } from '@/features/auth/use-me';
 import { useAcceptInvitation, useInvitationPreview } from '@/features/invitations/use-invitation';
+import { roleDescriptions, roleLabels } from '@/features/workspaces/roles';
 import { apiErrorMessage } from '@/lib/error-message';
 
 const homeLink = <TextLink to="/">Ir para o início</TextLink>;
@@ -21,9 +22,28 @@ const homeLink = <TextLink to="/">Ir para o início</TextLink>;
 const ACCEPT_PARAM = 'aceitar';
 
 function describe(invitation: InvitationPreview) {
-  const access = invitation.role === 'EDITOR' ? 'ver e editar' : 'ver';
   const who = invitation.invitedByName ?? 'Alguém';
-  return `${who} convidou você para ${access} as finanças do espaço "${invitation.workspaceName}".`;
+  return `${who} convidou você para o espaço "${invitation.workspaceName}".`;
+}
+
+/**
+ * Before choosing (avaliação das telas de entrada): the access, by the same name and words as
+ * in Membros, and what a workspace is, for whoever has never had one shared.
+ */
+function WhatYouGet({ invitation }: { invitation: InvitationPreview }) {
+  const description = roleDescriptions[invitation.role];
+  return (
+    <div className="grid gap-1 rounded-lg border p-3 text-sm">
+      <p>
+        <strong>Seu acesso: {roleLabels[invitation.role]}.</strong>{' '}
+        {description.charAt(0).toUpperCase() + description.slice(1)}
+      </p>
+      <p className="text-muted-foreground">
+        Um espaço reúne as finanças de uma pessoa, de uma casa ou de um grupo, com os seus
+        lançamentos e orçamento. A sua conta e o seu espaço pessoal continuam só seus.
+      </p>
+    </div>
+  );
 }
 
 /**
@@ -130,13 +150,16 @@ export function InvitationPage() {
   if (user && user.termsVersion !== TERMS_VERSION) return <AcceptTerms user={user} />;
   return (
     <AuthCard title="Convite" description={describe(invitation)} footer={homeLink}>
-      {!user ? (
-        <SignInFirst invitation={invitation} />
-      ) : user.email.toLowerCase() !== invitation.email ? (
-        <WrongAccount invitation={invitation} email={user.email} />
-      ) : (
-        <Accept token={token} onArrival={searchParams.has(ACCEPT_PARAM)} />
-      )}
+      <div className="grid gap-4">
+        <WhatYouGet invitation={invitation} />
+        {!user ? (
+          <SignInFirst invitation={invitation} />
+        ) : user.email.toLowerCase() !== invitation.email ? (
+          <WrongAccount invitation={invitation} email={user.email} />
+        ) : (
+          <Accept token={token} onArrival={searchParams.has(ACCEPT_PARAM)} />
+        )}
+      </div>
     </AuthCard>
   );
 }

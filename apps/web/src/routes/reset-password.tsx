@@ -47,7 +47,11 @@ export function ResetPasswordPage() {
         onSuccess: () =>
           void navigate('/entrar', {
             replace: true,
-            state: { notice: 'Senha alterada. Entre com a nova senha.' },
+            // What really happened: every session ended (revokeSessionsOnPasswordReset).
+            state: {
+              notice:
+                'Senha alterada. Por segurança, todos os aparelhos saíram da conta: entre com a nova senha.',
+            },
           }),
       },
     );

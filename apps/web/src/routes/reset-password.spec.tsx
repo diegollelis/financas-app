@@ -21,7 +21,7 @@ describe('ResetPasswordPage', () => {
     await fillAndSubmit('nova-senha-123', 'nova-senha-123');
 
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Senha alterada. Entre com a nova senha.',
+      'Senha alterada. Por segurança, todos os aparelhos saíram da conta: entre com a nova senha.',
     );
     expect(router.state.location.pathname).toBe('/entrar');
     expect(fetchMock).toHaveBeenCalledWith(

@@ -154,9 +154,9 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
   - [x] Arquivar um destino vale a partir da competência atual (os meses anteriores não mudam); categorias e destinos nunca usados podem ser excluídos (`inUse` nas listas; nota de 2026-10-09 no ADR 0047)
 - [x] Lançamentos: etiquetas de receita e despesa ("Pago em" e "Recebido em" no lugar de "Efetivado em")
 - [ ] E-mails e textos com o nome CodeLélis Finanças
-- [ ] Revisão de todas as telas em claro e escuro, com a lista do axe zerada
+- [x] Revisão de todas as telas em claro e escuro, com a lista do axe zerada
   - [x] Lista do axe zerada: a Análise na coluna larga, com os totais em duas listas de definição, e os menus não modais
-  - [ ] Avaliação externa tela a tela, com um pacote de revisão (capturas, o que já foi feito e decidido, onde focar): Painel, Lançamentos, Análise, Recorrências, Pessoas, Importar, Membros, Minha conta, Convite e entrada
+  - [x] Avaliação externa tela a tela, com um pacote de revisão (capturas, o que já foi feito e decidido, onde focar): Painel, Lançamentos, Análise, Recorrências, Pessoas, Importar, Membros, Minha conta, Convite e entrada
     - [x] Painel: o saldo explicado junto do número, uma frase de abertura em cada bloco do orçamento, "Agendado" e "Falta" no lugar de "A aplicar", e as metas de guardar fechando no centavo
     - [x] Lançamentos: busca por descrição, categoria ou pessoa; filtro por situação no endereço (o aviso de vencidos do Painel abre já filtrado); "Mais opções" no formulário; "Pago em" e "Recebido em"
     - [x] Análise: aplicações à parte do gasto (como no Painel), comparação com o período anterior, a diferença do mês tocado, "Saldo do mês" na legenda e "Filtros (2)" no celular
@@ -167,6 +167,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
     - [x] Minha conta: a exportação explicada sem depender de "JSON", o próximo passo no bloqueio da exclusão e o contraste do link corrigido. Trocar nome, e-mail e senha e ver as sessões ficam para uma rodada própria, com ADR
     - [x] Gerenciar a conta (ADR 0049), parte 1: trocar o nome, trocar a senha (os outros aparelhos saem), criar uma senha numa conta do Google e ver e encerrar os aparelhos conectados
     - [x] Gerenciar a conta (ADR 0049), parte 2: trocar o e-mail, confirmado pelo novo endereço, com aviso ao antigo
+    - [x] Convite e telas de entrada: o acesso do convite com o mesmo nome e texto de Membros, o que é um espaço, por que confirmar o e-mail e que a redefinição desconecta todos os aparelhos; capturas de "Esqueci minha senha", "Redefinir senha" e do convite
 - [x] Carregamento com o símbolo CL animado (`components/brand-loader.tsx`, pedido em 2026-10-09):
   - **Onde:** nas telas de carregamento da página inteira: a abertura do app enquanto confere a sessão (que pode levar até um minuto com a API dormindo), Entrar e Cadastro, "/" e o convite. As listas continuam com esqueletos.
   - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).
