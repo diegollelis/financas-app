@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
 import { TextLink } from '@/components/text-link';
 import { Button } from '@/components/ui/button';
+import { AccountDetails, ConnectedDevices } from '@/features/account/account-security';
 import { DeleteAccountSection } from '@/features/account/delete-account-section';
 import { useDataExport } from '@/features/account/use-data-export';
 import { useCurrentUser } from '@/features/auth/use-me';
@@ -13,8 +14,9 @@ import { AppHeader, SkipLink } from '@/features/shell/app-header';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /**
- * Minha conta (ADR 0041): who is signed in, the terms accepted and the LGPD data export. Outside
- * any workspace, so it has the header without the workspace nav.
+ * Minha conta (ADRs 0041 and 0049): who is signed in, the name and the password, the devices
+ * connected, the terms accepted, the LGPD data export and the deletion. Outside any workspace, so
+ * it has the header without the workspace nav.
  */
 export function AccountPage() {
   const user = useCurrentUser();
@@ -45,15 +47,8 @@ export function AccountPage() {
             <h2 id="account-data" className="font-medium">
               Conta
             </h2>
-            <dl className="grid gap-3 rounded-xl border p-4">
-              <div className="grid gap-0.5">
-                <dt className="text-muted-foreground text-sm">Nome</dt>
-                <dd className="break-words">{user.name}</dd>
-              </div>
-              <div className="grid gap-0.5">
-                <dt className="text-muted-foreground text-sm">E-mail</dt>
-                <dd className="break-words">{user.email}</dd>
-              </div>
+            {/* The name and the password can change here (ADR 0049). */}
+            <AccountDetails>
               {user.termsVersion && (
                 <div className="grid gap-0.5">
                   <dt className="text-muted-foreground text-sm">Termos de uso</dt>
@@ -65,8 +60,10 @@ export function AccountPage() {
                   </dd>
                 </div>
               )}
-            </dl>
+            </AccountDetails>
           </section>
+
+          <ConnectedDevices />
 
           <section aria-labelledby="account-export" className="grid gap-3">
             <h2 id="account-export" className="font-medium">

@@ -1,8 +1,10 @@
 import {
   accountDeletionSchema,
+  accountSecuritySchema,
   dataExportSchema,
   todayIso,
   type AccountDeletion,
+  type AccountSecurity,
 } from '@financas/shared';
 import { Controller, Get, Res, UseGuards } from '@nestjs/common';
 import {
@@ -15,9 +17,10 @@ import {
 import type { Response } from 'express';
 import { z } from 'zod';
 import type { AuthSession } from '../auth/auth.js';
-import { CurrentUser } from '../auth/current-user.decorator.js';
+import { CurrentSession, CurrentUser } from '../auth/current-user.decorator.js';
 import { SessionGuard } from '../auth/session.guard.js';
 import { AccountDeletionService } from './account-deletion.service.js';
+import { AccountSecurityService } from './account-security.service.js';
 import { DataExportService } from './data-export.service.js';
 
 /** The signed-in person's own account (ADR 0041). */
@@ -29,7 +32,27 @@ export class AccountController {
   constructor(
     private readonly dataExport: DataExportService,
     private readonly accountDeletion: AccountDeletionService,
+    private readonly accountSecurity: AccountSecurityService,
   ) {}
+
+  /**
+   * How the account is protected (ADR 0049): whether it has a password, and the devices it is
+   * signed in on, without tokens or IPs. Changing the name or the password, and signing the
+   * other devices out, go through Better Auth (/api/auth/update-user, /change-password and
+   * /revoke-other-sessions).
+   */
+  @Get('security')
+  @ApiOkResponse({
+    description: 'Whether the account has a password, and its open sessions.',
+    schema: z.toJSONSchema(accountSecuritySchema, { target: 'openapi-3.0' }) as SchemaObject,
+  })
+  @ApiUnauthorizedResponse({ description: 'No valid session cookie.' })
+  security(
+    @CurrentUser() user: AuthSession['user'],
+    @CurrentSession() session: AuthSession['session'],
+  ): Promise<AccountSecurity> {
+    return this.accountSecurity.describe(user.id, session.id);
+  }
 
   /**
    * What deleting the account would need resolved first (ADR 0041): the workspaces the person

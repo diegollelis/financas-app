@@ -3,12 +3,14 @@ import {
   FORGOT_PASSWORD_PATH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  changePasswordInputSchema,
   RESET_PASSWORD_PATH,
   resetPasswordInputSchema,
   safeReturnTo,
   SIGN_IN_PATH,
   signUpInputSchema,
   TERMS_VERSION,
+  updateNameInputSchema,
 } from '@financas/shared';
 import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
@@ -51,6 +53,18 @@ type AuthEnv = Pick<
 const bodySchemas: Record<string, z.ZodType<Record<string, unknown>>> = {
   '/sign-up/email': signUpInputSchema,
   '/reset-password': resetPasswordInputSchema,
+  '/update-user': updateNameInputSchema,
+  '/change-password': changePasswordInputSchema,
+};
+
+/**
+ * Routes whose body is only what the schema allows (ADR 0049), with what the server imposes on
+ * top: "update-user" changes the name and nothing else, and changing the password always signs
+ * the other devices out, whatever the request says.
+ */
+const strictBodies: Record<string, Record<string, unknown>> = {
+  '/update-user': {},
+  '/change-password': { revokeOtherSessions: true },
 };
 
 const logger = new Logger('Auth');
@@ -239,6 +253,8 @@ export function createAuth(
         '/reset-password/*': { window: 300, max: 5 },
         // Sends an e-mail too.
         '/delete-user': { window: 300, max: 3 },
+        // Guessing the current password, as signing in (ADR 0049).
+        '/change-password': { window: 300, max: 5 },
       },
     },
     databaseHooks: {
@@ -293,6 +309,14 @@ export function createAuth(
               code: 'INVALID_INPUT',
               message: result.error.issues[0]?.message ?? 'Dados inválidos.',
             });
+          }
+          const imposed = strictBodies[ctx.path];
+          if (imposed) {
+            // Better Auth merges the body returned here into the request's: anything the schema
+            // does not allow has to be removed from the request's own body.
+            const body = ctx.body as Record<string, unknown>;
+            for (const key of Object.keys(body)) if (!(key in result.data)) delete body[key];
+            return { context: { body: { ...result.data, ...imposed } } };
           }
           // Continues with the parsed body (e.g. the name already trimmed). acceptTerms has done its
           // job here; Better Auth does not know it.

@@ -19,6 +19,11 @@ export function authErrorMessage(error: unknown): string {
         return 'E-mail ou senha incorretos.';
       case 'PROVIDER_NOT_FOUND':
         return 'O login com Google não está disponível no momento.';
+      // Changing the password (ADR 0049).
+      case 'INVALID_PASSWORD':
+        return 'A senha atual não confere.';
+      case 'CREDENTIAL_ACCOUNT_NOT_FOUND':
+        return 'Esta conta ainda não tem senha. Use "Criar senha".';
       case 'INVALID_TOKEN':
         return 'Este link é inválido ou expirou. Peça um novo.';
       case 'OWNS_SHARED_WORKSPACES':
