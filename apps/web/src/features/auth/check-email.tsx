@@ -23,7 +23,7 @@ export function CheckEmail({
     <div className="grid gap-4">
       <p role="status">
         Enviamos um link de confirmação para <strong className="break-words">{email}</strong>. Abra
-        o link para entrar.
+        o link para entrar: assim sabemos que o e-mail é seu.
       </p>
       <p className="text-muted-foreground">
         Não chegou em alguns minutos? Confira a caixa de spam ou peça outro.
