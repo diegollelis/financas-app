@@ -19,6 +19,7 @@ import { chromium, type APIRequestContext, type Page } from 'playwright';
 
 const WEB = 'http://localhost:5173';
 const API = 'http://localhost:3333';
+/** The development inbox (Mailpit): where an invitation's link, and its token, can be read. */
 const MAILPIT = 'http://localhost:8025';
 const OUT = new URL('../.screenshots/', import.meta.url);
 
@@ -319,6 +320,21 @@ async function main() {
   await auth.request.post(`${API}/api/workspaces/${houseId}/invitations`, {
     data: { email: 'convidada@example.com', role: 'VIEWER' },
   });
+  // That invitation's page: its token exists only in the e-mail, so it is read from Mailpit.
+  // Without Mailpit (or the e-mail), the invitation is simply not captured.
+  const invitationPath = await fetch(
+    `${MAILPIT}/api/v1/search?query=to:convidada@example.com&limit=1`,
+  )
+    .then((response) => response.json() as Promise<{ messages?: { ID: string }[] }>)
+    .then(async ({ messages }) => {
+      const id = messages?.[0]?.ID;
+      if (!id) return undefined;
+      const message = (await (await fetch(`${MAILPIT}/api/v1/message/${id}`)).json()) as {
+        Text?: string;
+      };
+      return message.Text?.match(/\/convites\/[\w-]+/)?.[0];
+    })
+    .catch(() => undefined);
   // A filled-in template to show the import review (ADR 0040), made here with fictitious rows and
   // kept in the system's temporary folder: spreadsheets never go into the repository. One row
   // has no amount and one a category the workspace does not have, so both cases show.
@@ -344,6 +360,12 @@ async function main() {
   const pages = [
     { name: 'entrar', path: '/entrar', signedIn: false },
     { name: 'cadastro', path: '/cadastro', signedIn: false },
+    { name: 'esqueci-senha', path: '/esqueci-senha', signedIn: false },
+    // The page opened from the reset e-mail; a made-up token still shows the form.
+    { name: 'redefinir-senha', path: '/redefinir-senha?token=ficticio', signedIn: false },
+    // An invitation opened by someone signed out, and one whose link is not valid.
+    ...(invitationPath ? [{ name: 'convite', path: invitationPath, signedIn: false }] : []),
+    { name: 'convite-invalido', path: '/convites/ficticio', signedIn: false },
     { name: 'termos', path: '/termos', signedIn: false },
     // "/" is not a page: it opens the last workspace used (ADR 0036). The switcher is captured open.
     {
