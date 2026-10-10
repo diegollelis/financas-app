@@ -53,6 +53,7 @@ CI (`.github/workflows/ci.yml`) runs `format:check`, `lint`, `typecheck`, `test`
 
 - `main` is protected: no direct pushes, no force pushes. Work on a branch, push it and open a pull request. Both CI checks (`Lint, typecheck, testes e build` and `Varredura de segredos`) must pass, and the branch must be up to date with `main`.
 - GitHub CLI is not installed: after pushing a branch, give the user the `https://github.com/diegollelis/financas-app/pull/new/<branch>` link.
+- Versions are annotated semver tags on `main` with a GitHub release (ADR 0050). When handing over a PR, say what it means for the version: after the merge and a check in production, suggest the tag (patch, minor or major, read from the user's side) or say that it waits for the next batch. Never tag a commit that is not on `main` and live.
 - The pre-commit hook runs gitleaks on staged files. Never bypass it (`LEFTHOOK=0`) to get a commit through; fix the finding.
 
 ## Gotchas
