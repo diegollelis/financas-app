@@ -2,8 +2,6 @@ import type { Workspace } from '@financas/shared';
 import { ChevronDown, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { toast } from 'sonner';
-import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { CreateWorkspaceForm } from './create-workspace-form';
+import { NewWorkspaceDialog } from './new-workspace-dialog';
 import { roleLabels } from './roles';
 import { useWorkspaces } from './use-workspaces';
 
@@ -89,22 +87,7 @@ export function WorkspaceSwitcher({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <ResponsiveDialog
-        open={creating}
-        onOpenChange={setCreating}
-        returnFocusTo={triggerRef}
-        title="Novo espaço compartilhado"
-        description="Para dividir as finanças com outras pessoas. Depois de criar, convide-as em Membros."
-      >
-        <CreateWorkspaceForm
-          onCreated={(workspace) => {
-            setCreating(false);
-            toast.success('Espaço criado');
-            void navigate(`/espacos/${workspace.id}/painel`);
-          }}
-          onCancel={() => setCreating(false)}
-        />
-      </ResponsiveDialog>
+      <NewWorkspaceDialog open={creating} onOpenChange={setCreating} returnFocusTo={triggerRef} />
     </>
   );
 }

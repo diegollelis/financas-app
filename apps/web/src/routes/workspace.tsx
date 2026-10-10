@@ -7,7 +7,8 @@ import {
   type Workspace,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm } from 'react-hook-form';
+import { useRef, useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import type { z } from 'zod';
@@ -31,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
+import { NewWorkspaceDialog } from '@/features/workspaces/new-workspace-dialog';
 import { roleLabels } from '@/features/workspaces/roles';
 import {
   useCreateInvitation,
@@ -174,7 +176,10 @@ function DeleteWorkspace({ workspace }: { workspace: Workspace }) {
     );
 
   return (
-    <section aria-labelledby="delete-workspace-title" className="grid gap-3">
+    <section
+      aria-labelledby="delete-workspace-title"
+      className="border-destructive/40 mt-4 grid gap-3 rounded-xl border p-4"
+    >
       <h2 id="delete-workspace-title" className="font-medium">
         Excluir espaço
       </h2>
@@ -226,6 +231,7 @@ function InviteForm({ workspaceId }: { workspaceId: string }) {
     resolver: zodResolver(createInvitationInputSchema),
     defaultValues: { email: '', role: 'EDITOR' },
   });
+  const role = useWatch({ control, name: 'role' });
   const submit = (input: CreateInvitationInput) =>
     createInvitation.mutate(input, {
       onSuccess: (invitation) => {
@@ -255,6 +261,13 @@ function InviteForm({ workspaceId }: { workspaceId: string }) {
             />
           )}
         />
+        {/* What the chosen access allows, in the app's real terms. */}
+        <p aria-live="polite" className="text-muted-foreground text-sm">
+          {role === 'VIEWER'
+            ? 'Só visualizar: vê tudo, sem mudar nada.'
+            : 'Pode editar: lança, efetiva e muda lançamentos, categorias, orçamento, pessoas e importações.'}{' '}
+          Só o dono convida, remove pessoas e exclui o espaço.
+        </p>
       </div>
       {createInvitation.isError && (
         <p role="alert" className="text-destructive">
@@ -392,16 +405,27 @@ function Invitations({ workspaceId }: { workspaceId: string }) {
   );
 }
 
+/** The personal workspace takes no invitations: sharing starts with a shared workspace. */
+function PersonalSharing() {
+  const [creating, setCreating] = useState(false);
+  const opener = useRef<HTMLButtonElement>(null);
+  return (
+    <section className="grid justify-items-start gap-3 rounded-xl border p-4">
+      <p className="text-muted-foreground">
+        Este é o seu espaço pessoal: só você tem acesso. Para dividir as finanças com alguém, crie
+        um espaço compartilhado e convide as pessoas para ele.
+      </p>
+      <Button ref={opener} variant="outline" onClick={() => setCreating(true)}>
+        Criar espaço compartilhado
+      </Button>
+      <NewWorkspaceDialog open={creating} onOpenChange={setCreating} returnFocusTo={opener} />
+    </section>
+  );
+}
+
 /** Who can be invited and how: the OWNER of a shared workspace (ADR 0027). */
 function Sharing({ workspace }: { workspace: Workspace }) {
-  if (workspace.isPersonal) {
-    return (
-      <p className="text-muted-foreground">
-        Este é o seu espaço pessoal: só você tem acesso. Para dividir finanças com alguém, crie um
-        espaço compartilhado em Seus espaços.
-      </p>
-    );
-  }
+  if (workspace.isPersonal) return <PersonalSharing />;
   if (workspace.role !== 'OWNER') return null;
   return (
     <section aria-labelledby="invite-title" className="grid gap-3">
