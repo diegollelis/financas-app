@@ -49,7 +49,7 @@ describe('WorkspacePage', () => {
     const memberList = await screen.findByRole('list', { name: 'Membros do espaço' });
     expect(within(memberList).getByText('João Exemplo')).toBeInTheDocument();
     expect(within(memberList).getByText('joao@example.com')).toBeInTheDocument();
-    expect(memberList).toHaveTextContent('Leitor');
+    expect(memberList).toHaveTextContent('Só visualizar');
     expect(await screen.findByText('ana@example.com')).toBeInTheDocument();
     expect(screen.getByText('Aguardando, vale até 09/10/2026')).toBeInTheDocument();
   });
@@ -153,7 +153,7 @@ describe('WorkspacePage', () => {
 
     renderApp(`/espacos/${houseId}`);
 
-    expect(await screen.findByText('Seu acesso: Editor')).toBeInTheDocument();
+    expect(await screen.findByText('Seu acesso: Pode editar')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Convidar alguém' })).not.toBeInTheDocument();
   });
 
