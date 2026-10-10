@@ -3,6 +3,8 @@ import { env } from './env';
 
 export class ApiError extends Error {
   readonly status: number;
+  /** The path called, e.g. to tell Better Auth's routes (`/api/auth/*`) from ours. */
+  readonly path: string;
   /** Machine-readable error code sent by the API, when there is one (e.g. Better Auth's). */
   readonly code?: string;
   /** The API's own message. Shown to the user only when it is known to be pt-BR. */
@@ -12,6 +14,7 @@ export class ApiError extends Error {
 
   constructor(
     status: number,
+    path: string,
     message: string,
     body?: { code?: string; message?: string },
     retryAfter?: number,
@@ -19,6 +22,7 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.path = path;
     this.code = body?.code;
     this.detail = body?.message;
     this.retryAfter = retryAfter;
@@ -35,6 +39,7 @@ async function apiError(response: Response, method: string, path: string) {
   const errorBody = errorBodySchema.safeParse(await response.json().catch(() => null));
   return new ApiError(
     response.status,
+    path,
     `${method} ${path} failed with status ${response.status}`,
     errorBody.data,
     Number(response.headers.get('X-Retry-After')) || undefined,

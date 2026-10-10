@@ -1,12 +1,13 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
+import { createQueryClient } from '@/lib/query-client';
 import { routes } from '@/router';
 
 /** A fresh client per test, without retries, keeps tests fast and independent. */
 function createTestQueryClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return createQueryClient({ retry: 0 });
 }
 
 /** Renders a component with the app providers. */
