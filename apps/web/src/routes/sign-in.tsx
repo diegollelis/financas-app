@@ -47,7 +47,8 @@ export function SignInPage() {
         </p>
       )}
       {notice && (
-        <p role="status" className="bg-muted mb-4 rounded-lg p-3 text-sm">
+        // The border keeps the box in sight on the card in the dark theme, where muted = card.
+        <p role="status" className="bg-muted mb-4 rounded-lg border p-3 text-sm">
           {notice}
         </p>
       )}
