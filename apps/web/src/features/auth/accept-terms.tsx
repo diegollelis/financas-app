@@ -16,6 +16,8 @@ export function AcceptTerms({ user }: { user: MeResponse }) {
   const accept = useAcceptTerms();
   const signOut = useSignOut({ leaveTo: SIGN_IN_PATH });
   const changed = user.termsVersion !== null;
+  // Until the sign-in page loads, on success too.
+  const leaving = signOut.isPending || signOut.isSuccess;
 
   return (
     <AuthCard
@@ -25,9 +27,9 @@ export function AcceptTerms({ user }: { user: MeResponse }) {
         <Button
           variant="ghost"
           onClick={() => signOut.mutate()}
-          disabled={signOut.isPending || accept.isPending}
+          disabled={leaving || accept.isPending}
         >
-          Sair sem aceitar
+          {leaving ? 'Saindo…' : 'Sair sem aceitar'}
         </Button>
       }
     >
@@ -48,7 +50,7 @@ export function AcceptTerms({ user }: { user: MeResponse }) {
             {apiErrorMessage(accept.error)}
           </p>
         )}
-        <Button onClick={() => accept.mutate()} disabled={accept.isPending || signOut.isPending}>
+        <Button onClick={() => accept.mutate()} disabled={accept.isPending || leaving}>
           {accept.isPending ? 'Aceitando…' : 'Aceitar e continuar'}
         </Button>
       </div>

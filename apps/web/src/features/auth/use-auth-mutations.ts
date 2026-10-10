@@ -52,7 +52,12 @@ export function useSignOut({ leaveTo }: { leaveTo?: string } = {}) {
   return useMutation({
     mutationFn: () => apiPost('/api/auth/sign-out', {}, z.object({ success: z.boolean() })),
     onSuccess: () => {
-      if (leaveTo) navigateAway(leaveTo);
+      // Loading another page from scratch already drops everything in memory. Clearing the
+      // cache too would first show this app's own sign-in page, then the new one: a flash.
+      if (leaveTo) {
+        navigateAway(leaveTo);
+        return;
+      }
       queryClient.setQueryData(meQueryKey, null);
       // Drops everything else cached: the next person on this browser must not see it.
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== meQueryKey[0] });
