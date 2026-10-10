@@ -1,4 +1,5 @@
 import {
+  changeEmailInputSchema,
   changePasswordFormSchema,
   updateNameInputSchema,
   type ChangePasswordForm,
@@ -30,6 +31,7 @@ import { useRequestPasswordReset } from '@/features/auth/use-auth-mutations';
 import { useCurrentUser } from '@/features/auth/use-me';
 import {
   useAccountSecurity,
+  useChangeEmail,
   useChangePassword,
   useRevokeOtherSessions,
   useUpdateName,
@@ -106,6 +108,66 @@ function NameForm({ onDone }: { onDone: () => void }) {
   );
 }
 
+/**
+ * The new address. Once sent, the dialog says where the link went and stays until closed: the
+ * e-mail changes only when that link is opened.
+ */
+function EmailForm({ onDone }: { onDone: () => void }) {
+  const user = useCurrentUser();
+  const change = useChangeEmail();
+  const schema = changeEmailInputSchema
+    .pick({ newEmail: true })
+    .refine((input) => input.newEmail.trim().toLowerCase() !== user.email.toLowerCase(), {
+      message: 'Este já é o e-mail da sua conta.',
+      path: ['newEmail'],
+    });
+  const { register, handleSubmit, formState } = useForm<{ newEmail: string }>({
+    resolver: zodResolver(schema),
+    defaultValues: { newEmail: '' },
+  });
+
+  if (change.isSuccess) {
+    return (
+      <div className="grid gap-4">
+        <p role="status">
+          Enviamos um link para <strong>{change.variables.newEmail}</strong>. O e-mail da conta muda
+          quando você abrir esse link; até lá, continua {user.email}. Avisamos também o endereço
+          atual.
+        </p>
+        <Button className="sm:justify-self-end" onClick={onDone}>
+          Fechar
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <form
+      noValidate
+      className="grid gap-4"
+      onSubmit={(event) =>
+        void handleSubmit(({ newEmail }) => change.mutate({ newEmail: newEmail.trim() }))(event)
+      }
+    >
+      <FormField id="new-email" label="Novo e-mail" error={formState.errors.newEmail?.message}>
+        <Input type="email" autoComplete="email" {...register('newEmail')} />
+      </FormField>
+      {change.isError && (
+        <p role="alert" className="text-destructive">
+          {authErrorMessage(change.error)}
+        </p>
+      )}
+      <div className="grid gap-2 sm:flex sm:flex-row-reverse sm:justify-start">
+        <Button type="submit" disabled={change.isPending}>
+          {change.isPending ? 'Enviando…' : 'Enviar link de confirmação'}
+        </Button>
+        <Button type="button" variant="outline" onClick={onDone}>
+          Cancelar
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function PasswordForm({ onDone }: { onDone: () => void }) {
   const change = useChangePassword();
   const { register, handleSubmit, formState } = useForm<ChangePasswordForm>({
@@ -172,8 +234,9 @@ export function AccountDetails({ children }: { children?: ReactNode }) {
   const user = useCurrentUser();
   const security = useAccountSecurity();
   const createPassword = useRequestPasswordReset();
-  const [editing, setEditing] = useState<'name' | 'password' | null>(null);
+  const [editing, setEditing] = useState<'name' | 'email' | 'password' | null>(null);
   const nameButton = useRef<HTMLButtonElement>(null);
+  const emailButton = useRef<HTMLButtonElement>(null);
   const passwordButton = useRef<HTMLButtonElement>(null);
   const close = () => setEditing(null);
   const hasPassword = security.data?.hasPassword;
@@ -191,7 +254,21 @@ export function AccountDetails({ children }: { children?: ReactNode }) {
         >
           {user.name}
         </AccountRow>
-        <AccountRow label="E-mail">{user.email}</AccountRow>
+        <AccountRow
+          label="E-mail"
+          action={
+            <Button
+              ref={emailButton}
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing('email')}
+            >
+              Trocar e-mail
+            </Button>
+          }
+        >
+          {user.email}
+        </AccountRow>
         {security.isSuccess && (
           <AccountRow
             label="Senha"
@@ -246,6 +323,15 @@ export function AccountDetails({ children }: { children?: ReactNode }) {
         description="O nome aparece para as pessoas dos espaços que você compartilha."
       >
         <NameForm onDone={close} />
+      </ResponsiveDialog>
+      <ResponsiveDialog
+        open={editing === 'email'}
+        onOpenChange={(open) => !open && close()}
+        returnFocusTo={emailButton}
+        title="Trocar e-mail"
+        description="Enviamos um link para o novo endereço. O e-mail só muda depois que você abrir esse link."
+      >
+        <EmailForm onDone={close} />
       </ResponsiveDialog>
       <ResponsiveDialog
         open={editing === 'password'}

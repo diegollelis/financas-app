@@ -1,6 +1,8 @@
 import {
+  ACCOUNT_PATH,
   accountSecuritySchema,
   statusResponseSchema,
+  type ChangeEmailInput,
   type ChangePasswordInput,
   type UpdateNameInput,
 } from '@financas/shared';
@@ -40,6 +42,21 @@ export function useChangePassword() {
       // The answer carries the new session, which the cookie already holds: nothing to read.
       apiPost('/api/auth/change-password', input, z.object({}).loose()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: securityKey }),
+  });
+}
+
+/**
+ * The e-mail: the new address gets a link, and the account changes only once it is opened
+ * (ADR 0049). The link leads back to this page.
+ */
+export function useChangeEmail() {
+  return useMutation({
+    mutationFn: ({ newEmail }: Pick<ChangeEmailInput, 'newEmail'>) =>
+      apiPost(
+        '/api/auth/change-email',
+        { newEmail, callbackURL: ACCOUNT_PATH },
+        statusResponseSchema,
+      ),
   });
 }
 
