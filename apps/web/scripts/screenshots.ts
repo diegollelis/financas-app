@@ -314,6 +314,11 @@ async function main() {
   await auth.request.post(`${API}/api/workspaces/${workspaceId}/categories`, {
     data: { name: 'Pet', type: 'DEBIT' },
   });
+  // A pending invitation (fictitious address, it lands in Mailpit), so Membros shows "Convites".
+  // Inviting the same e-mail again answers an error, which is fine here.
+  await auth.request.post(`${API}/api/workspaces/${houseId}/invitations`, {
+    data: { email: 'convidada@example.com', role: 'VIEWER' },
+  });
   // A filled-in template to show the import review (ADR 0040), made here with fictitious rows and
   // kept in the system's temporary folder: spreadsheets never go into the repository. One row
   // has no amount and one a category the workspace does not have, so both cases show.
@@ -349,6 +354,8 @@ async function main() {
       opens: 'menu' as const,
     },
     { name: 'espaco', path: `/espacos/${workspaceId}`, signedIn: true },
+    // A shared one: the invitation, its access explained, and the deletion apart.
+    { name: 'espaco-compartilhado', path: `/espacos/${houseId}`, signedIn: true },
     { name: 'conta', path: '/conta', signedIn: true },
     { name: 'painel', path: `/espacos/${workspaceId}/painel`, signedIn: true },
     { name: 'lancamentos', path: `/espacos/${workspaceId}/lancamentos`, signedIn: true },
