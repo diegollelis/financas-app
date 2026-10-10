@@ -41,7 +41,11 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo',
 });
 
-/** One line of "Conta": what it is on the left, the action on the right. */
+/**
+ * One line of "Conta": what it is on the left, the action on the right. The term and its
+ * descriptions sit right inside the group, as a <dl> requires (axe); the action is a description
+ * of its own, laid out in a second column.
+ */
 function AccountRow({
   label,
   children,
@@ -52,12 +56,10 @@ function AccountRow({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-      <div className="grid min-w-0 gap-0.5">
-        <dt className="text-muted-foreground text-sm">{label}</dt>
-        <dd className="break-words">{children}</dd>
-      </div>
-      {action}
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-0.5">
+      <dt className="text-muted-foreground col-start-1 text-sm">{label}</dt>
+      <dd className="col-start-1 break-words">{children}</dd>
+      {action && <dd className="col-start-2 row-span-2 row-start-1 self-center">{action}</dd>}
     </div>
   );
 }
@@ -177,62 +179,65 @@ export function AccountDetails({ children }: { children?: ReactNode }) {
   const hasPassword = security.data?.hasPassword;
 
   return (
-    <dl className="grid gap-4 rounded-xl border p-4">
-      <AccountRow
-        label="Nome"
-        action={
-          <Button ref={nameButton} variant="outline" size="sm" onClick={() => setEditing('name')}>
-            Alterar nome
-          </Button>
-        }
-      >
-        {user.name}
-      </AccountRow>
-      <AccountRow label="E-mail">{user.email}</AccountRow>
-      {security.isSuccess && (
+    <>
+      <dl className="grid gap-4 rounded-xl border p-4">
         <AccountRow
-          label="Senha"
+          label="Nome"
           action={
-            hasPassword ? (
-              <Button
-                ref={passwordButton}
-                variant="outline"
-                size="sm"
-                onClick={() => setEditing('password')}
-              >
-                Trocar senha
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={createPassword.isPending}
-                onClick={() =>
-                  createPassword.mutate(
-                    { email: user.email },
-                    {
-                      onSuccess: () =>
-                        toast.success(`Enviamos um link para criar a senha em ${user.email}.`),
-                      onError: (error) => toast.error(authErrorMessage(error)),
-                    },
-                  )
-                }
-              >
-                Criar senha
-              </Button>
-            )
+            <Button ref={nameButton} variant="outline" size="sm" onClick={() => setEditing('name')}>
+              Alterar nome
+            </Button>
           }
         >
-          {hasPassword ? (
-            'Definida'
-          ) : (
-            <span className="text-muted-foreground">
-              Sem senha: você entra com o Google. Com uma senha, entra também pelo e-mail.
-            </span>
-          )}
+          {user.name}
         </AccountRow>
-      )}
-      {children}
+        <AccountRow label="E-mail">{user.email}</AccountRow>
+        {security.isSuccess && (
+          <AccountRow
+            label="Senha"
+            action={
+              hasPassword ? (
+                <Button
+                  ref={passwordButton}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditing('password')}
+                >
+                  Trocar senha
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={createPassword.isPending}
+                  onClick={() =>
+                    createPassword.mutate(
+                      { email: user.email },
+                      {
+                        onSuccess: () =>
+                          toast.success(`Enviamos um link para criar a senha em ${user.email}.`),
+                        onError: (error) => toast.error(authErrorMessage(error)),
+                      },
+                    )
+                  }
+                >
+                  Criar senha
+                </Button>
+              )
+            }
+          >
+            {hasPassword ? (
+              'Definida'
+            ) : (
+              <span className="text-muted-foreground">
+                Sem senha: você entra com o Google. Com uma senha, entra também pelo e-mail.
+              </span>
+            )}
+          </AccountRow>
+        )}
+        {children}
+      </dl>
+      {/* Outside the list: a <dl> holds only its terms and descriptions. */}
       <ResponsiveDialog
         open={editing === 'name'}
         onOpenChange={(open) => !open && close()}
@@ -251,17 +256,23 @@ export function AccountDetails({ children }: { children?: ReactNode }) {
       >
         <PasswordForm onDone={close} />
       </ResponsiveDialog>
-    </dl>
+    </>
   );
 }
+
+/** How many devices are listed before "Ver todos": this one and the 4 most recent. */
+const DEVICES_SHOWN = 5;
 
 /** "Aparelhos conectados" (ADR 0049): where the account is signed in, and a way to end the rest. */
 export function ConnectedDevices() {
   const security = useAccountSecurity();
   const revoke = useRevokeOtherSessions();
+  const [showAll, setShowAll] = useState(false);
   if (!security.isSuccess) return null;
   const { sessions } = security.data;
   const others = sessions.filter((session) => !session.current).length;
+  // This device and the most recent ones; the rest on request, so a long list never takes the page.
+  const shown = showAll ? sessions : sessions.slice(0, DEVICES_SHOWN);
 
   return (
     <section aria-labelledby="account-devices" className="grid gap-3">
@@ -269,7 +280,7 @@ export function ConnectedDevices() {
         Aparelhos conectados
       </h2>
       <ul className="divide-y rounded-xl border px-4">
-        {sessions.map((session) => (
+        {shown.map((session) => (
           <li key={session.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
             <span className="grid gap-0.5">
               <span>
@@ -283,6 +294,11 @@ export function ConnectedDevices() {
           </li>
         ))}
       </ul>
+      {shown.length < sessions.length && (
+        <Button variant="ghost" className="justify-self-start" onClick={() => setShowAll(true)}>
+          Ver todos os {sessions.length} aparelhos
+        </Button>
+      )}
       {others > 0 && (
         <AlertDialog>
           <AlertDialogTrigger asChild>

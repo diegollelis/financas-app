@@ -130,6 +130,22 @@ describe('Managing the account', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows this device and the most recent ones, the rest on request', async () => {
+    const many = Array.from({ length: 7 }, (_, index) => ({
+      ...phone,
+      id: `sessao-${index + 10}`,
+    }));
+    mockAccount({ hasPassword: true, sessions: [thisDevice, ...many] });
+    renderApp('/conta');
+
+    const devices = await screen.findByRole('region', { name: 'Aparelhos conectados' });
+    expect(within(devices).getAllByRole('listitem')).toHaveLength(5);
+    await userEvent.click(
+      within(devices).getByRole('button', { name: 'Ver todos os 8 aparelhos' }),
+    );
+    expect(within(devices).getAllByRole('listitem')).toHaveLength(8);
+  });
+
   it('lists the devices and signs the others out, after asking', async () => {
     const fetchMock = mockAccount(
       { hasPassword: true, sessions: [thisDevice, phone] },
