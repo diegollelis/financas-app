@@ -129,17 +129,17 @@ function message(to: string, web: string, text: string, content: Content): MailM
 export function mailTemplates(web: string) {
   return {
     verificationEmail: (to: string, name: string, url: string): MailMessage => {
-      const note = `O link vale por 1 hora. Se você não criou uma conta no ${MAIL_BRAND}, ignore este e-mail.`;
+      const note = `O link vale por 1 hora. Se você não criou uma conta, ignore este e-mail.`;
       return message(
         to,
         web,
         `Olá, ${name}!\n\nConfirme seu e-mail abrindo o link abaixo:\n${url}\n\n${note}`,
         {
           subject: 'Confirme seu e-mail',
-          preview: `Falta só confirmar o e-mail para concluir o cadastro no ${MAIL_BRAND}.`,
+          preview: `Falta só confirmar o e-mail para concluir o cadastro.`,
           paragraphs: [
             `Olá, ${escapeHtml(name)}!`,
-            `Confirme seu e-mail para concluir o cadastro no ${MAIL_BRAND}.`,
+            'Confirme seu e-mail para concluir o cadastro.',
           ],
           button: { label: 'Confirmar e-mail', url },
           note,
@@ -163,13 +163,13 @@ export function mailTemplates(web: string) {
       return message(
         to,
         web,
-        `Olá, ${name}!\n\nAlguém tentou criar uma conta no ${MAIL_BRAND} com este e-mail, mas ele já tem uma.\n\nPara entrar: ${links.signIn}\nSe não lembra a senha, crie uma nova: ${links.resetPassword}\n\n${note}`,
+        `Olá, ${name}!\n\nAlguém tentou criar uma conta com este e-mail, mas ele já tem uma.\n\nPara entrar: ${links.signIn}\nSe não lembra a senha, crie uma nova: ${links.resetPassword}\n\n${note}`,
         {
           subject: 'Você já tem uma conta',
           preview: 'Alguém tentou se cadastrar com este e-mail, que já tem uma conta.',
           paragraphs: [
             `Olá, ${escapeHtml(name)}!`,
-            `Alguém tentou criar uma conta no ${MAIL_BRAND} com este e-mail, mas ele já tem uma.`,
+            'Alguém tentou criar uma conta com este e-mail, mas ele já tem uma.',
             `Se não lembra a senha, <a href="${escapeHtml(links.resetPassword)}" style="color: ${colors.primary}">crie uma nova</a>.`,
           ],
           button: { label: 'Entrar', url: links.signIn },
@@ -241,13 +241,13 @@ export function mailTemplates(web: string) {
       return message(
         to,
         web,
-        `Olá, ${name}!\n\nRecebemos um pedido para excluir a sua conta no ${MAIL_BRAND} e todos os seus dados. Para confirmar, abra o link abaixo:\n${url}\n\n${note}`,
+        `Olá, ${name}!\n\nRecebemos um pedido para excluir a sua conta e todos os seus dados. Para confirmar, abra o link abaixo:\n${url}\n\n${note}`,
         {
           subject: 'Confirme a exclusão da sua conta',
           preview: 'Recebemos um pedido para excluir a sua conta e todos os seus dados.',
           paragraphs: [
             `Olá, ${escapeHtml(name)}!`,
-            `Recebemos um pedido para excluir a sua conta no ${MAIL_BRAND} e todos os seus dados.`,
+            'Recebemos um pedido para excluir a sua conta e todos os seus dados.',
             'Ao abrir o link, você confirma a exclusão mais uma vez. Depois disso, ela não pode ser desfeita.',
           ],
           button: { label: 'Confirmar exclusão', url },
@@ -264,13 +264,13 @@ export function mailTemplates(web: string) {
       return message(
         to,
         web,
-        `Olá, ${name}!\n\nVocê pediu para usar este endereço na sua conta do ${MAIL_BRAND}. Confirme abrindo o link abaixo:\n${url}\n\nAté confirmar, a conta continua com o e-mail de antes.\n\n${note}`,
+        `Olá, ${name}!\n\nVocê pediu para usar este endereço na sua conta. Confirme abrindo o link abaixo:\n${url}\n\nAté confirmar, a conta continua com o e-mail de antes.\n\n${note}`,
         {
           subject: 'Confirme seu novo e-mail',
           preview: 'Confirme o endereço para usá-lo na sua conta.',
           paragraphs: [
             `Olá, ${escapeHtml(name)}!`,
-            `Você pediu para usar este endereço na sua conta do ${MAIL_BRAND}.`,
+            'Você pediu para usar este endereço na sua conta.',
             'Até confirmar, a conta continua com o e-mail de antes.',
           ],
           button: { label: 'Confirmar novo e-mail', url },
@@ -295,13 +295,13 @@ export function mailTemplates(web: string) {
       return message(
         to,
         web,
-        `Olá, ${name}!\n\nFoi pedida a troca do e-mail da sua conta no ${MAIL_BRAND} para ${newEmail}.\n\nSe não foi você, troque sua senha agora: ${resetPasswordUrl}\n\n${note}`,
+        `Olá, ${name}!\n\nFoi pedida a troca do e-mail da sua conta para ${newEmail}.\n\nSe não foi você, troque sua senha agora: ${resetPasswordUrl}\n\n${note}`,
         {
           subject: 'Pedido de troca do seu e-mail',
           preview: 'Foi pedida a troca do e-mail da sua conta. Se não foi você, troque a senha.',
           paragraphs: [
             `Olá, ${escapeHtml(name)}!`,
-            `Foi pedida a troca do e-mail da sua conta no ${MAIL_BRAND} para <strong>${escapeHtml(newEmail)}</strong>.`,
+            `Foi pedida a troca do e-mail da sua conta para <strong>${escapeHtml(newEmail)}</strong>.`,
             'Se não foi você, troque sua senha agora.',
           ],
           button: { label: 'Trocar senha', url: resetPasswordUrl },
