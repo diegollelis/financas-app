@@ -118,6 +118,65 @@ describe('account security', () => {
     await other.get('/api/me').expect(401);
   });
 
+  describe('changing the e-mail', () => {
+    const newEmail = 'maria.nova@example.com';
+
+    it('confirms through a link to the new address, telling the old one', async () => {
+      const { browser, userId } = await t.signUp(maria);
+      t.mailer.sent.length = 0;
+
+      await browser
+        .post('/api/auth/change-email')
+        .send({ newEmail, callbackURL: '/conta' })
+        .expect(200);
+
+      // Nothing changes until the new address confirms.
+      expect((await ownerClient().user.findUniqueOrThrow({ where: { id: userId } })).email).toBe(
+        maria.email,
+      );
+      expect(t.mailer.sent.map((message) => [message.to, message.subject])).toEqual([
+        [newEmail, 'Confirme seu novo e-mail no Finanças'],
+        [maria.email, 'Pedido de troca do e-mail da sua conta no Finanças'],
+      ]);
+      expect(t.mailer.sent[1]?.text).toContain(newEmail);
+
+      await browser.get(pathOf(t.mailer.lastLinkTo(newEmail))).expect(302);
+
+      expect(await ownerClient().user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({
+        email: newEmail,
+        emailVerified: true,
+      });
+      // The password signs in with the new address.
+      await t
+        .http()
+        .post('/api/auth/sign-in/email')
+        .send({ email: newEmail, password: maria.password })
+        .expect(200);
+    });
+
+    it("answers the same for another account's address, and sends nothing", async () => {
+      const { browser } = await t.signUp(maria);
+      await t.signUp({ ...maria, email: newEmail });
+      t.mailer.sent.length = 0;
+
+      const response = await browser.post('/api/auth/change-email').send({ newEmail }).expect(200);
+
+      expect(response.body).toMatchObject({ status: true });
+      expect(t.mailer.sent).toHaveLength(0);
+    });
+
+    it('refuses an invalid address with the shared message', async () => {
+      const { browser } = await t.signUp(maria);
+
+      const response = await browser
+        .post('/api/auth/change-email')
+        .send({ newEmail: 'nao-e-email' })
+        .expect(400);
+
+      expect(response.body).toMatchObject({ code: 'INVALID_INPUT' });
+    });
+  });
+
   it('creates a password for an account without one, through the reset link', async () => {
     const { browser, userId } = await t.signUp(maria);
     // As an account created with Google: no password of its own.
