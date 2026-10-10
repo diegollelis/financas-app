@@ -34,6 +34,7 @@ export function SignInPage() {
     <AuthCard
       title="Entrar"
       description="Acesse o seu controle financeiro."
+      notice={notice}
       footer={
         <span>
           Ainda não tem conta?{' '}
@@ -44,12 +45,6 @@ export function SignInPage() {
       {googleFailed && (
         <p role="alert" className="text-destructive mb-4 text-sm">
           Não foi possível entrar com o Google. Tente de novo.
-        </p>
-      )}
-      {notice && (
-        // The border keeps the box in sight on the card in the dark theme, where muted = card.
-        <p role="status" className="bg-muted mb-4 rounded-lg border p-3 text-sm">
-          {notice}
         </p>
       )}
       <form
