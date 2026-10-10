@@ -54,10 +54,13 @@ export function DeleteAccountSection() {
         </div>
       )}
       {blockers.length > 0 && (
-        <div role="note" className="bg-muted grid gap-2 rounded-lg p-3">
+        // A border, not a gray fill: the links keep the page's contrast (axe).
+        <div role="note" className="grid gap-2 rounded-lg border p-3">
           <p>
-            Antes, resolva {blockers.length === 1 ? 'este espaço' : 'estes espaços'}, que têm outras
-            pessoas: remova os membros e os convites, ou exclua o espaço.
+            Para continuar, abra {blockers.length === 1 ? 'o espaço abaixo' : 'os espaços abaixo'} e
+            remova os membros e os convites pendentes, ou exclua{' '}
+            {blockers.length === 1 ? 'o espaço' : 'cada espaço'}. Enquanto houver outras pessoas, a
+            conta não pode ser excluída.
           </p>
           <ul className="grid gap-1">
             {blockers.map((blocker) => (

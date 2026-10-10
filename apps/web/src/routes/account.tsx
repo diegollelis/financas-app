@@ -72,15 +72,16 @@ export function AccountPage() {
             <h2 id="account-export" className="font-medium">
               Seus dados
             </h2>
+            {/* What it is for first; the format, for whoever needs it, after. */}
             <p>
-              Baixe uma cópia de tudo o que o Finanças guarda sobre você: a conta e, dos espaços de
-              que você é dono, os lançamentos, categorias, orçamentos, recorrências, parcelamentos,
-              importações, membros e convites. Dos espaços de outras pessoas, vêm só o nome e o seu
-              papel.
+              Baixe uma cópia dos seus dados, para guardar ou usar em outro programa. Vem tudo o que
+              o Finanças guarda sobre você: a conta e, dos espaços de que você é dono, os
+              lançamentos, categorias, orçamentos, recorrências, parcelamentos, importações, membros
+              e convites. Dos espaços de outras pessoas, vêm só o nome e o seu papel.
             </p>
-            <p className="text-muted-foreground">
-              O arquivo é um JSON, um formato de texto que outros programas conseguem ler. Valores
-              estão em centavos.
+            <p className="text-muted-foreground text-sm">
+              O arquivo é JSON, um formato de texto que outros programas leem; os valores estão em
+              centavos.
             </p>
             <Button
               variant="outline"

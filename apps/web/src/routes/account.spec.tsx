@@ -73,6 +73,10 @@ describe('AccountPage', () => {
     renderApp('/conta');
 
     const note = await screen.findByRole('note');
+    // What to do next, not only what blocks it.
+    expect(note).toHaveTextContent(
+      'Para continuar, abra o espaço abaixo e remova os membros e os convites pendentes, ou exclua o espaço.',
+    );
     expect(note).toHaveTextContent('Casa (2 outros membros e 1 convite pendente)');
     expect(within(note).getByRole('link', { name: 'Casa' })).toHaveAttribute(
       'href',
