@@ -53,3 +53,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0047](0047-orcamento-real-por-destino.md)            | Orçamento real: duas bases, destinos personalizados e aplicações pela categoria     | Aceita |
 | [0048](0048-copiar-categorias-entre-espacos.md)       | Copiar categorias de outro espaço: participação conferida na origem, RLS por espaço | Aceita |
 | [0049](0049-gerenciar-a-conta.md)                     | Gerenciar a conta: nome, senha, e-mail e aparelhos conectados                       | Aceita |
+| [0050](0050-versionamento.md)                         | Versões: tags com versionamento semântico e releases no GitHub                      | Aceita |
