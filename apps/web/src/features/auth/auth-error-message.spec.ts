@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
 import { authErrorMessage } from './auth-error-message';
 
-const rateLimited = (retryAfter?: number) => new ApiError(429, 'POST failed', {}, retryAfter);
+const rateLimited = (retryAfter?: number) =>
+  new ApiError(429, '/api/auth/sign-in/email', 'POST failed', {}, retryAfter);
 
 describe('authErrorMessage', () => {
   it.each([

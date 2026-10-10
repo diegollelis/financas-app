@@ -17,10 +17,17 @@ async function fetchMe(): Promise<MeResponse | null> {
 
 /**
  * The session state of the whole app: route guards and pages read it from here. Sign-in,
- * sign-up and sign-out update it directly, so it does not need to be refetched often.
+ * sign-up and sign-out update it directly, so it does not need to be refetched often. Coming back
+ * to the tab (or to the app on the phone) always checks it again: a session ended elsewhere then
+ * leads to the sign-in page before the person clicks anything. A failed check keeps the user.
  */
 export function useMe() {
-  return useQuery({ queryKey: meQueryKey, queryFn: fetchMe, staleTime: 5 * 60 * 1000 });
+  return useQuery({
+    queryKey: meQueryKey,
+    queryFn: fetchMe,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: 'always',
+  });
 }
 
 /**

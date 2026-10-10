@@ -12,6 +12,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { apiPost } from '@/lib/api';
 import { navigateAway } from '@/lib/browser';
+import { clearSession } from './session';
 import { meQueryKey } from './use-me';
 
 // Better Auth routes (ADR 0020). On success the session cookie is set by the API; here we only
@@ -58,9 +59,7 @@ export function useSignOut({ leaveTo }: { leaveTo?: string } = {}) {
         navigateAway(leaveTo);
         return;
       }
-      queryClient.setQueryData(meQueryKey, null);
-      // Drops everything else cached: the next person on this browser must not see it.
-      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== meQueryKey[0] });
+      clearSession(queryClient);
     },
   });
 }
