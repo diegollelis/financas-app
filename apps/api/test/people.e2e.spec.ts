@@ -248,7 +248,7 @@ describe('people and splits', () => {
         .send({
           type: 'DEBIT',
           description: 'Casa de praia',
-          categoryId: category('Viagem', 'DEBIT').id,
+          categoryId: category('Lazer', 'DEBIT').id,
           amountCents: 40_000,
           period,
           personId: ana.id,
@@ -269,7 +269,7 @@ describe('people and splits', () => {
         .send({
           type: 'DEBIT',
           description: 'Hospedagem',
-          categoryId: category('Viagem', 'DEBIT').id,
+          categoryId: category('Lazer', 'DEBIT').id,
           amountCents: 100_000,
           period,
           settledAt: `${period}-01`,

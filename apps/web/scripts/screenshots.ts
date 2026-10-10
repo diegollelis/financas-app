@@ -123,6 +123,15 @@ function monthsBefore(period: string, months: number): string {
  * Sample transactions for one competência, if it has none. Past months are all settled, and
  * the variable debits change a little from month to month, so the analysis chart has a shape.
  */
+/**
+ * A default category by name (docs/dominio/modelo.md). A demo workspace created before the
+ * current defaults may lack it: then the first active one of that type.
+ */
+function byName(categories: Category[], type: Category['type'], name: string): string {
+  const active = categories.filter((c) => c.type === type && !c.archived);
+  return (active.find((c) => c.name === name) ?? active[0]!).id;
+}
+
 async function seed(api: APIRequestContext, workspaceId: string, period: string, monthsAgo = 0) {
   const base = `${API}/api/workspaces/${workspaceId}`;
   const vary = (cents: number) => Math.round(cents * (1 + (((monthsAgo * 7) % 5) - 2) / 10));
@@ -133,14 +142,13 @@ async function seed(api: APIRequestContext, workspaceId: string, period: string,
   if (existing.length > 0) return;
 
   const categories = (await (await api.get(`${base}/categories`)).json()) as Category[];
-  const pick = (type: Category['type'], index: number) =>
-    categories.filter((c) => c.type === type && !c.archived)[index]!.id;
+  const pick = (type: Category['type'], name: string) => byName(categories, type, name);
   const day = (d: number) => `${period}-${String(d).padStart(2, '0')}`;
   const samples = [
     {
       type: 'CREDIT',
       description: 'Salário',
-      categoryId: pick('CREDIT', 0),
+      categoryId: pick('CREDIT', 'Salário'),
       amountCents: 520000,
       dueDate: day(5),
       settledAt: day(5),
@@ -148,7 +156,7 @@ async function seed(api: APIRequestContext, workspaceId: string, period: string,
     {
       type: 'DEBIT',
       description: 'Aluguel',
-      categoryId: pick('DEBIT', 0),
+      categoryId: pick('DEBIT', 'Moradia'),
       amountCents: 180000,
       dueDate: day(10),
       settledAt: pending(day(10)),
@@ -156,7 +164,7 @@ async function seed(api: APIRequestContext, workspaceId: string, period: string,
     {
       type: 'DEBIT',
       description: 'Mercado',
-      categoryId: pick('DEBIT', 1),
+      categoryId: pick('DEBIT', 'Mercado'),
       amountCents: vary(64035),
       dueDate: day(3),
       settledAt: day(3),
@@ -164,7 +172,7 @@ async function seed(api: APIRequestContext, workspaceId: string, period: string,
     {
       type: 'DEBIT',
       description: 'Energia elétrica',
-      categoryId: pick('DEBIT', 2),
+      categoryId: pick('DEBIT', 'Contas da casa'),
       amountCents: vary(18990),
       dueDate: day(1),
       settledAt: pending(day(1)),
@@ -190,15 +198,14 @@ async function seedSeries(api: APIRequestContext, workspaceId: string, period: s
   const recurrences = (await (await api.get(`${base}/recurrences`)).json()) as unknown[];
   const plans = (await (await api.get(`${base}/installments`)).json()) as unknown[];
   const categories = (await (await api.get(`${base}/categories`)).json()) as Category[];
-  const debit = (index: number) =>
-    categories.filter((c) => c.type === 'DEBIT' && !c.archived)[index]!.id;
+  const debit = (name: string) => byName(categories, 'DEBIT', name);
   if (recurrences.length === 0) {
     const created = await api.post(`${base}/recurrences`, {
       headers,
       data: {
         type: 'DEBIT',
         description: 'Internet',
-        categoryId: debit(2),
+        categoryId: debit('Contas da casa'),
         amountCents: 9990,
         dueDay: 15,
         startPeriod: period,
@@ -212,7 +219,7 @@ async function seedSeries(api: APIRequestContext, workspaceId: string, period: s
       data: {
         type: 'DEBIT',
         description: 'Notebook',
-        categoryId: debit(1),
+        categoryId: debit('Compras'),
         installments: 12,
         amountCents: 360000,
         amountIs: 'TOTAL',
@@ -345,12 +352,12 @@ async function main() {
       sheet: 'Lançamentos',
       data: [
         [...TEMPLATE_HEADERS],
-        [before, 'Crédito', 'Freelance de setembro', 'Freelance', 800, null, null, null],
+        [before, 'Crédito', 'Freelance de setembro', 'Renda extra', 800, null, null, null],
         [before, 'Débito', 'Academia', 'Academia', 120, null, null, null],
-        [before, 'Débito', 'Internet', 'Internet', 0, null, null, null],
+        [before, 'Débito', 'Internet', 'Contas da casa', 0, null, null, null],
         [period, 'Crédito', 'Salário', 'Salário', 5200, null, null, null],
         [period, 'Débito', 'Supermercado', 'Mercado', 640.35, null, null, null],
-        [period, 'Débito', 'Conta de luz', 'Energia', 189.9, null, null, null],
+        [period, 'Débito', 'Conta de luz', 'Contas da casa', 189.9, null, null, null],
       ],
     },
   ]).toFile(sampleSheet);

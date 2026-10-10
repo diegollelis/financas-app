@@ -96,7 +96,7 @@ describe('summary', () => {
     await create(browser, id, {
       type: 'DEBIT',
       description: 'Conta de luz',
-      categoryId: categoryId('Energia', 'DEBIT'),
+      categoryId: categoryId('Contas da casa', 'DEBIT'),
       amountCents: 15_990,
       period: '2026-10',
       // Long past whatever day the test runs: overdue is judged by the server's today.

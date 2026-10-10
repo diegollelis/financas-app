@@ -91,7 +91,7 @@ describe('transactions', () => {
       const light = await create(browser, workspaceId, {
         type: 'DEBIT',
         description: 'Conta de luz',
-        categoryId: categoryId('Energia', 'DEBIT'),
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
         amountCents: 15_990,
         period: '2026-10',
         dueDate: '2026-10-10',
@@ -102,7 +102,7 @@ describe('transactions', () => {
         type: 'DEBIT',
         description: 'Conta de luz',
         notes: null,
-        categoryId: categoryId('Energia', 'DEBIT'),
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
         amountCents: 15_990,
         period: '2026-10',
         dueDate: '2026-10-10',
@@ -206,7 +206,7 @@ describe('transactions', () => {
 
     it('refuses an archived category, but keeps it on transactions made before', async () => {
       const { browser, workspaceId, categoryId } = await mariaReady();
-      const ipva = categoryId('IPVA', 'DEBIT');
+      const ipva = categoryId('Impostos e taxas', 'DEBIT');
       const tax = await create(browser, workspaceId, {
         type: 'DEBIT',
         description: 'IPVA 2026',
@@ -326,7 +326,7 @@ describe('transactions', () => {
       const light = await create(browser, workspaceId, {
         type: 'DEBIT',
         description: 'Conta de luz',
-        categoryId: categoryId('Energia', 'DEBIT'),
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
         amountCents: 15_990,
         period: '2026-10',
       });
@@ -344,7 +344,7 @@ describe('transactions', () => {
       const loan = await create(browser, workspaceId, {
         type: 'DEBIT',
         description: 'Empréstimo',
-        categoryId: categoryId('Empréstimo', 'DEBIT'),
+        categoryId: categoryId('Outros', 'DEBIT'),
         amountCents: 100_000,
         period: '2026-10',
       });
@@ -353,7 +353,7 @@ describe('transactions', () => {
       await browser.patch(path).send({ type: 'CREDIT' }).expect(400);
       const changed = await browser
         .patch(path)
-        .send({ type: 'CREDIT', categoryId: categoryId('Empréstimo', 'CREDIT') })
+        .send({ type: 'CREDIT', categoryId: categoryId('Outros', 'CREDIT') })
         .expect(200);
 
       expect(changed.body).toMatchObject({ type: 'CREDIT' });
@@ -365,7 +365,7 @@ describe('transactions', () => {
         type: 'DEBIT',
         description: 'Curso',
         notes: 'Turma de sábado',
-        categoryId: categoryId('Curso', 'DEBIT'),
+        categoryId: categoryId('Educação', 'DEBIT'),
         amountCents: 30_000,
         period: '2026-10',
         dueDate: '2026-10-15',
@@ -401,7 +401,7 @@ describe('transactions', () => {
       const light = await create(browser, workspaceId, {
         type: 'DEBIT',
         description: 'Conta de luz',
-        categoryId: categoryId('Energia', 'DEBIT'),
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
         amountCents: 15_990,
         period: '2026-10',
       });
@@ -462,7 +462,7 @@ describe('transactions', () => {
       const light = await create(browser, workspaceId, {
         type: 'DEBIT',
         description: 'Conta de luz',
-        categoryId: categoryId('Energia', 'DEBIT'),
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
         amountCents: 15_990,
         period: '2026-10',
       });

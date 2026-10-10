@@ -4,52 +4,25 @@ import { setWorkspaceContext } from '../prisma/prisma.service.js';
 
 /**
  * Copied into every new workspace; members can then rename, archive or add others
- * (docs/dominio/modelo.md). The migration that created the table holds the same list, for the
- * workspaces that already existed.
+ * (docs/dominio/modelo.md). Generic on purpose: each person adds their own. "Reembolso" is the
+ * category of the shares of a split (ADR 0042). Workspaces created before this list keep the one
+ * they got, from the source spreadsheet.
  */
 export const DEFAULT_CATEGORIES: Record<TransactionType, readonly string[]> = {
-  CREDIT: [
-    'Salário',
-    'PLR',
-    '13º salário',
-    'Férias',
-    'Benefício',
-    'Cashback',
-    'Freelance',
-    'Vendas',
-    'Empréstimo',
-    'Consórcio',
-    'Saque-aniversário FGTS',
-    'Restituição IRPF',
-    'Reembolso',
-    'Outros',
-  ],
+  CREDIT: ['Salário', 'Renda extra', 'Rendimentos', 'Reembolso', 'Outros'],
   DEBIT: [
-    'Cartão de crédito',
-    'Energia',
-    'Internet',
-    'Celular',
-    'Streaming',
+    'Moradia',
+    'Contas da casa',
     'Mercado',
-    'Vale-alimentação',
-    'Combustível',
-    'Carro',
-    'Seguro do carro',
-    'IPVA',
-    'Lote',
-    'Consórcio',
-    'Empréstimo',
-    'Faculdade',
-    'Pós-graduação',
-    'Curso',
-    'Inglês',
-    'Concurso',
+    'Restaurantes',
+    'Transporte',
     'Saúde',
-    'Farmácia',
-    'Suplemento',
-    'Roupas',
+    'Educação',
     'Lazer',
-    'Viagem',
+    'Compras',
+    'Assinaturas',
+    'Cartão de crédito',
+    'Impostos e taxas',
     'Outros',
   ],
 };

@@ -6,7 +6,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
 
 As versões são tags com versionamento semântico, cada uma com a sua release no GitHub ([ADR 0050](adr/0050-versionamento.md)).
 
-- **1.0.0** (2026-10-10): as fases 1 a 4, o front-end mobile-first e a revisão das telas, dos textos legais e da segurança. É o início do uso real.
+- **1.0.0** (2026-10-10): as fases 1 a 4, o front-end mobile-first, a revisão das telas, dos textos legais e da segurança, e as categorias e os destinos padrão genéricos. É o início do uso real.
 
 ## Fase 0 — Planejamento ✅
 
