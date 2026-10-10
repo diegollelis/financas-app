@@ -138,3 +138,39 @@ Sessões, contas de login e participações saem em cascata com o usuário.
 
 - O pedido do link tem limite próprio por IP: 3 a cada 5 minutos, como as outras rotas que enviam e-mail.
 - O token fica na query string, que nunca vai para o Sentry (`redactUrl` descarta a query inteira). Por isso, `TOKEN_SEGMENTS` não precisou mudar.
+
+## Nota (revisão antes do uso real, 2026-10-10)
+
+Antes de começar a usar o app de verdade, os textos legais e a segurança foram revisados contra o que o app faz.
+
+**Termos de uso (versão `2026-10-10`, que pede novo aceite):**
+
+- O nome passa a ser "CodeLélis Finanças", mantido por Diego Lélis.
+- Idade mínima: 18 anos, ou menos com a autorização dos pais ou responsáveis. É o comum em apps financeiros e evita tratar dados de crianças, que têm regras mais rígidas na LGPD.
+- Uma seção nova, "Dados de outras pessoas": quem convida ou cadastra pessoas usa o nome e o e-mail delas só para organizar as finanças e cadastra só o necessário.
+
+**Política de privacidade:**
+
+- Diego Lélis é identificado como o controlador, como a LGPD pede.
+- Passam a constar:
+  - as pessoas cadastradas ([ADR 0042](0042-pessoas-e-rateio.md)), das quais só o nome é guardado;
+  - recorrências, parcelamentos e destinos de guardar;
+  - as importações: a planilha é lida no navegador, e o servidor guarda só os lançamentos e um registro da importação.
+- A lista de e-mails da conta fica completa.
+- O armazenamento no navegador é descrito: o cookie da sessão, o cookie temporário do login com o Google, o tema e o último espaço.
+- As sessões terminam depois de 7 dias sem uso.
+- Os membros de um espaço veem também o nome e o e-mail uns dos outros.
+- O GitHub entra como fornecedor, porque guarda os backups criptografados ([ADR 0035](0035-backup-do-banco.md)).
+- A base legal é a execução do serviço (art. 7º, V), e os registros de segurança se apoiam no legítimo interesse (art. 7º, IX).
+- Quem foi cadastrado como pessoa na conta de outra pessoa pode pedir acesso ou exclusão pelo e-mail de contato.
+
+**Segurança:**
+
+- **Cabeçalhos do site:** `apps/web/public/_headers`, aplicado pela Cloudflare Pages.
+  - Uma CSP que só libera o próprio site e o envio de erros ao Sentry. Estilos inline continuam liberados, porque diálogos e avisos os definem durante o uso.
+  - `frame-ancestors 'none'` e `X-Frame-Options: DENY`: nenhum outro site pode mostrar o app dentro de um quadro (clickjacking).
+  - HSTS de 1 ano e uma `Permissions-Policy` que desliga câmera, microfone, localização e pagamentos.
+- **Zod sem `eval`:** o Zod roda no navegador com `jitless`. Sem isso, o teste que ele faz para saber se `eval` existe apareceria como violação da CSP.
+- **A API deixa de se anunciar:** o cabeçalho `X-Powered-By: Express` foi desligado.
+- **`shadcn` virou dependência de desenvolvimento:** é uma ferramenta de linha de comando. Os alertas do `pnpm audit` que restam vêm do `mysql2` e do `deepmerge-ts`, puxados pelo Prisma e pelo Better Auth, e nenhum deles roda no app: o banco é Postgres, e o `deepmerge-ts` só lê a configuração do Prisma. Eles somem quando essas bibliotecas atualizarem.
+- **Fica para depois:** a verificação em duas etapas e o bloqueio de senhas vazadas. São melhorias, não falhas encontradas.
