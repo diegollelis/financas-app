@@ -185,7 +185,7 @@ describe('WorkspaceLayout', () => {
 
   it('signs out from the account menu, loading the plain sign-in page', async () => {
     mockHouse({ 'POST /api/auth/sign-out': { body: { success: true } } });
-    renderApp(`/espacos/${houseId}/painel`);
+    const { router } = renderApp(`/espacos/${houseId}/painel`);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Menu da conta' }));
     const menu = await screen.findByRole('menu');
@@ -194,6 +194,14 @@ describe('WorkspaceLayout', () => {
 
     // No ?voltar= to this workspace: whoever signs in next may be another account.
     await vi.waitFor(() => expect(navigateAway).toHaveBeenCalledWith('/entrar'));
+    // Until that page loads, this one stays as it was, saying so: no sign-in page of its own
+    // first (the flash before the new page).
+    expect(within(menu).getByRole('menuitem', { name: 'Saindo…' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);
+    expect(screen.getByRole('heading', { name: 'Painel' })).toBeInTheDocument();
   });
 
   it('answers "not found" without the sections for a workspace that is not yours', async () => {

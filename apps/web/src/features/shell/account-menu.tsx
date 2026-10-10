@@ -40,6 +40,7 @@ export function AccountMenu({
 }) {
   const user = useCurrentUser();
   const theme = useTheme();
+  const leaving = signOut.isPending || signOut.isSuccess;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -93,8 +94,15 @@ export function AccountMenu({
           </DropdownMenuRadioGroup>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={signOut.isPending} onSelect={() => signOut.mutate()}>
-          Sair
+        {/* The menu stays open, saying so, until the sign-in page loads (on success, too). */}
+        <DropdownMenuItem
+          disabled={leaving}
+          onSelect={(event) => {
+            event.preventDefault();
+            signOut.mutate();
+          }}
+        >
+          {leaving ? 'Saindo…' : 'Sair'}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
