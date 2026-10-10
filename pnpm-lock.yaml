@@ -350,9 +350,6 @@ importers:
       read-excel-file:
         specifier: ^9.3.10
         version: 9.3.10
-      shadcn:
-        specifier: ^4.21.3
-        version: 4.21.3(supports-color@8.1.1)
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -402,6 +399,9 @@ importers:
       playwright:
         specifier: ^1.63.0
         version: 1.63.0
+      shadcn:
+        specifier: ^4.21.3
+        version: 4.21.3(supports-color@8.1.1)
       sharp:
         specifier: ^0.35.5
         version: 0.35.5(@types/node@26.6.4)

@@ -25,7 +25,7 @@ export const ACCOUNT_DELETED_PATH = '/conta-excluida';
  * The terms of use version in force (ADR 0041): the date of their last relevant change. Changing
  * it asks every user to accept the terms again.
  */
-export const TERMS_VERSION = '2026-10-07';
+export const TERMS_VERSION = '2026-10-10';
 
 /** Web page that receives the password reset link (the API builds the e-mail link to it). */
 export const RESET_PASSWORD_PATH = '/redefinir-senha';

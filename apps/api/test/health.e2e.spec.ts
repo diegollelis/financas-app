@@ -34,4 +34,10 @@ describe('GET /api/health', () => {
 
     expect(healthResponseSchema.parse(response.body)).toEqual({ status: 'ok', database: 'up' });
   });
+
+  it('does not say which server answers', async () => {
+    const response = await request(app.getHttpServer()).get('/api/health').expect(200);
+
+    expect(response.headers['x-powered-by']).toBeUndefined();
+  });
 });

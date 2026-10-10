@@ -26,6 +26,10 @@ const IMPORT_BODY_LIMIT = '4mb';
 export function setupApp(app: NestExpressApplication) {
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
+  // Express announces itself in every answer (X-Powered-By): nothing a client needs, and a hint
+  // to whoever looks for known flaws (note of 2026-10-10 in ADR 0041).
+  app.disable('x-powered-by');
+
   // Locally the web app runs on another origin (in production the proxy puts both on one, ADR
   // 0033); credentials allow the session cookie (ADR 0007).
   // X-Retry-After: how long a rate-limited client must wait (ADR 0023); the browser only lets the

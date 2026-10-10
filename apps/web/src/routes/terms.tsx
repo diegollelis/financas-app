@@ -14,11 +14,11 @@ export function TermsPage() {
 
   return (
     <LegalPage title="Termos de uso" updated={formatIsoDate(TERMS_VERSION)}>
-      <Section title="O que é o Finanças">
+      <Section title="O que é o CodeLélis Finanças">
         <p>
-          O Finanças é um app gratuito para organizar as finanças do mês, sozinho ou com a família.
-          É um projeto pessoal de estudo, sem fins lucrativos, mantido por uma pessoa. Ao criar uma
-          conta ou continuar usando o app, você concorda com estes termos e com a{' '}
+          O CodeLélis Finanças é um app gratuito para organizar as finanças do mês, sozinho ou com a
+          família. É um projeto pessoal de estudo, sem fins lucrativos, mantido por Diego Lélis. Ao
+          criar uma conta ou continuar usando o app, você concorda com estes termos e com a{' '}
           <Link to={PRIVACY_PATH} className={inlineLink}>
             Política de privacidade
           </Link>
@@ -28,6 +28,10 @@ export function TermsPage() {
 
       <Section title="Sua conta">
         <ul className="grid list-disc gap-1 pl-5">
+          <li>
+            O app é para maiores de 18 anos. Quem tem menos de 18 precisa da autorização dos pais ou
+            responsáveis.
+          </li>
           <li>Use o seu nome e um e-mail que seja seu. Cada conta é de uma pessoa.</li>
           <li>
             Guarde a sua senha e não a compartilhe. Para dar acesso a alguém, convide a pessoa para
@@ -44,6 +48,13 @@ export function TermsPage() {
           Quem convida alguém para um espaço escolhe o papel da pessoa, e ela passa a ver os dados
           daquele espaço. Convide só quem deve ver essas informações. O dono do espaço pode remover
           membros a qualquer momento.
+        </p>
+      </Section>
+
+      <Section title="Dados de outras pessoas">
+        <p>
+          Ao convidar alguém ou cadastrar uma pessoa para dividir contas, use o nome e o e-mail dela
+          só para organizar as finanças no app, e cadastre apenas o necessário para identificá-la.
         </p>
       </Section>
 
@@ -67,8 +78,8 @@ export function TermsPage() {
 
       <Section title="O que o app não é">
         <p>
-          O Finanças mostra os números que você lança; ele não é consultoria financeira, contábil
-          nem de investimentos. Confira as informações antes de tomar decisões importantes.
+          O CodeLélis Finanças mostra os números que você lança; ele não é consultoria financeira,
+          contábil nem de investimentos. Confira as informações antes de tomar decisões importantes.
         </p>
       </Section>
 

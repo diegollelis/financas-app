@@ -22,7 +22,7 @@ export function AcceptTerms({ user }: { user: MeResponse }) {
   return (
     <AuthCard
       title={changed ? 'Os termos de uso mudaram' : 'Termos de uso'}
-      description={`Olá, ${user.name}. Para continuar usando o Finanças, leia e aceite os termos.`}
+      description={`Olá, ${user.name}. Para continuar usando o CodeLélis Finanças, leia e aceite os termos.`}
       footer={
         <Button
           variant="ghost"

@@ -1,3 +1,5 @@
+// First: configures Zod before any module parses with it.
+import './lib/zod-config';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
