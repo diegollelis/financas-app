@@ -33,7 +33,7 @@ import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { NewWorkspaceDialog } from '@/features/workspaces/new-workspace-dialog';
-import { roleLabels } from '@/features/workspaces/roles';
+import { roleDescriptions, roleLabels } from '@/features/workspaces/roles';
 import {
   useCreateInvitation,
   useDeleteWorkspace,
@@ -263,10 +263,8 @@ function InviteForm({ workspaceId }: { workspaceId: string }) {
         />
         {/* What the chosen access allows, in the app's real terms. */}
         <p aria-live="polite" className="text-muted-foreground text-sm">
-          {role === 'VIEWER'
-            ? 'Só visualizar: vê tudo, sem mudar nada.'
-            : 'Pode editar: lança, efetiva e muda lançamentos, categorias, orçamento, pessoas e importações.'}{' '}
-          Só o dono convida, remove pessoas e exclui o espaço.
+          {roleLabels[role]}: {roleDescriptions[role]} Só o dono convida, remove pessoas e exclui o
+          espaço.
         </p>
       </div>
       {createInvitation.isError && (

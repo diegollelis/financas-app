@@ -21,10 +21,13 @@ describe('InvitationPage', () => {
     const { router } = renderApp(`/convites/${token}`);
 
     expect(
-      await screen.findByText(
-        'Maria Exemplo convidou você para ver e editar as finanças do espaço "Casa".',
-      ),
+      await screen.findByText('Maria Exemplo convidou você para o espaço "Casa".'),
     ).toBeInTheDocument();
+    // The access by the same name as in Membros, what it allows, and what a workspace is.
+    expect(screen.getByText(/^Seu acesso: Pode editar\./).parentElement).toHaveTextContent(
+      'Seu acesso: Pode editar. Lança, efetiva e muda lançamentos, categorias, orçamento, pessoas e importações.',
+    );
+    expect(screen.getByText(/^Um espaço reúne as finanças/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('link', { name: 'Criar conta e aceitar' }));
 
     expect(router.state.location.pathname).toBe('/cadastro');
