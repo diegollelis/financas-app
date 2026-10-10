@@ -163,6 +163,7 @@ Cada fase termina com algo funcionando e revisado. Decisões novas surgidas no c
     - [x] Recorrências: total por mês (a parte variável como estimativa), o que falta de cada parcelamento (parcelas, valor e mês da última) e a regra do passado em duas frases curtas
     - [x] Pessoas: "Marcar como recebido/pago" no histórico (a mesma efetivação de Lançamentos), total a receber e a pagar, quem tem pendência primeiro e busca numa lista longa
     - [x] Importar: passos numerados, botão "Escolher planilha", resumo da revisão (o que entra, com créditos e débitos, e o que tem problema), filtro "Com problemas", nota de "tudo ou nada" e a revisão nas capturas
+    - [x] Membros: o que cada acesso permite, os mesmos nomes de acesso em todo o app ("Pode editar" e "Só visualizar"), "Excluir espaço" numa área à parte e "Criar espaço compartilhado" no espaço pessoal
 - [x] Carregamento com o símbolo CL animado (`components/brand-loader.tsx`, pedido em 2026-10-09):
   - **Onde:** nas telas de carregamento da página inteira: a abertura do app enquanto confere a sessão (que pode levar até um minuto com a API dormindo), Entrar e Cadastro, "/" e o convite. As listas continuam com esqueletos.
   - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).
