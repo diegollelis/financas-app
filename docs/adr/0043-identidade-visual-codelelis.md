@@ -49,11 +49,11 @@ Até aqui, o app usava uma identidade provisória: um quadrado índigo com "R$",
 
 **Nome**
 
-| Onde                                                                                                                    | Como fica                                                                                       |
-| ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Logo (arte)                                                                                                             | `<CodeLélis/> FINANÇAS`                                                                         |
-| Lugares sem a logo ao lado: título da aba, nome do app instalado, remetente e assunto dos e-mails, termos e privacidade | **"CodeLélis Finanças"**, sem os sinais `< />`, que leitores de tela e filtros de spam leem mal |
-| Dentro do app, onde a logo aparece, e no `short_name` do manifesto                                                      | **"Finanças"**                                                                                  |
+| Onde                                                                                                                   | Como fica                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Logo (arte)                                                                                                            | `<CodeLélis/> FINANÇAS`                                                                         |
+| Lugares sem a logo ao lado: título da aba, nome do app instalado, remetente e textos dos e-mails, termos e privacidade | **"CodeLélis Finanças"**, sem os sinais `< />`, que leitores de tela e filtros de spam leem mal |
+| Dentro do app, onde a logo aparece, e no `short_name` do manifesto                                                     | **"Finanças"**                                                                                  |
 
 O acento de "Lélis" é obrigatório em todo lugar.
 
@@ -163,5 +163,5 @@ Uma versão da logo para tamanhos pequenos, com "FINANÇAS" proporcionalmente ma
 - **A troca é quase toda de valores de tokens:** as telas herdam a identidade sem reescrita, e só a moldura do app e o Painel ganham ajustes de estrutura.
 - **Arquivos raster pequenos podem perder detalhes:** o favicon a 16 px precisa ser conferido. Se o CL colorido borrar, o favicon usa a versão monocromática, que também é do pacote.
 - **O tema escuro muda de cinza para marinho:** todas as telas precisam de captura nos dois temas antes do merge do PR de tokens.
-- **O nome muda nos e-mails:** depois do deploy, `MAIL_FROM_NAME` no Render passa a ser "CodeLélis Finanças".
+- **O nome muda nos e-mails:** o padrão de `MAIL_FROM_NAME` passou a ser "CodeLélis Finanças". O nome vai no remetente, e os assuntos ficaram curtos, sem ele (nota de 2026-10-10 no [ADR 0022](0022-envio-de-email.md)).
 - **A skill `financas-ui` passa a descrever a marca e essas regras.**

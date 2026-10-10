@@ -60,7 +60,7 @@ async function verificationLink(api: APIRequestContext): Promise<string> {
       `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${demoUser.email}`)}`,
     );
     const { messages } = (await search.json()) as { messages: { ID: string; Subject: string }[] };
-    const message = messages.find((m) => m.Subject === 'Confirme seu e-mail no Finanças');
+    const message = messages.find((m) => m.Subject === 'Confirme seu e-mail');
     if (message) {
       const full = (await (await api.get(`${MAILPIT}/api/v1/message/${message.ID}`)).json()) as {
         Text: string;

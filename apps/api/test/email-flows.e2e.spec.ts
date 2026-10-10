@@ -36,7 +36,7 @@ describe('e-mail flows', () => {
       await t.http().post('/api/auth/sign-up/email').send(user).expect(200);
 
       const link = t.mailer.lastLinkTo(user.email);
-      expect(t.mailer.sent[0]?.subject).toBe('Confirme seu e-mail no Finanças');
+      expect(t.mailer.sent[0]?.subject).toBe('Confirme seu e-mail');
       expect(link.pathname).toBe('/api/auth/verify-email');
       expect(link.searchParams.get('callbackURL')).toBe(`${testEnv.WEB_ORIGIN}/`);
     });
@@ -101,7 +101,7 @@ describe('e-mail flows', () => {
         .send({ email: user.email, password: user.password, callbackURL: '/convites/abc' })
         .expect(403);
 
-      expect(t.mailer.sent[0]?.subject).toBe('Confirme seu e-mail no Finanças');
+      expect(t.mailer.sent[0]?.subject).toBe('Confirme seu e-mail');
       const link = t.mailer.lastLinkTo(user.email);
       expect(link.searchParams.get('callbackURL')).toBe(`${testEnv.WEB_ORIGIN}/convites/abc`);
     });
@@ -132,7 +132,7 @@ describe('e-mail flows', () => {
       expect(t.mailer.sent).toHaveLength(1);
       expect(t.mailer.sent[0]).toMatchObject({
         to: user.email,
-        subject: 'Você já tem uma conta no Finanças',
+        subject: 'Você já tem uma conta',
       });
       expect(t.mailer.lastLinkTo(user.email).toString()).toBe(`${testEnv.WEB_ORIGIN}/entrar`);
       expect(t.mailer.sent[0]?.text).toContain(`${testEnv.WEB_ORIGIN}/esqueci-senha`);
@@ -172,7 +172,7 @@ describe('e-mail flows', () => {
 
       // The e-mail link goes to the API, which checks the token and redirects to the web page.
       const link = t.mailer.lastLinkTo(user.email);
-      expect(t.mailer.sent.at(-1)?.subject).toBe('Redefina sua senha no Finanças');
+      expect(t.mailer.sent.at(-1)?.subject).toBe('Redefina sua senha');
       const redirect = await t.http().get(pathOf(link)).expect(302);
       const page = new URL(redirect.headers.location as string);
       expect(`${page.origin}${page.pathname}`).toBe(`${testEnv.WEB_ORIGIN}/redefinir-senha`);

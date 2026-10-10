@@ -16,7 +16,7 @@ const envSchema = z
     RESEND_API_KEY: z.string().optional(),
     // Without our own domain, Resend only sends from its test address (ADR 0022).
     MAIL_FROM_EMAIL: z.email().default('onboarding@resend.dev'),
-    MAIL_FROM_NAME: z.string().default('Finanças'),
+    MAIL_FROM_NAME: z.string().default('CodeLélis Finanças'),
     // Google sign-in (ADR 0026). Optional: without them, only e-mail and password.
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),

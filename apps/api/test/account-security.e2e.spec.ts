@@ -135,8 +135,8 @@ describe('account security', () => {
         maria.email,
       );
       expect(t.mailer.sent.map((message) => [message.to, message.subject])).toEqual([
-        [newEmail, 'Confirme seu novo e-mail no Finanças'],
-        [maria.email, 'Pedido de troca do e-mail da sua conta no Finanças'],
+        [newEmail, 'Confirme seu novo e-mail'],
+        [maria.email, 'Pedido de troca do seu e-mail'],
       ]);
       expect(t.mailer.sent[1]?.text).toContain(newEmail);
 

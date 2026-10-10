@@ -1,4 +1,9 @@
-import { TERMS_VERSION, type InvitationPreview } from '@financas/shared';
+import {
+  roleDescriptions,
+  roleLabels,
+  TERMS_VERSION,
+  type InvitationPreview,
+} from '@financas/shared';
 import { useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { BrandLoader } from '@/components/brand-loader';
@@ -10,7 +15,6 @@ import { withReturnTo } from '@/features/auth/return-to';
 import { useSignOut } from '@/features/auth/use-auth-mutations';
 import { useMe } from '@/features/auth/use-me';
 import { useAcceptInvitation, useInvitationPreview } from '@/features/invitations/use-invitation';
-import { roleDescriptions, roleLabels } from '@/features/workspaces/roles';
 import { apiErrorMessage } from '@/lib/error-message';
 
 const homeLink = <TextLink to="/">Ir para o início</TextLink>;
