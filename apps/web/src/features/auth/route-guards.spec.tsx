@@ -52,7 +52,7 @@ describe('a session ended elsewhere', () => {
   async function expectSignInWithNotice(router: ReturnType<typeof renderApp>['router']) {
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Sua sessão foi encerrada. Entre de novo para continuar.',
+      'Sua sessão terminou. Entre de novo para continuar.',
     );
     // Back to the same page after signing in.
     expect(router.state.location.search).toBe(`?voltar=${encodeURIComponent(dashboard)}`);

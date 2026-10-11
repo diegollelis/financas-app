@@ -11,7 +11,7 @@ import { useMe } from './use-me';
  * Neutral on purpose: the API answers the same 401 whether the session expired, was ended on
  * another device or by a password change.
  */
-export const SESSION_ENDED_NOTICE = 'Sua sessão foi encerrada. Entre de novo para continuar.';
+export const SESSION_ENDED_NOTICE = 'Sua sessão terminou. Entre de novo para continuar.';
 
 /** The session could not be checked: the server did not answer. Say so and offer to try again. */
 function ConnectionError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {

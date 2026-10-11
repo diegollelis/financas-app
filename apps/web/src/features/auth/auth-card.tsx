@@ -12,11 +12,14 @@ export function AuthCard({
   title,
   description,
   footer,
+  notice,
   children,
 }: {
   title: string;
   description?: string;
   footer: ReactNode;
+  /** Context for arriving here (e.g. the session ended), above the card and apart from the form. */
+  notice?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -27,6 +30,12 @@ export function AuthCard({
         {/* The logo is the only name on these pages: its alt says it (ADR 0043). Large enough
             for the art's "FINANÇAS" to be read (an eighth of the logo's height). */}
         <BrandLogo variant="horizontal" className="h-14 justify-self-center py-1 sm:h-16" />
+        {notice && (
+          // On the phone it sits closer to the title it leads into; from sm, two cards apart.
+          <p role="status" className="bg-card -mb-2 rounded-xl border p-3 text-sm sm:mb-0 sm:px-6">
+            {notice}
+          </p>
+        )}
         <div className="sm:bg-card grid gap-6 sm:rounded-xl sm:border sm:p-6 sm:shadow-sm">
           <div className="grid gap-1">
             <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>

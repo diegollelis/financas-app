@@ -374,6 +374,14 @@ async function main() {
     ...(invitationPath ? [{ name: 'convite', path: invitationPath, signedIn: false }] : []),
     { name: 'convite-invalido', path: '/convites/ficticio', signedIn: false },
     { name: 'termos', path: '/termos', signedIn: false },
+    {
+      // The sign-in page with its notice, after the session ended on another device: the API
+      // answers 401 once the dashboard is open, and a click on Lançamentos meets it.
+      name: 'entrar-sessao-terminou',
+      path: `/espacos/${workspaceId}/painel`,
+      signedIn: true,
+      endSession: true,
+    },
     // "/" is not a page: it opens the last workspace used (ADR 0036). The switcher is captured open.
     {
       name: 'seletor-espaco',
@@ -525,6 +533,13 @@ async function main() {
         await page.waitForTimeout(target.holdSessionMs);
       } else {
         await page.goto(`${WEB}${target.path}`, { waitUntil: 'networkidle' });
+      }
+      if ('endSession' in target && target.endSession) {
+        await page.route(`${API}/api/workspaces/**`, (route) =>
+          route.fulfill({ status: 401, json: { message: 'Unauthorized', statusCode: 401 } }),
+        );
+        await page.getByRole('link', { name: 'Lançamentos' }).first().click();
+        await page.getByRole('heading', { name: 'Entrar' }).waitFor();
       }
       if ('upload' in target && target.upload) {
         await page.locator('#import-file-input').setInputFiles(target.upload);
