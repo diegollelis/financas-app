@@ -11,6 +11,13 @@ const ptBrCodes = new Set([
   'CATEGORY_EXISTS',
   'CATEGORY_IN_USE',
   'INVALID_CATEGORY',
+  'CATEGORY_OF_DESTINATION',
+  'DESTINATION_EXISTS',
+  'DESTINATION_FIXED',
+  'DESTINATION_IN_USE',
+  'PERSON_EXISTS',
+  'PERSON_IN_USE',
+  'INVALID_PERSON',
 ]);
 
 /** Turns an error from our own API routes (not /api/auth) into a message for the user. */
