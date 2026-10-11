@@ -47,3 +47,7 @@ Onde calcular:
 - **O "Resultado" saiu.** Em seu lugar entram "Disponível para guardar" (créditos − despesas) e "Aplicado".
 - **As duas visões, previsto e efetivado, continuam.**
 - **Detalhes:** [ADR 0047](0047-orcamento-real-por-destino.md).
+
+## Nota (2026-10-11, ADR 0051)
+
+Os nomes na tela mudaram; o código e as regras, não. A visão efetivada aparece como **"Realizado"**, o saldo efetivado como **"Saldo atual"**, créditos e débitos como **entradas e saídas**, e o aplicado como **"Guardado"**. Detalhes: [ADR 0051](0051-vocabulario-da-interface.md).

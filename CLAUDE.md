@@ -12,7 +12,7 @@ Finanças App: a multi-user, public web app for monthly personal finance. Users 
 
 - `docs/adr/` holds the binding decisions. The index is `docs/adr/README.md`; copy `0000-template.md` for new ones and update the index.
 - `docs/dominio/planilha-origem.md` describes the source spreadsheet's formulas and the problems the app must fix.
-- `docs/dominio/modelo.md` has the entities, rules and default categories. `glossario.md` has the PT↔EN terms and the Protheus analogies.
+- `docs/dominio/modelo.md` has the entities, rules and default categories. `glossario.md` maps each UI term to its name in the code (ADR 0051: the UI follows the market's terms, the code keeps its English names) and has the Protheus analogies. A new UI term goes there first.
 - `docs/roadmap.md` lists the phases as checklists. Tick items as they are completed.
 - `docs/deploy.md` is the production runbook (Neon, Resend, Render, then Cloudflare Pages).
 - `docs/backup.md` is the backup runbook (ADR 0035): `.github/workflows/backup.yml` is a reusable workflow called daily by the private repo `financas-backup`; it never runs on its own here.

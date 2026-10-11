@@ -180,6 +180,10 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - **Como:** a arte oficial animada como um todo, numa "respiração" suave de opacidade e escala, sem redesenhar nem recriar o CL em CSS (ADR 0043).
   - **Acessibilidade:** parada para quem pede menos movimento, e "Carregando…" só para leitores de tela.
   - **Depois de 3 s:** "Aguardando o servidor… isso pode levar até um minuto." abaixo do símbolo (o mesmo texto das listas e dos botões). O erro da abertura oferece "Tentar de novo".
+- [ ] **Vocabulário da interface** ([ADR 0051](adr/0051-vocabulario-da-interface.md)): os termos dos apps de finanças pessoais, um nome por conceito, e o código sem mudar
+  - [x] Mensagens da API sobre destinos e pessoas aparecendo na tela, em vez do erro genérico
+  - [x] ADR e glossário com a ponte entre a tela e o código
+  - [ ] Telas, toasts, e-mails e planilha modelo com os termos novos (a planilha antiga continua sendo lida), rótulos de tipo e situação em `packages/shared`, capturas e axe zerado
 
 **Ideias futuras:**
 
