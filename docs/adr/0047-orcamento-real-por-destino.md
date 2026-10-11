@@ -149,3 +149,7 @@ As aplicações **não entram na base**. É isso que tira a circularidade: aplic
 ## Nota (padrões genéricos, 2026-10-10)
 
 Antes da 1.0.0, os destinos de guardar padrão de um espaço novo passaram a ser **Reserva de emergência** e **Investimentos**, nessa ordem: primeiro a reserva, depois investir. **"Viagens" saiu**, e com ele a categoria de despesa "Viagem", que existia para não confundir os dois. Quem quiser cria Viagens, Carro ou Casa própria em "Gerenciar destinos de guardar". Os espaços criados antes continuam com os destinos que receberam, e não houve migração. As categorias padrão também ficaram genéricas (nota de 2026-10-10 no [ADR 0024](0024-espacos-membros-e-espaco-pessoal.md)).
+
+## Nota (vocabulário, 2026-10-11)
+
+Na interface, os destinos de guardar passam a se chamar **metas de guardar**, "Aplicar" vira **"Guardar"**, o aplicado vira **"Guardado"**, "Sem destino" vira **"Livre"** e o percentual de Despesas é o **limite de gastos**. As tabelas, os campos e as regras deste ADR não mudam ([ADR 0051](0051-vocabulario-da-interface.md)).

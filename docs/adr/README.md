@@ -54,3 +54,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0048](0048-copiar-categorias-entre-espacos.md)       | Copiar categorias de outro espaço: participação conferida na origem, RLS por espaço | Aceita |
 | [0049](0049-gerenciar-a-conta.md)                     | Gerenciar a conta: nome, senha, e-mail e aparelhos conectados                       | Aceita |
 | [0050](0050-versionamento.md)                         | Versões: tags com versionamento semântico e releases no GitHub                      | Aceita |
+| [0051](0051-vocabulario-da-interface.md)              | Vocabulário da interface: os termos do mercado, sem mudar o código                  | Aceita |
