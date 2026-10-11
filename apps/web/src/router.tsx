@@ -12,7 +12,7 @@ import {
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { RootLayout } from '@/components/root-layout';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
-import { WorkspaceLayout } from '@/features/workspaces/workspace-layout';
+import { AccountLayout, WorkspaceLayout } from '@/features/workspaces/workspace-layout';
 import { AnalysisPage } from '@/routes/analysis';
 import { ImportPage } from '@/routes/import';
 import { RecurrencesPage } from '@/routes/recurrences';
@@ -52,7 +52,11 @@ export const routes: RouteObject[] = [
         element: <RequireAuth />,
         children: [
           { path: '/', element: <HomePage /> },
-          { path: ACCOUNT_PATH, element: <AccountPage /> },
+          {
+            // In the frame of the last workspace used, like every other page (ADR 0044 note).
+            element: <AccountLayout />,
+            children: [{ path: ACCOUNT_PATH, element: <AccountPage /> }],
+          },
           { path: DELETE_ACCOUNT_PATH, element: <DeleteAccountPage /> },
           {
             // Header, sections nav and the workspace loaded once for every page below (ADR 0036).

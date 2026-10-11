@@ -1,20 +1,9 @@
-import type { Workspace } from '@financas/shared';
 import { Navigate, useLocation } from 'react-router';
 import { BrandLoader } from '@/components/brand-loader';
 import { ListSkeleton, QueryState } from '@/components/query-state';
 import { AppHeader } from '@/features/shell/app-header';
-import { readLastWorkspace } from '@/features/workspaces/last-workspace';
+import { pickWorkspace } from '@/features/workspaces/last-workspace';
 import { useWorkspaces } from '@/features/workspaces/use-workspaces';
-
-/** The last workspace opened in this browser, if it is still one of the user's; else the personal. */
-function pickWorkspace(workspaces: Workspace[]) {
-  const last = readLastWorkspace();
-  return (
-    workspaces.find((workspace) => workspace.id === last) ??
-    workspaces.find((workspace) => workspace.isPersonal) ??
-    workspaces[0]
-  );
-}
 
 /**
  * "/" is not a page: it opens a workspace's dashboard (ADR 0036). Workspaces are switched and

@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useMatches, useParams, useSearchParams } from 'react-router';
 import { AppBrand } from '@/components/brand-logo';
+import { BrandLoader } from '@/components/brand-loader';
 import { ListSkeleton, QueryState } from '@/components/query-state';
 import {
   Sheet,
@@ -32,8 +33,9 @@ import { AppHeader, SidebarAccount, SkipLink } from '@/features/shell/app-header
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import { CurrentWorkspaceContext } from './current-workspace';
-import { rememberLastWorkspace } from './last-workspace';
+import { pickWorkspace, rememberLastWorkspace } from './last-workspace';
 import { useWorkspace } from './use-workspace';
+import { useWorkspaces } from './use-workspaces';
 import { WorkspaceSwitcher } from './workspace-switcher';
 
 type Section = {
@@ -166,6 +168,49 @@ function SectionNav({ workspaceId }: { workspaceId: string }) {
  */
 export function WorkspaceLayout() {
   const { workspaceId = '' } = useParams();
+  return <WorkspaceFrame workspaceId={workspaceId} />;
+}
+
+/**
+ * "Minha conta" in the frame of the workspace the person came from (ADR 0044, note of
+ * 2026-10-11): the same sidebar or tab bar, no section marked, so leaving the account page is one
+ * tap away. The workspace is picked as "/" picks it; if the list cannot load, the page still
+ * opens, under the plain header.
+ */
+export function AccountLayout() {
+  const user = useCurrentUser();
+  const workspaces = useWorkspaces();
+  const target = workspaces.isSuccess ? pickWorkspace(workspaces.data) : undefined;
+
+  if (target) return <WorkspaceFrame workspaceId={target.id} account />;
+  if (workspaces.isPending) return <BrandLoader />;
+  return (
+    <div className="flex min-h-svh flex-col">
+      <SkipLink />
+      <AppHeader />
+      <main
+        id="conteudo"
+        tabIndex={-1}
+        className="grid max-w-3xl flex-1 content-start gap-6 px-4 pt-5 pb-8 text-base outline-none sm:px-6 md:pt-8 md:text-sm"
+      >
+        <Outlet context={user} />
+      </main>
+      <AppFooter className="mx-4 mt-6 mb-8 max-w-3xl sm:mx-6" />
+    </div>
+  );
+}
+
+/**
+ * The frame itself. `account`: the page under it is the account's, not the workspace's, so it
+ * renders whatever state the workspace is in (the workspace only fills the switcher and links).
+ */
+function WorkspaceFrame({
+  workspaceId,
+  account = false,
+}: {
+  workspaceId: string;
+  account?: boolean;
+}) {
   const user = useCurrentUser();
   const workspace = useWorkspace(workspaceId);
   const desktop = useMediaQuery(DESKTOP_QUERY);
@@ -214,7 +259,9 @@ export function WorkspaceLayout() {
         >
           {/* On every page until confirmed; not blocking (ADR 0022). */}
           {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
-          {workspace.isSuccess ? (
+          {account ? (
+            <Outlet context={user} />
+          ) : workspace.isSuccess ? (
             <CurrentWorkspaceContext value={workspace.data}>
               {/* Pages read the user with useCurrentUser(), as under RequireAuth. */}
               <Outlet context={user} />

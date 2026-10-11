@@ -74,3 +74,13 @@ O ano vem de `currentPeriod()`.
 - **Testes:**
   - o celular é o padrão;
   - um teste de desktop (`stubPrefersDark(false, { desktop: true })`) confere que não há cabeçalho e que a conta está na barra lateral.
+
+## Nota (2026-10-11): Minha conta na moldura do espaço
+
+**O problema.** Minha conta tinha só o cabeçalho, em qualquer largura. Ao abrir a página, o app parecia mudar de moldura: a barra lateral sumia, e voltar dependia do botão do navegador ou do link "Voltar aos espaços".
+
+**A decisão:**
+
+- **Minha conta abre na moldura do último espaço usado,** escolhido como "/" escolhe (`pickWorkspace`: o último aberto neste navegador, senão o pessoal). A barra lateral, ou o cabeçalho e a barra inferior no celular, ficam como nas outras páginas, **sem nenhuma seção marcada**, porque a conta não é uma seção do espaço. As seções são o caminho de volta, e o link "Voltar aos espaços" saiu.
+- **A página continua sendo da conta, não do espaço:** ela abre mesmo que o espaço não carregue, e se a lista de espaços falhar, cai no cabeçalho simples de antes.
+- **"Excluir sua conta"** (`/conta/excluir`, o link do e-mail) continua no cartão centralizado das telas de entrada: é uma confirmação, não uma página de uso.
