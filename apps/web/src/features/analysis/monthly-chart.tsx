@@ -256,11 +256,11 @@ export function MonthlyTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full tabular-nums">
-        <caption className="sr-only">Valores por competência</caption>
+        <caption className="sr-only">Valores por mês</caption>
         <thead className="text-muted-foreground">
           <tr className="border-b">
             <th scope="col" className="py-2 text-left font-normal">
-              Competência
+              Mês
             </th>
             {keys.map((key) => (
               <th key={key} scope="col" className="py-2 text-right font-normal">

@@ -10,6 +10,7 @@ import {
   type Category,
   type Person,
   type Transaction,
+  transactionTypeLabels,
   type TransactionType,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -116,8 +117,8 @@ export type TransactionFormValues = z.output<typeof transactionFormSchema>;
 const amountText = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 });
 
 const typeOptions: readonly { value: TransactionType; label: string }[] = [
-  { value: 'DEBIT', label: 'Débito' },
-  { value: 'CREDIT', label: 'Crédito' },
+  { value: 'DEBIT', label: transactionTypeLabels.DEBIT.singular },
+  { value: 'CREDIT', label: transactionTypeLabels.CREDIT.singular },
 ];
 
 const amountKindOptions = [
@@ -292,9 +293,9 @@ export function TransactionForm({
     >
       {fixedCategory !== null ? (
         <p className="text-muted-foreground text-sm">
-          Será lançado um débito na categoria{' '}
+          Será lançada uma saída na categoria{' '}
           <span className="text-foreground font-medium">{fixedCategory}</span>. Nenhum dinheiro é
-          movido: é só o registro da aplicação.
+          movido: é só o registro do que você guardou.
         </p>
       ) : (
         <Controller
@@ -400,7 +401,7 @@ export function TransactionForm({
           />
           <p className="text-muted-foreground text-sm">
             {variable
-              ? 'Para contas que mudam todo mês, como energia e água. Cada mês começa com a média dos 3 últimos pagos; ao efetivar, você informa o valor da fatura.'
+              ? 'Para contas que mudam todo mês, como energia e água. Cada mês começa com a média dos 3 últimos pagos; ao marcar como pago, você informa o valor da fatura.'
               : 'O mesmo valor todo mês, como internet e aluguel.'}
           </p>
         </div>

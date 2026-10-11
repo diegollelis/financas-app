@@ -15,15 +15,27 @@ export const TEMPLATE_FILE_NAME = 'financas-modelo.xlsx';
 /** What a cell holds once read: dates already as Date (midnight UTC), numbers as numbers. */
 export type TemplateCell = string | number | boolean | Date | null;
 
+// `formerTitles`: the titles of the template before ADR 0051, still read, since spreadsheets
+// filled in with it exist.
 const columns = [
-  { key: 'period', title: 'Competência', required: true },
-  { key: 'type', title: 'Tipo', required: true },
-  { key: 'description', title: 'Descrição', required: true },
-  { key: 'category', title: 'Categoria', required: true },
-  { key: 'amount', title: 'Valor', required: true },
-  { key: 'dueDate', title: 'Vencimento', required: false },
-  { key: 'settledAt', title: 'Efetivado em', required: false },
-  { key: 'notes', title: 'Observações', required: false },
+  {
+    key: 'period',
+    title: 'Mês de referência',
+    formerTitles: ['Competência', 'Mês'],
+    required: true,
+  },
+  { key: 'type', title: 'Tipo', formerTitles: [], required: true },
+  { key: 'description', title: 'Descrição', formerTitles: [], required: true },
+  { key: 'category', title: 'Categoria', formerTitles: [], required: true },
+  { key: 'amount', title: 'Valor', formerTitles: [], required: true },
+  { key: 'dueDate', title: 'Vencimento', formerTitles: [], required: false },
+  {
+    key: 'settledAt',
+    title: 'Pago ou recebido em',
+    formerTitles: ['Efetivado em'],
+    required: false,
+  },
+  { key: 'notes', title: 'Observações', formerTitles: [], required: false },
 ] as const;
 
 type ColumnKey = (typeof columns)[number]['key'];
@@ -34,7 +46,7 @@ export const TEMPLATE_HEADERS: readonly string[] = columns.map((column) => colum
 /** The example row the downloaded template comes with (fictitious, ADR 0019). */
 export const TEMPLATE_EXAMPLE: readonly string[] = [
   '2026-09',
-  'Débito',
+  'Saída',
   'Aluguel',
   'Moradia',
   '1.500,00',
@@ -81,7 +93,7 @@ export type ImportIssue = {
   message: string;
 };
 
-/** "Efetivado  em" → "efetivado em": no accents, no case, single spaces. */
+/** "Pago ou  Recebido em" → "pago ou recebido em": no accents, no case, single spaces. */
 export function normalizeName(text: string): string {
   return text
     .normalize('NFD')
@@ -123,8 +135,9 @@ function readDate(cell: TemplateCell | undefined): string | null | undefined {
 
 function readType(cell: TemplateCell | undefined): TransactionType | null {
   const value = normalizeName(text(cell));
-  if (value === 'credito' || value === 'credit') return 'CREDIT';
-  if (value === 'debito' || value === 'debit') return 'DEBIT';
+  // Crédito and Débito: the template's words before ADR 0051.
+  if (['entrada', 'credito', 'credit'].includes(value)) return 'CREDIT';
+  if (['saida', 'debito', 'debit'].includes(value)) return 'DEBIT';
   return null;
 }
 
@@ -158,7 +171,9 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
   const titles = header.map((cell) => normalizeName(text(cell)));
   const index = new Map<ColumnKey, number>();
   for (const column of columns) {
-    const position = titles.indexOf(normalizeName(column.title));
+    const position = titles.findIndex((title) =>
+      [column.title, ...column.formerTitles].some((name) => normalizeName(name) === title),
+    );
     if (position >= 0) index.set(column.key, position);
     else if (column.required) {
       issues.push({
@@ -182,9 +197,9 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
 
     const errors: string[] = [];
     const period = readPeriod(cell('period'));
-    if (!period) errors.push('Competência inválida: use AAAA-MM, como 2026-09.');
+    if (!period) errors.push('Mês de referência inválido: use AAAA-MM, como 2026-09.');
     const type = readType(cell('type'));
-    if (!type) errors.push('Tipo inválido: use Crédito ou Débito.');
+    if (!type) errors.push('Tipo inválido: use Entrada ou Saída.');
     const description = transactionDescriptionSchema.safeParse(text(cell('description')));
     if (!description.success)
       errors.push(description.error.issues[0]?.message ?? 'Descrição inválida.');
@@ -203,7 +218,8 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
     const dueDate = readDate(cell('dueDate'));
     if (dueDate === undefined) errors.push('Vencimento inválido: use dd/mm/aaaa.');
     const settledAt = readDate(cell('settledAt'));
-    if (settledAt === undefined) errors.push('Data de efetivação inválida: use dd/mm/aaaa.');
+    if (settledAt === undefined)
+      errors.push('Data de pagamento ou recebimento inválida: use dd/mm/aaaa.');
     const notes = transactionNotesSchema.safeParse(text(cell('notes')));
     if (!notes.success) errors.push(notes.error.issues[0]?.message ?? 'Observações inválidas.');
 
@@ -245,7 +261,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
       issues.push({
         line,
         severity: 'warning',
-        message: `Efetivado em ${settledAt.slice(0, 7)}, fora da competência ${period}.`,
+        message: `Pago ou recebido em ${settledAt.slice(0, 7)}, fora do mês de referência ${period}.`,
       });
     }
 

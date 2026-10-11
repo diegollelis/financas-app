@@ -116,7 +116,7 @@ function DestinationRow({
   const remove = useDeleteBudgetDestination(workspaceId);
   const deleteIt = () =>
     remove.mutate(destination.id, {
-      onSuccess: () => toast.success('Destino excluído'),
+      onSuccess: () => toast.success('Meta excluída'),
       onError: (error) => toast.error(apiErrorMessage(error)),
     });
   const { name } = destination;
@@ -124,7 +124,7 @@ function DestinationRow({
     update.mutate(
       { id: destination.id, archived },
       {
-        onSuccess: () => toast.success(archived ? 'Destino arquivado' : 'Destino reativado'),
+        onSuccess: () => toast.success(archived ? 'Meta arquivada' : 'Meta reativada'),
         onError: (error) => toast.error(apiErrorMessage(error)),
       },
     );
@@ -141,7 +141,7 @@ function DestinationRow({
           error={update.error}
           onSubmit={(newName) =>
             update.mutateAsync({ id: destination.id, name: newName }).then(() => {
-              toast.success('Destino renomeado');
+              toast.success('Meta renomeada');
               setRenaming(false);
             })
           }
@@ -200,7 +200,7 @@ function DestinationRow({
             <AlertDialogTitle>Arquivar {name}?</AlertDialogTitle>
             <AlertDialogDescription>
               {name} sai do orçamento a partir de {formatPeriod(currentPeriod())}, e o percentual
-              dele fica sem destino. Os meses anteriores não mudam. A categoria {name} é arquivada
+              dela fica sem meta. Os meses anteriores não mudam. A categoria {name} é arquivada
               junto e continua nos lançamentos antigos.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -215,8 +215,8 @@ function DestinationRow({
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir {name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              O destino e a categoria {name} deixam de existir. Se ele tiver percentual em algum
-              orçamento salvo, esse percentual fica sem destino, também nos meses anteriores. Não é
+              A meta e a categoria {name} deixam de existir. Se ela tiver percentual em algum
+              orçamento salvo, esse percentual fica sem meta, também nos meses anteriores. Não é
               possível desfazer.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -245,11 +245,11 @@ export function DestinationManager({ workspaceId }: { workspaceId: string }) {
 
   return (
     <details className="group rounded-xl border px-4 py-2">
-      <summary className="cursor-pointer py-2 font-medium">Gerenciar destinos de guardar</summary>
+      <summary className="cursor-pointer py-2 font-medium">Gerenciar metas</summary>
       <div className="grid gap-3 pb-2">
         <p className="text-muted-foreground text-sm">
-          Cada destino tem uma categoria de débito com o mesmo nome: um lançamento nela é uma
-          aplicação no destino.
+          Cada meta tem uma categoria de saída com o mesmo nome: um lançamento nela é dinheiro
+          guardado na meta.
         </p>
         {saving.length > 0 && (
           <ul className="divide-y">
@@ -264,12 +264,12 @@ export function DestinationManager({ workspaceId }: { workspaceId: string }) {
         )}
         <NameForm
           id="new-destination"
-          label="Novo destino"
+          label="Nova meta"
           submitLabel={create.isPending ? 'Adicionando…' : 'Adicionar'}
           pending={create.isPending}
           error={create.error}
           onSubmit={(name) =>
-            create.mutateAsync({ name }).then(() => toast.success('Destino adicionado'))
+            create.mutateAsync({ name }).then(() => toast.success('Meta adicionada'))
           }
         />
       </div>

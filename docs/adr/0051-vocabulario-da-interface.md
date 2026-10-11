@@ -36,6 +36,7 @@ Os textos da interface nasceram da planilha de origem e do vocabulário contábi
 1. **Manter "destinos" e "Aplicar".**
 2. **"Caixinhas".** É um termo reconhecível, mas é associado a um banco.
 3. **"Metas de guardar"**, com o verbo **Guardar**.
+4. **Só "Metas"**, com o verbo **Guardar**, já que "meta" deixa de ser usada para o limite de gastos.
 
 **O código**
 
@@ -44,14 +45,14 @@ Os textos da interface nasceram da planilha de origem e do vocabulário contábi
 
 ## Decisão
 
-**Entrada / Saída, metas de guardar e só os textos mudam.**
+**Entrada / Saída, "Metas" e só os textos mudam.**
 
 ### Os termos
 
 | Conceito (código)      | Antes                                        | Agora                                                                                                     |
 | ---------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `CREDIT` / `DEBIT`     | Crédito / Débito                             | **Entrada / Saída**; seções "Entradas" e "Saídas"; filtro "Todas, Entradas, Saídas"                       |
-| `period`               | Competência                                  | **Mês**: "Mês anterior", "Escolher mês", o campo "Mês"                                                    |
+| `period`               | Competência                                  | **Mês**: "Mês anterior", "Escolher mês"; na importação, "Mês de referência"                               |
 | `settledAt` preenchido | Efetivado, Quitado, Pagos                    | **Pago** (saída) ou **Recebido** (entrada); filtro "Pagos e recebidos"; o parcelamento todo pago é "Pago" |
 | marcar como efetivado  | Efetivar / Desfazer efetivação               | **Marcar como pago** ou **recebido**; **Desmarcar pagamento** ou **recebimento**                          |
 | `PENDING`              | Pendente, A pagar, Agendado                  | **Pendente** como situação; "A pagar" e "A receber" só como valores                                       |
@@ -59,15 +60,17 @@ Os textos da interface nasceram da planilha de origem e do vocabulário contábi
 | visões do resumo       | Previsto / Efetivado                         | **Previsto / Realizado**                                                                                  |
 | saldos                 | Saldo previsto / Saldo efetivado             | **Saldo previsto / Saldo atual**                                                                          |
 | destino `EXPENSES`     | Despesas, "Limite de despesas", "meta"       | **Limite de gastos**, sempre "limite"; "Despesas" continua sendo o nome das saídas que não são guardadas  |
-| destinos `SAVINGS`     | Destinos de guardar, Aplicar, Aplicado       | **Metas de guardar**; o botão **Guardar**; **Guardado**; o formulário "Guardar em {meta}"                 |
-| `unallocated`          | Sem destino                                  | **Livre**                                                                                                 |
+| destinos `SAVINGS`     | Destinos de guardar, Aplicar, Aplicado       | **Metas**; o botão **Guardar**; **Guardado**; o formulário "Registrar valor guardado"                     |
+| `unallocated`          | Sem destino                                  | **Sem meta**                                                                                              |
 | bloco do Painel        | Orçamento por destino                        | **Orçamento do mês**                                                                                      |
 | remoções               | Excluir, Apagar, Remover, Tirar              | **Excluir** para dados; **Remover** para um membro ou para uma pessoa da divisão; **Cancelar convite**    |
 | a página de importação | "Importar" no menu, "Importar planilha" nela | **Importar planilha** nos dois                                                                            |
 
-**"Meta" é só das metas de guardar.** Despesas tem um **limite**, que é um % da renda líquida; cada meta de guardar é um % do que sobra. São as duas bases do [ADR 0047](0047-orcamento-real-por-destino.md), agora com nomes que não se confundem.
+**"Meta" é só do que se guarda.** Despesas tem um **limite**, que é um % da renda líquida; cada meta é um % do que sobra. São as duas bases do [ADR 0047](0047-orcamento-real-por-destino.md), agora com nomes que não se confundem.
 
-**Na Análise, os rótulos seguem a visão:** "Entradas previstas" na visão prevista e "Recebido" na realizada.
+**Na Análise, nenhum rótulo afirma o que a visão não garante:** "Entradas" e "Despesas" valem nas duas visões, e o dinheiro das metas é "Para guardar" na prevista e "Guardado" na realizada. Os rankings são "Entradas por categoria" e "Despesas por categoria".
+
+**"Progresso" é o % da meta.** Na tabela das metas, a coluna que diz quanto da meta já foi guardado se chama "Progresso", e não "Realizado", para não se confundir com a visão "Realizado" da Análise.
 
 **Continuam iguais,** porque já são os termos do mercado: Lançamento, Categoria, Espaço, Painel, Análise, Recorrências, Parcelamento e Parcela, Pessoas, Reembolso, Renda líquida, Disponível para guardar, e os acessos Dono, Pode editar e Só visualizar.
 
@@ -83,13 +86,31 @@ Os textos da interface nasceram da planilha de origem e do vocabulário contábi
 
 ### A planilha modelo
 
-- **Os títulos novos** são "Mês", "Tipo" (com Entrada e Saída) e "Pago ou recebido em".
+- **Os títulos novos** são "Mês de referência" (ao lado de "Vencimento" e de "Pago ou recebido em", "Mês" sozinho poderia ser lido como o mês do pagamento), "Tipo" (com Entrada e Saída) e "Pago ou recebido em".
 - **A leitura continua aceitando** os títulos e os valores antigos ("Competência", "Crédito", "Débito", "Efetivado em"), porque já existem planilhas preenchidas com o modelo antigo ([ADR 0040](0040-importacao-da-planilha.md)).
 
 ### Os textos num lugar só
 
 - Os rótulos repetidos em várias telas (os tipos e as situações) passam a vir de `packages/shared`, ao lado de `roleLabels`.
 - É um passo na direção prometida pelo [ADR 0011](0011-idioma-do-codigo.md), de textos centralizados.
+
+### Ajustes da revisão da prévia
+
+Uma revisão externa da prévia das telas mudou cinco pontos da primeira versão desta tabela:
+
+- **"Metas de guardar" virou "Metas".** "Metas de guardar" soava artificial e se repete em muitas telas. "Metas de reserva" repetiria "Reserva de emergência", e "Metas de economia" pode ser lido como cortar despesas. Como "meta" deixou de ser usada no limite de gastos, a palavra sozinha basta.
+- **"Livre" virou "Sem meta".** Ao lado de "Saldo atual", "Livre" podia ser lido como um saldo à parte. Uma frase abaixo da tabela diz o que é: _"Sem meta: parte do Disponível para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo."_
+  - O valor é uma parte do disponível **previsto** (`unallocated` sai de `available.plannedCents`), por isso a frase não fala em "o que sobrou".
+  - A frase **não diz que o valor não pode ser gasto**: ele não está reservado para nada e já faz parte do Saldo previsto. Uma versão anterior dizia "Não é dinheiro livre para gastar", o que contradiz o cálculo. O risco real é ler esse valor como um saldo, e é isso que a frase evita.
+- **"Guardar em {meta}" virou "Registrar valor guardado"** no título do formulário, com a meta na descrição. O app registra o valor e não faz aplicação nenhuma; o título não pode prometer isso. O botão do Painel continua "Guardar".
+- **A descrição preenchida é "Aporte em {meta}".** O lançamento nasce pendente e é pago depois: um substantivo serve aos dois estados, enquanto "Valor guardado em…" afirmaria um pagamento que ainda não aconteceu, e "Guardar em…" pareceria uma tarefa na lista. A pessoa pode editar o texto.
+- **"Alcançado" virou "Progresso"**, o rótulo comum de uma coluna de percentual.
+- **Na importação, "Mês de referência".** A navegação continua com "Mês".
+
+**Ficaram como estavam, depois de conferidos:**
+
+- **"Despesas" ao lado de "Entradas" e "Saídas".** Despesa é a saída que não vai para uma meta, e "Despesas por categoria" deixa de fora o que foi guardado.
+- **"Pendente" e "Falta" nas metas.** São números diferentes: Pendente é o que já foi lançado e não foi pago, e Falta é o que ainda nem foi lançado. "A guardar" juntaria os dois.
 
 ## Consequências
 

@@ -16,7 +16,7 @@ import { useCreateTransaction, useUpdateTransaction } from './use-transactions';
 
 /**
  * Create or edit a transaction, in a sheet on the phone and a dialog from md. Used by the
- * transactions page and, with a `preset`, by the dashboard's "Registrar aplicação" (ADR 0047).
+ * transactions page and, with a `preset`, by the dashboard's "Guardar", titled "Registrar valor guardado" (ADRs 0047, 0051).
  */
 export function TransactionDialog({
   workspaceId,
@@ -149,16 +149,19 @@ export function TransactionDialog({
         editing
           ? 'Editar lançamento'
           : preset?.applicationTo
-            ? `Aplicação em ${preset.applicationTo}`
+            ? // A record of money put aside, not an investment the app makes (ADR 0051).
+              'Registrar valor guardado'
             : 'Novo lançamento'
       }
       description={
         // Editing one generated month or one installment changes only it (ADR 0038).
-        editing?.recurrenceId
-          ? `Competência de ${formatPeriod(editing.period)} em ${workspaceName}. Repete todo mês: esta mudança vale só para este mês.`
-          : editing?.installment
-            ? `Competência de ${formatPeriod(editing.period)} em ${workspaceName}. Parcela ${editing.installment.number} de ${editing.installment.count}: esta mudança vale só para esta parcela.`
-            : `Competência de ${formatPeriod(editing?.period ?? period)} em ${workspaceName}.`
+        !editing && preset?.applicationTo
+          ? `Em ${preset.applicationTo}, no mês de ${formatPeriod(period)} em ${workspaceName}.`
+          : editing?.recurrenceId
+            ? `Mês de ${formatPeriod(editing.period)} em ${workspaceName}. Repete todo mês: esta mudança vale só para este mês.`
+            : editing?.installment
+              ? `Mês de ${formatPeriod(editing.period)} em ${workspaceName}. Parcela ${editing.installment.number} de ${editing.installment.count}: esta mudança vale só para esta parcela.`
+              : `Mês de ${formatPeriod(editing?.period ?? period)} em ${workspaceName}.`
       }
     >
       <TransactionForm

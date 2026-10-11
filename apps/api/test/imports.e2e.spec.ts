@@ -127,7 +127,7 @@ describe('imports', () => {
 
     expect(response.body).toMatchObject({
       code: 'INVALID_CATEGORY',
-      message: 'A categoria Salário é de crédito.',
+      message: 'A categoria Salário é de entrada.',
     });
     expect(await transactionsOf('2026-08')).toHaveLength(0);
     expect((await browser.get(`${base}/imports`).expect(200)).body).toEqual([]);

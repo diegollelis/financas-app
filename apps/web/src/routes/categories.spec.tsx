@@ -31,7 +31,7 @@ function mockCategories(overrides: Record<string, { status?: number; body: unkno
   });
 }
 
-const section = (name: 'Créditos' | 'Débitos') => screen.findByRole('region', { name });
+const section = (name: 'Entradas' | 'Saídas') => screen.findByRole('region', { name });
 
 function expectCall(fetchMock: ReturnType<typeof mockApi>, path: string, init: object) {
   return vi.waitFor(() =>
@@ -68,13 +68,13 @@ describe('CategoriesPage', () => {
 
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const credits = await section('Créditos');
+    const credits = await section('Entradas');
     expect(
       within(credits)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual([expect.stringContaining('Consórcio'), expect.stringContaining('Salário')]);
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     expect(within(debits).getByRole('heading', { name: 'Arquivadas' })).toBeInTheDocument();
     // Each category has its actions in a menu: active ones are renamed or archived...
     expect(await menuOf('Mercado')).toEqual(['Renomear', 'Arquivar']);
@@ -110,11 +110,11 @@ describe('CategoriesPage', () => {
 
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     const row = within(debits)
       .getAllByRole('listitem')
       .find((item) => item.textContent?.startsWith('Investimentos'));
-    expect(row).toHaveTextContent('Destino do orçamento');
+    expect(row).toHaveTextContent('Meta');
     expect(
       screen.queryByRole('button', { name: 'Ações de Investimentos' }),
     ).not.toBeInTheDocument();
@@ -125,8 +125,8 @@ describe('CategoriesPage', () => {
     mockCategories();
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const credits = await section('Créditos');
-    const debits = await section('Débitos');
+    const credits = await section('Entradas');
+    const debits = await section('Saídas');
     expect(credits).toHaveTextContent('2 categorias');
     expect(debits).toHaveTextContent('3 categorias');
 
@@ -138,7 +138,7 @@ describe('CategoriesPage', () => {
 
     await userEvent.clear(screen.getByLabelText('Buscar categoria'));
     await userEvent.type(screen.getByLabelText('Buscar categoria'), 'sal');
-    expect(debits).toHaveTextContent('Nenhuma categoria de débito ativa com “sal”.');
+    expect(debits).toHaveTextContent('Nenhuma categoria de saída ativa com “sal”.');
     expect(within(credits).getByText('Salário')).toBeInTheDocument();
   });
 
@@ -151,8 +151,8 @@ describe('CategoriesPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Nova categoria' }));
     const dialog = await screen.findByRole('dialog', { name: 'Nova categoria' });
     // Debit first: most categories are of spending.
-    expect(within(dialog).getByRole('radio', { name: 'Débito' })).toBeChecked();
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'Crédito' }));
+    expect(within(dialog).getByRole('radio', { name: 'Saída' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Entrada' }));
     await userEvent.type(within(dialog).getByLabelText('Nome'), ' Aluguel recebido ');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
 
@@ -353,7 +353,7 @@ describe('CategoriesPage', () => {
 
     renderApp(`/espacos/${houseId}/categorias`);
 
-    await section('Débitos');
+    await section('Saídas');
     expect(
       screen.queryByRole('button', { name: 'Copiar de outro espaço' }),
     ).not.toBeInTheDocument();
@@ -364,7 +364,7 @@ describe('CategoriesPage', () => {
 
     renderApp(`/espacos/${houseId}/categorias`);
 
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     expect(within(debits).getByText('Mercado')).toBeInTheDocument();
     expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Nova categoria' })).not.toBeInTheDocument();

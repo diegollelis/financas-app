@@ -52,8 +52,8 @@ const nameSchema = createCategoryInputSchema.pick({ name: true });
 type NameInput = z.infer<typeof nameSchema>;
 
 const sections: { type: TransactionType; title: string; singular: string }[] = [
-  { type: 'CREDIT', title: 'Créditos', singular: 'crédito' },
-  { type: 'DEBIT', title: 'Débitos', singular: 'débito' },
+  { type: 'CREDIT', title: 'Entradas', singular: 'entrada' },
+  { type: 'DEBIT', title: 'Saídas', singular: 'saída' },
 ];
 
 const sectionTitleId = (type: TransactionType) => `categories-${type}`;
@@ -70,8 +70,8 @@ function confirmWith(change: Promise<unknown>, message: string) {
 }
 
 const typeOptions = [
-  { value: 'DEBIT', label: 'Débito' },
-  { value: 'CREDIT', label: 'Crédito' },
+  { value: 'DEBIT', label: 'Saída' },
+  { value: 'CREDIT', label: 'Entrada' },
 ] as const;
 
 /** Inside the dialog: mounted on each opening, so it starts empty and without errors. */
@@ -214,7 +214,7 @@ function CategoryItem({
     <li className="flex min-h-14 items-center justify-between gap-3 py-1.5">
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 break-words">
         {name}
-        {category.destinationId && <Badge variant="secondary">Destino do orçamento</Badge>}
+        {category.destinationId && <Badge variant="secondary">Meta</Badge>}
       </span>
       {canEdit && !category.destinationId && (
         <>
@@ -401,7 +401,7 @@ export function CategoriesPage() {
     <>
       <PageHeader
         title="Categorias"
-        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada. As de destino do orçamento mudam junto com o destino, no orçamento do Painel."
+        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada. As das metas mudam junto com a meta, no orçamento do Painel."
       >
         {/* At the top, so adding never needs scrolling past a long list. */}
         {canEdit && categories.isSuccess && (
@@ -435,7 +435,7 @@ export function CategoriesPage() {
           onOpenChange={setCreating}
           returnFocusTo={newButton}
           title="Nova categoria"
-          description="Débito para o que sai, crédito para o que entra."
+          description="Escolha se ela é de entrada ou de saída de dinheiro."
         >
           <NewCategoryForm workspaceId={workspace.id} onDone={() => setCreating(false)} />
         </ResponsiveDialog>

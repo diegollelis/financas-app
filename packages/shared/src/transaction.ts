@@ -80,7 +80,7 @@ export const createTransactionInputSchema = transactionFieldsSchema
     if (!input.split) return;
     const issue = (message: string) =>
       context.addIssue({ code: 'custom', message, path: ['split'] });
-    if (input.type !== 'DEBIT') issue('Só um débito pode ser dividido.');
+    if (input.type !== 'DEBIT') issue('Só uma saída pode ser dividida.');
     if (input.personId) issue('Um lançamento dividido não fica ligado a uma só pessoa.');
     const others = input.split.reduce((sum, share) => sum + share.amountCents, 0);
     if (others > input.amountCents) issue('As partes dos outros passam do valor do lançamento.');

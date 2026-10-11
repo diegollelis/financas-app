@@ -36,7 +36,7 @@ export async function readTemplate(file: Blob) {
   return parseTemplateRows(data as unknown as TemplateCell[][]);
 }
 
-const typeLabel = { CREDIT: 'Crédito', DEBIT: 'Débito' } as const;
+const typeLabel = { CREDIT: 'Entrada', DEBIT: 'Saída' } as const;
 
 /**
  * The template: the header, one example row and, on a second sheet, the workspace's active

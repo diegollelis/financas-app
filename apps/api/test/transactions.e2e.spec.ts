@@ -158,7 +158,7 @@ describe('transactions', () => {
 
       expect(response.body).toMatchObject({
         code: 'INVALID_INPUT',
-        message: 'Use uma competência no formato AAAA-MM.',
+        message: 'Use um mês no formato AAAA-MM.',
       });
     });
 
@@ -200,7 +200,7 @@ describe('transactions', () => {
 
       expect(response.body).toMatchObject({
         code: 'INVALID_CATEGORY',
-        message: 'Escolha uma categoria de crédito.',
+        message: 'Escolha uma categoria de entrada.',
       });
     });
 

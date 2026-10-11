@@ -16,7 +16,7 @@ export const amountCentsSchema = z
 /** Competência: the month a transaction belongs to, e.g. `2026-10`. */
 export const periodSchema = z
   .string()
-  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use uma competência no formato AAAA-MM.');
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use um mês no formato AAAA-MM.');
 
 export type Period = z.infer<typeof periodSchema>;
 

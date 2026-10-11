@@ -132,7 +132,7 @@ export function SplitFields({
                 variant="ghost"
                 size="icon"
                 className="mt-6"
-                aria-label={`Tirar a pessoa ${index + 1}`}
+                aria-label={`Remover a pessoa ${index + 1}`}
                 disabled={fields.length === 1}
                 onClick={() => remove(index)}
               >

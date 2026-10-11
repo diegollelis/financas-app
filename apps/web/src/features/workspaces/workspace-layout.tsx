@@ -53,7 +53,7 @@ const sections: Section[] = [
   { path: 'analise', label: 'Análise', icon: ChartColumn },
   { path: 'recorrencias', label: 'Recorrências', icon: Repeat, more: true },
   { path: 'pessoas', label: 'Pessoas', icon: HandCoins, more: true },
-  { path: 'importar', label: 'Importar', icon: FileUp, more: true },
+  { path: 'importar', label: 'Importar planilha', icon: FileUp, more: true },
   { path: 'categorias', label: 'Categorias', icon: Tags, more: true },
   { path: '', label: 'Membros', icon: Users, more: true },
 ];

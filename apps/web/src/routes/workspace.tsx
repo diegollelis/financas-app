@@ -185,7 +185,7 @@ function DeleteWorkspace({ workspace }: { workspace: Workspace }) {
         Excluir espaço
       </h2>
       <p className="text-muted-foreground">
-        Apaga o espaço e tudo o que há nele: lançamentos, categorias, orçamentos, recorrências e
+        Exclui o espaço e tudo o que há nele: lançamentos, categorias, orçamentos, recorrências e
         parcelamentos. Os membros perdem o acesso. Para guardar uma cópia, baixe seus dados em{' '}
         <Link to={ACCOUNT_PATH} className="text-primary underline">
           Minha conta
@@ -354,10 +354,10 @@ function InvitationRow({
             <Button
               variant="ghost"
               size="sm"
-              aria-label={`${pending ? 'Cancelar' : 'Apagar'} convite de ${invitation.email}`}
+              aria-label={`${pending ? 'Cancelar' : 'Excluir'} convite de ${invitation.email}`}
               disabled={revoke.isPending}
             >
-              {pending ? 'Cancelar' : 'Apagar'}
+              {pending ? 'Cancelar' : 'Excluir'}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -365,7 +365,7 @@ function InvitationRow({
               <AlertDialogTitle>
                 {pending
                   ? `Cancelar o convite de ${invitation.email}?`
-                  : `Apagar o convite expirado de ${invitation.email}?`}
+                  : `Excluir o convite expirado de ${invitation.email}?`}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {pending
@@ -376,7 +376,7 @@ function InvitationRow({
             <AlertDialogFooter>
               <AlertDialogCancel>{pending ? 'Manter convite' : 'Manter'}</AlertDialogCancel>
               <AlertDialogAction variant="destructive" onClick={confirmRevoke}>
-                {pending ? 'Cancelar convite' : 'Apagar convite'}
+                {pending ? 'Cancelar convite' : 'Excluir convite'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

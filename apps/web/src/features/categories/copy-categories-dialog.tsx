@@ -28,8 +28,8 @@ const sameKey = (category: Pick<Category, 'type' | 'name'>) =>
   `${category.type}:${normalizeName(category.name)}`;
 
 const groups: { type: TransactionType; title: string }[] = [
-  { type: 'CREDIT', title: 'Créditos' },
-  { type: 'DEBIT', title: 'Débitos' },
+  { type: 'CREDIT', title: 'Entradas' },
+  { type: 'DEBIT', title: 'Saídas' },
 ];
 
 const copiedMessage = ({ copied }: CopyCategoriesResult) =>
@@ -215,7 +215,7 @@ export function CopyCategoriesDialog({
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
       title="Copiar de outro espaço"
-      description={`As categorias escolhidas são criadas em ${workspaceName} com o mesmo nome e tipo. As arquivadas e as de destinos do orçamento não são copiadas.`}
+      description={`As categorias escolhidas são criadas em ${workspaceName} com o mesmo nome e tipo. As arquivadas e as das metas não são copiadas.`}
     >
       <div className="grid gap-4">
         <div className="grid gap-2">

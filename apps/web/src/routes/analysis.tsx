@@ -32,11 +32,11 @@ import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 
-/** "Últimos 6 meses, previsto, só débitos, 2 categorias": what the numbers below are about. */
+/** "Últimos 6 meses, previsto, só saídas, 2 categorias": what the numbers below are about. */
 function describeFilters(settings: AnalysisSettings, categories: Category[]) {
-  const parts = [describeRange(settings), settings.view === 'SETTLED' ? 'efetivado' : 'previsto'];
+  const parts = [describeRange(settings), settings.view === 'SETTLED' ? 'realizado' : 'previsto'];
   if (settings.type !== 'BOTH')
-    parts.push(settings.type === 'CREDIT' ? 'só créditos' : 'só débitos');
+    parts.push(settings.type === 'CREDIT' ? 'só entradas' : 'só saídas');
   if (settings.categoryIds.length === 1) {
     parts.push(categories.find((category) => category.id === settings.categoryIds[0])?.name ?? '');
   } else if (settings.categoryIds.length > 1) {
@@ -89,12 +89,14 @@ function Totals({
   previous,
   months,
   type,
+  view,
 }: {
   totals: Totals;
   /** The same totals over the range right before, when it had anything. */
   previous: Totals | null;
   months: number;
   type: AnalysisFilters['type'];
+  view: AnalysisSettings['view'];
 }) {
   if (type !== 'BOTH') {
     const credit = type === 'CREDIT';
@@ -102,7 +104,7 @@ function Totals({
     return (
       <dl className="grid gap-1">
         <dt className="text-muted-foreground">
-          {credit ? 'Recebido no período' : 'Gasto no período'}
+          {credit ? 'Entradas no período' : 'Despesas no período'}
         </dt>
         <dd className="grid gap-1">
           <span className="text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -117,7 +119,7 @@ function Totals({
           />
           {!credit && totals.appliedCents > 0 && (
             <span className="text-muted-foreground">
-              Além disso, {formatCents(totals.appliedCents)} aplicados nos destinos de guardar.
+              Além disso, {formatCents(totals.appliedCents)} foram para as metas.
             </span>
           )}
         </dd>
@@ -134,15 +136,18 @@ function Totals({
         </dd>
       </dl>
       <dl className="grid sm:grid-cols-3 sm:gap-3">
-        <Stat label="Recebido">
+        <Stat label="Entradas">
           {formatCents(totals.creditsCents)}
           <Versus cents={totals.creditsCents} before={previous?.creditsCents} months={months} />
         </Stat>
-        <Stat label="Gasto">
+        <Stat label="Despesas">
           {formatCents(totals.expensesCents)}
           <Versus cents={totals.expensesCents} before={previous?.expensesCents} months={months} />
         </Stat>
-        <Stat label="Aplicado">{formatCents(totals.appliedCents)}</Stat>
+        {/* Planned counts what is still to be put aside too: not "guardado" yet (ADR 0051). */}
+        <Stat label={view === 'SETTLED' ? 'Guardado' : 'Para guardar'}>
+          {formatCents(totals.appliedCents)}
+        </Stat>
       </dl>
     </div>
   );
@@ -289,6 +294,7 @@ function Results({
           previous={previousTotals}
           months={periodsBetween(analysis.from, analysis.to).length}
           type={settings.type}
+          view={settings.view}
         />
       </div>
       <section aria-labelledby="analysis-monthly" className="grid content-start gap-3">
@@ -308,7 +314,7 @@ function Results({
             <MonthlyChart series={series} type={settings.type} />
             <p className="text-muted-foreground text-sm">
               {settings.type === 'BOTH' &&
-                'Débitos: gastos e aplicações. Saldo do mês: créditos menos débitos de cada mês. '}
+                'Saídas: despesas e o que foi guardado. Saldo do mês: entradas menos saídas de cada mês. '}
               Toque num mês para ver os valores e a diferença para o mês anterior.
             </p>
           </>

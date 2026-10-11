@@ -352,12 +352,12 @@ async function main() {
       sheet: 'Lançamentos',
       data: [
         [...TEMPLATE_HEADERS],
-        [before, 'Crédito', 'Freelance de setembro', 'Renda extra', 800, null, null, null],
-        [before, 'Débito', 'Academia', 'Academia', 120, null, null, null],
-        [before, 'Débito', 'Internet', 'Contas da casa', 0, null, null, null],
-        [period, 'Crédito', 'Salário', 'Salário', 5200, null, null, null],
-        [period, 'Débito', 'Supermercado', 'Mercado', 640.35, null, null, null],
-        [period, 'Débito', 'Conta de luz', 'Contas da casa', 189.9, null, null, null],
+        [before, 'Entrada', 'Freelance de setembro', 'Renda extra', 800, null, null, null],
+        [before, 'Saída', 'Academia', 'Academia', 120, null, null, null],
+        [before, 'Saída', 'Internet', 'Contas da casa', 0, null, null, null],
+        [period, 'Entrada', 'Salário', 'Salário', 5200, null, null, null],
+        [period, 'Saída', 'Supermercado', 'Mercado', 640.35, null, null, null],
+        [period, 'Saída', 'Conta de luz', 'Contas da casa', 189.9, null, null, null],
       ],
     },
   ]).toFile(sampleSheet);
@@ -415,10 +415,10 @@ async function main() {
     },
     {
       // The month picker, opened away from this month (the dot shows beside the name).
-      name: 'competencia-seletor',
+      name: 'mes-seletor',
       path: `/espacos/${workspaceId}/lancamentos?competencia=${monthsBefore(period, 14)}`,
       signedIn: true,
-      open: /^Escolher competência/,
+      open: /^Escolher mês/,
       opens: 'dialog' as const,
     },
     {
@@ -431,11 +431,11 @@ async function main() {
       opens: 'dialog' as const,
     },
     {
-      // An application to a saving destination: type and category fixed (ADR 0047).
-      name: 'painel-aplicar',
+      // "Guardar" on a goal opens "Registrar valor guardado", type and category fixed (ADRs 0047, 0051).
+      name: 'painel-guardar',
       path: `/espacos/${workspaceId}/painel`,
       signedIn: true,
-      open: /^Aplicar em Investimentos$/,
+      open: /^Guardar em Investimentos$/,
       opens: 'dialog' as const,
     },
     {

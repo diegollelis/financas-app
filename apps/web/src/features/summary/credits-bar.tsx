@@ -10,13 +10,13 @@ import { cn } from '@/lib/utils';
 export function CreditsBar({ summary }: { summary: Summary }) {
   const { credits, debits, balance } = summary;
   const segments = [
-    { label: 'Débitos pagos', cents: debits.settledCents, color: 'bg-chart-1' },
-    { label: 'Débitos a pagar', cents: debits.pendingCents, color: 'bg-chart-2' },
+    { label: 'Saídas pagas', cents: debits.settledCents, color: 'bg-chart-1' },
+    { label: 'Saídas a pagar', cents: debits.pendingCents, color: 'bg-chart-2' },
     { label: 'Saldo previsto', cents: Math.max(balance.plannedCents, 0), color: 'bg-chart-3' },
   ];
   const whole = segments.reduce((sum, segment) => sum + segment.cents, 0);
   if (whole === 0) {
-    return <p className="text-muted-foreground">Nenhum lançamento nesta competência.</p>;
+    return <p className="text-muted-foreground">Nenhum lançamento neste mês.</p>;
   }
   const visible = segments.filter((segment) => segment.cents > 0);
   const percent = (cents: number) => (cents / whole) * 100;
@@ -26,7 +26,7 @@ export function CreditsBar({ summary }: { summary: Summary }) {
       {/* The legend below carries the numbers; the bar is a picture of them. */}
       <div
         role="img"
-        aria-label={`Créditos de ${formatCents(credits.totalCents)}: ${visible
+        aria-label={`Entradas de ${formatCents(credits.totalCents)}: ${visible
           .map((segment) => `${segment.label.toLowerCase()} ${formatCents(segment.cents)}`)
           .join(', ')}.`}
         className="flex h-6 gap-0.5"
@@ -56,7 +56,7 @@ export function CreditsBar({ summary }: { summary: Summary }) {
         </ul>
         {balance.plannedCents < 0 && (
           <p className="text-destructive mt-2">
-            Os débitos passam dos créditos em {formatCents(-balance.plannedCents)}.
+            As saídas passam das entradas em {formatCents(-balance.plannedCents)}.
           </p>
         )}
       </figcaption>

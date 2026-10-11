@@ -148,7 +148,7 @@ export function summarizePeriod(
   };
   // Nothing to set aside when expenses pass the credits: the goals are zero, not negative.
   const savingBase = Math.max(0, available.plannedCents);
-  // Split together, so the goals add up to the cent (and the "Sem destino" rest is exact).
+  // Split together, so the goals add up to the cent (and the "Sem meta" rest is exact).
   const savingShares = budget.shares.filter((share) => share.kind === 'SAVINGS');
   const savingParts = splitShares(
     savingBase,

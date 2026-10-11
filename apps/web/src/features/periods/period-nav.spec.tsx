@@ -21,9 +21,9 @@ function renderTransactions(search: string) {
   return renderApp(`/espacos/${houseId}/lancamentos${search}`);
 }
 
-const openPicker = async (name: RegExp | string = /^Escolher competência/) => {
+const openPicker = async (name: RegExp | string = /^Escolher mês/) => {
   await userEvent.click(await screen.findByRole('button', { name }));
-  return screen.findByRole('dialog', { name: 'Escolher competência' });
+  return screen.findByRole('dialog', { name: 'Escolher mês' });
 };
 
 describe('PeriodNav', () => {
@@ -40,13 +40,13 @@ describe('PeriodNav', () => {
   it('keeps previous and next, and tells when the month on screen is not this one', async () => {
     renderTransactions('?competencia=2026-03');
 
-    const nav = await screen.findByRole('navigation', { name: 'Competência' });
+    const nav = await screen.findByRole('navigation', { name: 'Mês' });
     expect(
-      within(nav).getByRole('link', { name: 'Competência anterior: fevereiro de 2026' }),
+      within(nav).getByRole('link', { name: 'Mês anterior: fevereiro de 2026' }),
     ).toHaveAttribute('href', `/espacos/${houseId}/lancamentos?competencia=2026-02`);
     expect(
       within(nav).getByRole('button', {
-        name: 'Escolher competência: março de 2026, fora do mês atual',
+        name: 'Escolher mês: março de 2026, fora do mês atual',
       }),
     ).toBeInTheDocument();
     // The row never changes shape: no "Mês atual" in it.
@@ -82,7 +82,7 @@ describe('PeriodNav', () => {
     await userEvent.click(within(picker).getByRole('link', { name: 'Ir para o mês atual' }));
 
     expect(router.state.location.search).toBe('?competencia=2026-10');
-    picker = await openPicker('Escolher competência: outubro de 2026');
+    picker = await openPicker('Escolher mês: outubro de 2026');
     expect(
       within(picker).queryByRole('link', { name: 'Ir para o mês atual' }),
     ).not.toBeInTheDocument();

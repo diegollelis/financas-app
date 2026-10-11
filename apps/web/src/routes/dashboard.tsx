@@ -53,7 +53,7 @@ function Section({
   children,
 }: {
   title: string;
-  /** 3 for the blocks inside "Orçamento por destino". */
+  /** 3 for the blocks inside "Orçamento do mês". */
   level?: 2 | 3;
   className?: string;
   children: ReactNode;
@@ -114,7 +114,7 @@ function OverdueNotice({
 
 function budgetOrigin(summary: Summary) {
   const { budget } = summary;
-  if (budget.source === 'SAVED') return 'Orçamento próprio desta competência.';
+  if (budget.source === 'SAVED') return 'Orçamento próprio deste mês.';
   if (budget.source === 'INHERITED' && budget.inheritedFrom) {
     return `Orçamento herdado de ${formatPeriod(budget.inheritedFrom)}.`;
   }
@@ -127,7 +127,7 @@ function shareOfGoal(cents: number, goalCents: number) {
   return formatBasisPoints(Math.round((cents / goalCents) * FULL_BASIS_POINTS));
 }
 
-/** Opens "Registrar aplicação" for a saving destination (ADR 0047); absent for a VIEWER. */
+/** Opens "Guardar em …" for a saving destination (ADRs 0047, 0051); absent for a VIEWER. */
 type OnApply = (destination: DestinationSummary, event: MouseEvent<HTMLButtonElement>) => void;
 
 function ApplyButton({
@@ -141,39 +141,39 @@ function ApplyButton({
   return (
     <Button variant="outline" size="sm" onClick={(event) => onApply(destination, event)}>
       {/* The visible word starts the accessible name, so voice control finds it. */}
-      Aplicar <span className="sr-only">em {destination.name}</span>
+      Guardar <span className="sr-only">em {destination.name}</span>
     </Button>
   );
 }
 
 /**
- * Despesas, apart from the saving destinations (ADR 0047): its goal is a share of the net
- * income, and what counts is everything spent or still to pay, so "Usado da meta" matches the
- * meter.
+ * The spending limit (Despesas, ADRs 0047 and 0051), apart from the saving goals: a share of the
+ * net income, and what counts is everything spent or still to pay, so "Usado do limite" matches
+ * the meter.
  */
 function ExpensesBlock({ summary }: { summary: Summary }) {
   const goal = summary.destinations.find((destination) => destination.kind === 'EXPENSES');
   if (!goal) return null;
   const { expenses } = summary;
   return (
-    <Section title="Despesas" level={3}>
+    <Section title="Limite de gastos" level={3}>
       <p className="text-muted-foreground">Quanto da renda líquida você planeja gastar no mês.</p>
       {goal.targetCents > 0 ? (
         <ExpensesMeter summary={summary} />
       ) : (
         <p className="text-muted-foreground">
-          Sem meta: defina a renda líquida e o percentual de despesas no orçamento.
+          Sem limite: defina a renda líquida e o percentual do limite de gastos no orçamento.
         </p>
       )}
       <AmountRows
         rows={[
           ['Pago', formatCents(expenses.settledCents)],
           ['A pagar', formatCents(expenses.pendingCents)],
-          ['Usado da meta', shareOfGoal(expenses.totalCents, goal.targetCents)],
+          ['Usado do limite', shareOfGoal(expenses.totalCents, goal.targetCents)],
         ]}
       />
       <p className="text-muted-foreground text-sm">
-        Usado da meta: o que já foi pago mais o que falta pagar.
+        Usado do limite: o que já foi pago mais o que falta pagar.
       </p>
     </Section>
   );
@@ -184,12 +184,12 @@ function AvailableBlock({ summary }: { summary: Summary }) {
   return (
     <Section title="O que sobra para guardar" level={3}>
       <p className="text-muted-foreground">
-        Os créditos previstos menos as despesas previstas: é sobre esse valor que as metas de
-        guardar são calculadas.
+        As entradas previstas menos as despesas previstas: é sobre esse valor que as metas são
+        calculadas.
       </p>
       <AmountRows
         rows={[
-          ['Créditos previstos', formatCents(summary.credits.totalCents)],
+          ['Entradas previstas', formatCents(summary.credits.totalCents)],
           ['Despesas previstas', `− ${formatCents(summary.expenses.totalCents)}`],
           [
             'Disponível para guardar',
@@ -200,7 +200,7 @@ function AvailableBlock({ summary }: { summary: Summary }) {
         ]}
       />
       <p className="text-muted-foreground text-sm">
-        As aplicações não entram na conta: guardar mais não diminui as metas.
+        O que você guarda não entra na conta: guardar mais não diminui as metas.
       </p>
     </Section>
   );
@@ -211,14 +211,14 @@ const missingCents = (destination: DestinationSummary) =>
   Math.max(0, destination.targetCents - destination.appliedCents - destination.pendingCents);
 
 /**
- * The saving destinations' amounts, in the order of the table's columns. "Agendado" is launched
- * and not paid yet; "Falta" is not launched at all ("A aplicar" was read as either).
+ * The saving goals' amounts, in the order of the table's columns. "Pendente" is launched and not
+ * paid yet; "Falta" is not launched at all ("A aplicar" was read as either).
  */
 const savingCells = (destination: DestinationSummary) =>
   [
-    ['Meta', formatCents(destination.targetCents)],
-    ['Aplicado', formatCents(destination.appliedCents)],
-    ['Agendado', formatCents(destination.pendingCents)],
+    ['Valor da meta', formatCents(destination.targetCents)],
+    ['Guardado', formatCents(destination.appliedCents)],
+    ['Pendente', formatCents(destination.pendingCents)],
     ['Falta', formatCents(missingCents(destination))],
   ] as const;
 
@@ -255,7 +255,7 @@ function SavingsCards({
               ))}
             </dl>
             <p className="text-sm tabular-nums">
-              <span className="text-muted-foreground">Realizado:</span> {realized(destination)}
+              <span className="text-muted-foreground">Progresso:</span> {realized(destination)}
             </p>
             <div className="empty:hidden">
               <ApplyButton destination={destination} onApply={onApply} />
@@ -268,7 +268,7 @@ function SavingsCards({
         <AmountRows
           rows={[
             [
-              `Sem destino (${formatBasisPoints(summary.unallocated.basisPoints)})`,
+              `Sem meta (${formatBasisPoints(summary.unallocated.basisPoints)})`,
               formatCents(summary.unallocated.targetCents),
             ],
           ]}
@@ -279,8 +279,8 @@ function SavingsCards({
 }
 
 /**
- * From md, where the columns fit. "Sem destino" closes the shares at 100%, so the total of the
- * goals is what is available.
+ * From md, where the columns fit. "Sem meta" closes the shares at 100%, so the total of the goals
+ * is what is available.
  */
 function SavingsTable({
   savings,
@@ -292,7 +292,7 @@ function SavingsTable({
   onApply?: OnApply;
 }) {
   const { unallocated } = summary;
-  // What the goals are a share of: they and "Sem destino" add up to it, to the cent.
+  // What the goals are a share of: they and "Sem meta" add up to it, to the cent.
   const totalTarget = Math.max(0, summary.available.plannedCents);
   const totalApplied = summary.applied.settledCents;
   const actions = onApply ? <td className="py-2 pl-4" /> : null;
@@ -301,9 +301,9 @@ function SavingsTable({
       <thead className="text-muted-foreground">
         <tr className="border-b">
           <th scope="col" className="py-2 text-left font-normal">
-            Destino
+            Meta
           </th>
-          {['%', 'Meta', 'Aplicado', 'Agendado', 'Falta', 'Realizado'].map((label) => (
+          {['%', 'Valor', 'Guardado', 'Pendente', 'Falta', 'Progresso'].map((label) => (
             <th key={label} scope="col" className="py-2 text-right font-normal">
               {label}
             </th>
@@ -338,7 +338,7 @@ function SavingsTable({
         {unallocated.basisPoints > 0 && (
           <tr className="text-muted-foreground border-b">
             <th scope="row" className="py-2 text-left font-normal">
-              Sem destino
+              Sem meta
             </th>
             <td className="py-2 text-right">{formatBasisPoints(unallocated.basisPoints)}</td>
             <td className="py-2 text-right">{formatCents(unallocated.targetCents)}</td>
@@ -374,6 +374,14 @@ function SavingsTable({
   );
 }
 
+/**
+ * What "Sem meta" is: a share of the planned "Disponível para guardar" (`unallocated` comes from
+ * `available.plannedCents`). It may be spent, and it is already in the planned balance: the note
+ * only keeps it from being read as a balance of its own (ADR 0051).
+ */
+const UNALLOCATED_NOTE =
+  'Sem meta: parte do Disponível para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo.';
+
 /** The saving destinations, each a share of what is left after expenses (ADR 0047). */
 function SavingsBlock({
   summary,
@@ -387,13 +395,13 @@ function SavingsBlock({
   const savings = summary.destinations.filter((destination) => destination.kind === 'SAVINGS');
   if (savings.length === 0) return null;
   return (
-    <Section title="Destinos de guardar" level={3} className="xl:col-span-2">
+    <Section title="Metas" level={3} className="xl:col-span-2">
       <p className="text-muted-foreground">
-        Como você divide o que sobra entre os seus objetivos. A meta de cada um é uma parte do
-        disponível para guardar, não da renda.
+        Como você divide o que sobra entre as suas metas. Cada uma é uma parte do disponível para
+        guardar, não da renda.
       </p>
       {summary.available.plannedCents <= 0 && (
-        <p>Nada sobrou para guardar este mês: as despesas previstas alcançaram os créditos.</p>
+        <p>Nada sobrou para guardar este mês: as despesas previstas alcançaram as entradas.</p>
       )}
       {desktop ? (
         <SavingsTable savings={savings} summary={summary} onApply={onApply} />
@@ -401,9 +409,14 @@ function SavingsBlock({
         <SavingsCards savings={savings} summary={summary} onApply={onApply} />
       )}
       <p className="text-muted-foreground text-sm">
-        Aplicado: já lançado e pago. Agendado: lançado, ainda não pago. Falta: o que ainda não foi
-        lançado. Realizado: quanto da meta já foi aplicado.
+        Guardado: já lançado e pago. Pendente: lançado, ainda não pago. Falta: o que ainda não foi
+        lançado. Progresso: quanto da meta já foi guardado.
       </p>
+      {summary.unallocated.basisPoints > 0 && (
+        // A forecast share of what is left, never money in the account (ADR 0051): said here,
+        // where the row sits next to the balances.
+        <p className="text-muted-foreground text-sm">{UNALLOCATED_NOTE}</p>
+      )}
     </Section>
   );
 }
@@ -450,13 +463,13 @@ function Dashboard({
             </p>
           </div>
           <dl className="grid sm:grid-cols-3 sm:gap-3">
-            <StatTile label="Saldo efetivado">
+            <StatTile label="Saldo atual">
               <SignedCents cents={summary.balance.settledCents} />
             </StatTile>
             <StatTile label="Disponível para guardar">
               <SignedCents cents={summary.available.plannedCents} />
             </StatTile>
-            <StatTile label="Aplicado">
+            <StatTile label="Guardado">
               <SignedCents cents={summary.applied.settledCents} />
             </StatTile>
           </dl>
@@ -468,11 +481,11 @@ function Dashboard({
           </p>
         )}
         <p className="text-muted-foreground text-sm">
-          Efetivado: só o que já foi recebido ou pago. Disponível para guardar: os créditos menos as
-          despesas. Aplicado: o que já foi para os destinos de guardar.
+          Saldo atual: só o que já foi recebido ou pago. Disponível para guardar: as entradas menos
+          as despesas. Guardado: o que já foi para as metas.
         </p>
       </Section>
-      <Section title="Créditos e débitos">
+      <Section title="Entradas e saídas">
         <dl className="grid tabular-nums sm:grid-cols-2 sm:gap-x-8">
           {(
             [
@@ -489,10 +502,10 @@ function Dashboard({
           ))}
         </dl>
       </Section>
-      <Section title="Para onde vão os créditos">
+      <Section title="Para onde vão as entradas">
         <CreditsBar summary={summary} />
       </Section>
-      <Section title="Orçamento por destino" className="xl:col-span-2">
+      <Section title="Orçamento do mês" className="xl:col-span-2">
         <div className="grid justify-items-start gap-2">
           {/* The net income the goals are a share of: shown here now that the budget has no
               page of its own (ADR 0046). */}
@@ -546,7 +559,7 @@ function DashboardSkeleton() {
 }
 
 /**
- * "Registrar aplicação" (ADR 0047): a new debit in the destination's category, for what is
+ * "Guardar em …" (ADRs 0047, 0051): a new debit in the destination's category, for what is
  * still missing to reach its goal (paid and scheduled applications discounted). It loads the
  * categories and people the form needs only when opened.
  */
@@ -592,7 +605,8 @@ function applicationPreset(summary: Summary, destination: DestinationSummary): T
   return {
     type: 'DEBIT',
     categoryId,
-    description: `Aplicação em ${destination.name}`,
+    // A noun, not a tense: the transaction starts pending and is paid later (ADR 0051).
+    description: `Aporte em ${destination.name}`,
     amountCents: missing > 0 ? missing : null,
     // Without its category the form cannot fix it: then it is chosen as in any transaction.
     applicationTo: categoryId ? destination.name : undefined,

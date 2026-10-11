@@ -22,7 +22,7 @@ export async function ensureUsableCategory(
   if (!category) throw invalidCategory('Categoria não encontrada neste espaço.');
   if (category.type !== type) {
     throw invalidCategory(
-      type === 'CREDIT' ? 'Escolha uma categoria de crédito.' : 'Escolha uma categoria de débito.',
+      type === 'CREDIT' ? 'Escolha uma categoria de entrada.' : 'Escolha uma categoria de saída.',
     );
   }
   if (category.archivedAt) {
@@ -49,7 +49,7 @@ export async function ensureUsableCategories(
     if (!category) throw invalidCategory('Categoria não encontrada neste espaço.');
     if (category.type !== type) {
       throw invalidCategory(
-        `A categoria ${category.name} é de ${category.type === 'CREDIT' ? 'crédito' : 'débito'}.`,
+        `A categoria ${category.name} é de ${category.type === 'CREDIT' ? 'entrada' : 'saída'}.`,
       );
     }
     if (category.archivedAt) {
