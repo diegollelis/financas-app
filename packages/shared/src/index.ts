@@ -9,6 +9,7 @@ export * from './health.ts';
 export * from './import.ts';
 export * from './import-template.ts';
 export * from './installment.ts';
+export * from './labels.ts';
 export * from './invitation.ts';
 export * from './money-and-dates.ts';
 export * from './person.ts';

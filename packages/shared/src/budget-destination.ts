@@ -15,7 +15,7 @@ export type BudgetDestinationKind = z.infer<typeof budgetDestinationKindSchema>;
 export const budgetDestinationNameSchema = z
   .string()
   .trim()
-  .min(1, 'Informe o nome do destino.')
+  .min(1, 'Informe o nome da meta.')
   .max(
     BUDGET_DESTINATION_NAME_MAX_LENGTH,
     `Use no máximo ${BUDGET_DESTINATION_NAME_MAX_LENGTH} caracteres.`,

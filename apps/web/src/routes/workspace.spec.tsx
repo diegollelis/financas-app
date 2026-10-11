@@ -66,7 +66,9 @@ describe('WorkspacePage', () => {
     const access = screen.getByRole('radiogroup', { name: 'Acesso' });
     expect(within(access).getByRole('radio', { name: 'Pode editar' })).toBeChecked();
     // What each access allows, under the choice.
-    expect(screen.getByText(/^Pode editar: lança, efetiva e muda/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^Pode editar: lança, marca como pago ou recebido e muda/),
+    ).toBeInTheDocument();
     await userEvent.click(within(access).getByRole('radio', { name: 'Só visualizar' }));
     expect(screen.getByText(/^Só visualizar: vê tudo, sem mudar nada\./)).toHaveTextContent(
       'Só o dono convida, remove pessoas e exclui o espaço.',
@@ -210,7 +212,7 @@ describe('WorkspacePage', () => {
       within(list).getByRole('button', { name: 'Cancelar convite de ana@example.com' }),
     ).toBeInTheDocument();
     expect(
-      within(list).getByRole('button', { name: 'Apagar convite de pedro@example.com' }),
+      within(list).getByRole('button', { name: 'Excluir convite de pedro@example.com' }),
     ).toBeInTheDocument();
     for (const email of ['joao@example.com', 'bia@example.com', 'caio@example.com']) {
       expect(

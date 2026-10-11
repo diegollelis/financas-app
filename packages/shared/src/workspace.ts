@@ -62,7 +62,8 @@ export const roleLabels: Record<WorkspaceRole, string> = {
 /** What each access allows, after its name: the invitation form, page and e-mail. */
 export const roleDescriptions: Record<WorkspaceRole, string> = {
   OWNER: 'muda tudo, convida e remove pessoas e pode excluir o espaço.',
-  EDITOR: 'lança, efetiva e muda lançamentos, categorias, orçamento, pessoas e importações.',
+  EDITOR:
+    'lança, marca como pago ou recebido e muda lançamentos, categorias, orçamento, pessoas e importações.',
   VIEWER: 'vê tudo, sem mudar nada.',
 };
 

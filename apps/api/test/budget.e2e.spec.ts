@@ -197,7 +197,7 @@ describe('budget', () => {
 
     expect(response.body).toMatchObject({
       code: 'INVALID_INPUT',
-      message: 'A soma dos destinos de guardar não pode passar de 100%.',
+      message: 'A soma das metas não pode passar de 100%.',
     });
   });
 
@@ -276,7 +276,7 @@ describe('budget', () => {
 
     const response = await browser.get(`/api/workspaces/${id}/budget/2026-13`).expect(400);
 
-    expect(response.body).toMatchObject({ message: 'Use uma competência no formato AAAA-MM.' });
+    expect(response.body).toMatchObject({ message: 'Use um mês no formato AAAA-MM.' });
   });
 
   it('the database itself refuses a share over 100%', async () => {

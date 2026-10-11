@@ -334,7 +334,7 @@ describe('people and splits', () => {
             categoryId: category('Outros', 'CREDIT').id,
             split: [{ personId: ana.id, amountCents: 100 }],
           },
-          'Só um débito pode ser dividido.',
+          'Só uma saída pode ser dividida.',
         ],
         [
           { ...debit, split: [{ personId: ana.id, amountCents: 30_001 }] },

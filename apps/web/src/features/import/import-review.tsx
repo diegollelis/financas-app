@@ -2,6 +2,8 @@ import {
   formatCents,
   formatIsoDate,
   formatPeriod,
+  PENDING_LABEL,
+  settledLabels,
   type Category,
   type Import,
 } from '@financas/shared';
@@ -27,7 +29,7 @@ import {
 } from './review';
 import { useCreateImport } from './use-imports';
 
-const typeLabel = { CREDIT: 'crédito', DEBIT: 'débito' } as const;
+const typeLabel = { CREDIT: 'entrada', DEBIT: 'saída' } as const;
 
 /** "2026-08 a 2026-09" of a previous import overlaps what is about to be imported. */
 function overlapsPrevious(imports: Import[], rows: ReviewRow[]) {
@@ -75,7 +77,11 @@ function RowItem({
             {categoryName ?? `${row.categoryName || 'Sem categoria'} (sem correspondência)`}
           </span>
           {row.dueDate && <span>Vence em {formatIsoDate(row.dueDate)}</span>}
-          <span>{row.settledAt ? `Efetivado em ${formatIsoDate(row.settledAt)}` : 'Pendente'}</span>
+          <span>
+            {row.settledAt
+              ? `${row.type ? settledLabels[row.type] : 'Pago ou recebido'} em ${formatIsoDate(row.settledAt)}`
+              : PENDING_LABEL}
+          </span>
           <span>Linha {row.line}</span>
         </p>
         {[...problems, ...row.warnings].map((message) => (
@@ -190,7 +196,7 @@ export function ImportReview({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p role="status" className="tabular-nums">
           {ready.length} de {rows.length} {rows.length === 1 ? 'linha pronta' : 'linhas prontas'}{' '}
-          para importar: créditos {formatCents(credits)}, débitos {formatCents(debits)}.
+          para importar: entradas {formatCents(credits)}, saídas {formatCents(debits)}.
           {withProblems.length > 0 &&
             ` ${withProblems.length} ${withProblems.length === 1 ? 'linha com problema' : 'linhas com problema'}.`}
           {waitingForCategory > 0 &&
@@ -203,7 +209,7 @@ export function ImportReview({
 
       {overlapping.length > 0 && (
         <p role="note" className="bg-muted rounded-lg p-3">
-          Você já importou lançamentos dessas competências (
+          Você já importou lançamentos desses meses (
           {overlapping
             .map((previous) =>
               previous.firstPeriod === previous.lastPeriod
@@ -267,10 +273,10 @@ export function ImportReview({
           <section key={period ?? 'sem'} aria-labelledby={titleId} className="grid gap-2">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3">
               <h2 id={titleId} className="font-medium first-letter:uppercase">
-                {period ? formatPeriod(period) : 'Sem competência válida'}
+                {period ? formatPeriod(period) : 'Sem mês de referência válido'}
               </h2>
               <span className="text-muted-foreground text-sm tabular-nums">
-                Créditos {formatCents(totals.credits)}, débitos {formatCents(totals.debits)}
+                Entradas {formatCents(totals.credits)}, saídas {formatCents(totals.debits)}
               </span>
             </div>
             <ul className="divide-y rounded-xl border px-2 md:px-4">

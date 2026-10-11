@@ -42,11 +42,11 @@ export function periodsBetween(from: string, to: string): string[] {
 export const analysisQuerySchema = z
   .object({ from: periodSchema, to: periodSchema })
   .refine((query) => query.from <= query.to, {
-    message: 'A competência inicial precisa vir antes da final.',
+    message: 'O mês inicial precisa vir antes do final.',
     path: ['to'],
   })
   .refine((query) => periodsBetween(query.from, query.to).length <= MAX_ANALYSIS_MONTHS, {
-    message: `Escolha no máximo ${MAX_ANALYSIS_MONTHS} competências.`,
+    message: `Escolha no máximo ${MAX_ANALYSIS_MONTHS} meses.`,
     path: ['to'],
   });
 

@@ -3,7 +3,12 @@ import {
   formatIsoDate,
   formatPeriod,
   hasRole,
+  OVERDUE_LABEL,
+  PENDING_LABEL,
+  settleActionLabels,
+  settledLabels,
   todayIso,
+  transactionTypeLabels,
   transactionStatus,
   type Category,
   type Transaction,
@@ -57,10 +62,11 @@ import {
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
-const sections: { type: TransactionType; title: string; singular: string }[] = [
-  { type: 'CREDIT', title: 'Créditos', singular: 'crédito' },
-  { type: 'DEBIT', title: 'Débitos', singular: 'débito' },
-];
+const sections = (['CREDIT', 'DEBIT'] as const).map((type) => ({
+  type,
+  title: transactionTypeLabels[type].plural,
+  singular: transactionTypeLabels[type].lower,
+}));
 
 const sectionTitleId = (type: TransactionType) => `transactions-${type}`;
 
@@ -75,13 +81,12 @@ function StatusBadge({ transaction, today }: { transaction: Transaction; today: 
     const sameYear = transaction.settledAt?.slice(0, 4) === transaction.period.slice(0, 4);
     return (
       <Badge variant="success">
-        {transaction.type === 'CREDIT' ? 'Recebido' : 'Pago'} em{' '}
-        {sameYear ? date.slice(0, 5) : date}
+        {settledLabels[transaction.type]} em {sameYear ? date.slice(0, 5) : date}
       </Badge>
     );
   }
-  if (status === 'OVERDUE') return <Badge variant="destructive">Vencido</Badge>;
-  return <Badge variant="outline">Pendente</Badge>;
+  if (status === 'OVERDUE') return <Badge variant="destructive">{OVERDUE_LABEL}</Badge>;
+  return <Badge variant="outline">{PENDING_LABEL}</Badge>;
 }
 
 /** Asks before deleting, naming the transaction (ADR 0036). */
@@ -123,8 +128,8 @@ function DeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir {transaction.description}?</AlertDialogTitle>
           <AlertDialogDescription>
-            O lançamento de {formatCents(transaction.amountCents)} sai desta competência. Não é
-            possível desfazer.
+            O lançamento de {formatCents(transaction.amountCents)} sai deste mês. Não é possível
+            desfazer.
             {transaction.recurrenceId &&
               ' A recorrência continua nos outros meses, e este mês não volta a ser gerado.'}
             {transaction.installment && ' As outras parcelas continuam.'}
@@ -137,7 +142,7 @@ function DeleteDialog({
           {shares.count > 0 ? (
             <>
               <AlertDialogAction variant="outline" onClick={() => void confirmDelete(false)}>
-                Excluir só o gasto
+                Excluir só este lançamento
               </AlertDialogAction>
               <AlertDialogAction variant="destructive" onClick={() => void confirmDelete(true)}>
                 Excluir com as partes
@@ -185,7 +190,7 @@ function EndSeriesDialog({
     : {
         title: `Encerrar a recorrência ${transaction.description}?`,
         description:
-          'Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já efetivados ficam.',
+          'Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já pagos ou recebidos ficam.',
         action: 'Encerrar recorrência',
         done: 'Recorrência encerrada',
       };
@@ -264,6 +269,9 @@ function TransactionItem({
   const estimated = transaction.amountEstimated && !transaction.settledAt;
   // Part of a recurrence or of an installment plan, which can be ended from here (ADR 0038).
   const inSeries = Boolean(transaction.recurrenceId ?? transaction.installment);
+  const labels = settleActionLabels[transaction.type];
+  const settledToast =
+    transaction.type === 'CREDIT' ? 'Marcado como recebido' : 'Marcado como pago';
   const settle = (settledAt: string | null, message: string) =>
     update.mutate(
       { id: transaction.id, settledAt },
@@ -275,7 +283,7 @@ function TransactionItem({
       {
         onSuccess: () => {
           setAskingAmount(false);
-          toast.success('Lançamento efetivado');
+          toast.success(settledToast);
         },
       },
     );
@@ -317,6 +325,33 @@ function TransactionItem({
             </Badge>
           )}
         </span>
+        {canEdit && !transaction.settledAt && (
+          // One tap: settled today; an estimate first asks for the bill's amount. The date can be
+          // fixed later by editing. Under the badges, not beside the amount: "Marcar como
+          // recebido" does not fit next to the description on a 360px screen (ADR 0051).
+          <Button
+            ref={settleRef}
+            variant="secondary"
+            size="sm"
+            className="mt-1"
+            aria-label={`${labels.settle}: ${description}`}
+            disabled={update.isPending}
+            onClick={() => (estimated ? setAskingAmount(true) : settle(today, settledToast))}
+          >
+            {labels.settle}
+          </Button>
+        )}
+        {canEdit && estimated && (
+          <SettleWithAmount
+            transaction={transaction}
+            open={askingAmount}
+            onOpenChange={setAskingAmount}
+            returnFocusTo={settleRef}
+            pending={update.isPending}
+            error={update.error}
+            onSettle={settleWithAmount}
+          />
+        )}
       </div>
       <div className="grid shrink-0 justify-items-end gap-2">
         <span className="grid justify-items-end">
@@ -328,33 +363,6 @@ function TransactionItem({
         </span>
         {canEdit && (
           <div className="flex items-center gap-2 md:gap-1">
-            {!transaction.settledAt && (
-              // One tap: settled today; an estimate first asks for the bill's amount. The date
-              // can be fixed later by editing.
-              <Button
-                ref={settleRef}
-                variant="secondary"
-                size="sm"
-                aria-label={`Efetivar ${description}`}
-                disabled={update.isPending}
-                onClick={() =>
-                  estimated ? setAskingAmount(true) : settle(today, 'Lançamento efetivado')
-                }
-              >
-                Efetivar
-              </Button>
-            )}
-            {estimated && (
-              <SettleWithAmount
-                transaction={transaction}
-                open={askingAmount}
-                onOpenChange={setAskingAmount}
-                returnFocusTo={settleRef}
-                pending={update.isPending}
-                error={update.error}
-                onSettle={settleWithAmount}
-              />
-            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -373,9 +381,16 @@ function TransactionItem({
                 {transaction.settledAt && (
                   <DropdownMenuItem
                     disabled={update.isPending}
-                    onSelect={() => settle(null, 'Efetivação desfeita')}
+                    onSelect={() =>
+                      settle(
+                        null,
+                        transaction.type === 'CREDIT'
+                          ? 'Recebimento desmarcado'
+                          : 'Pagamento desmarcado',
+                      )
+                    }
                   >
-                    Desfazer efetivação
+                    {labels.unsettle}
                   </DropdownMenuItem>
                 )}
                 {inSeries && (
@@ -529,8 +544,8 @@ export function TransactionsPage() {
                 {items.length === 0 ? (
                   <p className="text-muted-foreground">
                     {filtering
-                      ? `Nenhum ${singular} com esse filtro.`
-                      : `Nenhum ${singular} em ${formatPeriod(period)}.`}
+                      ? `Nenhuma ${singular} com esse filtro.`
+                      : `Nenhuma ${singular} em ${formatPeriod(period)}.`}
                   </p>
                 ) : (
                   <ul className="divide-y rounded-xl border px-4">

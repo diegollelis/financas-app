@@ -83,10 +83,10 @@ describe('DashboardPage', () => {
     await section('Saldo do mês');
     // Credits − all debits: 6.000,00 − 3.009,90; settled: 5.000,00 − (350,00 + 500,00).
     expect(tile('Saldo previsto')).toHaveTextContent('R$ 2.990,10');
-    expect(tile('Saldo efetivado')).toHaveTextContent('R$ 4.150,00');
+    expect(tile('Saldo atual')).toHaveTextContent('R$ 4.150,00');
     // Credits − expenses (the application is not an expense): 6.000,00 − 2.509,90.
     expect(tile('Disponível para guardar')).toHaveTextContent('R$ 3.490,10');
-    expect(tile('Aplicado')).toHaveTextContent('R$ 500,00');
+    expect(tile('Guardado')).toHaveTextContent('R$ 500,00');
     expect(nbsp(screen.getByRole('status').textContent)).toContain(
       '1 lançamento vencido (R$ 159,90).',
     );
@@ -102,23 +102,23 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const chart = await section('Para onde vão os créditos');
+    const chart = await section('Para onde vão as entradas');
     expect(nbsp(within(chart).getByRole('img').getAttribute('aria-label'))).toBe(
-      'Créditos de R$ 6.000,00: débitos pagos R$ 850,00, débitos a pagar R$ 2.159,90, saldo previsto R$ 2.990,10.',
+      'Entradas de R$ 6.000,00: saídas pagas R$ 850,00, saídas a pagar R$ 2.159,90, saldo previsto R$ 2.990,10.',
     );
-    const goal = await section('Orçamento por destino');
-    expect(goal).toHaveTextContent('R$ 2.509,90 de R$ 3.000,00 (meta de 60% da renda)');
+    const goal = await section('Orçamento do mês');
+    expect(goal).toHaveTextContent('R$ 2.509,90 de R$ 3.000,00 (limite de 60% da renda)');
     expect(goal).toHaveTextContent('Folga de R$ 490,10.');
-    const destinations = await section('Orçamento por destino');
+    const destinations = await section('Orçamento do mês');
     expect(destinations).toHaveTextContent('Orçamento herdado de setembro de 2026.');
     // Despesas apart (ADR 0047): paid 350,00 and 2.159,90 to pay, 2.509,90 of 3.000,00.
-    const expenses = await section('Despesas');
+    const expenses = await section('Limite de gastos');
     expect(nbsp(expenses.textContent)).toContain(
-      'PagoR$ 350,00A pagarR$ 2.159,90Usado da meta83,66%',
+      'PagoR$ 350,00A pagarR$ 2.159,90Usado do limite83,66%',
     );
     // Where the saving goals come from.
     expect(nbsp((await section('O que sobra para guardar')).textContent)).toContain(
-      'Créditos previstosR$ 6.000,00Despesas previstas− R$ 2.509,90Disponível para guardarR$ 3.490,10',
+      'Entradas previstasR$ 6.000,00Despesas previstas− R$ 2.509,90Disponível para guardarR$ 3.490,10',
     );
     // On the phone, a card per saving destination: the table's columns do not fit.
     // Investimentos: 50% of 3.490,10 = 1.745,05; 500,00 applied, nothing scheduled, 1.245,05
@@ -127,18 +127,18 @@ describe('DashboardPage', () => {
       .getAllByRole('listitem')
       .find((item) => item.textContent?.startsWith('Investimentos'));
     expect(nbsp(investments?.textContent)).toBe(
-      'Investimentos50%MetaR$ 1.745,05AplicadoR$ 500,00AgendadoR$ 0,00FaltaR$ 1.245,05Realizado: 28,65%',
+      'Investimentos50%Valor da metaR$ 1.745,05GuardadoR$ 500,00PendenteR$ 0,00FaltaR$ 1.245,05Progresso: 28,65%',
     );
     expect(within(destinations).queryByRole('table')).not.toBeInTheDocument();
     // Despesas is not one of the saving destinations.
-    const savings = await section('Destinos de guardar');
+    const savings = await section('Metas');
     expect(
       within(savings)
         .getAllByRole('listitem')
         .map((item) => item.textContent?.match(/^\D+/)?.[0]),
     ).toEqual(['Investimentos', 'Reserva de emergência', 'Viagens']);
     // Their shares add up to 100%: nothing is left without a destination.
-    expect(savings).not.toHaveTextContent('Sem destino');
+    expect(savings).not.toHaveTextContent('Sem meta');
   });
 
   it('shows the destinations as a table from md', async () => {
@@ -147,7 +147,7 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const savings = await section('Destinos de guardar');
+    const savings = await section('Metas');
     const investments = within(savings).getByRole('row', { name: /Investimentos/ });
     expect(investments).toHaveTextContent('50%R$ 1.745,05R$ 500,00R$ 0,00R$ 1.245,0528,65%');
     expect(within(savings).queryByRole('row', { name: /Despesas/ })).not.toBeInTheDocument();
@@ -170,14 +170,20 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const savings = await section('Destinos de guardar');
+    const savings = await section('Metas');
     // 10% of 3.490,10 has no destination.
-    expect(within(savings).getByRole('row', { name: /Sem destino/ })).toHaveTextContent(
+    expect(within(savings).getByRole('row', { name: /Sem meta/ })).toHaveTextContent(
       '10%R$ 349,01',
     );
     expect(within(savings).getByRole('row', { name: /Total/ })).toHaveTextContent(
       '100%R$ 3.490,10',
     );
+    // Never read as money to spend (ADR 0051).
+    expect(
+      within(savings).getByText(
+        'Sem meta: parte do Disponível para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('warns, in words, when debits pass the credits and the goal', async () => {
@@ -186,12 +192,12 @@ describe('DashboardPage', () => {
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
     expect(
-      await screen.findByText('Os débitos passam dos créditos em R$ 1.009,90.'),
+      await screen.findByText('As saídas passam das entradas em R$ 1.009,90.'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Acima da meta em R$ 3.509,90.')).toBeInTheDocument();
+    expect(screen.getByText('Acima do limite em R$ 3.509,90.')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Nada sobrou para guardar este mês: as despesas previstas alcançaram os créditos.',
+        'Nada sobrou para guardar este mês: as despesas previstas alcançaram as entradas.',
       ),
     ).toBeInTheDocument();
     expect(tile('Saldo previsto')).toHaveTextContent('-R$ 1.009,90');
@@ -205,9 +211,9 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
 
-    expect(await screen.findByText('Nenhum lançamento nesta competência.')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhum lançamento neste mês.')).toBeInTheDocument();
     // No net income, so no goal; a VIEWER cannot set it.
-    expect(await section('Orçamento por destino')).toHaveTextContent('Renda líquida: não definida');
+    expect(await section('Orçamento do mês')).toHaveTextContent('Renda líquida: não definida');
     expect(screen.queryByRole('meter')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     // Nothing that changes the budget (ADR 0046).
@@ -224,7 +230,7 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-11`);
 
-    const destinations = await section('Orçamento por destino');
+    const destinations = await section('Orçamento do mês');
     expect(destinations).toHaveTextContent('Nenhum orçamento definido até aqui.');
     // It opens the budget dialog (tested in budget.spec.tsx).
     expect(
@@ -238,7 +244,7 @@ describe('DashboardPage', () => {
     const created = {
       id: '01920000-0000-7000-8000-0000000000f1',
       type: 'DEBIT',
-      description: 'Aplicação em Investimentos',
+      description: 'Aporte em Investimentos',
       notes: null,
       categoryId: investimentos,
       amountCents: 124_505,
@@ -260,23 +266,25 @@ describe('DashboardPage', () => {
     });
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const destinations = await section('Orçamento por destino');
+    const destinations = await section('Orçamento do mês');
     // Despesas has no category to apply to: only the saving destinations have the button.
     expect(
-      within(destinations).queryByRole('button', { name: 'Aplicar em Despesas' }),
+      within(destinations).queryByRole('button', { name: 'Guardar em Despesas' }),
     ).not.toBeInTheDocument();
     await userEvent.click(
-      within(destinations).getByRole('button', { name: 'Aplicar em Investimentos' }),
+      within(destinations).getByRole('button', { name: 'Guardar em Investimentos' }),
     );
 
-    const form = await screen.findByRole('dialog', { name: 'Aplicação em Investimentos' });
-    expect(within(form).getByLabelText('Descrição')).toHaveValue('Aplicação em Investimentos');
+    const form = await screen.findByRole('dialog', { name: 'Registrar valor guardado' });
+    // The goal in the description: a record, not an investment the app makes (ADR 0051).
+    expect(form).toHaveAccessibleDescription(/^Em Investimentos, no mês de outubro de 2026/);
+    expect(within(form).getByLabelText('Descrição')).toHaveValue('Aporte em Investimentos');
     // Goal 1.745,05 − 500,00 applied.
     expect(within(form).getByLabelText('Valor (R$)')).toHaveValue('1.245,05');
     // Type and category are fixed: changing them would make it something else.
     // Said plainly: a record, not money moved.
-    expect(within(form).getByText(/^Será lançado um débito/)).toHaveTextContent(
-      'Será lançado um débito na categoria Investimentos. Nenhum dinheiro é movido: é só o registro da aplicação.',
+    expect(within(form).getByText(/^Será lançada uma saída/)).toHaveTextContent(
+      'Será lançada uma saída na categoria Investimentos. Nenhum dinheiro é movido: é só o registro do que você guardou.',
     );
     expect(within(form).queryByRole('radiogroup', { name: 'Tipo' })).not.toBeInTheDocument();
     expect(within(form).queryByRole('combobox', { name: 'Categoria' })).not.toBeInTheDocument();
@@ -298,11 +306,37 @@ describe('DashboardPage', () => {
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining(
-            `"type":"DEBIT","description":"Aplicação em Investimentos","notes":null,"categoryId":"${investimentos}","amountCents":124505`,
+            `"type":"DEBIT","description":"Aporte em Investimentos","notes":null,"categoryId":"${investimentos}","amountCents":124505`,
           ) as string,
         }),
       ),
     );
+  });
+
+  it('names the transaction after any goal, one the person created too', async () => {
+    stubPrefersDark(false, { desktop: true });
+    const viagens = testDestinations[3]!;
+    mockApi({
+      'GET /api/me': { body: verifiedUser },
+      [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'EDITOR' } },
+      [`GET /api/workspaces/${houseId}/summary/2026-10`]: {
+        body: summarizePeriod(october, budget, today),
+      },
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [{ id: viagens.categoryId, name: viagens.name, type: 'DEBIT', archived: false }],
+      },
+      [`GET /api/workspaces/${houseId}/people`]: { body: [] },
+    });
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    await userEvent.click(
+      within(await section('Orçamento do mês')).getByRole('button', { name: 'Guardar em Viagens' }),
+    );
+
+    const form = await screen.findByRole('dialog', { name: 'Registrar valor guardado' });
+    expect(form).toHaveAccessibleDescription(/^Em Viagens, no mês de outubro de 2026/);
+    // A noun, right while pending and once paid (ADR 0051).
+    expect(within(form).getByLabelText('Descrição')).toHaveValue('Aporte em Viagens');
   });
 
   it('offers no application to a VIEWER', async () => {
@@ -310,8 +344,8 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    await section('Orçamento por destino');
-    expect(screen.queryByRole('button', { name: /^Aplicar/ })).not.toBeInTheDocument();
+    await section('Orçamento do mês');
+    expect(screen.queryByRole('button', { name: /^Guardar/ })).not.toBeInTheDocument();
   });
 
   it('is reached from the sections of the workspace, on this month', async () => {
@@ -356,24 +390,20 @@ describe('DashboardPage', () => {
 
     try {
       await userEvent.click(
-        await screen.findByRole('link', { name: 'Próxima competência: janeiro de 2027' }),
+        await screen.findByRole('link', { name: 'Próximo mês: janeiro de 2027' }),
       );
       expect(router.state.location.search).toBe('?competencia=2027-01');
       expect(await screen.findByText('janeiro de 2027')).toBeInTheDocument();
       expect(
-        screen.getByRole('link', { name: 'Competência anterior: dezembro de 2026' }),
+        screen.getByRole('link', { name: 'Mês anterior: dezembro de 2026' }),
       ).toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole('button', { name: /^Escolher competência/ }));
+      await userEvent.click(screen.getByRole('button', { name: /^Escolher mês/ }));
       await userEvent.click(await screen.findByRole('link', { name: 'Ir para o mês atual' }));
       expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
       // Already on this month: the picker offers no way to it.
-      await userEvent.click(
-        screen.getByRole('button', { name: 'Escolher competência: outubro de 2026' }),
-      );
-      expect(
-        await screen.findByRole('dialog', { name: 'Escolher competência' }),
-      ).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Escolher mês: outubro de 2026' }));
+      expect(await screen.findByRole('dialog', { name: 'Escolher mês' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Ir para o mês atual' })).not.toBeInTheDocument();
       expect(router.state.location.pathname).toBe(`/espacos/${houseId}/painel`);
       await vi.waitFor(() =>

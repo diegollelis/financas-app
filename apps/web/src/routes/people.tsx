@@ -4,6 +4,7 @@ import {
   formatPeriod,
   hasRole,
   normalizeName,
+  settledLabels,
   todayIso,
   transactionStatus,
   type Person,
@@ -132,7 +133,7 @@ function AddPersonForm({ workspaceId }: { workspaceId: string }) {
 /** A person's transactions of any month, read-only: settle and edit them in Lançamentos. */
 /**
  * Every transaction with one person, of any month. A pending one can be marked as received or
- * paid right here: the same settling as "Efetivar" in Lançamentos, with today's date, where the
+ * paid right here: the same settling as "Marcar como pago" in Lançamentos, with today's date, where the
  * debt is seen. An estimated amount still goes to Lançamentos, which asks for the real one.
  */
 function PersonHistory({
@@ -195,9 +196,7 @@ function PersonHistory({
                         {transaction.type === 'CREDIT' ? 'A receber' : 'A pagar'}
                       </Badge>
                       {status === 'SETTLED' ? (
-                        <Badge variant="success">
-                          {transaction.type === 'CREDIT' ? 'Recebido' : 'Pago'}
-                        </Badge>
+                        <Badge variant="success">{settledLabels[transaction.type]}</Badge>
                       ) : status === 'OVERDUE' ? (
                         <Badge variant="destructive">Vencido</Badge>
                       ) : (
@@ -208,7 +207,7 @@ function PersonHistory({
                       status !== 'SETTLED' &&
                       (transaction.amountEstimated ? (
                         <span className="text-muted-foreground text-sm">
-                          Valor estimado: efetive em Lançamentos, informando o valor real.
+                          Valor estimado: marque como pago em Lançamentos, informando o valor real.
                         </span>
                       ) : (
                         <Button

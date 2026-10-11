@@ -57,7 +57,7 @@ const budgetFormSchema = z
       form.shares
         .filter((share) => share.kind === 'SAVINGS')
         .reduce((sum, share) => sum + share.basisPoints, 0) <= FULL_BASIS_POINTS,
-    { message: 'A soma dos destinos de guardar não pode passar de 100%.', path: ['shares'] },
+    { message: 'A soma das metas não pode passar de 100%.', path: ['shares'] },
   )
   .transform((form): BudgetInput => ({
     netIncomeCents: form.netIncomeCents,
@@ -173,16 +173,16 @@ export function BudgetForm({
         />
       </FormField>
       <fieldset className="grid gap-3">
-        <legend className="mb-1 font-medium">Limite de despesas</legend>
+        <legend className="mb-1 font-medium">Limite de gastos</legend>
         <p className="text-muted-foreground text-sm">Percentual da renda líquida.</p>
         {expenses.map(shareField)}
       </fieldset>
       {savings.length > 0 && (
         <fieldset className="grid gap-3">
-          <legend className="mb-1 font-medium">Destinos de guardar</legend>
+          <legend className="mb-1 font-medium">Metas</legend>
           <p className="text-muted-foreground text-sm">
-            Percentual do que sobrar no mês depois das despesas. O que ficar sem destino aparece
-            como &quot;Sem destino&quot; no Painel.
+            Percentual do que sobrar no mês depois das despesas. O que nenhuma meta receber aparece
+            como &quot;Sem meta&quot; no Painel.
           </p>
           {savings.map(shareField)}
           {savingTotal !== null && (
@@ -195,7 +195,7 @@ export function BudgetForm({
             >
               Soma: {formatBasisPoints(savingTotal)}
               {savingTotal < FULL_BASIS_POINTS &&
-                `. Sem destino: ${formatBasisPoints(FULL_BASIS_POINTS - savingTotal)}`}
+                `. Sem meta: ${formatBasisPoints(FULL_BASIS_POINTS - savingTotal)}`}
             </p>
           )}
           {sumError && (

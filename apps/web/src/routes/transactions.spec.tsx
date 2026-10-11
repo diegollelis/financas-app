@@ -70,7 +70,7 @@ function mockTransactions(overrides: Record<string, { status?: number; body: unk
   });
 }
 
-const section = (name: 'Créditos' | 'Débitos') => screen.findByRole('region', { name });
+const section = (name: 'Entradas' | 'Saídas') => screen.findByRole('region', { name });
 
 // People (ADR 0042).
 const ana = {
@@ -140,10 +140,10 @@ describe('TransactionsPage', () => {
 
     expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
     await expectCall(fetchMock, `${base}?period=2026-10`, {});
-    const credits = await section('Créditos');
+    const credits = await section('Entradas');
     expect(credits).toHaveTextContent('Total: R$ 5.000,00');
     expect(within(credits).getByText('Recebido em 05/10')).toBeInTheDocument();
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     expect(debits).toHaveTextContent('Total: R$ 509,90');
     const lightItem = row(debits, 'Conta de luz');
     expect(within(lightItem).getByText('Energia')).toBeInTheDocument();
@@ -160,14 +160,14 @@ describe('TransactionsPage', () => {
       `/espacos/${houseId}/lancamentos?competencia=2026-10&situacao=vencidos`,
     );
 
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     expect(screen.getByRole('radio', { name: 'Vencidos' })).toBeChecked();
     expect(row(debits, 'Conta de luz')).toBeInTheDocument();
     expect(within(debits).queryByText('Compras da semana')).not.toBeInTheDocument();
     // How many are shown, and the total of those.
     expect(debits).toHaveTextContent('1 de 2');
     expect(debits).toHaveTextContent('Total: R$ 159,90');
-    expect(await section('Créditos')).toHaveTextContent('Nenhum crédito com esse filtro.');
+    expect(await section('Entradas')).toHaveTextContent('Nenhuma entrada com esse filtro.');
 
     await userEvent.click(screen.getByRole('radio', { name: 'Todos' }));
     expect(router.state.location.search).toBe('?competencia=2026-10');
@@ -179,9 +179,7 @@ describe('TransactionsPage', () => {
     // Another month keeps the status filter.
     await userEvent.clear(screen.getByLabelText('Buscar lançamento'));
     await userEvent.click(screen.getByRole('radio', { name: 'Pendentes' }));
-    await userEvent.click(
-      screen.getByRole('link', { name: 'Próxima competência: novembro de 2026' }),
-    );
+    await userEvent.click(screen.getByRole('link', { name: 'Próximo mês: novembro de 2026' }));
     expect(router.state.location.search).toBe('?competencia=2026-11&situacao=pendentes');
   });
 
@@ -199,10 +197,10 @@ describe('TransactionsPage', () => {
 
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     expect(row(debits, 'Conta de luz')).toHaveTextContent('Pago em 08/10');
     expect(row(debits, 'Presentes de Natal')).toHaveTextContent('Pago em 04/01/2027');
-    expect(row(await section('Créditos'), 'Salário de outubro')).toHaveTextContent(
+    expect(row(await section('Entradas'), 'Salário de outubro')).toHaveTextContent(
       'Recebido em 05/10',
     );
   });
@@ -221,7 +219,7 @@ describe('TransactionsPage', () => {
     ).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Novo lançamento' }));
     expect(await screen.findByRole('dialog', { name: 'Novo lançamento' })).toHaveTextContent(
-      'Competência de novembro de 2026 em Casa.',
+      'Mês de novembro de 2026 em Casa.',
     );
   });
 
@@ -285,7 +283,7 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     expect(row(debits, 'Conta de luz')).toHaveTextContent('Todo mês');
     expect(row(debits, 'Compras da semana')).not.toHaveTextContent('Todo mês');
 
@@ -363,23 +361,23 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     expect(row(debits, 'Conta de luz')).toHaveTextContent('Estimado');
     expect(row(debits, 'Compras da semana')).not.toHaveTextContent('Estimado');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Efetivar Conta de luz' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Efetivar Conta de luz' });
+    await userEvent.click(screen.getByRole('button', { name: 'Marcar como pago: Conta de luz' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Marcar como pago: Conta de luz' });
     const amount = within(dialog).getByLabelText('Valor da fatura (R$)');
     expect(amount).toHaveValue('159,90');
     await userEvent.clear(amount);
     await userEvent.type(amount, '172,50');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Efetivar' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar como pago' }));
 
     await expectCall(fetchMock, `${base}/${light.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ amountCents: 17_250, settledAt: '2026-10-15' }),
     });
-    expect(await screen.findByText('Lançamento efetivado')).toBeInTheDocument();
+    expect(await screen.findByText('Marcado como pago')).toBeInTheDocument();
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
@@ -463,7 +461,7 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    const debits = await section('Débitos');
+    const debits = await section('Saídas');
     expect(row(debits, 'Compras da semana')).toHaveTextContent('Parcela 3/10');
     const menu = await openActions('Compras da semana');
     expect(
@@ -564,9 +562,9 @@ describe('TransactionsPage', () => {
       return names;
     };
 
-    expect(within(form).getByRole('radio', { name: 'Débito' })).toBeChecked();
+    expect(within(form).getByRole('radio', { name: 'Saída' })).toBeChecked();
     expect(await options()).toEqual(['Energia', 'Mercado']);
-    await userEvent.click(within(form).getByRole('radio', { name: 'Crédito' }));
+    await userEvent.click(within(form).getByRole('radio', { name: 'Entrada' }));
     expect(await options()).toEqual(['Salário']);
   });
 
@@ -587,6 +585,67 @@ describe('TransactionsPage', () => {
     );
   });
 
+  it('shows an "Aporte em …" pending, then paid as the API returns it after settling', async () => {
+    const investmentsCategory = {
+      id: '01920000-0000-7000-8000-000000000104',
+      name: 'Investimentos',
+      type: 'DEBIT',
+      archived: false,
+    };
+    const pending = transaction(9, {
+      type: 'DEBIT',
+      description: 'Aporte em Investimentos',
+      categoryId: investmentsCategory.id,
+      amountCents: 60_743,
+    });
+    const paid = { ...pending, settledAt: '2026-10-15' };
+    // The list is what the API answers: pending until the PATCH reaches it, paid after. The badge
+    // must come from that new answer, not from the click.
+    let settled = false;
+    const fetchMock = mockApi({
+      'GET /api/me': { body: verifiedUser },
+      [`GET /api/workspaces/${houseId}`]: { body: house },
+      [`GET /api/workspaces/${houseId}/people`]: { body: [] },
+      [`GET /api/workspaces/${houseId}/categories`]: { body: [investmentsCategory] },
+      get [`GET ${base}`]() {
+        return { body: [settled ? paid : pending] };
+      },
+      get [`PATCH ${base}/${pending.id}`]() {
+        settled = true;
+        return { body: paid };
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Saídas');
+    const item = () =>
+      within(debits)
+        .getAllByRole('listitem')
+        .find((li) => li.textContent?.startsWith('Aporte em Investimentos'))!;
+    await within(debits).findByText('Aporte em Investimentos');
+    expect(item()).toHaveTextContent('Pendente');
+
+    await userEvent.click(
+      within(debits).getByRole('button', { name: 'Marcar como pago: Aporte em Investimentos' }),
+    );
+    // Today's date, the one the app sends (it can be changed later by editing).
+    await expectCall(fetchMock, `${base}/${pending.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ settledAt: '2026-10-15' }),
+    });
+    await vi.waitFor(() => expect(item()).toHaveTextContent('Pago em 15/10'));
+    expect(item()).not.toHaveTextContent('Pendente');
+    expect(
+      within(debits).queryByRole('button', { name: /^Marcar como pago/ }),
+    ).not.toBeInTheDocument();
+    // The list was asked again: the badge is the API's answer.
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, init]) => new URL(url).pathname === base && (init?.method ?? 'GET') === 'GET',
+      ).length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
   it('settles in one tap with today’s date, and undoes it from the menu', async () => {
     const fetchMock = mockTransactions({
       [`PATCH ${base}/${light.id}`]: { body: { ...light, settledAt: '2026-10-15' } },
@@ -594,27 +653,31 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Efetivar Conta de luz' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Marcar como pago: Conta de luz' }),
+    );
     await expectCall(fetchMock, `${base}/${light.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ settledAt: '2026-10-15' }),
     });
-    expect(await screen.findByText('Lançamento efetivado')).toBeInTheDocument();
+    expect(await screen.findByText('Marcado como pago')).toBeInTheDocument();
 
     const menu = await openActions('Salário de outubro');
-    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Desfazer efetivação' }));
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Desmarcar recebimento' }));
     await expectCall(fetchMock, `${base}/${salary.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ settledAt: null }),
     });
-    expect(await screen.findByText('Efetivação desfeita')).toBeInTheDocument();
+    expect(await screen.findByText('Recebimento desmarcado')).toBeInTheDocument();
   });
 
   it('tells when a change fails', async () => {
     mockTransactions({ [`PATCH ${base}/${light.id}`]: { status: 500, body: {} } });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Efetivar Conta de luz' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Marcar como pago: Conta de luz' }),
+    );
 
     expect(
       await screen.findByText('Não foi possível concluir agora. Tente de novo em instantes.'),
@@ -754,7 +817,7 @@ describe('TransactionsPage', () => {
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     const form = await openNewTransaction();
-    await userEvent.click(within(form).getByRole('radio', { name: 'Crédito' }));
+    await userEvent.click(within(form).getByRole('radio', { name: 'Entrada' }));
     await userEvent.type(within(form).getByLabelText('Descrição'), 'Empréstimo ao Carlos');
     await chooseCategory(form, 'Salário');
     await userEvent.type(within(form).getByLabelText('Valor (R$)'), '200,00');
@@ -793,8 +856,8 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    expect(await section('Créditos')).toHaveTextContent('A receber de Ana');
-    expect(await section('Débitos')).toHaveTextContent('Dividido com Ana');
+    expect(await section('Entradas')).toHaveTextContent('A receber de Ana');
+    expect(await section('Saídas')).toHaveTextContent('Dividido com Ana');
     const menu = await openActions('Jantar');
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Excluir' }));
     const confirm = await screen.findByRole('alertdialog', { name: 'Excluir Jantar?' });
@@ -842,13 +905,13 @@ describe('TransactionsPage', () => {
 
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    expect(await section('Débitos')).toHaveTextContent('Conta de luz');
+    expect(await section('Saídas')).toHaveTextContent('Conta de luz');
     // Only the competência picker, which navigates; nothing that edits.
     expect(
       within(screen.getByRole('main'))
         .getAllByRole('button')
         .map((button) => button.textContent),
-    ).toEqual([expect.stringMatching(/^Escolher competência/)]);
+    ).toEqual([expect.stringMatching(/^Escolher mês/)]);
   });
 
   it('is reached from the sections of the workspace', async () => {

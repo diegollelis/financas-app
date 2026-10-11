@@ -3,6 +3,7 @@ import {
   MAX_ANALYSIS_MONTHS,
   periodsBetween,
   shiftPeriod,
+  transactionTypeLabels,
   type AnalysisFilters,
   type Category,
 } from '@financas/shared';
@@ -34,16 +35,16 @@ import {
 
 const viewOptions = [
   { value: 'PLANNED', label: 'Previsto' },
-  { value: 'SETTLED', label: 'Efetivado' },
+  { value: 'SETTLED', label: 'Realizado' },
 ] as const;
 
 const typeOptions = [
-  { value: 'BOTH', label: 'Ambos' },
-  { value: 'CREDIT', label: 'Créditos' },
-  { value: 'DEBIT', label: 'Débitos' },
+  { value: 'BOTH', label: 'Todas' },
+  { value: 'CREDIT', label: 'Entradas' },
+  { value: 'DEBIT', label: 'Saídas' },
 ] as const;
 
-/** A competência picker for the custom range. */
+/** A month picker for the custom range. */
 function PeriodSelect({
   id,
   label,
@@ -137,7 +138,7 @@ function CategoryFilter({
               {category.name}
               {type === 'BOTH' && (
                 <span className="text-muted-foreground ml-auto pl-2 text-sm">
-                  {category.type === 'CREDIT' ? 'crédito' : 'débito'}
+                  {transactionTypeLabels[category.type].lower}
                 </span>
               )}
             </DropdownMenuCheckboxItem>

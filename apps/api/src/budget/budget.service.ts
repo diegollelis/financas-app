@@ -82,7 +82,7 @@ export class BudgetService {
       if (!destination) {
         throw new BadRequestException({
           code: 'INVALID_INPUT',
-          message: 'Um dos destinos não existe neste espaço.',
+          message: 'Uma das metas não existe neste espaço.',
         });
       }
       return { ...share, kind: destination.kind };
@@ -90,7 +90,7 @@ export class BudgetService {
     if (savingSharesTotal(shares) > FULL_BASIS_POINTS) {
       throw new BadRequestException({
         code: 'INVALID_INPUT',
-        message: 'A soma dos destinos de guardar não pode passar de 100%.',
+        message: 'A soma das metas não pode passar de 100%.',
       });
     }
 

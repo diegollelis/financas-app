@@ -44,8 +44,8 @@ type FormValues = z.output<typeof rowFormSchema>;
 const amountText = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 });
 
 const typeOptions = [
-  { value: 'DEBIT', label: 'Débito' },
-  { value: 'CREDIT', label: 'Crédito' },
+  { value: 'DEBIT', label: 'Saída' },
+  { value: 'CREDIT', label: 'Entrada' },
 ] as const;
 
 export function ImportRowForm({
@@ -143,7 +143,11 @@ export function ImportRowForm({
             {...register('amount')}
           />
         </FormField>
-        <FormField id={id('period')} label="Competência" error={formState.errors.period?.message}>
+        <FormField
+          id={id('period')}
+          label="Mês de referência"
+          error={formState.errors.period?.message}
+        >
           <Input type="month" {...register('period')} />
         </FormField>
         <FormField
@@ -155,7 +159,7 @@ export function ImportRowForm({
         </FormField>
         <FormField
           id={id('settled-at')}
-          label="Efetivado em (opcional)"
+          label="Pago ou recebido em (opcional)"
           error={formState.errors.settledAt?.message}
         >
           <Input type="date" {...register('settledAt')} />

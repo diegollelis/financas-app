@@ -40,8 +40,7 @@ const typeOrder: Record<TransactionType, number> = { CREDIT: 0, DEBIT: 1 };
 const ownedByDestination = () =>
   new ConflictException({
     code: 'CATEGORY_OF_DESTINATION',
-    message:
-      'Esta categoria é de um destino do orçamento: renomeie, arquive ou exclua pelo destino.',
+    message: 'Esta categoria é de uma meta: renomeie, arquive ou exclua pela meta, no orçamento.',
   });
 
 const categoryExists = () =>

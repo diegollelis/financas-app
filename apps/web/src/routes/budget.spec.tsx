@@ -61,7 +61,7 @@ describe('Budget dialog (on the dashboard)', () => {
 
     renderApp(`/espacos/${houseId}/painel`);
 
-    const budget = await screen.findByRole('region', { name: 'Orçamento por destino' });
+    const budget = await screen.findByRole('region', { name: 'Orçamento do mês' });
     expect(budget).toHaveTextContent('Renda líquida: R$');
     const dialog = await openDialog();
     expect(
@@ -87,7 +87,7 @@ describe('Budget dialog (on the dashboard)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Definir orçamento' }));
     const dialog = await screen.findByRole('dialog', { name: 'Orçamento de novembro de 2026' });
     expect(
-      await within(dialog).findByText(/^Nenhuma competência até aqui tem orçamento salvo/),
+      await within(dialog).findByText(/^Nenhum mês até aqui tem orçamento salvo/),
     ).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Despesas (%)')).toHaveValue('0');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
@@ -105,7 +105,7 @@ describe('Budget dialog (on the dashboard)', () => {
     const travel = await within(dialog).findByLabelText('Viagens (%)');
     await userEvent.clear(travel);
     await userEvent.type(travel, '10');
-    expect(within(dialog).getByText('Soma: 90%. Sem destino: 10%')).toBeInTheDocument();
+    expect(within(dialog).getByText('Soma: 90%. Sem meta: 10%')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar orçamento' }));
 
     await vi.waitFor(() =>
@@ -143,7 +143,7 @@ describe('Budget dialog (on the dashboard)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar orçamento' }));
 
     expect(
-      await within(dialog).findByText('A soma dos destinos de guardar não pode passar de 100%.'),
+      await within(dialog).findByText('A soma das metas não pode passar de 100%.'),
     ).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith(
       expect.anything(),
@@ -164,9 +164,7 @@ describe('Budget dialog (on the dashboard)', () => {
 
     let dialog = await openDialog();
     await userEvent.click(await within(dialog).findByRole('button', { name: 'Cancelar' }));
-    await userEvent.click(
-      screen.getByRole('link', { name: 'Próxima competência: novembro de 2026' }),
-    );
+    await userEvent.click(screen.getByRole('link', { name: 'Próximo mês: novembro de 2026' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Editar orçamento' }));
     dialog = await screen.findByRole('dialog', { name: 'Orçamento de novembro de 2026' });
 
@@ -194,12 +192,12 @@ describe('Budget dialog (on the dashboard)', () => {
     renderApp(`/espacos/${houseId}/painel`);
 
     const dialog = await openDialog();
-    await userEvent.click(within(dialog).getByText('Gerenciar destinos de guardar'));
+    await userEvent.click(within(dialog).getByText('Gerenciar metas'));
     // Despesas is fixed: only the saving destinations are listed.
     expect(await within(dialog).findByText('Investimentos')).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Ações de Despesas' })).toBeNull();
 
-    await userEvent.type(within(dialog).getByLabelText('Novo destino'), 'Reforma');
+    await userEvent.type(within(dialog).getByLabelText('Nova meta'), 'Reforma');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -207,7 +205,7 @@ describe('Budget dialog (on the dashboard)', () => {
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'Reforma' }) }),
       ),
     );
-    expect(await screen.findByText('Destino adicionado')).toBeInTheDocument();
+    expect(await screen.findByText('Meta adicionada')).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ações de Viagens' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Renomear' }));
@@ -221,14 +219,14 @@ describe('Budget dialog (on the dashboard)', () => {
         expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ name: 'Férias' }) }),
       ),
     );
-    expect(await screen.findByText('Destino renomeado')).toBeInTheDocument();
+    expect(await screen.findByText('Meta renomeada')).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ações de Investimentos' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Arquivar' }));
     // It changes the budget from this month on: asked first.
     const confirm = await screen.findByRole('alertdialog', { name: 'Arquivar Investimentos?' });
     expect(confirm).toHaveTextContent(
-      'Investimentos sai do orçamento a partir de outubro de 2026, e o percentual dele fica sem destino. Os meses anteriores não mudam.',
+      'Investimentos sai do orçamento a partir de outubro de 2026, e o percentual dela fica sem meta. Os meses anteriores não mudam.',
     );
     await userEvent.click(within(confirm).getByRole('button', { name: 'Arquivar' }));
     await vi.waitFor(() =>
@@ -258,7 +256,7 @@ describe('Budget dialog (on the dashboard)', () => {
     renderApp(`/espacos/${houseId}/painel`);
 
     const dialog = await openDialog();
-    await userEvent.click(within(dialog).getByText('Gerenciar destinos de guardar'));
+    await userEvent.click(within(dialog).getByText('Gerenciar metas'));
     await userEvent.click(
       await within(dialog).findByRole('button', { name: 'Ações de Investimentos' }),
     );
@@ -275,7 +273,7 @@ describe('Budget dialog (on the dashboard)', () => {
         expect.objectContaining({ method: 'DELETE' }),
       ),
     );
-    expect(await screen.findByText('Destino excluído')).toBeInTheDocument();
+    expect(await screen.findByText('Meta excluída')).toBeInTheDocument();
   });
 
   it('offers no way to change it to a VIEWER', async () => {
@@ -283,9 +281,7 @@ describe('Budget dialog (on the dashboard)', () => {
 
     renderApp(`/espacos/${houseId}/painel`);
 
-    expect(
-      await screen.findByRole('region', { name: 'Orçamento por destino' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Orçamento do mês' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar orçamento' })).not.toBeInTheDocument();
   });
 

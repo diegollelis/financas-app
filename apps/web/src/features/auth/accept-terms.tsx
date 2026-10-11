@@ -43,7 +43,7 @@ export function AcceptTerms({ user }: { user: MeResponse }) {
           <Link to={PRIVACY_PATH} className={inlineLink}>
             Política de privacidade
           </Link>
-          . Eles explicam o que o app guarda, para quê, e como baixar ou apagar os seus dados.
+          . Eles explicam o que o app guarda, para quê, e como baixar ou excluir os seus dados.
         </p>
         {accept.isError && (
           <p role="alert" className="text-destructive">

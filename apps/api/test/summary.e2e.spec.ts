@@ -160,7 +160,7 @@ describe('summary', () => {
 
     const response = await browser.get(`/api/workspaces/${id}/summary/2026-13`).expect(400);
 
-    expect(response.body).toMatchObject({ message: 'Use uma competência no formato AAAA-MM.' });
+    expect(response.body).toMatchObject({ message: 'Use um mês no formato AAAA-MM.' });
   });
 
   describe('isolation', () => {

@@ -15,13 +15,13 @@ const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 const row = (overrides: Partial<Record<string, TemplateCell>> = {}): TemplateCell[] => {
   const values: Record<string, TemplateCell> = {
-    Competência: '2026-09',
-    Tipo: 'Débito',
+    'Mês de referência': '2026-09',
+    Tipo: 'Saída',
     Descrição: 'Supermercado',
     Categoria: 'Mercado',
     Valor: 640.35,
     Vencimento: day('2026-09-10'),
-    'Efetivado em': day('2026-09-10'),
+    'Pago ou recebido em': day('2026-09-10'),
     Observações: null,
     ...overrides,
   };
@@ -46,6 +46,45 @@ describe('parseTemplateRows', () => {
         settledAt: '2026-09-10',
       },
     ]);
+  });
+
+  it('still reads a spreadsheet filled in with the template before ADR 0051', () => {
+    const formerHeader = [
+      'Competência',
+      'Tipo',
+      'Descrição',
+      'Categoria',
+      'Valor',
+      'Vencimento',
+      'Efetivado em',
+      'Observações',
+    ];
+    const { rows, issues } = parseTemplateRows([
+      formerHeader,
+      ['2026-09', 'Débito', 'Supermercado', 'Mercado', 640.35, null, day('2026-09-10'), null],
+      ['2026-09', 'Crédito', 'Salário', 'Salário', 5000, null, null, null],
+    ]);
+
+    expect(issues).toEqual([]);
+    expect(rows).toMatchObject([
+      { type: 'DEBIT', period: '2026-09', settledAt: '2026-09-10' },
+      { type: 'CREDIT', period: '2026-09', settledAt: null },
+    ]);
+  });
+
+  it('reads "Mês" as the month column too', () => {
+    const titles = header.map((title) => (title === 'Mês de referência' ? 'Mês' : title));
+
+    const { rows, issues } = parseTemplateRows([titles, row()]);
+
+    expect(issues).toEqual([]);
+    expect(rows[0]?.period).toBe('2026-09');
+  });
+
+  it('reads Entrada and Saída in any case and without accents', () => {
+    const { rows } = parseTemplateRows([header, row({ Tipo: 'ENTRADA' }), row({ Tipo: 'saida' })]);
+
+    expect(rows.map((parsed) => parsed.type)).toEqual(['CREDIT', 'DEBIT']);
   });
 
   it('reads the example row of the template, typed as text', () => {
@@ -80,8 +119,8 @@ describe('parseTemplateRows', () => {
     });
   });
 
-  it('accepts a competência Excel turned into a date', () => {
-    const { rows } = parseTemplateRows([header, row({ Competência: day('2026-09-01') })]);
+  it('accepts a month Excel turned into a date', () => {
+    const { rows } = parseTemplateRows([header, row({ 'Mês de referência': day('2026-09-01') })]);
 
     expect(rows[0]?.period).toBe('2026-09');
   });
@@ -108,13 +147,17 @@ describe('parseTemplateRows', () => {
   it('leaves out a row with errors, saying why', () => {
     const { rows, issues } = parseTemplateRows([
       header,
-      row({ Valor: 0, Tipo: 'Transferência', Competência: '2026-13' }),
+      row({ Valor: 0, Tipo: 'Transferência', 'Mês de referência': '2026-13' }),
     ]);
 
     expect(rows).toEqual([]);
     expect(issues).toEqual([
-      { line: 2, severity: 'error', message: 'Competência inválida: use AAAA-MM, como 2026-09.' },
-      { line: 2, severity: 'error', message: 'Tipo inválido: use Crédito ou Débito.' },
+      {
+        line: 2,
+        severity: 'error',
+        message: 'Mês de referência inválido: use AAAA-MM, como 2026-09.',
+      },
+      { line: 2, severity: 'error', message: 'Tipo inválido: use Entrada ou Saída.' },
       {
         line: 2,
         severity: 'error',
@@ -152,7 +195,10 @@ describe('parseTemplateRows', () => {
     [{ Categoria: null }, 'Informe a categoria.'],
     [{ Valor: 'quinze reais' }, 'Valor inválido: use números, como 1.500,00.'],
     [{ Vencimento: '31/02/2026' }, 'Vencimento inválido: use dd/mm/aaaa.'],
-    [{ 'Efetivado em': 'ontem' }, 'Data de efetivação inválida: use dd/mm/aaaa.'],
+    [
+      { 'Pago ou recebido em': 'ontem' },
+      'Data de pagamento ou recebimento inválida: use dd/mm/aaaa.',
+    ],
   ])('reports %o', (overrides, message) => {
     const { issues } = parseTemplateRows([header, row(overrides)]);
 
@@ -189,14 +235,17 @@ describe('parseTemplateRows', () => {
     expect(issues[0]?.message).toContain('dado pessoal');
   });
 
-  it('warns when the settlement falls in another competência', () => {
-    const { issues } = parseTemplateRows([header, row({ 'Efetivado em': day('2026-10-02') })]);
+  it('warns when the settlement falls in another month', () => {
+    const { issues } = parseTemplateRows([
+      header,
+      row({ 'Pago ou recebido em': day('2026-10-02') }),
+    ]);
 
     expect(issues).toEqual([
       {
         line: 2,
         severity: 'warning',
-        message: 'Efetivado em 2026-10, fora da competência 2026-09.',
+        message: 'Pago ou recebido em 2026-10, fora do mês de referência 2026-09.',
       },
     ]);
   });
@@ -212,7 +261,7 @@ describe('parseTemplateRows', () => {
 
 describe('normalizeName', () => {
   it('ignores accents, case and extra spaces', () => {
-    expect(normalizeName('  Efetivado   EM ')).toBe('efetivado em');
+    expect(normalizeName('  Pago ou   Recebido EM ')).toBe('pago ou recebido em');
     expect(normalizeName('Observações')).toBe('observacoes');
   });
 });

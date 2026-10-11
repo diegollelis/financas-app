@@ -63,14 +63,12 @@ describe('analysisQuerySchema', () => {
 
   it('refuses a range that ends before it starts', () => {
     const result = analysisQuerySchema.safeParse({ from: '2026-10', to: '2026-09' });
-    expect(result.error?.issues[0]?.message).toBe(
-      'A competência inicial precisa vir antes da final.',
-    );
+    expect(result.error?.issues[0]?.message).toBe('O mês inicial precisa vir antes do final.');
   });
 
   it('refuses more than 24 competências', () => {
     const result = analysisQuerySchema.safeParse({ from: '2025-01', to: '2027-01' });
-    expect(result.error?.issues[0]?.message).toBe('Escolha no máximo 24 competências.');
+    expect(result.error?.issues[0]?.message).toBe('Escolha no máximo 24 meses.');
   });
 });
 

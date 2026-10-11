@@ -33,7 +33,7 @@ export function PeriodNav({ period }: { period: string }) {
       onClick={desktop ? undefined : () => setOpen(true)}
     >
       {/* The name holds the visible month (WCAG 2.5.3): the rest is screen-reader text. */}
-      <span className="sr-only">Escolher competência:</span>{' '}
+      <span className="sr-only">Escolher mês:</span>{' '}
       <span className="truncate first-letter:uppercase">{formatPeriod(period)}</span>
       {away && <span className="sr-only">, fora do mês atual</span>}
       {away && <span aria-hidden className="bg-primary size-1.5 shrink-0 rounded-full" />}
@@ -43,9 +43,9 @@ export function PeriodNav({ period }: { period: string }) {
   const picker = <PeriodPicker period={period} onPick={() => setOpen(false)} />;
 
   return (
-    <nav aria-label="Competência" className="flex items-center gap-2">
+    <nav aria-label="Mês" className="flex items-center gap-2">
       <Button asChild variant="outline" size="icon">
-        <Link to={to(previous)} aria-label={`Competência anterior: ${formatPeriod(previous)}`}>
+        <Link to={to(previous)} aria-label={`Mês anterior: ${formatPeriod(previous)}`}>
           <ChevronLeft aria-hidden />
         </Link>
       </Button>
@@ -53,7 +53,7 @@ export function PeriodNav({ period }: { period: string }) {
         // A small balloon on the desktop: a quick choice that does not dim the page.
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          <PopoverContent align="start" aria-label="Escolher competência" className="w-72">
+          <PopoverContent align="start" aria-label="Escolher mês" className="w-72">
             {picker}
           </PopoverContent>
         </Popover>
@@ -64,7 +64,7 @@ export function PeriodNav({ period }: { period: string }) {
             open={open}
             onOpenChange={setOpen}
             returnFocusTo={triggerRef}
-            title="Escolher competência"
+            title="Escolher mês"
             description="Escolha o ano e depois o mês."
           >
             {picker}
@@ -72,7 +72,7 @@ export function PeriodNav({ period }: { period: string }) {
         </>
       )}
       <Button asChild variant="outline" size="icon">
-        <Link to={to(next)} aria-label={`Próxima competência: ${formatPeriod(next)}`}>
+        <Link to={to(next)} aria-label={`Próximo mês: ${formatPeriod(next)}`}>
           <ChevronRight aria-hidden />
         </Link>
       </Button>

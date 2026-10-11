@@ -154,7 +154,7 @@ export function CategoryRanking({
   const folded = !showAll && ranking.length > VISIBLE;
   const shown = folded ? ranking.slice(0, VISIBLE - 1) : ranking;
   const largest = ranking[0]?.totalCents ?? 1;
-  const title = credit ? 'Recebidos por categoria' : 'Gastos por categoria';
+  const title = credit ? 'Entradas por categoria' : 'Despesas por categoria';
   const open = settings.categoryId
     ? categories.find((category) => category.id === settings.categoryId)
     : undefined;
@@ -166,7 +166,7 @@ export function CategoryRanking({
       </h2>
       {ranking.length === 0 ? (
         <p className="text-muted-foreground">
-          {credit ? 'Nenhum crédito' : 'Nenhum débito'} no período.
+          {credit ? 'Nenhuma entrada' : 'Nenhuma despesa'} no período.
         </p>
       ) : (
         <>
@@ -212,7 +212,7 @@ export function CategoryRanking({
         }}
         returnFocusTo={opener}
         title={open?.name ?? ''}
-        description={`${describeRange(settings)}, ${settings.view === 'SETTLED' ? 'efetivado' : 'previsto'}.`}
+        description={`${describeRange(settings)}, ${settings.view === 'SETTLED' ? 'realizado' : 'previsto'}.`}
       >
         {open && (
           <CategoryDetail

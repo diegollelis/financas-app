@@ -1,4 +1,4 @@
-import { reaisInputSchema, type Transaction } from '@financas/shared';
+import { reaisInputSchema, settleActionLabels, type Transaction } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { RefObject } from 'react';
 import { useForm } from 'react-hook-form';
@@ -40,8 +40,8 @@ export function SettleWithAmount({
       open={open}
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
-      title={`Efetivar ${transaction.description}`}
-      description="O valor muda todo mês: confira o valor da fatura antes de efetivar."
+      title={`${settleActionLabels[transaction.type].settle}: ${transaction.description}`}
+      description="O valor muda todo mês: confira o valor da fatura antes de confirmar."
     >
       {/* Mounted on each opening: the estimate of now, no error left over. */}
       {open && (
@@ -101,7 +101,7 @@ function SettleForm({
       )}
       <div className="grid gap-2 sm:flex sm:flex-row-reverse sm:justify-start">
         <Button type="submit" disabled={pending}>
-          {pending ? 'Efetivando…' : 'Efetivar'}
+          {pending ? 'Salvando…' : settleActionLabels[transaction.type].settle}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar

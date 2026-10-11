@@ -88,7 +88,7 @@ function requestedRanges(fetchMock: ReturnType<typeof mockApi>) {
 /** The table of the monthly values, as rows of text. */
 async function monthlyTable() {
   await userEvent.click(await screen.findByRole('button', { name: 'Ver como tabela' }));
-  return within(screen.getByRole('table', { name: 'Valores por competência' }))
+  return within(screen.getByRole('table', { name: 'Valores por mês' }))
     .getAllByRole('row')
     .map((tr) => nbsp(tr.textContent));
 }
@@ -131,11 +131,11 @@ describe('AnalysisPage', () => {
     const stat = async (label: string) =>
       nbsp((await screen.findByText(label, { selector: 'dt' })).nextElementSibling?.textContent);
     // Spending is the expenses only; the application is shown apart.
-    expect(await stat('Gasto')).toBe('R$ 4.900,00');
-    expect(await stat('Aplicado')).toBe('R$ 500,00');
+    expect(await stat('Despesas')).toBe('R$ 4.900,00');
+    expect(await stat('Para guardar')).toBe('R$ 500,00');
     // The balance is after every debit, as on the dashboard.
     expect(await stat('Saldo do período')).toBe('R$ 4.600,00');
-    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Despesas por categoria' });
     expect(within(ranking).queryByText('Investimentos')).not.toBeInTheDocument();
   });
 
@@ -165,11 +165,11 @@ describe('AnalysisPage', () => {
 
     renderApp(`/espacos/${houseId}/analise`);
 
-    const gasto = await screen.findByText('Gasto', { selector: 'dt' });
+    const gasto = await screen.findByText('Despesas', { selector: 'dt' });
     expect(nbsp(gasto.nextElementSibling?.textContent)).toBe(
       'R$ 4.900,00R$ 900,00 a mais que nos 6 meses anteriores.',
     );
-    const recebido = screen.getByText('Recebido', { selector: 'dt' });
+    const recebido = screen.getByText('Entradas', { selector: 'dt' });
     expect(nbsp(recebido.nextElementSibling?.textContent)).toContain(
       'O mesmo que nos 6 meses anteriores.',
     );
@@ -185,7 +185,7 @@ describe('AnalysisPage', () => {
     expect(nbsp(balance.nextElementSibling?.textContent)).toBe('R$ 5.100,00');
     expect(requestedRanges(fetchMock)).toEqual(['?from=2026-05&to=2026-10']);
     expect(await monthlyTable()).toEqual([
-      'CompetênciaCréditosDébitosSaldo do mês',
+      'MêsEntradasSaídasSaldo do mês',
       'maio de 2026R$ 0,00R$ 0,00R$ 0,00',
       'junho de 2026R$ 0,00R$ 0,00R$ 0,00',
       'julho de 2026R$ 0,00R$ 0,00R$ 0,00',
@@ -200,12 +200,12 @@ describe('AnalysisPage', () => {
 
     renderApp(`/espacos/${houseId}/analise?periodo=12&visao=efetivado&tipo=debitos`);
 
-    expect(await screen.findByText('Últimos 12 meses, efetivado, só débitos')).toBeInTheDocument();
-    const spent = await screen.findByText('Gasto no período');
+    expect(await screen.findByText('Últimos 12 meses, realizado, só saídas')).toBeInTheDocument();
+    const spent = await screen.findByText('Despesas no período');
     expect(nbsp(spent.nextElementSibling?.textContent)).toBe('R$ 2.700,00');
     expect(requestedRanges(fetchMock)).toEqual(['?from=2025-11&to=2026-10']);
     const table = await monthlyTable();
-    expect(table[0]).toBe('CompetênciaDébitos');
+    expect(table[0]).toBe('MêsSaídas');
     expect(table.at(-1)).toBe('outubro de 2026R$ 300,00');
   });
 
@@ -233,8 +233,8 @@ describe('AnalysisPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Filtros' }));
     const dialog = await screen.findByRole('dialog', { name: 'Filtros' });
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'Efetivado' }));
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'Débitos' }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Realizado' }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Saídas' }));
     await userEvent.click(within(dialog).getByRole('combobox', { name: 'Período' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Últimos 3 meses' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ver resultado' }));
@@ -242,7 +242,7 @@ describe('AnalysisPage', () => {
     expect(new URLSearchParams(router.state.location.search).toString()).toBe(
       'periodo=3&visao=efetivado&tipo=debitos',
     );
-    expect(await screen.findByText('Últimos 3 meses, efetivado, só débitos')).toBeInTheDocument();
+    expect(await screen.findByText('Últimos 3 meses, realizado, só saídas')).toBeInTheDocument();
     await vi.waitFor(() =>
       expect(requestedRanges(fetchMock)).toContain('?from=2026-08&to=2026-10'),
     );
@@ -261,9 +261,9 @@ describe('AnalysisPage', () => {
 
     expect(router.state.location.search).toContain(`categorias=${mercado.id}`);
     expect(
-      await screen.findByText('Últimos 6 meses, previsto, só débitos, Mercado'),
+      await screen.findByText('Últimos 6 meses, previsto, só saídas, Mercado'),
     ).toBeInTheDocument();
-    const spent = screen.getByText('Gasto no período');
+    const spent = screen.getByText('Despesas no período');
     expect(nbsp(spent.nextElementSibling?.textContent)).toBe('R$ 1.300,00');
     expect(requestedRanges(fetchMock)).toHaveLength(1);
   });
@@ -283,7 +283,7 @@ describe('AnalysisPage', () => {
     mockAnalysis('2026-05', '2026-10');
     renderApp(`/espacos/${houseId}/analise`);
 
-    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Despesas por categoria' });
     const rows = within(ranking)
       .getAllByRole('button')
       .map((button) => nbsp(button.textContent));
@@ -297,7 +297,7 @@ describe('AnalysisPage', () => {
     mockAnalysis('2026-05', '2026-10');
     renderApp(`/espacos/${houseId}/analise?tipo=creditos`);
 
-    const ranking = await screen.findByRole('region', { name: 'Recebidos por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Entradas por categoria' });
     expect(within(ranking).getByRole('button', { name: /^Salário/ })).toBeInTheDocument();
   });
 
@@ -305,7 +305,7 @@ describe('AnalysisPage', () => {
     mockAnalysis('2026-05', '2026-10');
     const { router } = renderApp(`/espacos/${houseId}/analise`);
 
-    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Despesas por categoria' });
     const mercadoRow = within(ranking).getByRole('button', { name: /^Mercado/ });
     await userEvent.click(mercadoRow);
 
@@ -345,7 +345,7 @@ describe('AnalysisPage', () => {
     });
     renderApp(`/espacos/${houseId}/analise`);
 
-    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Despesas por categoria' });
     expect(within(ranking).getAllByRole('button', { name: /^Despesa/ })).toHaveLength(7);
     expect(within(ranking).getByText('Outras 3 categorias')).toBeInTheDocument();
     await userEvent.click(

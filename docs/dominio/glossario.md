@@ -16,41 +16,43 @@ O nome que a pessoa vê na tela e o nome no código são independentes ([ADR 005
 
 ### Lançamentos
 
-| Interface                           | Código                            | Definição                                                                           |
-| ----------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------- |
-| Lançamento                          | `Transaction`                     | Uma entrada ou uma saída de dinheiro                                                |
-| Entrada / Saída                     | `CREDIT` / `DEBIT`                | O tipo do lançamento                                                                |
-| Categoria                           | `Category`                        | Classificação do lançamento, de um tipo só                                          |
-| Mês                                 | `period` (`YYYY-MM`)              | O mês ao qual o lançamento pertence (nos docs técnicos, "competência")              |
-| Vencimento                          | `dueDate`                         | Data prevista para pagar ou receber                                                 |
-| Pago em / Recebido em               | `settledAt`                       | Data em que a saída foi paga ou a entrada foi recebida                              |
-| Marcar como pago / recebido         | `PATCH { settledAt }`             | A ação de registrar o pagamento ou o recebimento                                    |
-| Pendente / Vencido / Pago, Recebido | `PENDING` / `OVERDUE` / `SETTLED` | Situação derivada (`transactionStatus`, [modelo](modelo.md#transaction-lançamento)) |
-| Recorrência                         | `Recurrence`                      | Lançamento que se repete todo mês                                                   |
-| Valor estimado                      | `amountEstimated`                 | Valor de uma recorrência variável ainda não confirmado                              |
-| Parcelamento / Parcela              | `InstallmentPlan` / `installment` | Compra ou dívida dividida em parcelas, uma por mês                                  |
-| Pessoa                              | `Person`                          | Contato do espaço a quem se deve ou que deve                                        |
-| A receber de / A pagar para         | `personId`                        | A pessoa ligada a uma entrada ou a uma saída                                        |
-| Dividir com alguém                  | `split`, `splitOfId`              | Dividir uma saída cria uma entrada pendente por pessoa                              |
-| Reembolso                           | `REIMBURSEMENT_CATEGORY_NAME`     | A categoria de entrada das partes de uma divisão                                    |
-| Importação                          | `TransactionImport`               | Lançamentos trazidos de uma planilha, desfazível                                    |
+| Interface                              | Código                            | Definição                                                                           |
+| -------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------- |
+| Lançamento                             | `Transaction`                     | Uma entrada ou uma saída de dinheiro                                                |
+| Entrada / Saída                        | `CREDIT` / `DEBIT`                | O tipo do lançamento                                                                |
+| Categoria                              | `Category`                        | Classificação do lançamento, de um tipo só                                          |
+| Mês (na importação, Mês de referência) | `period` (`YYYY-MM`)              | O mês ao qual o lançamento pertence (nos docs técnicos, "competência")              |
+| Vencimento                             | `dueDate`                         | Data prevista para pagar ou receber                                                 |
+| Pago em / Recebido em                  | `settledAt`                       | Data em que a saída foi paga ou a entrada foi recebida                              |
+| Marcar como pago / recebido            | `PATCH { settledAt }`             | A ação de registrar o pagamento ou o recebimento                                    |
+| Pendente / Vencido / Pago, Recebido    | `PENDING` / `OVERDUE` / `SETTLED` | Situação derivada (`transactionStatus`, [modelo](modelo.md#transaction-lançamento)) |
+| Recorrência                            | `Recurrence`                      | Lançamento que se repete todo mês                                                   |
+| Valor estimado                         | `amountEstimated`                 | Valor de uma recorrência variável ainda não confirmado                              |
+| Parcelamento / Parcela                 | `InstallmentPlan` / `installment` | Compra ou dívida dividida em parcelas, uma por mês                                  |
+| Pessoa                                 | `Person`                          | Contato do espaço a quem se deve ou que deve                                        |
+| A receber de / A pagar para            | `personId`                        | A pessoa ligada a uma entrada ou a uma saída                                        |
+| Dividir com alguém                     | `split`, `splitOfId`              | Dividir uma saída cria uma entrada pendente por pessoa                              |
+| Reembolso                              | `REIMBURSEMENT_CATEGORY_NAME`     | A categoria de entrada das partes de uma divisão                                    |
+| Importação                             | `TransactionImport`               | Lançamentos trazidos de uma planilha, desfazível                                    |
 
 ### Orçamento e Painel
 
-| Interface               | Código                                     | Definição                                                                     |
-| ----------------------- | ------------------------------------------ | ----------------------------------------------------------------------------- |
-| Orçamento do mês        | `BudgetConfig` + `BudgetShare`             | A renda líquida e os percentuais salvos para um mês, herdados pelos seguintes |
-| Renda líquida           | `netIncomeCents`                           | A base do limite de gastos                                                    |
-| Limite de gastos        | destino `EXPENSES`                         | O % da renda líquida que se planeja gastar                                    |
-| Despesas                | `expenses`                                 | Saídas fora das categorias das metas de guardar                               |
-| Disponível para guardar | `available`                                | Entradas − despesas: a base das metas de guardar                              |
-| Meta de guardar         | `BudgetDestination` `SAVINGS`              | Um % do disponível, com a sua categoria de saída (Reserva de emergência…)     |
-| Guardar / Guardado      | saída na categoria da meta, `appliedCents` | Registrar dinheiro guardado numa meta / o total já pago nela                  |
-| Pendente (na meta)      | `pendingCents`                             | Saídas da meta ainda não pagas                                                |
-| Livre                   | `unallocated`                              | O % e o valor do disponível que nenhuma meta recebeu                          |
-| Previsto / Realizado    | visões `planned` / `settled`               | Tudo o que foi lançado / só o que já foi pago ou recebido                     |
-| Saldo previsto          | `balance.plannedCents`                     | Como o mês termina se tudo for pago e recebido                                |
-| Saldo atual             | `balance.settledCents`                     | Recebido − pago até agora                                                     |
+| Interface                                                   | Código                                           | Definição                                                                                              |
+| ----------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Orçamento do mês                                            | `BudgetConfig` + `BudgetShare`                   | A renda líquida e os percentuais salvos para um mês, herdados pelos seguintes                          |
+| Renda líquida                                               | `netIncomeCents`                                 | A base do limite de gastos                                                                             |
+| Limite de gastos                                            | destino `EXPENSES`                               | O % da renda líquida que se planeja gastar                                                             |
+| Despesas                                                    | `expenses`                                       | Saídas fora das categorias das metas de guardar                                                        |
+| Disponível para guardar                                     | `available`                                      | Entradas − despesas: a base das metas de guardar                                                       |
+| Meta                                                        | `BudgetDestination` `SAVINGS`                    | Um % do disponível, com a sua categoria de saída (Reserva de emergência…)                              |
+| Guardar / Guardado (formulário: "Registrar valor guardado") | saída na categoria da meta, `appliedCents`       | Registrar dinheiro guardado numa meta (descrição preenchida "Aporte em {meta}") / o total já pago nela |
+| Pendente (na meta)                                          | `pendingCents`                                   | Saídas da meta ainda não pagas                                                                         |
+| Progresso                                                   | `appliedCents ÷ targetCents`                     | Quanto da meta já foi guardado, em %                                                                   |
+| Para guardar                                                | `applied.plannedCents` (Análise, visão prevista) | O que vai para as metas, pago ou não                                                                   |
+| Sem meta                                                    | `unallocated`                                    | A parte do disponível previsto que nenhuma meta recebeu; uma divisão do orçamento, não um saldo        |
+| Previsto / Realizado                                        | visões `planned` / `settled`                     | Tudo o que foi lançado / só o que já foi pago ou recebido                                              |
+| Saldo previsto                                              | `balance.plannedCents`                           | Como o mês termina se tudo for pago e recebido                                                         |
+| Saldo atual                                                 | `balance.settledCents`                           | Recebido − pago até agora                                                                              |
 
 ## Pontes com o Protheus
 

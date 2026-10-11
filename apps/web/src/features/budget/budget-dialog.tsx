@@ -13,7 +13,7 @@ function budgetSourceText(budget: Budget) {
   const origin =
     budget.source === 'INHERITED' && budget.inheritedFrom
       ? `Herdado de ${formatPeriod(budget.inheritedFrom)}.`
-      : 'Nenhuma competência até aqui tem orçamento salvo.';
+      : 'Nenhum mês até aqui tem orçamento salvo.';
   return `${origin} Ao salvar, ${month} passa a ter o seu próprio orçamento.`;
 }
 

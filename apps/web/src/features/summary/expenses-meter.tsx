@@ -18,7 +18,7 @@ export function ExpensesMeter({ summary }: { summary: Summary }) {
     <div className="grid gap-2">
       <div
         role="meter"
-        aria-label="Despesas em relação à meta"
+        aria-label="Despesas em relação ao limite"
         aria-valuemin={0}
         aria-valuemax={goalCents}
         aria-valuenow={Math.min(spent, goalCents)}
@@ -33,12 +33,12 @@ export function ExpensesMeter({ summary }: { summary: Summary }) {
       <p className="tabular-nums">
         {formatCents(spent)} de {formatCents(goalCents)}{' '}
         <span className="text-muted-foreground">
-          (meta de {formatBasisPoints(goal.basisPoints)} da renda)
+          (limite de {formatBasisPoints(goal.basisPoints)} da renda)
         </span>
       </p>
       {over ? (
         <p className="text-destructive">
-          Acima da meta em {formatCents(-summary.expensesLeftCents)}.
+          Acima do limite em {formatCents(-summary.expensesLeftCents)}.
         </p>
       ) : (
         <p className="text-muted-foreground">Folga de {formatCents(summary.expensesLeftCents)}.</p>

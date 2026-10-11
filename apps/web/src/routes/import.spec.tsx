@@ -102,7 +102,7 @@ describe('ImportPage', () => {
     expect(await screen.findByRole('heading', { name: '3. Revise e importe' })).toBeInTheDocument();
 
     const august = await screen.findByRole('region', { name: 'agosto de 2026' });
-    expect(august).toHaveTextContent('Créditos R$ 5.200,00, débitos R$ 640,35');
+    expect(august).toHaveTextContent('Entradas R$ 5.200,00, saídas R$ 640,35');
     expect(within(august).getAllByRole('listitem')).toHaveLength(2);
     await userEvent.click(screen.getByRole('button', { name: 'Importar 2 lançamentos' }));
 
@@ -149,7 +149,7 @@ describe('ImportPage', () => {
 
     expect(screen.getByRole('button', { name: 'Importar 1 lançamento' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'agosto de 2026' })).toHaveTextContent(
-      'Créditos R$ 5.200,00, débitos R$ 0,00',
+      'Entradas R$ 5.200,00, saídas R$ 0,00',
     );
   });
 
@@ -166,7 +166,7 @@ describe('ImportPage', () => {
     const matching = await screen.findByRole('region', { name: 'Categorias' });
     expect(screen.getByRole('button', { name: 'Importar 1 lançamento' })).toBeInTheDocument();
     await userEvent.click(
-      within(matching).getByRole('combobox', { name: /^Feira \(débito, 1 linha\)/ }),
+      within(matching).getByRole('combobox', { name: /^Feira \(saída, 1 linha\)/ }),
     );
     await userEvent.click(await screen.findByRole('option', { name: 'Mercado' }));
 
@@ -191,7 +191,7 @@ describe('ImportPage', () => {
     expect(screen.getByRole('button', { name: 'Importar 1 lançamento' })).toBeInTheDocument();
     // The check before importing: what goes in, adding up, and what does not.
     expect(screen.getByRole('status').textContent?.replaceAll(' ', ' ')).toBe(
-      '1 de 2 linhas prontas para importar: créditos R$ 5.200,00, débitos R$ 0,00. 1 linha com problema.',
+      '1 de 2 linhas prontas para importar: entradas R$ 5.200,00, saídas R$ 0,00. 1 linha com problema.',
     );
     // Only the rows with a problem on screen; the others stay in the import.
     await userEvent.click(screen.getByRole('radio', { name: 'Com problemas' }));
@@ -251,7 +251,9 @@ describe('ImportPage', () => {
     expect(previous).toHaveTextContent('por Maria Exemplo');
     await userEvent.click(within(previous).getByRole('button', { name: /^Desfazer a importação/ }));
     const confirm = await screen.findByRole('alertdialog');
-    expect(confirm).toHaveTextContent('inclusive os que foram editados ou efetivados depois');
+    expect(confirm).toHaveTextContent(
+      'inclusive os que foram editados ou marcados como pagos ou recebidos depois',
+    );
     await userEvent.click(within(confirm).getByRole('button', { name: 'Desfazer importação' }));
 
     await expectCall(fetchMock, `${base}/imports/${previousImport.id}`, { method: 'DELETE' });

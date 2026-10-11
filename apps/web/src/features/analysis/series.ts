@@ -6,8 +6,8 @@ export const savingCategoryIds = (categories: Category[]): ReadonlySet<string> =
 
 /** Colors in the validated order of ADR 0032 (ADR 0037): credits, debits, balance. */
 export const seriesStyles = {
-  credits: { label: 'Créditos', fill: 'fill-chart-1', swatch: 'bg-chart-1' },
-  debits: { label: 'Débitos', fill: 'fill-chart-2', swatch: 'bg-chart-2' },
+  credits: { label: 'Entradas', fill: 'fill-chart-1', swatch: 'bg-chart-1' },
+  debits: { label: 'Saídas', fill: 'fill-chart-2', swatch: 'bg-chart-2' },
   balance: { label: 'Saldo do mês', fill: 'fill-chart-3', swatch: 'bg-chart-3' },
 } as const;
 

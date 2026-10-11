@@ -14,7 +14,8 @@ export const statusFilterOptions: readonly { value: StatusFilter; label: string 
   { value: 'todos', label: 'Todos' },
   { value: 'pendentes', label: 'Pendentes' },
   { value: 'vencidos', label: 'Vencidos' },
-  { value: 'efetivados', label: 'Efetivados' },
+  // The address keeps "efetivados", the word before ADR 0051: links and bookmarks still work.
+  { value: 'efetivados', label: 'Pagos e recebidos' },
 ];
 
 /** The filter in the address, and a way to change it without stacking history entries. */

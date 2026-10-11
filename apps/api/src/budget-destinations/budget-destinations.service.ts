@@ -25,21 +25,21 @@ function toResponse(destination: DestinationRow, inUse?: boolean): BudgetDestina
 const destinationExists = () =>
   new ConflictException({
     code: 'DESTINATION_EXISTS',
-    message: 'Já existe um destino com esse nome. Se ele estiver arquivado, reative-o.',
+    message: 'Já existe uma meta com esse nome. Se ela estiver arquivada, reative-a.',
   });
 
 const categoryTaken = () =>
   new ConflictException({
     code: 'CATEGORY_EXISTS',
     message:
-      'Já existe uma categoria de débito com esse nome. O destino cria a sua própria: escolha outro nome.',
+      'Já existe uma categoria de saída com esse nome. A meta cria a sua própria: escolha outro nome.',
   });
 
 const expensesFixed = () =>
   new ConflictException({
     code: 'DESTINATION_FIXED',
     message:
-      'Despesas é o destino fixo do orçamento: ele não pode ser renomeado, arquivado nem excluído.',
+      'O limite de gastos é fixo no orçamento: ele não pode ser renomeado, arquivado nem excluído.',
   });
 
 function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
@@ -174,7 +174,7 @@ export class BudgetDestinationsService {
         throw new ConflictException({
           code: 'DESTINATION_IN_USE',
           message:
-            'Este destino tem lançamentos, recorrências ou parcelamentos: ele não pode ser excluído, só arquivado.',
+            'Esta meta tem lançamentos, recorrências ou parcelamentos: ela não pode ser excluída, só arquivada.',
         });
       }
       throw error;
@@ -184,7 +184,7 @@ export class BudgetDestinationsService {
   /**
    * An archived destination leaves the budget from `period` on (ADR 0047, note of 2026-10-09):
    * its share goes from this competência's budget and from every later saved one, and becomes
-   * "Sem destino". Earlier competências keep theirs, so their dashboards do not change. When
+   * "Sem meta". Earlier competências keep theirs, so their dashboards do not change. When
    * this competência only inherits a budget that gives the destination a share, it is saved now,
    * as a copy of the inherited one without that share.
    */

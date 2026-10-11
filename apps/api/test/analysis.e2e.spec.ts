@@ -146,10 +146,10 @@ describe('analysis', () => {
     const reversed = await browser.get(`${base}?from=2026-10&to=2026-09`).expect(400);
     expect(reversed.body).toMatchObject({
       code: 'INVALID_INPUT',
-      message: 'A competência inicial precisa vir antes da final.',
+      message: 'O mês inicial precisa vir antes do final.',
     });
     const tooLong = await browser.get(`${base}?from=2024-01&to=2026-10`).expect(400);
-    expect(tooLong.body).toMatchObject({ message: 'Escolha no máximo 24 competências.' });
+    expect(tooLong.body).toMatchObject({ message: 'Escolha no máximo 24 meses.' });
     await browser.get(`${base}?from=2026-13&to=2026-10`).expect(400);
     await browser.get(base).expect(400);
   });

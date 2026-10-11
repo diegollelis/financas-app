@@ -96,7 +96,7 @@ function PreviousImport({
                 <AlertDialogTitle>Desfazer a importação de {when}?</AlertDialogTitle>
                 <AlertDialogDescription>
                   Os {item.transactionCount} lançamentos dela saem, inclusive os que foram editados
-                  ou efetivados depois. Não é possível desfazer.
+                  ou marcados como pagos ou recebidos depois. Não é possível desfazer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -175,7 +175,7 @@ export function ImportPage() {
               1. Baixe o modelo
             </h2>
             <p>
-              Uma linha por lançamento, com competência, tipo, descrição, categoria e valor. A
+              Uma linha por lançamento, com mês de referência, tipo, descrição, categoria e valor. A
               planilha já vem com um exemplo e a lista das categorias deste espaço.
             </p>
             <Button variant="outline" className="justify-self-start" onClick={download}>

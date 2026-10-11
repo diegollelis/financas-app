@@ -151,7 +151,7 @@ describe('PeoplePage', () => {
     const items = within(history).getAllByRole('listitem');
     expect(text(items[0]!)).toContain('Ana: parte de Jantaroutubro de 2026A receberPendente');
     expect(text(items[1]!)).toContain('Casa de praiajulho de 2026A pagarPago');
-    // Only the pending one can be marked, with the same settling as "Efetivar".
+    // Only the pending one can be marked, with the same settling as in Lançamentos.
     expect(within(items[1]!).queryByRole('button')).not.toBeInTheDocument();
     await userEvent.click(
       within(items[0]!).getByRole('button', {

@@ -116,11 +116,11 @@ describe('RecurrencesPage', () => {
     const monthly = await section('Todo mês');
     // What the active ones add up to; the variable one is an estimate. Academia ended.
     expect(nbsp(monthly.textContent)).toContain(
-      'Por mês: R$ 1.689,90 em débitos, dos quais R$ 189,90 estimados.',
+      'Por mês: R$ 1.689,90 em saídas, dos quais R$ 189,90 estimados.',
     );
     const [active, ended] = within(monthly).getAllByRole('list');
     expect(rowsOf(active!)).toEqual([
-      expect.stringMatching(/Aluguel.*Débito.*Moradia.*Vence dia 10.*Desde janeiro de 2026/),
+      expect.stringMatching(/Aluguel.*Saída.*Moradia.*Vence dia 10.*Desde janeiro de 2026/),
       expect.stringMatching(/Conta de luz.*Contas da casa.*Varia todo mês/),
     ]);
     expect(within(monthly).getByRole('heading', { name: 'Encerradas' })).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe('RecurrencesPage', () => {
         /Geladeira.*1 de 3 pagas.*Faltam 2 parcelas: R\$.666,67, até novembro de 2026.*total em 3 parcelas/,
       ),
     ]);
-    expect(rowsOf(over!)).toEqual([expect.stringMatching(/Sofá.*Quitado.*total em 10 de R\$/)]);
+    expect(rowsOf(over!)).toEqual([expect.stringMatching(/Sofá.*Pago.*total em 10 de R\$/)]);
     expect(screen.queryByRole('button', { name: 'Ações de Sofá' })).not.toBeInTheDocument();
   });
 

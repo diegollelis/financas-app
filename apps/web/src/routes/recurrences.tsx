@@ -3,8 +3,10 @@ import {
   formatCents,
   formatPeriod,
   hasRole,
+  settledLabels,
   shiftPeriod,
   splitInstallments,
+  transactionTypeLabels,
   type Category,
   type InstallmentPlan,
   type Recurrence,
@@ -51,7 +53,7 @@ import { apiErrorMessage } from '@/lib/error-message';
 const MONTHLY_TITLE_ID = 'recurrences-monthly';
 const PLANS_TITLE_ID = 'recurrences-plans';
 
-const typeLabel = { CREDIT: 'Crédito', DEBIT: 'Débito' } as const;
+const typeLabel = { CREDIT: 'Entrada', DEBIT: 'Saída' } as const;
 
 const showError = (error: unknown) => toast.error(apiErrorMessage(error));
 
@@ -250,7 +252,7 @@ function RecurrenceItem({
               onOpenChange={setEditing}
               returnFocusTo={actionsRef}
               title={`Editar ${description}`}
-              description="As mudanças valem para os lançamentos pendentes deste mês em diante. Os efetivados e os meses anteriores ficam como estão."
+              description="As mudanças valem para os lançamentos pendentes deste mês em diante. Os já pagos ou recebidos e os meses anteriores ficam como estão."
             >
               <EditRecurrence
                 workspaceId={workspaceId}
@@ -264,7 +266,7 @@ function RecurrenceItem({
               onOpenChange={setConfirmingEnd}
               returnFocusTo={actionsRef}
               title={`Encerrar a recorrência ${description}?`}
-              description="Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já efetivados ficam."
+              description="Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já pagos ou recebidos ficam."
               action="Encerrar recorrência"
               onConfirm={confirmEnd}
             />
@@ -310,7 +312,7 @@ function PlanItem({
         plan.endedAt !== null
           ? 'Encerrado'
           : plan.settledCount >= plan.installments
-            ? 'Quitado'
+            ? settledLabels[plan.type]
             : remaining(plan),
       ]}
       amount={formatCents(plan.totalCents)}
@@ -360,7 +362,7 @@ function remaining(plan: InstallmentPlan) {
 }
 
 /**
- * What the active recurrences add up to each month, by type: "Por mês: R$ 224,90 em débitos, dos
+ * What the active recurrences add up to each month, by type: "Por mês: R$ 224,90 em saídas, dos
  * quais R$ 180,00 estimados." The variable ones are only an estimate, and it says so.
  */
 function monthlyTotal(recurrences: Recurrence[]) {
@@ -371,7 +373,7 @@ function monthlyTotal(recurrences: Recurrence[]) {
     const estimated = items
       .filter((item) => item.variableAmount)
       .reduce((sum, item) => sum + item.amountCents, 0);
-    const noun = type === 'DEBIT' ? 'débitos' : 'créditos';
+    const noun = transactionTypeLabels[type].lowerPlural;
     const part =
       estimated === 0
         ? ''
@@ -454,7 +456,7 @@ export function RecurrencesPage() {
     <>
       <PageHeader
         title="Recorrências"
-        description="O que se repete todo mês e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi efetivado não muda."
+        description="O que se repete todo mês e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi pago ou recebido não muda."
       />
       <QueryState queries={[recurrences, plans, categories]} />
       {ready &&
@@ -481,7 +483,7 @@ export function RecurrencesPage() {
               title="Parcelamentos"
               empty="Nenhum parcelamento em andamento."
               active={plans.data.filter((plan) => !planIsOver(plan)).map(planItem)}
-              pastTitle="Encerrados e quitados"
+              pastTitle="Encerrados e pagos"
               past={plans.data.filter(planIsOver).map(planItem)}
             />
           </>

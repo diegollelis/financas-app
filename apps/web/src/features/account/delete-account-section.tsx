@@ -34,7 +34,7 @@ export function DeleteAccountSection() {
         Excluir conta
       </h2>
       <p>
-        Apaga a sua conta, o seu espaço pessoal e os espaços em que só você participa, com todos os
+        Exclui a sua conta, o seu espaço pessoal e os espaços em que só você participa, com todos os
         lançamentos. Dos espaços de outras pessoas, você sai. Não é possível desfazer; baixe os seus
         dados antes, se quiser guardar uma cópia.
       </p>
