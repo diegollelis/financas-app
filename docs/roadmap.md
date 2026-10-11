@@ -9,6 +9,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.0.0** (2026-10-10): as fases 1 a 4, o front-end mobile-first, a revisão das telas, dos textos legais e da segurança, e as categorias e os destinos padrão genéricos. É o início do uso real.
 - **1.0.1** (2026-10-10): sessão encerrada em outro aparelho (ou expirada) leva à tela de login com o aviso "Sua sessão terminou. Entre de novo para continuar.", acima do cartão, e volta à mesma página depois de entrar; voltar à aba já confere a sessão.
 - **1.1.0** (2026-10-11): o vocabulário da interface com os termos dos apps de finanças pessoais ([ADR 0051](adr/0051-vocabulario-da-interface.md)): Entrada e Saída, Mês, "Marcar como pago" e "Marcar como recebido", Limite de gastos, Metas, Guardar e "Sem meta"; a planilha modelo com "Mês de referência", que continua lendo as antigas; e as mensagens da API sobre metas e pessoas aparecendo na tela, em vez do erro genérico.
+- **1.1.1** (2026-10-11): em Lançamentos, a busca ganha uma linha inteira, com o filtro de situação embaixo (no tablet, o rótulo e o filtro não quebram mais); Minha conta abre na moldura do último espaço usado, com o menu lateral ou a barra inferior.
 
 ## Fase 0 — Planejamento ✅
 
