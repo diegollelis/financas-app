@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { navigateAway, saveFile } from '@/lib/browser';
-import { mockApi, personalWorkspace, signedInHome, verifiedUser } from '@/test/mock-api';
+import { fakeUser, mockApi, personalWorkspace, signedInHome, verifiedUser } from '@/test/mock-api';
 import { renderApp } from '@/test/render';
 
 vi.mock('@/lib/browser', () => ({ navigateAway: vi.fn(), saveFile: vi.fn() }));
@@ -22,8 +22,16 @@ describe('AccountPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Minha conta' })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/conta');
-    expect(screen.getByText(verifiedUser.email)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Voltar aos espaços' })).toHaveAttribute('href', '/');
+    const account = screen.getByRole('region', { name: 'Conta' });
+    expect(within(account).getByText(fakeUser.email)).toBeInTheDocument();
+    // In the frame of the workspace it came from (ADR 0044 note): the sections are the way back,
+    // and none is marked, since this page is not one of them.
+    const sections = screen.getByRole('navigation', { name: 'Seções do espaço' });
+    expect(within(sections).getByRole('link', { name: 'Painel' })).toHaveAttribute(
+      'href',
+      `/espacos/${personalWorkspace.id}/painel`,
+    );
+    expect(within(sections).queryByRole('link', { current: 'page' })).not.toBeInTheDocument();
   });
 
   it('downloads the data export under the name the API gives it', async () => {

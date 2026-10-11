@@ -486,7 +486,9 @@ export function TransactionsPage() {
       >
         <PeriodNav period={period} />
         {ready && transactions.data.length > 0 && (
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          // The search on a row of its own at every width: beside the filter it was squeezed to a
+          // sliver once the filter read "Pagos e recebidos" (ADR 0051).
+          <div className="grid gap-3">
             <FormField id="transactions-search" label="Buscar lançamento">
               <Input
                 type="search"
@@ -500,8 +502,9 @@ export function TransactionsPage() {
               options={statusFilterOptions}
               value={statusFilter}
               onChange={setStatusFilter}
-              // Four do not fit in 360px: two rows of two on the phone, one row from sm.
-              className="grid-flow-row grid-cols-2 sm:grid-flow-col sm:grid-cols-none"
+              // Two rows of two up to lg: beside the sidebar of a tablet, "Pagos e recebidos" broke
+              // into two lines in a row of four.
+              className="grid-flow-row grid-cols-2 lg:grid-flow-col lg:grid-cols-none"
             />
           </div>
         )}

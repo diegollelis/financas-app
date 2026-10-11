@@ -24,6 +24,21 @@ export function forgetLastWorkspace(workspaceId: string) {
   }
 }
 
+/**
+ * The last workspace opened in this browser, if it is still one of the user's; else the personal.
+ * Where "/" goes, and whose frame "Minha conta" opens in (ADR 0044, note of 2026-10-11).
+ */
+export function pickWorkspace<T extends { id: string; isPersonal: boolean }>(
+  workspaces: T[],
+): T | undefined {
+  const last = readLastWorkspace();
+  return (
+    workspaces.find((workspace) => workspace.id === last) ??
+    workspaces.find((workspace) => workspace.isPersonal) ??
+    workspaces[0]
+  );
+}
+
 export function rememberLastWorkspace(workspaceId: string) {
   try {
     window.localStorage.setItem(LAST_WORKSPACE_KEY, workspaceId);
