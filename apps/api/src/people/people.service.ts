@@ -144,7 +144,8 @@ export class PeopleService {
       if (isPrismaError(error, 'P2003')) {
         throw new ConflictException({
           code: 'PERSON_IN_USE',
-          message: 'Esta pessoa tem lançamentos: ela não pode ser excluída, só arquivada.',
+          message:
+            'Esta pessoa tem lançamentos, recorrências ou parcelamentos: ela não pode ser excluída, só arquivada.',
         });
       }
       throw error;

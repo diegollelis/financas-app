@@ -31,6 +31,8 @@ export const createInstallmentPlanInputSchema = z
     /** The competência of the first installment. */
     firstPeriod: periodSchema,
     dueDay: dueDaySchema.nullable().optional(),
+    /** "A receber de" / "a pagar para" (ADR 0052): copied to every installment. */
+    personId: z.uuid().nullable().optional(),
   })
   .refine(
     (input) =>
@@ -54,6 +56,7 @@ export const installmentPlanSchema = z.object({
   installments: z.number().int(),
   firstPeriod: periodSchema,
   dueDay: z.number().int().nullable(),
+  personId: z.uuid().nullable().default(null),
   /** When it was ended; null while it runs. */
   endedAt: z.iso.datetime().nullable(),
   /** How many installments were already settled. */

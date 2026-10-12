@@ -26,6 +26,8 @@ export const createRecurrenceInputSchema = z.object({
    * last 3 settled, and stays an estimate until the real one is given. Otherwise it is fixed.
    */
   variableAmount: z.boolean().optional(),
+  /** "A receber de" / "a pagar para" (ADR 0052): copied to every month it generates. */
+  personId: z.uuid().nullable().optional(),
   /** The first competência; its transaction is created right away. */
   startPeriod: periodSchema,
 });
@@ -51,6 +53,7 @@ export const recurrenceSchema = z.object({
   amountCents: z.number().int(),
   variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
+  personId: z.uuid().nullable().default(null),
   startPeriod: periodSchema,
   /** The last competência it generated; null while active. */
   endPeriod: periodSchema.nullable(),

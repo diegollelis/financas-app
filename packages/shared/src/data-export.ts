@@ -82,6 +82,7 @@ const exportRecurrenceSchema = z.object({
   amountCents: z.number().int(),
   variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
+  personId: z.uuid().nullable(),
   startPeriod: period,
   endPeriod: period.nullable(),
   /** The competências it already generated a transaction for. */
@@ -99,6 +100,7 @@ const exportInstallmentPlanSchema = z.object({
   installments: z.number().int(),
   firstPeriod: period,
   dueDay: z.number().int().nullable(),
+  personId: z.uuid().nullable(),
   endedAt: instant.nullable(),
   createdAt: instant,
 });

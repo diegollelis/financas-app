@@ -308,20 +308,22 @@ model Transaction {
 // member of a shared workspace gets one, at most one each. Archived, not deleted, once it has
 // transactions.
 model Person {
-  id           String        @id @default(uuid(7)) @db.Uuid
-  workspaceId  String        @map("workspace_id") @db.Uuid
-  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name         String        @db.VarChar(100)
-  memberUserId String?       @map("member_user_id") @db.Uuid
-  memberUser   User?         @relation(fields: [memberUserId], references: [id], onDelete: SetNull)
-  archivedAt   DateTime?     @map("archived_at") @db.Timestamptz(3)
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
-  transactions Transaction[]
+  id               String            @id @default(uuid(7)) @db.Uuid
+  workspaceId      String            @map("workspace_id") @db.Uuid
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String            @db.VarChar(100)
+  memberUserId     String?           @map("member_user_id") @db.Uuid
+  memberUser       User?             @relation(fields: [memberUserId], references: [id], onDelete: SetNull)
+  archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions     Transaction[]
+  recurrences      Recurrence[]
+  installmentPlans InstallmentPlan[]
 
   @@unique([workspaceId, name])
   @@unique([workspaceId, memberUserId])
-  // Target of the composite foreign key of transactions.
+  // Target of the composite foreign keys of transactions, recurrences and installment plans.
   @@unique([id, workspaceId])
   @@map("people")
 }
@@ -365,6 +367,9 @@ model InstallmentPlan {
   installments Int             @db.SmallInt
   firstPeriod  String          @map("first_period") @db.Char(7)
   dueDay       Int?            @map("due_day") @db.SmallInt
+  // "A receber de" / "a pagar para" (ADR 0052), copied to every installment.
+  personId     String?         @map("person_id") @db.Uuid
+  person       Person?         @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   endedAt      DateTime?       @map("ended_at") @db.Timestamptz(3)
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -392,6 +397,9 @@ model Recurrence {
   variableAmount Boolean                @default(false) @map("variable_amount")
   // Day of the month it is due (1-31); a longer number than the month has means its last day.
   dueDay         Int?                   @map("due_day") @db.SmallInt
+  // "A receber de" / "a pagar para" (ADR 0052), copied to every month it generates.
+  personId       String?                @map("person_id") @db.Uuid
+  person         Person?                @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   startPeriod    String                 @map("start_period") @db.Char(7)
   endPeriod      String?                @map("end_period") @db.Char(7)
   createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
