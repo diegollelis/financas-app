@@ -1,4 +1,10 @@
-import { formatCents, MAX_SPLIT_PEOPLE, type Person, type TransactionType } from '@financas/shared';
+import {
+  formatCents,
+  MAX_SPLIT_PEOPLE,
+  splitInstallments,
+  type Person,
+  type TransactionType,
+} from '@financas/shared';
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -45,6 +51,7 @@ export function SplitFields({
   type,
   people,
   userId,
+  installments,
 }: {
   idPrefix: string;
   control: Control<SplitFormFields>;
@@ -59,6 +66,11 @@ export function SplitFields({
   people: Person[];
   /** The signed-in user, never offered. */
   userId: string;
+  /**
+   * An installment plan (ADR 0052): the shares are in the meaning of the amount typed, of the
+   * total or of each installment, and every installment gets its part of them.
+   */
+  installments?: { count: number; amountIs: 'TOTAL' | 'INSTALLMENT' };
 }) {
   const { fields, replace, remove } = useFieldArray({ control, name: 'shares' });
   const mode = useWatch({ control, name: 'shareMode' });
@@ -81,6 +93,34 @@ export function SplitFields({
       setValue(`shares.${index}.value`, value, { shouldValidate: false }),
     );
   }, [manual, count, mode, totalCents, setValue]);
+
+  // "Sua parte: R$ 400,00 do total. Por parcela: Ana R$ 133,33. Cada pessoa vira…"
+  const summary = (myCents: number) => {
+    const meaning = !installments
+      ? ''
+      : installments.amountIs === 'TOTAL'
+        ? ' do total'
+        : ' por parcela';
+    const parts = [`Sua parte: ${formatCents(myCents)}${meaning}.`];
+    if (installments?.amountIs === 'TOTAL' && installments.count >= 2) {
+      // Each share divided like the installments themselves, the leftover cents on the last.
+      const each = shares.map((share, index) => {
+        const [first = 0] = splitInstallments(cents[index] ?? 0, installments.count);
+        return `${share.name} ${formatCents(first)}`;
+      });
+      const uneven = cents.some((value) => (value ?? 0) % installments.count !== 0);
+      parts.push(
+        `Por parcela: ${each.join('; ')}${uneven ? ', a última com os centavos que sobram' : ''}.`,
+      );
+    }
+    const where = installments ? ' em cada parcela' : '';
+    parts.push(
+      type === 'CREDIT'
+        ? `Cada pessoa vira um valor a pagar${where}, na categoria Repasse.`
+        : `Cada pessoa vira um valor a receber${where}, na categoria Reembolso.`,
+    );
+    return parts.join(' ');
+  };
 
   const pickPeople = (picked: string[]) => {
     // Whoever stays keeps what was typed for them.
@@ -200,9 +240,7 @@ export function SplitFields({
               ? 'Informe o valor e a parte de cada pessoa.'
               : mine < 0
                 ? 'As partes dos outros passam do valor do lançamento.'
-                : type === 'CREDIT'
-                  ? `Sua parte: ${formatCents(mine)}. Cada pessoa vira um valor a pagar, na categoria Repasse.`
-                  : `Sua parte: ${formatCents(mine)}. Cada pessoa vira um valor a receber, na categoria Reembolso.`}
+                : summary(mine)}
           </p>
         </>
       )}

@@ -466,6 +466,64 @@ describe('TransactionsPage', () => {
     expect(await screen.findByText('Parcelamento adicionado: 3 parcelas')).toBeInTheDocument();
   });
 
+  it('splits an installment plan too, showing each share per installment', async () => {
+    const planId = '01920000-0000-7000-8000-000000000402';
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`POST /api/workspaces/${houseId}/installments`]: {
+        status: 201,
+        body: {
+          id: planId,
+          type: 'DEBIT',
+          description: 'TV',
+          notes: null,
+          categoryId: marketCategory.id,
+          totalCents: 100_000,
+          installments: 3,
+          firstPeriod: '2026-10',
+          dueDay: null,
+          endedAt: null,
+          settledCount: 0,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'TV');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Parcelado' }));
+    await userEvent.type(within(form).getByLabelText('Valor total (R$)'), '1.000');
+    await userEvent.type(within(form).getByLabelText('Parcelas'), '3');
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    // Half of the total each: Ana's R$ 500,00 in 3, the leftover cent on the last.
+    await pickPeople(form, ['Ana']);
+    expect(nbsp(within(form).getByText(/^Sua parte/).textContent)).toBe(
+      'Sua parte: R$ 500,00 do total. Por parcela: Ana R$ 166,66, a última com os centavos que sobram. Cada pessoa vira um valor a receber em cada parcela, na categoria Reembolso.',
+    );
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/installments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'TV',
+        notes: null,
+        categoryId: marketCategory.id,
+        installments: 3,
+        amountCents: 100_000,
+        amountIs: 'TOTAL',
+        firstPeriod: '2026-10',
+        dueDay: null,
+        personId: null,
+        split: [{ personId: ana.id, amountCents: 50_000 }],
+      }),
+    });
+    expect(
+      await screen.findByText('Parcelamento adicionado: 3 parcelas, dividido com 1 pessoa'),
+    ).toBeInTheDocument();
+  });
+
   it('takes the amount of each installment, and checks the count', async () => {
     mockTransactions();
     renderApp(`/espacos/${houseId}/lancamentos`);

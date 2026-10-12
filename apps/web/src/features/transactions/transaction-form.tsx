@@ -64,7 +64,12 @@ const transactionFormSchema = plainTransactionInputSchema
     shares: z.array(z.object({ name: z.string(), value: z.string() })),
   })
   .superRefine((values, ctx) => {
-    if (values.splitOn && values.repeat === 'NONE') {
+    if (values.splitOn && values.repeat !== 'MONTHLY') {
+      // A share of an installment plan's total is divided among its installments (ADR 0052).
+      const installments =
+        values.repeat === 'INSTALLMENTS' && values.amountIs === 'TOTAL'
+          ? Number(values.installments)
+          : 0;
       if (values.shares.length === 0) {
         ctx.addIssue({ code: 'custom', path: ['shares'], message: 'Escolha com quem dividir.' });
       }
@@ -92,6 +97,12 @@ const transactionFormSchema = plainTransactionInputSchema
             code: 'custom',
             path: ['shares', index, 'value'],
             message: values.shareMode === 'REAIS' ? 'Informe o valor.' : 'De 0 a 100%.',
+          });
+        } else if (cents < installments) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['shares', index, 'value'],
+            message: 'Precisa dar ao menos um centavo por parcela.',
           });
         }
         others += cents ?? 0;
@@ -243,9 +254,9 @@ export function TransactionForm({
   const typedAmount = useWatch({ control, name: 'amount' });
   const typedInstallments = useWatch({ control, name: 'installments' });
   const splitOn = useWatch({ control, name: 'splitOn' });
-  // Splitting is for a new transaction launched once, a credit too; anything else may name one
-  // person, a recurrence or an installment plan too, copied to each month (ADRs 0042, 0052).
-  const canSplit = allowRepeat && repeat === 'NONE';
+  // A new transaction, a credit too, launched once or in installments, may be split; anything
+  // else may name one person, a recurrence too, copied to each month (ADRs 0042, 0052).
+  const canSplit = allowRepeat && repeat !== 'MONTHLY';
   const splitting = canSplit && splitOn;
   const showPerson = !splitting;
   const user = useCurrentUser();
@@ -525,6 +536,11 @@ export function TransactionForm({
                   type={type}
                   people={people}
                   userId={user.id}
+                  installments={
+                    repeat === 'INSTALLMENTS'
+                      ? { count: Number(typedInstallments), amountIs: amountIs ?? 'TOTAL' }
+                      : undefined
+                  }
                 />
               )}
             </div>
