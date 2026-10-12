@@ -61,7 +61,7 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 
 ### Pessoa e rateio (fase 5)
 
-Pessoa (`Person`): um contato do espaço, só o nome, para quem usa ou não o app, opcionalmente ligado a um membro. Um lançamento pode ser ligado a uma pessoa (crédito = a receber de, débito = a pagar para), e dividir um gasto cria um crédito pendente "a receber" por pessoa, na categoria Reembolso ([ADR 0042](../adr/0042-pessoas-e-rateio.md)).
+Pessoa (`Person`): um contato do espaço, só o nome, para quem usa ou não o app, opcionalmente ligado a um membro. Um lançamento pode ser ligado a uma pessoa (crédito = a receber de, débito = a pagar para), e dividir um gasto cria um crédito pendente "a receber" por pessoa, na categoria Reembolso ([ADR 0042](../adr/0042-pessoas-e-rateio.md)); dividir uma entrada cria um débito pendente "a pagar" por pessoa, na categoria Repasse ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)).
 
 ## Indicadores do painel (por espaço e competência)
 
@@ -73,9 +73,9 @@ Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras
 
 **Créditos:** Salário, Renda extra, Rendimentos, Reembolso, Outros
 
-**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Educação, Lazer, Compras, Assinaturas, Cartão de crédito, Impostos e taxas, Outros
+**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Educação, Lazer, Compras, Assinaturas, Cartão de crédito, Impostos e taxas, Repasse, Outros
 
-- **"Reembolso"** recebe as partes de uma divisão de contas ([ADR 0042](../adr/0042-pessoas-e-rateio.md)).
+- **"Reembolso"** recebe as partes de uma saída dividida ([ADR 0042](../adr/0042-pessoas-e-rateio.md)), e **"Repasse"** as de uma entrada dividida ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)).
 - **Os destinos de guardar padrão** são Reserva de emergência e Investimentos, e cada um cria a sua categoria de débito com o mesmo nome ([ADR 0047](../adr/0047-orcamento-real-por-destino.md)).
 
 **Histórico:** até a versão 1.0.0, a lista vinha da planilha pessoal de origem, com 14 categorias de crédito e 26 de débito, como PLR, Lote, Inglês e IPVA. Ela foi trocada pela atual antes da 1.0.0 (nota de 2026-10-10 no [ADR 0024](../adr/0024-espacos-membros-e-espaco-pessoal.md)). Os espaços criados antes continuam com as categorias que receberam. "Viagem" saiu junto com o destino padrão "Viagens".

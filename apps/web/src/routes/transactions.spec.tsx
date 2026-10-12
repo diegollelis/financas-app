@@ -851,6 +851,42 @@ describe('TransactionsPage', () => {
     expect(field).toHaveTextContent('Ninguém');
   });
 
+  it('splits a credit too: each share becomes a value to pay, in Repasse', async () => {
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`POST ${base}`]: { status: 201, body: salary },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.click(within(form).getByRole('radio', { name: 'Entrada' }));
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Aluguel recebido');
+    await chooseCategory(form, 'Salário');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '1.000,00');
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    await pickPerson(form, 'Pessoa 1', 'Ana');
+    await userEvent.type(within(form).getByLabelText('Parte (R$)'), '500,00');
+
+    expect(
+      within(form).getByText(/Cada pessoa vira um valor a pagar, na categoria Repasse/),
+    ).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'CREDIT',
+        description: 'Aluguel recebido',
+        notes: null,
+        categoryId: salaryCategory.id,
+        amountCents: 100_000,
+        dueDate: null,
+        period: '2026-10',
+        split: [{ personId: ana.id, amountCents: 50_000 }],
+      }),
+    });
+  });
+
   it('checks the shares before calling the API', async () => {
     const fetchMock = mockTransactions();
     renderApp(`/espacos/${houseId}/lancamentos`);

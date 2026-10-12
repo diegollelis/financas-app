@@ -486,7 +486,7 @@ describe('people and splits', () => {
       expect(bruno.receivableCents).toBe(33_333);
     });
 
-    it('refuses a split of a credit, one bigger than the debit, or the same person twice', async () => {
+    it('refuses a split bigger than the debit, or the same person twice', async () => {
       const { browser, base, category } = await setup();
       const ana = await addPerson(browser, base, 'Ana');
       const post = (body: object) => browser.post(`${base}/transactions`).send(body).expect(400);
@@ -499,15 +499,6 @@ describe('people and splits', () => {
       };
 
       for (const [body, message] of [
-        [
-          {
-            ...debit,
-            type: 'CREDIT',
-            categoryId: category('Outros', 'CREDIT').id,
-            split: [{ personId: ana.id, amountCents: 100 }],
-          },
-          'Só uma saída pode ser dividida.',
-        ],
         [
           { ...debit, split: [{ personId: ana.id, amountCents: 30_001 }] },
           'As partes dos outros passam do valor do lançamento.',
@@ -584,6 +575,68 @@ describe('people and splits', () => {
       await browser.delete(`${base}/transactions/${withShares.id}?withShares=true`).expect(204);
       // Only the share left from the first one.
       expect(await transactions(browser, base)).toHaveLength(1);
+    });
+  });
+
+  describe('splitting a credit (ADR 0052)', () => {
+    it('creates the credit and one pending Repasse debit per person', async () => {
+      const { browser, base, category } = await setup();
+      const irmao = await addPerson(browser, base, 'Irmão');
+
+      const response = await browser
+        .post(`${base}/transactions`)
+        .send({
+          type: 'CREDIT',
+          description: 'Aluguel recebido',
+          categoryId: category('Renda extra', 'CREDIT').id,
+          amountCents: 100_000,
+          period,
+          settledAt: `${period}-05`,
+          split: [{ personId: irmao.id, amountCents: 50_000 }],
+        })
+        .expect(201);
+
+      const credit = transactionSchema.parse(response.body);
+      expect(credit).toMatchObject({ type: 'CREDIT', amountCents: 100_000 });
+      const shares = (await transactions(browser, base)).filter(
+        (transaction) => transaction.splitOfId === credit.id,
+      );
+      expect(shares).toEqual([
+        expect.objectContaining({
+          type: 'DEBIT',
+          description: 'Irmão: parte de Aluguel recebido',
+          categoryId: category('Repasse', 'DEBIT').id,
+          amountCents: 50_000,
+          personId: irmao.id,
+          settledAt: null,
+        }),
+      ]);
+      expect((await people(browser, base))[0]).toMatchObject({ payableCents: 50_000 });
+    });
+
+    it('creates Repasse again when it was deleted', async () => {
+      const { browser, base, category } = await setup();
+      const repasse = category('Repasse', 'DEBIT');
+      await browser.patch(`${base}/categories/${repasse.id}`).send({ archived: true }).expect(200);
+      await browser.delete(`${base}/categories/${repasse.id}`).expect(204);
+
+      await browser
+        .post(`${base}/transactions`)
+        .send({
+          type: 'CREDIT',
+          description: 'Rifa',
+          categoryId: category('Outros', 'CREDIT').id,
+          amountCents: 4_000,
+          period,
+          split: [{ newPersonName: 'Ana', amountCents: 1_000 }],
+        })
+        .expect(201);
+
+      const recreated = categoryListResponseSchema
+        .parse((await browser.get(`${base}/categories`).expect(200)).body)
+        .filter((c) => c.name === 'Repasse' && c.type === 'DEBIT');
+      expect(recreated).toHaveLength(1);
+      expect(recreated[0]).toMatchObject({ archived: false });
     });
   });
 });

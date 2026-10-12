@@ -8,7 +8,7 @@ import {
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
-import { reimbursementCategoryId } from '../categories/reimbursement-category.js';
+import { shareCategoryId } from '../categories/share-category.js';
 import { ensureUsablePerson } from '../people/ensure-person.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -78,9 +78,10 @@ export class TransactionsService {
   }
 
   /**
-   * One transaction, or a split debit (ADR 0042): the debit and, in the same nested write, one
-   * pending credit per share, "a receber" from that person, in the Reembolso category. New names
-   * in the split become people first.
+   * One transaction, or a split one: the transaction and, in the same nested write, one pending
+   * share per person on the opposite side. A debit's shares are credits "a receber" in Reembolso
+   * (ADR 0042); a credit's are debits "a pagar" in Repasse (ADR 0052). New names in the split
+   * become people first.
    */
   async create(workspaceId: string, input: CreateTransactionInput): Promise<Transaction> {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
@@ -105,17 +106,18 @@ export class TransactionsService {
     return toTransactionResponse(transaction);
   }
 
-  /** The credits of a split: each person resolved (or created) and the Reembolso category. */
+  /** The shares of a split: each person resolved (or created), on the side opposite the input. */
   private async shares(
     workspaceId: string,
     input: CreateTransactionInput,
     split: SplitShareInput[],
   ) {
-    const categoryId = await reimbursementCategoryId(this.prisma, workspaceId);
+    const type = input.type === 'DEBIT' ? ('CREDIT' as const) : ('DEBIT' as const);
+    const categoryId = await shareCategoryId(this.prisma, workspaceId, type);
     const people = await Promise.all(split.map((share) => this.splitPerson(workspaceId, share)));
     return split.map((share, index) => ({
       workspaceId,
-      type: 'CREDIT' as const,
+      type,
       description: shareDescription(people[index]!.name, input.description),
       categoryId,
       amountCents: share.amountCents,
