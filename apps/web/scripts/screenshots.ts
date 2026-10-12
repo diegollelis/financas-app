@@ -414,6 +414,16 @@ async function main() {
       combobox: 'Categoria',
     },
     {
+      // Its person picker (ADR 0052), in the shared workspace: members apart, then the others.
+      name: 'lancamentos-pessoa',
+      path: `/espacos/${houseId}/lancamentos`,
+      signedIn: true,
+      open: /^Novo lançamento$/,
+      opens: 'dialog' as const,
+      expand: /^Mais opções/,
+      combobox: 'A pagar para (opcional)',
+    },
+    {
       // The month picker, opened away from this month (the dot shows beside the name).
       name: 'mes-seletor',
       path: `/espacos/${workspaceId}/lancamentos?competencia=${monthsBefore(period, 14)}`,
@@ -552,6 +562,10 @@ async function main() {
         await page.getByRole(target.opens).waitFor();
         // Lets the opening animation finish.
         await page.waitForTimeout(400);
+      }
+      if ('expand' in target && target.expand) {
+        // A folded part of the form (<details>), opened by its summary.
+        await page.getByText(target.expand).first().click();
       }
       if ('combobox' in target && target.combobox) {
         await page.getByRole('combobox', { name: target.combobox }).click();

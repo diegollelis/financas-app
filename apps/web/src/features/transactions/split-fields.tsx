@@ -1,4 +1,4 @@
-import { formatCents, MAX_SPLIT_PEOPLE } from '@financas/shared';
+import { formatCents, MAX_SPLIT_PEOPLE, normalizeName, type Person } from '@financas/shared';
 import { Plus, X } from 'lucide-react';
 import {
   Controller,
@@ -12,6 +12,7 @@ import {
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PersonSelect } from '@/features/people/person-picker';
 import { evenShareValues, myShareCents, shareCents, type ShareMode } from './split';
 
 /** The part of the transaction form these fields read and write. */
@@ -29,8 +30,8 @@ const modeOptions = [
 /**
  * "Dividir com alguém" (ADR 0042): who else pays part of this debit, and how much, typed in
  * reais or as a percentage. Shows what stays yours as it is typed, and splits equally on request
- * (the cents left over stay in yours). Names already listed are suggested; a new one becomes a
- * person when the transaction is saved.
+ * (the cents left over stay in yours). Each person is picked like a category (ADR 0052); a new
+ * name becomes a person when the transaction is saved.
  */
 export function SplitFields({
   idPrefix,
@@ -39,7 +40,8 @@ export function SplitFields({
   setValue,
   errors,
   totalCents,
-  peopleListId,
+  people,
+  userId,
 }: {
   idPrefix: string;
   control: Control<SplitFormFields>;
@@ -48,8 +50,10 @@ export function SplitFields({
   errors: FieldErrors<SplitFormFields>;
   /** The amount typed, in cents; null while it is not a valid one. */
   totalCents: number | null;
-  /** The <datalist> with the names of the workspace's people. */
-  peopleListId: string;
+  /** The workspace's people, offered in each row (ADR 0052). */
+  people: Person[];
+  /** The signed-in user, never offered. */
+  userId: string;
 }) {
   const { fields, append, remove } = useFieldArray({ control, name: 'shares' });
   const mode = useWatch({ control, name: 'shareMode' });
@@ -89,17 +93,33 @@ export function SplitFields({
           const valueId = `${idPrefix}-share-${index}-value`;
           return (
             <li key={field.id} className="grid grid-cols-[1fr_7.5rem_auto] items-start gap-2">
-              <div className="grid gap-1">
+              <div className="grid min-w-0 gap-1">
                 <label htmlFor={nameId} className="text-sm font-medium">
                   Pessoa {index + 1}
                 </label>
-                <Input
-                  id={nameId}
-                  list={peopleListId}
-                  autoComplete="off"
-                  aria-invalid={nameError ? true : undefined}
-                  aria-describedby={nameError ? `${nameId}-error` : undefined}
-                  {...register(`shares.${index}.name`)}
+                <Controller
+                  control={control}
+                  name={`shares.${index}.name`}
+                  render={({ field: nameField }) => (
+                    <PersonSelect
+                      id={nameId}
+                      value={nameField.value}
+                      onChange={nameField.onChange}
+                      // Someone already in another row is not offered again.
+                      people={people.filter(
+                        (person) =>
+                          !shares.some(
+                            (share, other) =>
+                              other !== index &&
+                              normalizeName(share.name) === normalizeName(person.name),
+                          ),
+                      )}
+                      userId={userId}
+                      title={`Pessoa ${index + 1}`}
+                      aria-invalid={nameError ? true : undefined}
+                      aria-describedby={nameError ? `${nameId}-error` : undefined}
+                    />
+                  )}
                 />
                 {nameError && (
                   <p id={`${nameId}-error`} className="text-destructive text-sm">
