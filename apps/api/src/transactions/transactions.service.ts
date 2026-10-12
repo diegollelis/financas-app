@@ -9,7 +9,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
-import { ensureUsablePerson } from '../people/ensure-person.js';
+import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
@@ -114,7 +114,9 @@ export class TransactionsService {
   ) {
     const type = input.type === 'DEBIT' ? ('CREDIT' as const) : ('DEBIT' as const);
     const categoryId = await shareCategoryId(this.prisma, workspaceId, type);
-    const people = await Promise.all(split.map((share) => this.splitPerson(workspaceId, share)));
+    const people = await Promise.all(
+      split.map((share) => resolveSplitPerson(this.prisma, workspaceId, share)),
+    );
     return split.map((share, index) => ({
       workspaceId,
       type,
@@ -124,20 +126,6 @@ export class TransactionsService {
       period: input.period,
       personId: people[index]!.id,
     }));
-  }
-
-  /** Someone already listed, or a new name: an existing person of that name is reused. */
-  private async splitPerson(workspaceId: string, share: SplitShareInput) {
-    if (share.personId) return ensureUsablePerson(this.prisma, workspaceId, share.personId);
-    const db = this.prisma.forWorkspace(workspaceId);
-    const name = share.newPersonName!;
-    const existing = await db.person.findFirst({
-      where: { workspaceId, name: { equals: name, mode: 'insensitive' } },
-    });
-    if (existing?.archivedAt) {
-      return db.person.update({ where: { id: existing.id }, data: { archivedAt: null } });
-    }
-    return existing ?? db.person.create({ data: { workspaceId, name } });
   }
 
   async update(

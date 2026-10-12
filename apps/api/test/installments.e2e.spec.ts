@@ -211,6 +211,104 @@ describe('installments', () => {
     expect(refused.body).toMatchObject({ code: 'INVALID_PERSON' });
   });
 
+  describe('split (ADR 0052)', () => {
+    it('gives every installment one pending share per person, each total adding up', async () => {
+      const { create, fridge, transactionsOf, base, browser, categoryId, plans } = await setUp();
+      const ana = personSchema.parse(
+        (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201)).body,
+      );
+
+      // R$ 1.000,00 in 3, a third for Ana and R$ 100,00 for Bruno, new.
+      const plan = await create(
+        fridge({
+          split: [
+            { personId: ana.id, amountCents: 33_334 },
+            { newPersonName: 'Bruno', amountCents: 10_000 },
+          ],
+        }),
+      );
+
+      expect(plan).toMatchObject({ installments: 3, settledCount: 0, pendingCount: 3 });
+      const months = await Promise.all([0, 1, 2].map((offset) => transactionsOf(month(offset))));
+      const sharesOf = (transactions: (typeof months)[number]) => {
+        const installment = transactions.find((t) => t.installment !== null)!;
+        return transactions
+          .filter((t) => t.splitOfId === installment.id)
+          .map(({ type, description, amountCents, categoryId: category, settledAt }) => ({
+            type,
+            description,
+            amountCents,
+            category,
+            settledAt,
+          }))
+          .sort((a, b) => a.description.localeCompare(b.description));
+      };
+      const reembolso = categoryId('Reembolso', 'CREDIT');
+      expect(sharesOf(months[0]!)).toEqual([
+        {
+          type: 'CREDIT',
+          description: 'Ana: parte de Geladeira (1/3)',
+          amountCents: 11_111,
+          category: reembolso,
+          settledAt: null,
+        },
+        {
+          type: 'CREDIT',
+          description: 'Bruno: parte de Geladeira (1/3)',
+          amountCents: 3_333,
+          category: reembolso,
+          settledAt: null,
+        },
+      ]);
+      // The cents left over on the last one: each person's total adds up exactly.
+      expect(sharesOf(months[2]!).map((share) => share.amountCents)).toEqual([11_112, 3_334]);
+      // The shares are not installments: the plan still has 3.
+      expect((await plans())[0]).toMatchObject({ pendingCount: 3, pendingCents: 100_000 });
+    });
+
+    it('takes each share per installment when the amount is per installment', async () => {
+      const { create, fridge, transactionsOf } = await setUp();
+
+      await create(
+        fridge({
+          amountCents: 9_990,
+          amountIs: 'INSTALLMENT',
+          installments: 10,
+          split: [{ newPersonName: 'Ana', amountCents: 4_995 }],
+        }),
+      );
+
+      const last = await transactionsOf(month(9));
+      expect(last.find((t) => t.splitOfId !== null)).toMatchObject({
+        description: 'Ana: parte de Geladeira (10/10)',
+        amountCents: 4_995,
+      });
+    });
+
+    it('ends it with the shares still pending of the installments removed', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const plan = await create(
+        fridge({ firstPeriod: month(-1), split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }),
+      );
+      // Ana already paid her part of this month's installment.
+      const now = await transactionsOf(thisMonth);
+      const paidShare = now.find((t) => t.splitOfId !== null)!;
+      await browser
+        .patch(`${base}/transactions/${paidShare.id}`)
+        .send({ settledAt: `${thisMonth}-02` })
+        .expect(200);
+
+      await browser.delete(`${base}/installments/${plan.id}`).expect(204);
+
+      // Last month stays whole; this month's paid share stays, unlinked; next month is gone.
+      expect(await transactionsOf(month(-1))).toHaveLength(2);
+      expect(await transactionsOf(thisMonth)).toEqual([
+        expect.objectContaining({ id: paidShare.id, splitOfId: null }),
+      ]);
+      expect(await transactionsOf(month(1))).toEqual([]);
+    });
+  });
+
   it('a VIEWER sees them but does not create them', async () => {
     const owner = await t.signUp(maria);
     const created = await owner.browser.post('/api/workspaces').send({ name: 'Casa' }).expect(201);
