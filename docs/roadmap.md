@@ -10,6 +10,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.0.1** (2026-10-10): sessão encerrada em outro aparelho (ou expirada) leva à tela de login com o aviso "Sua sessão terminou. Entre de novo para continuar.", acima do cartão, e volta à mesma página depois de entrar; voltar à aba já confere a sessão.
 - **1.1.0** (2026-10-11): o vocabulário da interface com os termos dos apps de finanças pessoais ([ADR 0051](adr/0051-vocabulario-da-interface.md)): Entrada e Saída, Mês, "Marcar como pago" e "Marcar como recebido", Limite de gastos, Metas, Guardar e "Sem meta"; a planilha modelo com "Mês de referência", que continua lendo as antigas; e as mensagens da API sobre metas e pessoas aparecendo na tela, em vez do erro genérico.
 - **1.1.1** (2026-10-11): em Lançamentos, a busca ganha uma linha inteira, com o filtro de situação embaixo (no tablet, o rótulo e o filtro não quebram mais); Minha conta abre na moldura do último espaço usado, com o menu lateral ou a barra inferior.
+- **1.2.0** (2026-10-12): num espaço compartilhado, os membros viram pessoas sozinhos, com os selos "Membro" e "Você" em Pessoas (nota no [ADR 0042](adr/0042-pessoas-e-rateio.md)); a pessoa é escolhida como a categoria, com busca, "Membros" à parte e "Adicionar 'Nome'"; e "A receber de / A pagar para" também em "Todo mês" e "Parcelado", copiado para cada mês e cada parcela ([ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)). No celular, os detalhes de cada linha de Recorrências ocupam a largura inteira.
 
 ## Fase 0 — Planejamento ✅
 
