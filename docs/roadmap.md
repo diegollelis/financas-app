@@ -116,6 +116,13 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
     - [ ] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês; em % numa variável, acompanhando o valor real (API, depois tela)
   - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
   - [ ] Divisão das contas da casa por percentual entre os membros (ADR próprio)
+- [ ] **Estabelecimento** (ADR próprio, depois dos passos que faltam do ADR 0052): onde se comprou ou de quem se recebeu ("Mercado A", "Netflix"), um campo opcional do lançamento, separado da categoria e da pessoa. Pessoa responde "com quem"; estabelecimento responde "onde". Usar Pessoa para lojas foi descartado: os saldos de Pessoas contariam uma compra pendente como dívida com a loja, as lojas apareceriam em "Dividir com alguém" e um lançamento não teria como ter loja e pessoa ao mesmo tempo.
+  - [ ] ADR: o termo na tela ("Estabelecimento", talvez "Onde" no formulário; `Merchant` no código) entra antes no glossário; comparar com subcategorias e etiquetas
+  - [ ] API: tabela `merchants` com RLS (nome único no espaço, arquivar em vez de excluir), `merchant_id` opcional em lançamentos, recorrências e parcelamentos, exportação de dados
+  - [ ] Tela: seletor no formulário (o mesmo componente do de pessoa), o estabelecimento na linha do lançamento e uma página para renomear e arquivar
+  - [ ] Análise por estabelecimento dentro de uma categoria (ex.: quanto foi para cada mercado)
+  - [ ] Coluna opcional "Estabelecimento" na planilha modelo
+  - [ ] Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês
