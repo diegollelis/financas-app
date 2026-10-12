@@ -9,7 +9,9 @@ import {
   transactionTypeLabels,
   type Category,
   type InstallmentPlan,
+  type Person,
   type Recurrence,
+  type TransactionType,
   type UpdateRecurrenceInput,
 } from '@financas/shared';
 import { Ellipsis } from 'lucide-react';
@@ -36,11 +38,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useCurrentUser } from '@/features/auth/use-me';
 import { useCategories } from '@/features/categories/use-categories';
 import {
   useEndInstallmentPlan,
   useInstallmentPlans,
 } from '@/features/installments/use-installments';
+import { usePeople, useResolvePerson } from '@/features/people/use-people';
 import { RecurrenceForm } from '@/features/recurrences/recurrence-form';
 import {
   useEndRecurrence,
@@ -111,7 +115,11 @@ function EndDialog({
   );
 }
 
-/** A row: what it is on the left, the amount on the right, and the menu for EDITORs. */
+/**
+ * A row: what it is on the left, the amount on the right, and the menu for EDITORs. On the phone
+ * the details take the whole width under them, so they do not wrap word by word beside the
+ * amount; from md they stay under the title.
+ */
 function SeriesRow({
   title,
   meta,
@@ -126,24 +134,22 @@ function SeriesRow({
   menu: ReactNode;
 }) {
   return (
-    <li className="flex items-start gap-3 py-3">
-      <div className="grid min-w-0 flex-1 gap-1">
-        <p className="font-medium break-words">{title}</p>
-        <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
-          {meta
-            .filter((part) => part !== null)
-            .map((part) => (
-              <span key={part}>{part}</span>
-            ))}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-start gap-2 md:gap-1">
-        <span className="grid justify-items-end">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 py-3">
+      <p className="font-medium break-words">{title}</p>
+      <div className="flex items-start gap-2 md:row-span-2 md:gap-1">
+        <span className="grid justify-items-end text-right">
           <span className="text-base font-semibold tabular-nums">{amount}</span>
           {amountNote && <span className="text-muted-foreground text-xs">{amountNote}</span>}
         </span>
         {menu}
       </div>
+      <p className="text-muted-foreground col-span-2 flex flex-wrap gap-x-3 text-sm md:col-span-1">
+        {meta
+          .filter((part) => part !== null)
+          .map((part) => (
+            <span key={part}>{part}</span>
+          ))}
+      </p>
     </li>
   );
 }
@@ -163,15 +169,27 @@ function EditRecurrence({
   workspaceId,
   recurrence,
   categories,
+  people,
   onDone,
 }: {
   workspaceId: string;
   recurrence: Recurrence;
   categories: Category[];
+  people: Person[];
   onDone: () => void;
 }) {
+  const user = useCurrentUser();
   const update = useUpdateRecurrence(workspaceId);
-  const save = (changes: UpdateRecurrenceInput) => {
+  const person = useResolvePerson(workspaceId, people);
+  const save = async (changes: UpdateRecurrenceInput, personName: string | undefined) => {
+    if (personName !== undefined) {
+      // A new name becomes a person first (ADR 0042); '' unlinks.
+      try {
+        changes.personId = await person.resolve(personName);
+      } catch {
+        return; // Shown by the form, from person.error.
+      }
+    }
     // Nothing changed: nothing to send, and the pending months stay as they are.
     if (Object.keys(changes).length === 0) return onDone();
     update.mutate(
@@ -189,23 +207,34 @@ function EditRecurrence({
     <RecurrenceForm
       recurrence={recurrence}
       categories={categories}
-      pending={update.isPending}
-      error={update.error}
-      onSubmit={save}
+      people={people}
+      userId={user.id}
+      pending={update.isPending || person.isPending}
+      error={person.error ?? update.error}
+      onSubmit={(changes, personName) => void save(changes, personName)}
       onCancel={onDone}
     />
   );
+}
+
+/** "A receber de Ana" / "A pagar para Ana" (ADR 0052); null without a person. */
+function personLine(type: TransactionType, personId: string | null, people: Person[]) {
+  const name = people.find((person) => person.id === personId)?.name;
+  if (!name) return null;
+  return `${type === 'CREDIT' ? 'A receber de' : 'A pagar para'} ${name}`;
 }
 
 function RecurrenceItem({
   workspaceId,
   recurrence,
   categories,
+  people,
   canEdit,
 }: {
   workspaceId: string;
   recurrence: Recurrence;
   categories: Category[];
+  people: Person[];
   canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -228,6 +257,7 @@ function RecurrenceItem({
       meta={[
         typeLabel[recurrence.type],
         category?.name ?? 'Categoria',
+        personLine(recurrence.type, recurrence.personId, people),
         recurrence.dueDay === null ? null : `Vence dia ${recurrence.dueDay}`,
         ended ? `Até ${formatPeriod(recurrence.endPeriod ?? '')}` : since(recurrence.startPeriod),
       ]}
@@ -258,6 +288,7 @@ function RecurrenceItem({
                 workspaceId={workspaceId}
                 recurrence={recurrence}
                 categories={categories}
+                people={people}
                 onDone={() => setEditing(false)}
               />
             </ResponsiveDialog>
@@ -281,11 +312,13 @@ function PlanItem({
   workspaceId,
   plan,
   categories,
+  people,
   canEdit,
 }: {
   workspaceId: string;
   plan: InstallmentPlan;
   categories: Category[];
+  people: Person[];
   canEdit: boolean;
 }) {
   const [confirmingEnd, setConfirmingEnd] = useState(false);
@@ -308,6 +341,7 @@ function PlanItem({
       meta={[
         typeLabel[plan.type],
         category?.name ?? 'Categoria',
+        personLine(plan.type, plan.personId, people),
         `${plan.settledCount} de ${plan.installments} pagas`,
         plan.endedAt !== null
           ? 'Encerrado'
@@ -430,8 +464,10 @@ export function RecurrencesPage() {
   const recurrences = useRecurrences(workspace.id);
   const plans = useInstallmentPlans(workspace.id);
   const categories = useCategories(workspace.id);
+  const people = usePeople(workspace.id);
   const canEdit = hasRole(workspace.role, 'EDITOR');
-  const ready = recurrences.isSuccess && plans.isSuccess && categories.isSuccess;
+  const ready =
+    recurrences.isSuccess && plans.isSuccess && categories.isSuccess && people.isSuccess;
 
   const recurrenceItem = (recurrence: Recurrence) => (
     <RecurrenceItem
@@ -439,6 +475,7 @@ export function RecurrencesPage() {
       workspaceId={workspace.id}
       recurrence={recurrence}
       categories={categories.data ?? []}
+      people={people.data ?? []}
       canEdit={canEdit}
     />
   );
@@ -448,6 +485,7 @@ export function RecurrencesPage() {
       workspaceId={workspace.id}
       plan={plan}
       categories={categories.data ?? []}
+      people={people.data ?? []}
       canEdit={canEdit}
     />
   );
@@ -458,7 +496,7 @@ export function RecurrencesPage() {
         title="Recorrências"
         description="O que se repete todo mês e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi pago ou recebido não muda."
       />
-      <QueryState queries={[recurrences, plans, categories]} />
+      <QueryState queries={[recurrences, plans, categories, people]} />
       {ready &&
         (recurrences.data.length === 0 && plans.data.length === 0 ? (
           <p className="text-muted-foreground">

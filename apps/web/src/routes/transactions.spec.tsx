@@ -238,6 +238,7 @@ describe('TransactionsPage', () => {
   it('repeats it every month: creates a recurrence starting in this competência', async () => {
     const recurrenceId = '01920000-0000-7000-8000-000000000301';
     const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
       [`POST /api/workspaces/${houseId}/recurrences`]: {
         status: 201,
         body: {
@@ -264,6 +265,8 @@ describe('TransactionsPage', () => {
     await userEvent.type(within(form).getByLabelText('Vencimento (opcional)'), '2026-10-20');
     await userEvent.click(within(form).getByRole('radio', { name: 'Todo mês' }));
     expect(within(form).getByText(/Um lançamento pendente em cada mês/)).toBeInTheDocument();
+    // Who it is paid to, copied to every month (ADR 0052).
+    await pickPerson(form, 'A pagar para (opcional)', 'Ana');
     await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
 
     await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences`, {
@@ -277,6 +280,7 @@ describe('TransactionsPage', () => {
         dueDay: 20,
         startPeriod: '2026-10',
         variableAmount: false,
+        personId: ana.id,
       }),
     });
     expect(
@@ -355,6 +359,7 @@ describe('TransactionsPage', () => {
         dueDay: null,
         startPeriod: '2026-10',
         variableAmount: true,
+        personId: null,
       }),
     });
   });
@@ -439,6 +444,7 @@ describe('TransactionsPage', () => {
         amountIs: 'TOTAL',
         firstPeriod: '2026-10',
         dueDay: null,
+        personId: null,
       }),
     });
     expect(await screen.findByText('Parcelamento adicionado: 3 parcelas')).toBeInTheDocument();
