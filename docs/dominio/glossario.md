@@ -35,6 +35,7 @@ O nome que a pessoa vê na tela e o nome no código são independentes ([ADR 005
 | Dividir com alguém                     | `split`, `splitOfId`              | Cria uma parte pendente por pessoa, no lado oposto ao lançamento                                                                      |
 | Reembolso                              | `REIMBURSEMENT_CATEGORY_NAME`     | A categoria de entrada das partes de uma saída dividida                                                                               |
 | Repasse                                | `PASS_THROUGH_CATEGORY_NAME`      | A categoria de saída das partes de uma entrada dividida ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)) |
+| Com quem?                              | `PeopleMultiSelect`, `split`      | Na divisão, escolhe várias pessoas de uma vez; cada uma ganha a sua linha                                                             |
 | Adicionar 'Nome'                       | `PersonSelect`                    | No seletor de pessoa, cadastra quem ainda não está na lista, ao salvar                                                                |
 | Importação                             | `TransactionImport`               | Lançamentos trazidos de uma planilha, desfazível                                                                                      |
 

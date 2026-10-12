@@ -58,13 +58,16 @@ const transactionFormSchema = plainTransactionInputSchema
       .string()
       .trim()
       .max(PERSON_NAME_MAX_LENGTH, `Use no máximo ${PERSON_NAME_MAX_LENGTH} caracteres.`),
-    /** Only when creating a debit: "Dividir com alguém" (ADR 0042). */
+    /** Only when creating a transaction launched once: "Dividir com alguém" (ADRs 0042, 0052). */
     splitOn: z.boolean(),
     shareMode: z.enum(['REAIS', 'PERCENT']),
     shares: z.array(z.object({ name: z.string(), value: z.string() })),
   })
   .superRefine((values, ctx) => {
     if (values.splitOn && values.repeat === 'NONE') {
+      if (values.shares.length === 0) {
+        ctx.addIssue({ code: 'custom', path: ['shares'], message: 'Escolha com quem dividir.' });
+      }
       const seen = new Set<string>();
       let others = 0;
       values.shares.forEach((share, index) => {
@@ -229,7 +232,7 @@ export function TransactionForm({
       person: people.find((person) => person.id === initial?.personId)?.name ?? '',
       splitOn: false,
       shareMode: 'REAIS',
-      shares: [{ name: '', value: '' }],
+      shares: [],
     },
   });
   // useWatch rather than watch(): the hook form is safe for the React Compiler.

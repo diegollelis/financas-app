@@ -124,6 +124,22 @@ async function pickPerson(form: HTMLElement, label: string, name: string, { add 
   }
 }
 
+/**
+ * "Com quem?" (ADR 0052): open it, pick people listed and add new names, all at once, then
+ * close it with "Pronto" (the sheet of the phone, as in jsdom).
+ */
+async function pickPeople(form: HTMLElement, listed: string[], added: string[] = []) {
+  await userEvent.click(within(form).getByRole('combobox', { name: 'Com quem?' }));
+  for (const name of listed) {
+    await userEvent.click(await screen.findByRole('option', { name }));
+  }
+  for (const name of added) {
+    await userEvent.type(await screen.findByPlaceholderText('Buscar ou adicionar pessoa'), name);
+    await userEvent.click(await screen.findByRole('option', { name: `Adicionar “${name}”` }));
+  }
+  await userEvent.click(screen.getByRole('button', { name: 'Pronto' }));
+}
+
 async function openNewTransaction() {
   await userEvent.click(await screen.findByRole('button', { name: 'Novo lançamento' }));
   return screen.findByRole('dialog', { name: 'Novo lançamento' });
@@ -776,10 +792,10 @@ describe('TransactionsPage', () => {
     expect(within(form).getByLabelText('A pagar para (opcional)')).toBeInTheDocument();
     await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
     expect(within(form).queryByLabelText('A pagar para (opcional)')).not.toBeInTheDocument();
-    await pickPerson(form, 'Pessoa 1', 'Ana');
-    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar pessoa' }));
-    await pickPerson(form, 'Pessoa 2', 'Bruno', { add: true });
-    await userEvent.click(within(form).getByRole('button', { name: 'Dividir igualmente' }));
+    // Ana from the list and Bruno, new, at once; the shares start equal, you included.
+    await pickPeople(form, ['Ana'], ['Bruno']);
+    expect(within(form).getByLabelText('Parte de Ana (R$)')).toHaveValue('100,00');
+    expect(within(form).getByLabelText('Parte de Bruno (R$)')).toHaveValue('100,00');
 
     expect(within(form).getByText(/^Sua parte: R\$\s100,00/)).toBeInTheDocument();
     await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
@@ -864,8 +880,9 @@ describe('TransactionsPage', () => {
     await chooseCategory(form, 'Salário');
     await userEvent.type(within(form).getByLabelText('Valor (R$)'), '1.000,00');
     await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
-    await pickPerson(form, 'Pessoa 1', 'Ana');
-    await userEvent.type(within(form).getByLabelText('Parte (R$)'), '500,00');
+    await pickPeople(form, ['Ana']);
+    // Half each, you and Ana.
+    expect(within(form).getByLabelText('Parte de Ana (R$)')).toHaveValue('500,00');
 
     expect(
       within(form).getByText(/Cada pessoa vira um valor a pagar, na categoria Repasse/),
@@ -888,7 +905,7 @@ describe('TransactionsPage', () => {
   });
 
   it('checks the shares before calling the API', async () => {
-    const fetchMock = mockTransactions();
+    const fetchMock = mockTransactions({ [`GET ${peopleBase}`]: { body: [ana] } });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     const form = await openNewTransaction();
@@ -896,16 +913,52 @@ describe('TransactionsPage', () => {
     await chooseCategory(form, 'Mercado');
     await userEvent.type(within(form).getByLabelText('Valor (R$)'), '100,00');
     await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    // Nobody picked yet.
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+    expect(await within(form).findByText('Escolha com quem dividir.')).toBeInTheDocument();
+
+    await pickPeople(form, ['Ana']);
     await userEvent.click(within(form).getByRole('radio', { name: 'Em %' }));
-    await userEvent.type(within(form).getByLabelText('Parte (%)'), '120');
+    const share = within(form).getByLabelText('Parte de Ana (%)');
+    await userEvent.clear(share);
+    await userEvent.type(share, '120');
     await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
 
-    expect(await within(form).findByText('Informe o nome.')).toBeInTheDocument();
-    expect(within(form).getByText('De 0 a 100%.')).toBeInTheDocument();
+    expect(await within(form).findByText('De 0 a 100%.')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith(
       new URL(base, 'http://api.test'),
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('keeps the shares equal until one is typed, and takes someone out', async () => {
+    mockTransactions({ [`GET ${peopleBase}`]: { body: [ana] } });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '90,00');
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    await pickPeople(form, ['Ana'], ['Bia']);
+    expect(within(form).getByLabelText('Parte de Ana (R$)')).toHaveValue('30,00');
+
+    // The amount changes: still equal.
+    const amount = within(form).getByLabelText('Valor (R$)');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '120,00');
+    expect(within(form).getByLabelText('Parte de Ana (R$)')).toHaveValue('40,00');
+
+    // A share typed by hand stays, and taking Bia out keeps it.
+    const anaShare = within(form).getByLabelText('Parte de Ana (R$)');
+    await userEvent.clear(anaShare);
+    await userEvent.type(anaShare, '10,00');
+    await userEvent.click(within(form).getByRole('button', { name: 'Tirar Bia da divisão' }));
+    expect(within(form).queryByLabelText('Parte de Bia (R$)')).not.toBeInTheDocument();
+    expect(within(form).getByLabelText('Parte de Ana (R$)')).toHaveValue('10,00');
+    expect(within(form).getByRole('combobox', { name: 'Com quem?' })).toHaveTextContent('1 pessoa');
+
+    // Back to equal shares on request.
+    await userEvent.click(within(form).getByRole('button', { name: 'Dividir igualmente' }));
+    expect(within(form).getByLabelText('Parte de Ana (R$)')).toHaveValue('60,00');
   });
 
   it('links a credit to a new person, created on save', async () => {
