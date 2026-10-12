@@ -108,7 +108,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
     - [x] API: criadas ao aceitar o convite e ao listar, ligando a pessoa de mesmo nome; `isMember` e `PERSON_IS_MEMBER`
     - [x] Tela: selos "Membro" e "Você" em Pessoas, e você fora das sugestões
   - [ ] Pessoa e divisão em entradas, recorrências e parcelamentos ([ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
-    - [ ] Seletor de pessoa como o de categoria: busca, "Membros" e "Pessoas", "Adicionar 'Nome'"
+    - [x] Seletor de pessoa como o de categoria: busca, "Membros" e "Pessoas", "Adicionar 'Nome'"
     - [ ] Uma pessoa em "Todo mês" e "Parcelado" (API e tela)
     - [ ] Dividir uma entrada: as partes viram saídas pendentes em Repasse
     - [ ] Dividir um parcelamento: a parte de cada pessoa em cada parcela, criadas junto (API, depois tela)

@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { CategorySelect } from '@/features/categories/category-picker';
+import { PersonSelect } from '@/features/people/person-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 import { shareCents } from './split';
 import { SplitFields, type SplitFormFields } from './split-fields';
@@ -243,7 +244,6 @@ export function TransactionForm({
   const canSplit = allowRepeat && type === 'DEBIT' && repeat === 'NONE';
   const splitting = canSplit && splitOn;
   const showPerson = (!allowRepeat || repeat === 'NONE') && !splitting;
-  const peopleListId = `${idPrefix}-people`;
   const user = useCurrentUser();
   const totalCents = (() => {
     const cents = parseReais(typedAmount ?? '');
@@ -463,23 +463,27 @@ export function TransactionForm({
           >
             <Input autoComplete="off" {...register('notes')} />
           </FormField>
-          {/* The names already listed, suggested as the person types (a new one becomes a person);
-              the members of the workspace are among them, except you. */}
-          <datalist id={peopleListId}>
-            {people
-              .filter((person) => !person.archived && person.memberUserId !== user.id)
-              .map((person) => (
-                <option key={person.id} value={person.name} />
-              ))}
-          </datalist>
           {showPerson && !application && (
-            <FormField
-              id={id('person')}
-              label={type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'}
-              error={formState.errors.person?.message}
-            >
-              <Input list={peopleListId} autoComplete="off" {...register('person')} />
-            </FormField>
+            <Controller
+              control={control}
+              name="person"
+              render={({ field, fieldState }) => (
+                <FormField
+                  id={id('person')}
+                  label={type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'}
+                  error={fieldState.error?.message}
+                >
+                  <PersonSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    people={people}
+                    userId={user.id}
+                    optional
+                    title={type === 'CREDIT' ? 'A receber de' : 'A pagar para'}
+                  />
+                </FormField>
+              )}
+            />
           )}
           {canSplit && !application && (
             <div className="grid gap-3">
@@ -514,7 +518,8 @@ export function TransactionForm({
                   setValue={setValue as never}
                   errors={formState.errors}
                   totalCents={totalCents}
-                  peopleListId={peopleListId}
+                  people={people}
+                  userId={user.id}
                 />
               )}
             </div>

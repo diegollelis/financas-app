@@ -113,6 +113,17 @@ async function chooseCategory(form: HTMLElement, name: string) {
   await userEvent.click(await screen.findByRole('option', { name }));
 }
 
+/** The person picker (ADR 0052): open it, then pick someone listed or add the name typed. */
+async function pickPerson(form: HTMLElement, label: string, name: string, { add = false } = {}) {
+  await userEvent.click(within(form).getByRole('combobox', { name: label }));
+  if (add) {
+    await userEvent.type(await screen.findByPlaceholderText('Buscar ou adicionar pessoa'), name);
+    await userEvent.click(await screen.findByRole('option', { name: `Adicionar “${name}”` }));
+  } else {
+    await userEvent.click(await screen.findByRole('option', { name }));
+  }
+}
+
 async function openNewTransaction() {
   await userEvent.click(await screen.findByRole('button', { name: 'Novo lançamento' }));
   return screen.findByRole('dialog', { name: 'Novo lançamento' });
@@ -759,9 +770,9 @@ describe('TransactionsPage', () => {
     expect(within(form).getByLabelText('A pagar para (opcional)')).toBeInTheDocument();
     await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
     expect(within(form).queryByLabelText('A pagar para (opcional)')).not.toBeInTheDocument();
-    await userEvent.type(within(form).getByLabelText('Pessoa 1'), 'Ana');
+    await pickPerson(form, 'Pessoa 1', 'Ana');
     await userEvent.click(within(form).getByRole('button', { name: 'Adicionar pessoa' }));
-    await userEvent.type(within(form).getByLabelText('Pessoa 2'), 'Bruno');
+    await pickPerson(form, 'Pessoa 2', 'Bruno', { add: true });
     await userEvent.click(within(form).getByRole('button', { name: 'Dividir igualmente' }));
 
     expect(within(form).getByText(/^Sua parte: R\$\s100,00/)).toBeInTheDocument();
@@ -788,7 +799,7 @@ describe('TransactionsPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('suggests the members of the workspace as people, but not you', async () => {
+  it('picks a person like a category: members apart, never you, and a new name added', async () => {
     const joao = {
       ...ana,
       id: '01920000-0000-7000-8000-000000000302',
@@ -807,14 +818,31 @@ describe('TransactionsPage', () => {
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     const form = await openNewTransaction();
-    const input = within(form).getByLabelText('A pagar para (opcional)');
-    const suggestions = document.getElementById(input.getAttribute('list') ?? '');
+    const field = within(form).getByRole('combobox', { name: 'A pagar para (opcional)' });
+    expect(field).toHaveTextContent('Ninguém');
+    await userEvent.click(field);
 
-    await vi.waitFor(() =>
-      expect(
-        [...(suggestions?.querySelectorAll('option') ?? [])].map((option) => option.value),
-      ).toEqual(['Ana', 'João Exemplo']),
-    );
+    expect(screen.getByRole('group', { name: 'Membros' })).toHaveTextContent('João Exemplo');
+    expect(screen.getByRole('group', { name: 'Pessoas' })).toHaveTextContent('Ana');
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'João Exemplo',
+      'Ana',
+    ]);
+    // The search ignores accents; a name that is listed is not offered to be added again.
+    const search = screen.getByPlaceholderText('Buscar ou adicionar pessoa');
+    await userEvent.type(search, 'joao exemplo');
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'João Exemplo',
+    ]);
+    await userEvent.clear(search);
+    await userEvent.type(search, 'Bia');
+    await userEvent.click(screen.getByRole('option', { name: 'Adicionar “Bia”' }));
+    expect(field).toHaveTextContent('Bia');
+
+    // An optional field can be emptied again.
+    await userEvent.click(field);
+    await userEvent.click(await screen.findByRole('option', { name: 'Ninguém' }));
+    expect(field).toHaveTextContent('Ninguém');
   });
 
   it('checks the shares before calling the API', async () => {
@@ -851,7 +879,7 @@ describe('TransactionsPage', () => {
     await userEvent.type(within(form).getByLabelText('Descrição'), 'Empréstimo ao Carlos');
     await chooseCategory(form, 'Salário');
     await userEvent.type(within(form).getByLabelText('Valor (R$)'), '200,00');
-    await userEvent.type(within(form).getByLabelText('A receber de (opcional)'), 'Carlos');
+    await pickPerson(form, 'A receber de (opcional)', 'Carlos', { add: true });
     await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
 
     await expectCall(fetchMock, peopleBase, {
@@ -925,7 +953,9 @@ describe('TransactionsPage', () => {
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
     form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
     expect(more().closest('details')).toHaveAttribute('open');
-    expect(within(form).getByLabelText('A receber de (opcional)')).toHaveValue('Ana');
+    expect(
+      within(form).getByRole('combobox', { name: 'A receber de (opcional)' }),
+    ).toHaveTextContent('Ana');
   });
 
   it('is read-only for a VIEWER', async () => {
