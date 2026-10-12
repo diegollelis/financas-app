@@ -470,6 +470,8 @@ async function main() {
     },
     { name: 'recorrencias', path: `/espacos/${workspaceId}/recorrencias`, signedIn: true },
     { name: 'pessoas', path: `/espacos/${workspaceId}/pessoas`, signedIn: true },
+    // In the shared workspace: its members, marked, once someone has accepted the invitation.
+    { name: 'pessoas-compartilhado', path: `/espacos/${houseId}/pessoas`, signedIn: true },
     { name: 'importar', path: `/espacos/${workspaceId}/importar`, signedIn: true },
     {
       // The review, after choosing the generated spreadsheet.

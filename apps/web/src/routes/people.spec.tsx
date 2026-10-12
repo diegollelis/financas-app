@@ -216,6 +216,29 @@ describe('PeoplePage', () => {
     );
   });
 
+  it('marks the members of the workspace, you among them, and offers no actions for them', async () => {
+    const me = person(5, verifiedUser.name, { memberUserId: verifiedUser.id, isMember: true });
+    const joao = person(6, 'João Exemplo', {
+      memberUserId: '01920000-0000-7000-8000-000000000099',
+      isMember: true,
+    });
+    mockPeople({ [`GET ${base}`]: { body: [ana, joao, me] } });
+    renderApp(page);
+
+    const list = await screen.findByRole('region', { name: 'Pessoas' });
+    expect(within(list).getAllByRole('listitem').map(text)).toEqual([
+      expect.stringContaining('AnaVer lançamentos'),
+      expect.stringContaining('João ExemploMembroVer lançamentos'),
+      expect.stringContaining(`${verifiedUser.name}VocêVer lançamentos`),
+    ]);
+    expect(screen.getByText(/Os membros do espaço já estão aqui/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ações de Ana' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ações de João Exemplo' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: `Ações de ${verifiedUser.name}` }),
+    ).not.toBeInTheDocument();
+  });
+
   it('is read-only for a VIEWER', async () => {
     mockPeople({ [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'VIEWER' } } });
     renderApp(page);

@@ -45,6 +45,7 @@ import {
   usePersonTransactions,
   useUpdatePerson,
 } from '@/features/people/use-people';
+import { useCurrentUser } from '@/features/auth/use-me';
 import { useUpdateTransaction } from '@/features/transactions/use-transactions';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -326,13 +327,23 @@ function PersonRow({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const toList = () => document.getElementById(LIST_TITLE_ID)?.focus();
+  const user = useCurrentUser();
+  // A member's person comes from their account and stays while they do (ADR 0042 note).
+  const memberLabel = person.isMember
+    ? person.memberUserId === user.id
+      ? 'Você'
+      : 'Membro'
+    : null;
 
   return (
     // As a transaction row: who on the left, the amounts on the right; the menu below them on the
     // phone, where the width is short, and beside them, on the line of the name, from md.
     <li className="flex items-start gap-3 py-3">
       <span className="grid min-w-0 flex-1 justify-items-start">
-        <span className="font-medium break-words">{person.name}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-medium break-words">{person.name}</span>
+          {memberLabel && <Badge variant="secondary">{memberLabel}</Badge>}
+        </span>
         <button
           type="button"
           className="text-primary focus-visible:ring-ring/50 min-h-11 rounded-sm text-left text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3 md:min-h-0"
@@ -346,7 +357,7 @@ function PersonRow({
         <span className="font-semibold md:pt-0.5">
           <Balance person={person} />
         </span>
-        {canEdit && (
+        {canEdit && !person.isMember && (
           <>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -423,7 +434,8 @@ function PersonRow({
 
 /**
  * Pessoas (ADR 0042): who owes you and whom you owe, in this workspace only. The names are
- * contacts typed here, whether or not they use the app; nobody else is listed.
+ * contacts typed here, whether or not they use the app, and, in a shared workspace, its members,
+ * marked as such; nobody else is listed.
  */
 export function PeoplePage() {
   const workspace = useCurrentWorkspace();
@@ -454,7 +466,11 @@ export function PeoplePage() {
     <>
       <PageHeader
         title="Pessoas"
-        description="Quem te deve e a quem você deve. Os nomes valem só neste espaço, e a pessoa não precisa usar o app."
+        description={
+          workspace.isPersonal
+            ? 'Quem te deve e a quem você deve. Os nomes valem só neste espaço, e a pessoa não precisa usar o app.'
+            : 'Quem te deve e a quem você deve. Os membros do espaço já estão aqui; os outros nomes valem só neste espaço, e a pessoa não precisa usar o app.'
+        }
       />
       {canEdit && <AddPersonForm workspaceId={workspace.id} />}
       <QueryState queries={[people]} />

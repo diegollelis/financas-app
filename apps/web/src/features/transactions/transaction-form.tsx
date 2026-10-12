@@ -22,6 +22,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { useCurrentUser } from '@/features/auth/use-me';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 import { shareCents } from './split';
@@ -243,6 +244,7 @@ export function TransactionForm({
   const splitting = canSplit && splitOn;
   const showPerson = (!allowRepeat || repeat === 'NONE') && !splitting;
   const peopleListId = `${idPrefix}-people`;
+  const user = useCurrentUser();
   const totalCents = (() => {
     const cents = parseReais(typedAmount ?? '');
     return cents !== null && cents > 0 ? cents : null;
@@ -461,10 +463,11 @@ export function TransactionForm({
           >
             <Input autoComplete="off" {...register('notes')} />
           </FormField>
-          {/* The names already listed, suggested as the person types (a new one becomes a person). */}
+          {/* The names already listed, suggested as the person types (a new one becomes a person);
+              the members of the workspace are among them, except you. */}
           <datalist id={peopleListId}>
             {people
-              .filter((person) => !person.archived)
+              .filter((person) => !person.archived && person.memberUserId !== user.id)
               .map((person) => (
                 <option key={person.id} value={person.name} />
               ))}

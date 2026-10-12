@@ -104,9 +104,9 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] API: pessoas, lançamento ligado a uma pessoa, dividir um gasto e categoria Reembolso
   - [x] Tela: "Dividir com alguém" no novo lançamento, "A receber de / A pagar para", selos e excluir com as partes
   - [x] Página Pessoas (no Mais): saldos e os lançamentos de cada uma, de qualquer mês
-  - [ ] Membros do espaço compartilhado como pessoas (nota de 2026-10-12 no ADR 0042)
+  - [x] Membros do espaço compartilhado como pessoas (nota de 2026-10-12 no ADR 0042)
     - [x] API: criadas ao aceitar o convite e ao listar, ligando a pessoa de mesmo nome; `isMember` e `PERSON_IS_MEMBER`
-    - [ ] Tela: selos "Membro" e "Você" em Pessoas, e você fora das sugestões
+    - [x] Tela: selos "Membro" e "Você" em Pessoas, e você fora das sugestões
   - [ ] Dividir um parcelamento: a parte de cada pessoa em cada parcela, criadas junto
   - [ ] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês
   - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
