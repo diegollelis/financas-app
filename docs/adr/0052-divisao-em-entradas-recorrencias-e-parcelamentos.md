@@ -92,3 +92,13 @@ Escolhidos com o dono do projeto: **"Repasse" (opção 1)**, **tabela `recurrenc
   3. dividir uma entrada;
   4. o parcelamento dividido, API e tela;
   5. a recorrência dividida, API e tela.
+
+## Nota ("Com quem?", 2026-10-12)
+
+**A divisão escolhe as pessoas numa lista, não em linhas numeradas.** O dono do projeto não gostou de "Pessoa 1, Pessoa 2…": a pergunta é com quem dividir, e o campo de cada linha cortava nomes longos no celular. Agora:
+
+- **"Com quem?"** abre o seletor de pessoa em seleção múltipla: cada toque marca ou desmarca alguém, a lista fica aberta, e "Adicionar 'Nome'" inclui quem ainda não está nela. No celular, "Pronto" fecha a folha.
+- **Uma linha por pessoa escolhida, com o nome dela** e a parte ao lado (o campo se chama "Parte de Ana (R$)"); um "✕" a tira da divisão.
+- **As partes nascem iguais,** você incluído, e acompanham o valor e as pessoas escolhidas até alguém digitar uma parte à mão. "Dividir igualmente" volta às partes iguais.
+- **Uma lista fixa com caixas de marcar foi descartada:** com muitos contatos, vira uma parede no celular e esconde a busca e o "Adicionar 'Nome'".
+- **Só a tela muda:** a API recebe o mesmo `split`. A mesma forma vale para a divisão no parcelamento e na recorrência, quando chegarem à tela.
