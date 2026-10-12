@@ -2,6 +2,7 @@ import {
   analysisSchema,
   categoryListResponseSchema,
   currentPeriod,
+  personSchema,
   recurrenceListResponseSchema,
   recurrenceSchema,
   shiftPeriod,
@@ -253,6 +254,81 @@ describe('recurrences', () => {
 
     await viewer.browser.get(`/api/workspaces/${workspaceId}/recurrences`).expect(200);
     await viewer.browser.post(`/api/workspaces/${workspaceId}/recurrences`).send({}).expect(403);
+  });
+
+  describe('person (ADR 0052)', () => {
+    async function withPeople() {
+      const setup = await setUp();
+      const add = async (name: string) =>
+        personSchema.parse(
+          (await setup.browser.post(`${setup.base}/people`).send({ name }).expect(201)).body,
+        );
+      return { ...setup, ana: await add('Ana'), bruno: await add('Bruno') };
+    }
+
+    it('gives every month it generates the person it is from', async () => {
+      const { create, energy, categoryId, transactionsOf, ana } = await withPeople();
+
+      const rent = await create(
+        energy({
+          type: 'CREDIT',
+          description: 'Aluguel do quarto',
+          categoryId: categoryId('Renda extra', 'CREDIT'),
+          personId: ana.id,
+        }),
+      );
+
+      expect(rent.personId).toBe(ana.id);
+      expect((await transactionsOf(thisMonth))[0]?.personId).toBe(ana.id);
+      expect((await transactionsOf(month(1)))[0]?.personId).toBe(ana.id);
+    });
+
+    it('changes the person of the pending months from this month on only', async () => {
+      const { create, energy, transactionsOf, base, browser, ana, bruno } = await withPeople();
+      const recurrence = await create(energy({ startPeriod: month(-1), personId: ana.id }));
+      await transactionsOf(month(-1));
+      const [settledNow] = await transactionsOf(thisMonth);
+      await transactionsOf(month(1));
+      await browser
+        .patch(`${base}/transactions/${settledNow?.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      const changed = await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ personId: bruno.id })
+        .expect(200);
+
+      expect(recurrenceSchema.parse(changed.body).personId).toBe(bruno.id);
+      expect((await transactionsOf(month(-1)))[0]?.personId).toBe(ana.id);
+      expect((await transactionsOf(thisMonth))[0]?.personId).toBe(ana.id);
+      expect((await transactionsOf(month(1)))[0]?.personId).toBe(bruno.id);
+      expect((await transactionsOf(month(2)))[0]?.personId).toBe(bruno.id);
+
+      // And unlinks with null.
+      await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ personId: null })
+        .expect(200);
+      expect((await transactionsOf(month(1)))[0]?.personId).toBeNull();
+    });
+
+    it('refuses an archived person, and keeps a person it uses from being deleted', async () => {
+      const { create, energy, transactionsOf, base, browser, ana, bruno } = await withPeople();
+      await browser.patch(`${base}/people/${bruno.id}`).send({ archived: true }).expect(200);
+      const refused = await browser
+        .post(`${base}/recurrences`)
+        .send(energy({ personId: bruno.id }))
+        .expect(400);
+      expect(refused.body).toMatchObject({ code: 'INVALID_PERSON' });
+
+      await create(energy({ personId: ana.id }));
+      // Without its transaction, only the recurrence holds Ana.
+      const [generated] = await transactionsOf(thisMonth);
+      await browser.delete(`${base}/transactions/${generated?.id}`).expect(204);
+      const inUse = await browser.delete(`${base}/people/${ana.id}`).expect(409);
+      expect(inUse.body).toMatchObject({ code: 'PERSON_IN_USE' });
+    });
   });
 
   describe('variable amount (energy, water)', () => {

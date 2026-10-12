@@ -11,6 +11,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { Prisma, type Recurrence as RecurrenceRow } from '../generated/prisma/client.js';
+import { ensureUsablePerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
 
@@ -24,6 +25,7 @@ function toResponse(recurrence: RecurrenceRow): Recurrence {
     amountCents: recurrence.amountCents,
     variableAmount: recurrence.variableAmount,
     dueDay: recurrence.dueDay,
+    personId: recurrence.personId,
     startPeriod: recurrence.startPeriod,
     endPeriod: recurrence.endPeriod,
   };
@@ -57,6 +59,7 @@ export class RecurrencesService {
   /** Creates it and its transaction in the first competência right away. */
   async create(workspaceId: string, input: CreateRecurrenceInput): Promise<Recurrence> {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
+    if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     const recurrence = await this.prisma.forWorkspace(workspaceId).recurrence.create({
       data: {
         workspaceId,
@@ -67,6 +70,7 @@ export class RecurrencesService {
         amountCents: input.amountCents,
         variableAmount: input.variableAmount ?? false,
         dueDay: input.dueDay ?? null,
+        personId: input.personId ?? null,
         startPeriod: input.startPeriod,
       },
     });
@@ -87,6 +91,9 @@ export class RecurrencesService {
     if (input.categoryId && input.categoryId !== current.categoryId) {
       await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, current.type);
     }
+    if (input.personId && input.personId !== current.personId) {
+      await ensureUsablePerson(this.prisma, workspaceId, input.personId);
+    }
     const db = this.prisma.forWorkspace(workspaceId);
     const recurrence = await db.recurrence.update({
       where: { id: recurrenceId, workspaceId },
@@ -97,6 +104,7 @@ export class RecurrencesService {
         amountCents: input.amountCents,
         variableAmount: input.variableAmount,
         dueDay: input.dueDay,
+        personId: input.personId,
       },
     });
 
@@ -113,6 +121,7 @@ export class RecurrencesService {
           description: input.description,
           notes: input.notes,
           categoryId: input.categoryId,
+          personId: input.personId,
           amountCents: keepsAmount ? undefined : input.amountCents,
           // Turned fixed: what was an estimate becomes the amount.
           amountEstimated: input.variableAmount === false ? false : undefined,
@@ -208,6 +217,7 @@ export class RecurrencesService {
               description: recurrence.description,
               notes: recurrence.notes,
               categoryId: recurrence.categoryId,
+              personId: recurrence.personId,
               amountCents,
               amountEstimated: recurrence.variableAmount,
               period,

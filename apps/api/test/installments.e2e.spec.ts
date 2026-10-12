@@ -3,6 +3,7 @@ import {
   currentPeriod,
   installmentPlanListResponseSchema,
   installmentPlanSchema,
+  personSchema,
   shiftPeriod,
   transactionListResponseSchema,
   workspaceSchema,
@@ -187,6 +188,27 @@ describe('installments', () => {
       .send(fridge({ categoryId: categoryId('Salário', 'CREDIT') }))
       .expect(400);
     expect(credit.body).toMatchObject({ code: 'INVALID_CATEGORY' });
+  });
+
+  it('gives every installment the person it is owed to, and refuses an archived one', async () => {
+    const { create, fridge, transactionsOf, base, browser } = await setUp();
+    const add = async (name: string) =>
+      personSchema.parse((await browser.post(`${base}/people`).send({ name }).expect(201)).body);
+    const bruno = await add('Bruno');
+    const carla = await add('Carla');
+    await browser.patch(`${base}/people/${carla.id}`).send({ archived: true }).expect(200);
+
+    const loan = await create(fridge({ description: 'Empréstimo do Bruno', personId: bruno.id }));
+
+    expect(loan.personId).toBe(bruno.id);
+    for (const offset of [0, 1, 2]) {
+      expect((await transactionsOf(month(offset)))[0]?.personId).toBe(bruno.id);
+    }
+    const refused = await browser
+      .post(`${base}/installments`)
+      .send(fridge({ personId: carla.id }))
+      .expect(400);
+    expect(refused.body).toMatchObject({ code: 'INVALID_PERSON' });
   });
 
   it('a VIEWER sees them but does not create them', async () => {

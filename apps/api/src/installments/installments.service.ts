@@ -11,6 +11,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import type { InstallmentPlan as PlanRow } from '../generated/prisma/client.js';
+import { ensureUsablePerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
 
@@ -33,6 +34,7 @@ function toResponse(
     installments: plan.installments,
     firstPeriod: plan.firstPeriod,
     dueDay: plan.dueDay,
+    personId: plan.personId,
     endedAt: plan.endedAt?.toISOString() ?? null,
     settledCount,
     pendingCount: pending.count,
@@ -98,9 +100,11 @@ export class InstallmentsService {
    */
   async create(workspaceId: string, input: CreateInstallmentPlanInput): Promise<InstallmentPlan> {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
+    if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     const totalCents = installmentPlanTotal(input);
     const amounts = splitInstallments(totalCents, input.installments);
     const dueDay = input.dueDay ?? null;
+    const personId = input.personId ?? null;
     const plan = await this.prisma.forWorkspace(workspaceId).installmentPlan.create({
       data: {
         workspaceId,
@@ -112,6 +116,7 @@ export class InstallmentsService {
         installments: input.installments,
         firstPeriod: input.firstPeriod,
         dueDay,
+        personId,
         transactions: {
           create: amounts.map((amountCents, index) => {
             const period = shiftPeriod(input.firstPeriod, index);
@@ -121,6 +126,7 @@ export class InstallmentsService {
               description: input.description,
               notes: input.notes ?? null,
               categoryId: input.categoryId,
+              personId,
               amountCents,
               period,
               dueDate: dueDay === null ? null : toDate(dueDateIn(period, dueDay)),
