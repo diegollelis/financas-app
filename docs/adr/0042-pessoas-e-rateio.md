@@ -118,3 +118,7 @@ Escolhidos com o dono do projeto: **contatos por nome (opção 2)**, **valor a r
 - **Quem sai** continua como contato, com o nome gravado, e pode ser arquivado. Se voltar, a mesma pessoa é reativada.
 
 **Fica de fora:** desfazer uma ligação feita pelo nome, que exigiria mover lançamentos entre pessoas, e o acerto de contas entre membros ("pago por", partes por % da renda), que continua no roadmap com ADR próprio.
+
+## Nota (entradas, recorrências e parcelamentos, 2026-10-12)
+
+O [ADR 0052](0052-divisao-em-entradas-recorrencias-e-parcelamentos.md) amplia esta decisão: uma pessoa e a divisão também em "Todo mês" e "Parcelado", dividir uma entrada (as partes viram saídas pendentes em "Repasse") e um seletor de pessoa no padrão do de categoria. Ele também abre uma exceção à independência das partes: numa recorrência dividida em percentual, as partes pendentes acompanham o valor real do mês.
