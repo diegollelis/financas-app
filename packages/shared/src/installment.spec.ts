@@ -59,4 +59,44 @@ describe('createInstallmentPlanInputSchema', () => {
       'O total precisa dar ao menos um centavo por parcela.',
     );
   });
+
+  describe('split (ADR 0052)', () => {
+    const ana = '01920000-0000-7000-8000-000000000301';
+    const message = (input: object) =>
+      createInstallmentPlanInputSchema.safeParse({ ...valid, ...input }).error?.issues[0]?.message;
+
+    it('takes shares in the meaning of the amount: of the total, or of each installment', () => {
+      expect(message({ split: [{ personId: ana, amountCents: 175_000 }] })).toBeUndefined();
+      expect(
+        message({
+          amountCents: 35_000,
+          amountIs: 'INSTALLMENT',
+          split: [{ newPersonName: 'Bruno', amountCents: 35_000 }],
+        }),
+      ).toBeUndefined();
+    });
+
+    it('refuses shares bigger than the amount, the same person twice, or a person as well', () => {
+      expect(message({ split: [{ personId: ana, amountCents: 350_001 }] })).toBe(
+        'As partes dos outros passam do valor do lançamento.',
+      );
+      expect(
+        message({
+          split: [
+            { newPersonName: 'Ana', amountCents: 100 },
+            { newPersonName: 'ana', amountCents: 100 },
+          ],
+        }),
+      ).toBe('A mesma pessoa aparece duas vezes.');
+      expect(message({ personId: ana, split: [{ personId: ana, amountCents: 100 }] })).toBe(
+        'Um lançamento dividido não fica ligado a uma só pessoa.',
+      );
+    });
+
+    it('refuses a share of the total that does not give a cent to each installment', () => {
+      expect(message({ split: [{ personId: ana, amountCents: 9 }] })).toBe(
+        'Cada parte precisa dar ao menos um centavo por parcela.',
+      );
+    });
+  });
 });

@@ -1,8 +1,13 @@
 import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
 import { amountCentsSchema, MAX_AMOUNT_CENTS, periodSchema } from './money-and-dates.ts';
+import { MAX_SPLIT_PEOPLE } from './person.ts';
 import { dueDaySchema } from './recurrence.ts';
-import { transactionDescriptionSchema, transactionNotesSchema } from './transaction.ts';
+import {
+  splitShareInputSchema,
+  transactionDescriptionSchema,
+  transactionNotesSchema,
+} from './transaction.ts';
 
 // Parcelamentos (ADR 0038): a purchase or debt split into monthly installments, all created at
 // once, one per competência from the first on. The cents a split leaves go to the last one.
@@ -33,6 +38,16 @@ export const createInstallmentPlanInputSchema = z
     dueDay: dueDaySchema.nullable().optional(),
     /** "A receber de" / "a pagar para" (ADR 0052): copied to every installment. */
     personId: z.uuid().nullable().optional(),
+    /**
+     * Splits it with other people (ADR 0052): each share in the same meaning as `amountCents`
+     * (of the total, or of each installment). Every installment gets one pending share per
+     * person, on the opposite side, created with it.
+     */
+    split: z
+      .array(splitShareInputSchema)
+      .min(1, 'Informe com quem dividir.')
+      .max(MAX_SPLIT_PEOPLE, `Divida com no máximo ${MAX_SPLIT_PEOPLE} pessoas.`)
+      .optional(),
   })
   .refine(
     (input) =>
@@ -42,6 +57,22 @@ export const createInstallmentPlanInputSchema = z
   .refine((input) => input.amountIs === 'INSTALLMENT' || input.amountCents >= input.installments, {
     message: 'O total precisa dar ao menos um centavo por parcela.',
     path: ['amountCents'],
+  })
+  .superRefine((input, context) => {
+    if (!input.split) return;
+    const issue = (message: string) =>
+      context.addIssue({ code: 'custom', message, path: ['split'] });
+    if (input.personId) issue('Um lançamento dividido não fica ligado a uma só pessoa.');
+    const others = input.split.reduce((sum, share) => sum + share.amountCents, 0);
+    if (others > input.amountCents) issue('As partes dos outros passam do valor do lançamento.');
+    if (
+      input.amountIs === 'TOTAL' &&
+      input.split.some((share) => share.amountCents < input.installments)
+    ) {
+      issue('Cada parte precisa dar ao menos um centavo por parcela.');
+    }
+    const people = input.split.map((share) => share.personId ?? share.newPersonName?.toLowerCase());
+    if (new Set(people).size !== people.length) issue('A mesma pessoa aparece duas vezes.');
   });
 
 export type CreateInstallmentPlanInput = z.infer<typeof createInstallmentPlanInputSchema>;
