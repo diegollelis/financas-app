@@ -107,8 +107,12 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Membros do espaço compartilhado como pessoas (nota de 2026-10-12 no ADR 0042)
     - [x] API: criadas ao aceitar o convite e ao listar, ligando a pessoa de mesmo nome; `isMember` e `PERSON_IS_MEMBER`
     - [x] Tela: selos "Membro" e "Você" em Pessoas, e você fora das sugestões
-  - [ ] Dividir um parcelamento: a parte de cada pessoa em cada parcela, criadas junto
-  - [ ] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês
+  - [ ] Pessoa e divisão em entradas, recorrências e parcelamentos ([ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
+    - [ ] Seletor de pessoa como o de categoria: busca, "Membros" e "Pessoas", "Adicionar 'Nome'"
+    - [ ] Uma pessoa em "Todo mês" e "Parcelado" (API e tela)
+    - [ ] Dividir uma entrada: as partes viram saídas pendentes em Repasse
+    - [ ] Dividir um parcelamento: a parte de cada pessoa em cada parcela, criadas junto (API, depois tela)
+    - [ ] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês; em % numa variável, acompanhando o valor real (API, depois tela)
   - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
   - [ ] Divisão das contas da casa por percentual entre os membros (ADR próprio)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
