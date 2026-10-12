@@ -240,10 +240,11 @@ export function TransactionForm({
   const typedAmount = useWatch({ control, name: 'amount' });
   const typedInstallments = useWatch({ control, name: 'installments' });
   const splitOn = useWatch({ control, name: 'splitOn' });
-  // Splitting is for a new debit launched once; the rest may name one person (ADR 0042).
+  // Splitting is for a new debit launched once; anything else may name one person, a recurrence
+  // or an installment plan too, copied to each month (ADRs 0042, 0052).
   const canSplit = allowRepeat && type === 'DEBIT' && repeat === 'NONE';
   const splitting = canSplit && splitOn;
-  const showPerson = (!allowRepeat || repeat === 'NONE') && !splitting;
+  const showPerson = !splitting;
   const user = useCurrentUser();
   const totalCents = (() => {
     const cents = parseReais(typedAmount ?? '');

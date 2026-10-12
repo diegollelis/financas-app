@@ -31,7 +31,24 @@ const recurrence = (n: number, fields: object) => ({
   endPeriod: null,
   ...fields,
 });
-const aluguel = recurrence(1, { description: 'Aluguel', amountCents: 150_000, dueDay: 10 });
+const person = (n: number, name: string) => ({
+  id: `01920000-0000-7000-8000-0000000004${String(n).padStart(2, '0')}`,
+  name,
+  memberUserId: null,
+  isMember: false,
+  archived: false,
+  receivableCents: 0,
+  payableCents: 0,
+});
+const ana = person(1, 'Ana');
+const bruno = person(2, 'Bruno');
+
+const aluguel = recurrence(1, {
+  description: 'Aluguel',
+  amountCents: 150_000,
+  dueDay: 10,
+  personId: ana.id,
+});
 const energia = recurrence(2, {
   description: 'Conta de luz',
   categoryId: contas.id,
@@ -57,6 +74,7 @@ const plan = (n: number, fields: object) => ({
 });
 const geladeira = plan(1, {
   description: 'Geladeira',
+  personId: bruno.id,
   totalCents: 100_000,
   installments: 3,
   settledCount: 1,
@@ -82,6 +100,7 @@ function mockRecurrences(overrides: Record<string, { status?: number; body: unkn
     [`GET ${base}/categories`]: { body: [moradia, contas, salario] },
     [`GET ${base}/recurrences`]: { body: [aluguel, energia, academia] },
     [`GET ${base}/installments`]: { body: [geladeira, sofa] },
+    [`GET ${base}/people`]: { body: [ana, bruno] },
     ...overrides,
   });
 }
@@ -120,8 +139,10 @@ describe('RecurrencesPage', () => {
     );
     const [active, ended] = within(monthly).getAllByRole('list');
     expect(rowsOf(active!)).toEqual([
-      expect.stringMatching(/Aluguel.*Saída.*Moradia.*Vence dia 10.*Desde janeiro de 2026/),
-      expect.stringMatching(/Conta de luz.*Contas da casa.*Varia todo mês/),
+      expect.stringMatching(
+        /Aluguel.*Saída.*Moradia.*A pagar para Ana.*Vence dia 10.*Desde janeiro de 2026/,
+      ),
+      expect.stringMatching(/Conta de luz.*Varia todo mês.*Contas da casa/),
     ]);
     expect(within(monthly).getByRole('heading', { name: 'Encerradas' })).toBeInTheDocument();
     expect(rowsOf(ended!)).toEqual([expect.stringMatching(/Academia.*Até maio de 2026/)]);
@@ -133,10 +154,10 @@ describe('RecurrencesPage', () => {
     expect(rowsOf(running!)).toEqual([
       // What is left, and the amount named as the total.
       expect.stringMatching(
-        /Geladeira.*1 de 3 pagas.*Faltam 2 parcelas: R\$.666,67, até novembro de 2026.*total em 3 parcelas/,
+        /Geladeira.*total em 3 parcelas.*A pagar para Bruno.*1 de 3 pagas.*Faltam 2 parcelas: R\$.666,67, até novembro de 2026/,
       ),
     ]);
-    expect(rowsOf(over!)).toEqual([expect.stringMatching(/Sofá.*Pago.*total em 10 de R\$/)]);
+    expect(rowsOf(over!)).toEqual([expect.stringMatching(/Sofá.*total em 10 de R\$.*Pago/)]);
     expect(screen.queryByRole('button', { name: 'Ações de Sofá' })).not.toBeInTheDocument();
   });
 
@@ -165,6 +186,33 @@ describe('RecurrencesPage', () => {
     });
     expect(await screen.findByText('Recorrência alterada')).toBeInTheDocument();
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('changes the person of a recurrence, a new name becoming a person first', async () => {
+    const carla = person(3, 'Carla');
+    const fetchMock = mockRecurrences({
+      [`POST ${base}/people`]: { status: 201, body: carla },
+      [`PATCH ${base}/recurrences/${aluguel.id}`]: { body: { ...aluguel, personId: carla.id } },
+    });
+    renderApp(page);
+
+    await choose('Aluguel', 'Editar');
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
+    const field = within(dialog).getByRole('combobox', { name: 'A pagar para (opcional)' });
+    expect(field).toHaveTextContent('Ana');
+    await userEvent.click(field);
+    await userEvent.type(await screen.findByPlaceholderText('Buscar ou adicionar pessoa'), 'Carla');
+    await userEvent.click(await screen.findByRole('option', { name: 'Adicionar “Carla”' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/people`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Carla' }),
+    });
+    await expectCall(fetchMock, `${base}/recurrences/${aluguel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ personId: carla.id }),
+    });
   });
 
   it('turns a fixed recurrence variable, and validates the day', async () => {

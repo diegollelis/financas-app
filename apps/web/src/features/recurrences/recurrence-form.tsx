@@ -1,8 +1,10 @@
 import {
   createRecurrenceInputSchema,
   dueDaySchema,
+  normalizeName,
   reaisInputSchema,
   type Category,
+  type Person,
   type Recurrence,
   type UpdateRecurrenceInput,
 } from '@financas/shared';
@@ -14,6 +16,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CategorySelect } from '@/features/categories/category-picker';
+import { PersonSelect } from '@/features/people/person-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /** What can change in a recurrence: not its type nor its start (ADR 0038). */
@@ -29,6 +32,8 @@ const recurrenceFormSchema = createRecurrenceInputSchema
       .transform((day) => (day === '' ? null : Number(day)))
       .pipe(dueDaySchema.nullable()),
     amountKind: z.enum(['FIXED', 'VARIABLE']),
+    /** A receber de / a pagar para (ADR 0052): a name, resolved to a person on save. */
+    person: z.string().trim(),
   });
 
 type FormInput = z.input<typeof recurrenceFormSchema>;
@@ -60,6 +65,8 @@ function recurrenceChanges(recurrence: Recurrence, values: FormValues) {
 export function RecurrenceForm({
   recurrence,
   categories,
+  people,
+  userId,
   pending,
   error,
   onSubmit,
@@ -67,12 +74,20 @@ export function RecurrenceForm({
 }: {
   recurrence: Recurrence;
   categories: Category[];
+  /** The workspace's people, for "A receber de" / "A pagar para". */
+  people: Person[];
+  /** The signed-in user, left out of the people offered. */
+  userId: string;
   pending: boolean;
   error: unknown;
-  /** Only what changed; empty when nothing did. */
-  onSubmit: (changes: UpdateRecurrenceInput) => void;
+  /**
+   * Only what changed; empty when nothing did. `person` is the name picked when it changed
+   * ('' to unlink), undefined otherwise: a new name has to become a person first.
+   */
+  onSubmit: (changes: UpdateRecurrenceInput, person: string | undefined) => void;
   onCancel: () => void;
 }) {
+  const currentPerson = people.find((person) => person.id === recurrence.personId)?.name ?? '';
   const { register, handleSubmit, formState, control } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(recurrenceFormSchema),
     defaultValues: {
@@ -82,6 +97,7 @@ export function RecurrenceForm({
       amount: amountText.format(recurrence.amountCents / 100),
       dueDay: recurrence.dueDay === null ? '' : String(recurrence.dueDay),
       amountKind: recurrence.variableAmount ? 'VARIABLE' : 'FIXED',
+      person: currentPerson,
     },
   });
   const variable = useWatch({ control, name: 'amountKind' }) === 'VARIABLE';
@@ -98,7 +114,14 @@ export function RecurrenceForm({
       noValidate
       className="grid gap-4"
       onSubmit={(event) =>
-        void handleSubmit((values) => onSubmit(recurrenceChanges(recurrence, values)))(event)
+        void handleSubmit((values) =>
+          onSubmit(
+            recurrenceChanges(recurrence, values),
+            normalizeName(values.person) === normalizeName(currentPerson)
+              ? undefined
+              : values.person,
+          ),
+        )(event)
       }
     >
       <FormField
@@ -168,6 +191,28 @@ export function RecurrenceForm({
           ? 'Um valor novo substitui as estimativas pendentes; os meses cujo valor já foi informado ficam como estão. Os meses seguintes começam pela média dos 3 últimos pagos.'
           : 'Num mês sem esse dia, o vencimento é o último dia do mês.'}
       </p>
+      <Controller
+        control={control}
+        name="person"
+        render={({ field, fieldState }) => (
+          <FormField
+            id={id('person')}
+            label={
+              recurrence.type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'
+            }
+            error={fieldState.error?.message}
+          >
+            <PersonSelect
+              value={field.value}
+              onChange={field.onChange}
+              people={people}
+              userId={userId}
+              optional
+              title={recurrence.type === 'CREDIT' ? 'A receber de' : 'A pagar para'}
+            />
+          </FormField>
+        )}
+      />
       <FormField
         id={id('notes')}
         label="Observações (opcional)"

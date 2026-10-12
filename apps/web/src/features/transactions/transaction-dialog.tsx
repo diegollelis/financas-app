@@ -63,10 +63,12 @@ export function TransactionDialog({
     onOpenChange(false);
   };
   const submit = async (values: TransactionFormValues) => {
-    // A name typed in "A receber de" / "A pagar para": the person, created when new (ADR 0042).
+    // The name picked in "A receber de" / "A pagar para": the person, created when new (ADR 0042),
+    // for a recurrence or an installment plan too (ADR 0052). A split names its people itself.
+    const splitting = values.splitOn && values.type === 'DEBIT' && values.repeat === 'NONE';
     let personId: string | null;
     try {
-      personId = values.repeat === 'NONE' ? await person.resolve(values.person) : null;
+      personId = splitting ? null : await person.resolve(values.person);
     } catch {
       return; // Shown by the form, from person.error.
     }
@@ -97,6 +99,7 @@ export function TransactionDialog({
           amountIs: values.amountIs,
           firstPeriod: period,
           dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
+          personId,
         },
         { onSuccess: done(`Parcelamento adicionado: ${installments} parcelas`) },
       );
@@ -109,10 +112,11 @@ export function TransactionDialog({
           dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
           startPeriod: period,
           variableAmount: values.amountKind === 'VARIABLE',
+          personId,
         },
         { onSuccess: done('Lançamento adicionado, repetindo todo mês') },
       );
-    } else if (values.splitOn && values.type === 'DEBIT') {
+    } else if (splitting) {
       // The debit and one "a receber" per person, at once (ADR 0042). A name already listed
       // goes by id; a new one becomes a person in the same request.
       setRepeat('NONE');
