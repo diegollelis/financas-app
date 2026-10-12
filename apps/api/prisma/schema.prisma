@@ -304,8 +304,9 @@ model Transaction {
 
 // Pessoa (ADR 0042): a contact of the workspace, by name, whether or not they use the app; the
 // other side of "a receber de" and "a pagar para". Optionally linked to a member of the same
-// workspace, whose account name it then shows; if they leave, it stays as a contact. Archived,
-// not deleted, once it has transactions.
+// workspace, whose account name it then shows; if they leave, it stays as a contact. Every
+// member of a shared workspace gets one, at most one each. Archived, not deleted, once it has
+// transactions.
 model Person {
   id           String        @id @default(uuid(7)) @db.Uuid
   workspaceId  String        @map("workspace_id") @db.Uuid
@@ -319,6 +320,7 @@ model Person {
   transactions Transaction[]
 
   @@unique([workspaceId, name])
+  @@unique([workspaceId, memberUserId])
   // Target of the composite foreign key of transactions.
   @@unique([id, workspaceId])
   @@map("people")

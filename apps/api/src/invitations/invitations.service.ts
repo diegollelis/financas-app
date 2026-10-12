@@ -23,6 +23,7 @@ import type { Env } from '../config/env.js';
 import type { Invitation } from '../generated/prisma/client.js';
 import { Mailer } from '../mail/mailer.js';
 import { mailTemplates } from '../mail/templates.js';
+import { ensureMemberPeople } from '../people/member-people.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { WorkspaceMembership } from '../workspaces/workspace-member.guard.js';
 
@@ -211,6 +212,8 @@ export class InvitationsService {
           data: { workspaceId: invitation.workspaceId, userId: user.id, role: invitation.role },
         }));
       await tx.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+      // The new member, and the OWNER if they were alone so far, become people (ADR 0042).
+      await ensureMemberPeople(tx, invitation.workspaceId);
 
       const { id, name, isPersonal } = invitation.workspace;
       return { id, name, isPersonal, role: member.role };

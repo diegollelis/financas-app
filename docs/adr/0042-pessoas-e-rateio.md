@@ -105,3 +105,16 @@ Escolhidos com o dono do projeto: **contatos por nome (opção 2)**, **valor a r
 
 - **primeiro os parcelamentos:** as parcelas já nascem todas juntas, então as partes de cada pessoa podem nascer com elas;
 - **depois as recorrências:** a recorrência teria que guardar a divisão e gerar a parte de cada pessoa a cada mês.
+
+## Nota (membros viram pessoas, 2026-10-12)
+
+**Num espaço compartilhado, todo membro é uma pessoa, criada pela API.** No teste do dono, "Dividir com alguém" não sugeria o membro do espaço: a ligação a um membro existia na API, mas nenhuma tela a fazia. Decidido com o dono:
+
+- **Quem:** todos os membros, inclusive o dono, para que qualquer um possa dividir com qualquer outro. O espaço pessoal, e um compartilhado só com o dono, não ganham nenhuma.
+- **Quando:** ao aceitar um convite, na mesma transação, e antes de listar as pessoas (`ensureMemberPeople`, `apps/api/src/people/member-people.ts`). A listagem cobre os espaços que já tinham membros, sem migração de dados.
+- **Mesmo nome:** uma pessoa sem ligação com o nome da conta, sem diferenciar maiúsculas e acentos, é ligada ao membro e leva o histórico, em vez de nascer uma segunda "Ana". Se o nome já for de outra pessoa ligada (dois membros "Ana"), grava-se "Ana (2)"; a tela mostra o nome da conta de qualquer jeito.
+- **Uma por membro:** índice único em (`workspace_id`, `member_user_id`); um bloqueio por espaço evita que duas listagens simultâneas criem a mesma.
+- **Enquanto for membro,** a pessoa não é renomeada, arquivada, excluída nem religada (409 `PERSON_IS_MEMBER`): o nome vem da conta, e a API a recriaria. A resposta traz `isMember`, que a tela mostra como selo.
+- **Quem sai** continua como contato, com o nome gravado, e pode ser arquivado. Se voltar, a mesma pessoa é reativada.
+
+**Fica de fora:** desfazer uma ligação feita pelo nome, que exigiria mover lançamentos entre pessoas, e o acerto de contas entre membros ("pago por", partes por % da renda), que continua no roadmap com ADR próprio.
