@@ -112,7 +112,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
     - [x] Seletor de pessoa como o de categoria: busca, "Membros" e "Pessoas", "Adicionar 'Nome'"
     - [x] Uma pessoa em "Todo mês" e "Parcelado" (API e tela)
     - [x] Dividir uma entrada: as partes viram saídas pendentes em Repasse
-    - [ ] Dividir um parcelamento: a parte de cada pessoa em cada parcela, criadas junto (API, depois tela)
+    - [x] Dividir um parcelamento: a parte de cada pessoa em cada parcela, criadas junto (API, depois tela)
     - [ ] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês; em % numa variável, acompanhando o valor real (API, depois tela)
   - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
   - [ ] Divisão das contas da casa por percentual entre os membros (ADR próprio)

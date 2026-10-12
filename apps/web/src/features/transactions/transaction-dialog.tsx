@@ -65,7 +65,21 @@ export function TransactionDialog({
   const submit = async (values: TransactionFormValues) => {
     // The name picked in "A receber de" / "A pagar para": the person, created when new (ADR 0042),
     // for a recurrence or an installment plan too (ADR 0052). A split names its people itself.
-    const splitting = values.splitOn && values.repeat === 'NONE';
+    const splitting = values.splitOn && values.repeat !== 'MONTHLY';
+    // Each share as the API takes it (ADRs 0042, 0052): a name already listed goes by id, a new
+    // one becomes a person in the same request. In an installment plan, in the meaning of the
+    // amount typed (of the total, or of each installment).
+    const split = values.shares.map((share) => {
+      const listed = findPerson(people, share.name);
+      const amountCents = shareCents(values.amount, share.value, values.shareMode) ?? 0;
+      return listed && !listed.archived
+        ? { personId: listed.id, amountCents }
+        : { newPersonName: share.name.trim(), amountCents };
+    });
+    const withPeople = (message: string) =>
+      splitting
+        ? `${message}, dividido com ${split.length} ${split.length === 1 ? 'pessoa' : 'pessoas'}`
+        : message;
     let personId: string | null;
     try {
       personId = splitting ? null : await person.resolve(values.person);
@@ -100,8 +114,9 @@ export function TransactionDialog({
           firstPeriod: period,
           dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
           personId,
+          ...(splitting && { split }),
         },
-        { onSuccess: done(`Parcelamento adicionado: ${installments} parcelas`) },
+        { onSuccess: done(withPeople(`Parcelamento adicionado: ${installments} parcelas`)) },
       );
     } else if (values.repeat === 'MONTHLY') {
       // Every month from this one, due on the same day (ADR 0038).
@@ -118,22 +133,10 @@ export function TransactionDialog({
       );
     } else if (splitting) {
       // The transaction and one share per person on the other side, at once (ADRs 0042, 0052).
-      // A name already listed goes by id; a new one becomes a person in the same request.
       setRepeat('NONE');
-      const split = values.shares.map((share) => {
-        const listed = findPerson(people, share.name);
-        const amountCents = shareCents(values.amount, share.value, values.shareMode) ?? 0;
-        return listed && !listed.archived
-          ? { personId: listed.id, amountCents }
-          : { newPersonName: share.name.trim(), amountCents };
-      });
       create.mutate(
         { ...fields, dueDate: values.dueDate, period, split },
-        {
-          onSuccess: done(
-            `Lançamento adicionado, dividido com ${split.length} ${split.length === 1 ? 'pessoa' : 'pessoas'}`,
-          ),
-        },
+        { onSuccess: done(withPeople('Lançamento adicionado')) },
       );
     } else {
       setRepeat('NONE');
