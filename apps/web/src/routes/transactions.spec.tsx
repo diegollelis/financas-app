@@ -77,6 +77,7 @@ const ana = {
   id: '01920000-0000-7000-8000-000000000301',
   name: 'Ana',
   memberUserId: null,
+  isMember: false,
   archived: false,
   receivableCents: 0,
   payableCents: 0,

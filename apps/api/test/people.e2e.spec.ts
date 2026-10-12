@@ -10,7 +10,7 @@ import {
 } from '@financas/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp } from './app.js';
-import { resetDatabase } from './db.js';
+import { ownerClient, resetDatabase } from './db.js';
 import { expectHiddenFromOutsiders, type WorkspaceRoute } from './isolation.js';
 
 // People, receivables and payables, and splitting a debit (ADR 0042).
@@ -234,6 +234,178 @@ describe('people and splits', () => {
 
       await viewer.browser.get(`${base}/people`).expect(200);
       await viewer.browser.post(`${base}/people`).send({ name: 'Ana' }).expect(403);
+    });
+  });
+
+  describe('members as people', () => {
+    /** Maria (OWNER) with a shared workspace "Casa", and João, who joins it by invitation. */
+    async function house() {
+      const owner = await t.signUp(maria);
+      const created = await owner.browser
+        .post('/api/workspaces')
+        .send({ name: 'Casa' })
+        .expect(201);
+      const workspaceId = workspaceSchema.parse(created.body).id;
+      const base = `/api/workspaces/${workspaceId}`;
+      const join = async (account: typeof joao) => {
+        await owner.browser
+          .post(`${base}/invitations`)
+          .send({ email: account.email, role: 'EDITOR' })
+          .expect(201);
+        const token = t.mailer.lastLinkTo(account.email).pathname.split('/').at(-1) ?? '';
+        const joined = await t.signUp(account);
+        await joined.browser.post(`/api/invitations/${token}/accept`).expect(200);
+        return joined;
+      };
+      return { owner, workspaceId, base, join };
+    }
+
+    const summary = (list: Awaited<ReturnType<typeof people>>) =>
+      list.map(({ name, isMember, archived }) => [name, isMember, archived]);
+
+    /** The names as stored, read as the owner of the tables (the API role is under RLS). */
+    async function storedNames(workspaceId: string) {
+      const db = ownerClient();
+      try {
+        const rows = await db.person.findMany({ where: { workspaceId }, select: { name: true } });
+        return rows.map((row) => row.name).sort();
+      } finally {
+        await db.$disconnect();
+      }
+    }
+
+    it('makes the new member and the OWNER people when an invitation is accepted', async () => {
+      const { owner, workspaceId, base, join } = await house();
+      const joined = await join(joao);
+      // Created by the acceptance itself, before anyone lists them.
+      expect(await storedNames(workspaceId)).toEqual([joao.name, maria.name]);
+
+      const list = await people(owner.browser, base);
+
+      expect(summary(list)).toEqual([
+        [joao.name, true, false],
+        [maria.name, true, false],
+      ]);
+      expect(list.find((person) => person.name === joao.name)?.memberUserId).toBe(joined.userId);
+      expect(summary(await people(joined.browser, base))).toEqual(summary(list));
+    });
+
+    it('links a person typed before, ignoring case and accents, with their history', async () => {
+      const { owner, base, join } = await house();
+      const typed = await addPerson(owner.browser, base, 'joao exemplo');
+      const categories = categoryListResponseSchema.parse(
+        (await owner.browser.get(`${base}/categories`).expect(200)).body,
+      );
+      await owner.browser
+        .post(`${base}/transactions`)
+        .send({
+          type: 'CREDIT',
+          description: 'Empréstimo de exemplo',
+          categoryId: categories.find((c) => c.name === 'Outros' && c.type === 'CREDIT')!.id,
+          amountCents: 2_500,
+          period,
+          personId: typed.id,
+        })
+        .expect(201);
+
+      await join(joao);
+
+      const list = await people(owner.browser, base);
+      expect(list).toHaveLength(2);
+      expect(list.find((person) => person.id === typed.id)).toMatchObject({
+        name: joao.name,
+        isMember: true,
+        receivableCents: 2_500,
+      });
+    });
+
+    it('keeps names unique when two members have the same one', async () => {
+      const { owner, workspaceId, base, join } = await house();
+      await join(joao);
+      // A second account with João's name joins too.
+      await join({ ...joao, email: 'outro.joao@example.com' });
+
+      expect(summary(await people(owner.browser, base))).toEqual([
+        [joao.name, true, false],
+        [joao.name, true, false],
+        [maria.name, true, false],
+      ]);
+      expect(await storedNames(workspaceId)).toEqual([joao.name, `${joao.name} (2)`, maria.name]);
+    });
+
+    it('keeps the person of a member who leaves as a contact, and reuses it if they return', async () => {
+      const { owner, base, join } = await house();
+      const joined = await join(joao);
+      const before = await people(owner.browser, base);
+      const joaoPerson = before.find((person) => person.memberUserId === joined.userId)!;
+
+      await joined.browser.delete(`${base}/members/${joined.userId}`).expect(204);
+      expect((await people(owner.browser, base)).find((p) => p.id === joaoPerson.id)).toMatchObject(
+        { name: joao.name, isMember: false },
+      );
+      // Now a contact, it can be archived; coming back reactivates the same one.
+      await owner.browser
+        .patch(`${base}/people/${joaoPerson.id}`)
+        .send({ archived: true })
+        .expect(200);
+      await owner.browser
+        .post(`${base}/invitations`)
+        .send({ email: joao.email, role: 'EDITOR' })
+        .expect(201);
+      const token = t.mailer.lastLinkTo(joao.email).pathname.split('/').at(-1) ?? '';
+      await joined.browser.post(`/api/invitations/${token}/accept`).expect(200);
+
+      const after = await people(owner.browser, base);
+      expect(after).toHaveLength(2);
+      expect(after.find((p) => p.id === joaoPerson.id)).toMatchObject({
+        isMember: true,
+        archived: false,
+      });
+    });
+
+    it("refuses to rename, archive, delete or relink a member's person", async () => {
+      const { owner, base, join } = await house();
+      const joined = await join(joao);
+      const joaoPerson = (await people(owner.browser, base)).find(
+        (person) => person.memberUserId === joined.userId,
+      )!;
+
+      for (const body of [{ name: 'Outro nome' }, { archived: true }, { memberUserId: null }]) {
+        const response = await owner.browser
+          .patch(`${base}/people/${joaoPerson.id}`)
+          .send(body)
+          .expect(409);
+        expect(response.body).toMatchObject({ code: 'PERSON_IS_MEMBER' });
+      }
+      const removed = await owner.browser.delete(`${base}/people/${joaoPerson.id}`).expect(409);
+      expect(removed.body).toMatchObject({ code: 'PERSON_IS_MEMBER' });
+      const second = await owner.browser
+        .post(`${base}/people`)
+        .send({ name: 'Joãozinho', memberUserId: joined.userId })
+        .expect(409);
+      expect(second.body).toMatchObject({ code: 'PERSON_EXISTS' });
+    });
+
+    it('gives people to the members of a workspace shared before this rule, on listing', async () => {
+      const { owner, workspaceId, base } = await house();
+      const other = await t.signUp(joao);
+      // A membership with no people, as in the workspaces shared before.
+      await t.prisma.member.create({ data: { workspaceId, userId: other.userId, role: 'VIEWER' } });
+
+      expect(summary(await people(other.browser, base))).toEqual([
+        [joao.name, true, false],
+        [maria.name, true, false],
+      ]);
+      expect(await people(owner.browser, base)).toHaveLength(2);
+    });
+
+    it('gives no people to a workspace with only its OWNER, nor to the personal one', async () => {
+      const { owner, base } = await house();
+
+      expect(await people(owner.browser, base)).toEqual([]);
+      expect(await people(owner.browser, `/api/workspaces/${owner.personalWorkspaceId}`)).toEqual(
+        [],
+      );
     });
   });
 

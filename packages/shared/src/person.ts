@@ -38,6 +38,12 @@ export const personSchema = z.object({
   /** The member's account name when linked to one; the name typed otherwise. */
   name: z.string(),
   memberUserId: z.uuid().nullable(),
+  /**
+   * Linked to someone who is still a member: every member of a shared workspace has one, created
+   * by the API, which cannot be renamed, archived or deleted while they stay. Once they leave, it
+   * is a contact like any other, with the name it was saved with.
+   */
+  isMember: z.boolean(),
   archived: z.boolean(),
   /** Pending credits linked to them: what they owe you. */
   receivableCents: z.number().int().nonnegative(),

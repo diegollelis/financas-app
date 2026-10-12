@@ -14,6 +14,7 @@ const person = (n: number, name: string, fields: Record<string, unknown> = {}) =
   id: `01920000-0000-7000-8000-0000000003${String(n).padStart(2, '0')}`,
   name,
   memberUserId: null,
+  isMember: false,
   archived: false,
   receivableCents: 0,
   payableCents: 0,

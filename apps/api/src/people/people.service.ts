@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { Prisma, type Person as PersonRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toTransactionResponse, withOrigin } from '../transactions/transactions.service.js';
+import { ensureMemberPeople } from './member-people.js';
 
 /** Sorts names as a Brazilian reader expects ("Álvaro" next to "Alice"). */
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
@@ -23,6 +24,13 @@ const personExists = () =>
   new ConflictException({
     code: 'PERSON_EXISTS',
     message: 'Já existe uma pessoa com esse nome. Se ela estiver arquivada, reative-a.',
+  });
+
+/** The person of a member comes and goes with the membership (ensureMemberPeople). */
+const personIsMember = () =>
+  new ConflictException({
+    code: 'PERSON_IS_MEMBER',
+    message: 'Esta pessoa é membro do espaço: o nome vem da conta dela, e ela continua na lista.',
   });
 
 function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
@@ -38,8 +46,12 @@ function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
 export class PeopleService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** All of them, archived too, by name, with what is pending each way. */
+  /**
+   * All of them, archived too, by name, with what is pending each way. Every member of a shared
+   * workspace is among them (ensureMemberPeople).
+   */
   async list(workspaceId: string): Promise<Person[]> {
+    await this.prisma.$transaction((tx) => ensureMemberPeople(tx, workspaceId));
     const db = this.prisma.forWorkspace(workspaceId);
     const [people, pending, members] = await Promise.all([
       db.person.findMany({ where: { workspaceId } }),
@@ -57,6 +69,7 @@ export class PeopleService {
         id: person.id,
         name: displayName(person, members),
         memberUserId: person.memberUserId,
+        isMember: isMember(person, members),
         archived: person.archivedAt !== null,
         receivableCents: owed(person.id, 'CREDIT'),
         payableCents: owed(person.id, 'DEBIT'),
@@ -80,6 +93,7 @@ export class PeopleService {
 
   async update(workspaceId: string, personId: string, input: UpdatePersonInput): Promise<Person> {
     const current = await this.find(workspaceId, personId);
+    if (isMember(current, await this.memberNames(workspaceId))) throw personIsMember();
     if (input.name !== undefined) await this.ensureNameIsFree(workspaceId, input.name, personId);
     const memberUserId =
       input.memberUserId === undefined
@@ -119,7 +133,8 @@ export class PeopleService {
 
   /** One with transactions can only be archived: the foreign key refuses the delete. */
   async remove(workspaceId: string, personId: string): Promise<void> {
-    if (!z.uuid().safeParse(personId).success) throw new NotFoundException();
+    const current = await this.find(workspaceId, personId);
+    if (isMember(current, await this.memberNames(workspaceId))) throw personIsMember();
     try {
       const { count } = await this.prisma
         .forWorkspace(workspaceId)
@@ -152,6 +167,7 @@ export class PeopleService {
       id: person.id,
       name: displayName(person, members),
       memberUserId: person.memberUserId,
+      isMember: isMember(person, members),
       archived: person.archivedAt !== null,
       receivableCents: sum('CREDIT'),
       payableCents: sum('DEBIT'),
@@ -167,7 +183,10 @@ export class PeopleService {
     return new Map(members.map((member) => [member.userId, member.user.name]));
   }
 
-  /** Only a member of this very workspace can be linked (ADR 0042, privacy). */
+  /**
+   * Only a member of this very workspace can be linked (ADR 0042, privacy), and only to one
+   * person: a member of a shared workspace already has theirs (ensureMemberPeople).
+   */
   private async memberToLink(workspaceId: string, userId: string | null | undefined) {
     if (!userId) return null;
     const member = await this.prisma.member.findUnique({
@@ -177,6 +196,15 @@ export class PeopleService {
       throw new BadRequestException({
         code: 'INVALID_INPUT',
         message: 'Escolha um membro deste espaço.',
+      });
+    }
+    const linked = await this.prisma
+      .forWorkspace(workspaceId)
+      .person.findFirst({ where: { workspaceId, memberUserId: userId } });
+    if (linked) {
+      throw new ConflictException({
+        code: 'PERSON_EXISTS',
+        message: 'Este membro já está na lista de pessoas.',
       });
     }
     return userId;
@@ -211,4 +239,9 @@ export class PeopleService {
  */
 function displayName(person: PersonRow, members: Map<string, string>): string {
   return (person.memberUserId && members.get(person.memberUserId)) || person.name;
+}
+
+/** Linked to someone who is still a member: the screen marks them, and they cannot be changed. */
+function isMember(person: PersonRow, members: Map<string, string>): boolean {
+  return person.memberUserId !== null && members.has(person.memberUserId);
 }
