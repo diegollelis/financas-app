@@ -64,7 +64,7 @@ const transactionFormSchema = plainTransactionInputSchema
     shares: z.array(z.object({ name: z.string(), value: z.string() })),
   })
   .superRefine((values, ctx) => {
-    if (values.splitOn && values.type === 'DEBIT' && values.repeat === 'NONE') {
+    if (values.splitOn && values.repeat === 'NONE') {
       const seen = new Set<string>();
       let others = 0;
       values.shares.forEach((share, index) => {
@@ -240,9 +240,9 @@ export function TransactionForm({
   const typedAmount = useWatch({ control, name: 'amount' });
   const typedInstallments = useWatch({ control, name: 'installments' });
   const splitOn = useWatch({ control, name: 'splitOn' });
-  // Splitting is for a new debit launched once; anything else may name one person, a recurrence
-  // or an installment plan too, copied to each month (ADRs 0042, 0052).
-  const canSplit = allowRepeat && type === 'DEBIT' && repeat === 'NONE';
+  // Splitting is for a new transaction launched once, a credit too; anything else may name one
+  // person, a recurrence or an installment plan too, copied to each month (ADRs 0042, 0052).
+  const canSplit = allowRepeat && repeat === 'NONE';
   const splitting = canSplit && splitOn;
   const showPerson = !splitting;
   const user = useCurrentUser();
@@ -519,6 +519,7 @@ export function TransactionForm({
                   setValue={setValue as never}
                   errors={formState.errors}
                   totalCents={totalCents}
+                  type={type}
                   people={people}
                   userId={user.id}
                 />

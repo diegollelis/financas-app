@@ -1,4 +1,10 @@
-import { formatCents, MAX_SPLIT_PEOPLE, normalizeName, type Person } from '@financas/shared';
+import {
+  formatCents,
+  MAX_SPLIT_PEOPLE,
+  normalizeName,
+  type Person,
+  type TransactionType,
+} from '@financas/shared';
 import { Plus, X } from 'lucide-react';
 import {
   Controller,
@@ -28,9 +34,9 @@ const modeOptions = [
 ] as const;
 
 /**
- * "Dividir com alguém" (ADR 0042): who else pays part of this debit, and how much, typed in
- * reais or as a percentage. Shows what stays yours as it is typed, and splits equally on request
- * (the cents left over stay in yours). Each person is picked like a category (ADR 0052); a new
+ * "Dividir com alguém" (ADRs 0042, 0052): whose part of this transaction it is, and how much,
+ * typed in reais or as a percentage. Shows what stays yours as it is typed, and splits equally
+ * on request (the cents left over stay in yours). Each person is picked like a category; a new
  * name becomes a person when the transaction is saved.
  */
 export function SplitFields({
@@ -40,6 +46,7 @@ export function SplitFields({
   setValue,
   errors,
   totalCents,
+  type,
   people,
   userId,
 }: {
@@ -50,6 +57,8 @@ export function SplitFields({
   errors: FieldErrors<SplitFormFields>;
   /** The amount typed, in cents; null while it is not a valid one. */
   totalCents: number | null;
+  /** The side of the transaction: its shares go on the other one (ADR 0052). */
+  type: TransactionType;
   /** The workspace's people, offered in each row (ADR 0052). */
   people: Person[];
   /** The signed-in user, never offered. */
@@ -193,7 +202,9 @@ export function SplitFields({
           ? 'Informe o valor e a parte de cada pessoa.'
           : mine < 0
             ? 'As partes dos outros passam do valor do lançamento.'
-            : `Sua parte: ${formatCents(mine)}. Cada pessoa vira um valor a receber, na categoria Reembolso.`}
+            : type === 'CREDIT'
+              ? `Sua parte: ${formatCents(mine)}. Cada pessoa vira um valor a pagar, na categoria Repasse.`
+              : `Sua parte: ${formatCents(mine)}. Cada pessoa vira um valor a receber, na categoria Reembolso.`}
       </p>
     </fieldset>
   );

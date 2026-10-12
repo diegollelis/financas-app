@@ -65,7 +65,7 @@ export function TransactionDialog({
   const submit = async (values: TransactionFormValues) => {
     // The name picked in "A receber de" / "A pagar para": the person, created when new (ADR 0042),
     // for a recurrence or an installment plan too (ADR 0052). A split names its people itself.
-    const splitting = values.splitOn && values.type === 'DEBIT' && values.repeat === 'NONE';
+    const splitting = values.splitOn && values.repeat === 'NONE';
     let personId: string | null;
     try {
       personId = splitting ? null : await person.resolve(values.person);
@@ -117,8 +117,8 @@ export function TransactionDialog({
         { onSuccess: done('Lançamento adicionado, repetindo todo mês') },
       );
     } else if (splitting) {
-      // The debit and one "a receber" per person, at once (ADR 0042). A name already listed
-      // goes by id; a new one becomes a person in the same request.
+      // The transaction and one share per person on the other side, at once (ADRs 0042, 0052).
+      // A name already listed goes by id; a new one becomes a person in the same request.
       setRepeat('NONE');
       const split = values.shares.map((share) => {
         const listed = findPerson(people, share.name);

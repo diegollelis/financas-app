@@ -51,7 +51,7 @@ export const plainTransactionInputSchema = transactionFieldsSchema.omit({ person
 
 export type PlainTransactionInput = z.infer<typeof plainTransactionInputSchema>;
 
-/** One person's share of a split debit: someone already listed, or a new name (ADR 0042). */
+/** One person's share of a split: someone already listed, or a new name (ADR 0042). */
 export const splitShareInputSchema = z
   .object({
     personId: z.uuid().optional(),
@@ -67,8 +67,9 @@ export type SplitShareInput = z.infer<typeof splitShareInputSchema>;
 export const createTransactionInputSchema = transactionFieldsSchema
   .extend({
     /**
-     * Splits a debit you paid (ADR 0042): besides it, one pending credit per share, "a receber"
-     * from that person, in the Reembolso category.
+     * Splits it with other people: besides it, one pending share per person on the opposite
+     * side. A debit you paid gives credits "a receber" in Reembolso (ADR 0042); a credit you
+     * received gives debits "a pagar" in Repasse (ADR 0052).
      */
     split: z
       .array(splitShareInputSchema)
@@ -80,7 +81,6 @@ export const createTransactionInputSchema = transactionFieldsSchema
     if (!input.split) return;
     const issue = (message: string) =>
       context.addIssue({ code: 'custom', message, path: ['split'] });
-    if (input.type !== 'DEBIT') issue('Só uma saída pode ser dividida.');
     if (input.personId) issue('Um lançamento dividido não fica ligado a uma só pessoa.');
     const others = input.split.reduce((sum, share) => sum + share.amountCents, 0);
     if (others > input.amountCents) issue('As partes dos outros passam do valor do lançamento.');
