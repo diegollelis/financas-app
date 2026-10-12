@@ -30,6 +30,7 @@ O nome que a pessoa vê na tela e o nome no código são independentes ([ADR 005
 | Valor estimado                         | `amountEstimated`                 | Valor de uma recorrência variável ainda não confirmado                              |
 | Parcelamento / Parcela                 | `InstallmentPlan` / `installment` | Compra ou dívida dividida em parcelas, uma por mês                                  |
 | Pessoa                                 | `Person`                          | Contato do espaço a quem se deve ou que deve                                        |
+| Membro / Você (selos de Pessoa)        | `isMember`, `memberUserId`        | A pessoa de um membro do espaço compartilhado, criada sozinha; "Você" é a sua       |
 | A receber de / A pagar para            | `personId`                        | A pessoa ligada a uma entrada ou a uma saída                                        |
 | Dividir com alguém                     | `split`, `splitOfId`              | Dividir uma saída cria uma entrada pendente por pessoa                              |
 | Reembolso                              | `REIMBURSEMENT_CATEGORY_NAME`     | A categoria de entrada das partes de uma divisão                                    |

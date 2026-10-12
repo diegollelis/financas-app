@@ -788,6 +788,35 @@ describe('TransactionsPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('suggests the members of the workspace as people, but not you', async () => {
+    const joao = {
+      ...ana,
+      id: '01920000-0000-7000-8000-000000000302',
+      name: 'João Exemplo',
+      memberUserId: '01920000-0000-7000-8000-000000000099',
+      isMember: true,
+    };
+    const me = {
+      ...ana,
+      id: '01920000-0000-7000-8000-000000000303',
+      name: verifiedUser.name,
+      memberUserId: verifiedUser.id,
+      isMember: true,
+    };
+    mockTransactions({ [`GET ${peopleBase}`]: { body: [ana, joao, me] } });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    const input = within(form).getByLabelText('A pagar para (opcional)');
+    const suggestions = document.getElementById(input.getAttribute('list') ?? '');
+
+    await vi.waitFor(() =>
+      expect(
+        [...(suggestions?.querySelectorAll('option') ?? [])].map((option) => option.value),
+      ).toEqual(['Ana', 'João Exemplo']),
+    );
+  });
+
   it('checks the shares before calling the API', async () => {
     const fetchMock = mockTransactions();
     renderApp(`/espacos/${houseId}/lancamentos`);
