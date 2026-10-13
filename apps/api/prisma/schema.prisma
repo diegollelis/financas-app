@@ -34,6 +34,7 @@ model Workspace {
   budgetDestinations BudgetDestination[]
   budgetShares       BudgetShare[]
   recurrenceShares   RecurrenceShare[]
+  merchants          Merchant[]
   createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -293,6 +294,9 @@ model Transaction {
   splitOfId         String?               @map("split_of_id") @db.Uuid
   splitOf           Transaction?          @relation("Split", fields: [splitOfId], references: [id], onDelete: SetNull)
   shares            Transaction[]         @relation("Split")
+  // Where it was bought or who paid it (ADR 0053). Same composite key as the person.
+  merchantId        String?               @map("merchant_id") @db.Uuid
+  merchant          Merchant?             @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([installmentPlanId, installmentNumber])
   @@index([workspaceId, period])
@@ -300,6 +304,7 @@ model Transaction {
   @@index([importId])
   @@index([personId])
   @@index([splitOfId])
+  @@index([merchantId])
   @@map("transactions")
 }
 
@@ -328,6 +333,27 @@ model Person {
   // Target of the composite foreign keys of transactions, recurrences and installment plans.
   @@unique([id, workspaceId])
   @@map("people")
+}
+
+// Estabelecimento (ADR 0053): where a transaction was bought or who paid it, by name, one list
+// per workspace for debits and credits. No category of its own. Archived, not deleted, once
+// something uses it.
+model Merchant {
+  id               String            @id @default(uuid(7)) @db.Uuid
+  workspaceId      String            @map("workspace_id") @db.Uuid
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String            @db.VarChar(100)
+  archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions     Transaction[]
+  recurrences      Recurrence[]
+  installmentPlans InstallmentPlan[]
+
+  @@unique([workspaceId, name])
+  // Target of the composite foreign keys of transactions, recurrences and installment plans.
+  @@unique([id, workspaceId])
+  @@map("merchants")
 }
 
 // Importação (ADR 0040): one spreadsheet import, all its transactions created at once and
@@ -372,6 +398,9 @@ model InstallmentPlan {
   // "A receber de" / "a pagar para" (ADR 0052), copied to every installment.
   personId     String?         @map("person_id") @db.Uuid
   person       Person?         @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  // Where it was bought or who pays it (ADR 0053), copied to every installment.
+  merchantId   String?         @map("merchant_id") @db.Uuid
+  merchant     Merchant?       @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   endedAt      DateTime?       @map("ended_at") @db.Timestamptz(3)
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -402,6 +431,9 @@ model Recurrence {
   // "A receber de" / "a pagar para" (ADR 0052), copied to every month it generates.
   personId       String?                @map("person_id") @db.Uuid
   person         Person?                @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  // Where it is bought or who pays it (ADR 0053), copied to every month it generates.
+  merchantId     String?                @map("merchant_id") @db.Uuid
+  merchant       Merchant?              @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   startPeriod    String                 @map("start_period") @db.Char(7)
   endPeriod      String?                @map("end_period") @db.Char(7)
   createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)

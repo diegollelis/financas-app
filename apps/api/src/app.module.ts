@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AccountModule } from './account/account.module.js';
 import { BudgetDestinationsModule } from './budget-destinations/budget-destinations.module.js';
 import { PeopleModule } from './people/people.module.js';
+import { MerchantsModule } from './merchants/merchants.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BudgetModule } from './budget/budget.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
@@ -42,6 +43,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     ImportsModule,
     AccountModule,
     PeopleModule,
+    MerchantsModule,
     BudgetDestinationsModule,
   ],
   // Reports unexpected errors to Sentry (a no-op without SENTRY_DSN), without query data (ADR 0034).

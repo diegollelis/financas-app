@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
 import type { Prisma, InstallmentPlan as PlanRow } from '../generated/prisma/client.js';
+import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
@@ -38,6 +39,7 @@ function toResponse(
     firstPeriod: plan.firstPeriod,
     dueDay: plan.dueDay,
     personId: plan.personId,
+    merchantId: plan.merchantId,
     endedAt: plan.endedAt?.toISOString() ?? null,
     settledCount,
     pendingCount: pending.count,
@@ -105,10 +107,12 @@ export class InstallmentsService {
   async create(workspaceId: string, input: CreateInstallmentPlanInput): Promise<InstallmentPlan> {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
+    if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     const totalCents = installmentPlanTotal(input);
     const amounts = splitInstallments(totalCents, input.installments);
     const dueDay = input.dueDay ?? null;
     const personId = input.personId ?? null;
+    const merchantId = input.merchantId ?? null;
     const sharesOf = input.split ? await this.shares(workspaceId, input, input.split) : () => [];
     const plan = await this.prisma.forWorkspace(workspaceId).installmentPlan.create({
       data: {
@@ -122,6 +126,7 @@ export class InstallmentsService {
         firstPeriod: input.firstPeriod,
         dueDay,
         personId,
+        merchantId,
         transactions: {
           create: amounts.map((amountCents, index) => {
             const period = shiftPeriod(input.firstPeriod, index);
@@ -132,6 +137,7 @@ export class InstallmentsService {
               notes: input.notes ?? null,
               categoryId: input.categoryId,
               personId,
+              merchantId,
               amountCents,
               period,
               dueDate: dueDay === null ? null : toDate(dueDateIn(period, dueDay)),

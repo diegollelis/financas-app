@@ -38,6 +38,8 @@ export const createInstallmentPlanInputSchema = z
     dueDay: dueDaySchema.nullable().optional(),
     /** "A receber de" / "a pagar para" (ADR 0052): copied to every installment. */
     personId: z.uuid().nullable().optional(),
+    /** Where it was bought or who pays it (ADR 0053): copied to every installment. */
+    merchantId: z.uuid().nullable().optional(),
     /**
      * Splits it with other people (ADR 0052): each share in the same meaning as `amountCents`
      * (of the total, or of each installment). Every installment gets one pending share per
@@ -88,6 +90,7 @@ export const installmentPlanSchema = z.object({
   firstPeriod: periodSchema,
   dueDay: z.number().int().nullable(),
   personId: z.uuid().nullable().default(null),
+  merchantId: z.uuid().nullable().default(null),
   /** When it was ended; null while it runs. */
   endedAt: z.iso.datetime().nullable(),
   /** How many installments were already settled. */
