@@ -321,6 +321,8 @@ export function ImportReview({
         </p>
         {/* Fixed above the tab bar on the phone, within reach of the thumb (ADR 0036). */}
         <Button
+          // The layout keeps room for it below the footer (data-fab).
+          data-fab
           onClick={submit}
           disabled={ready.length === 0 || create.isPending}
           className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-20 shadow-lg md:static md:shadow-none"
@@ -329,8 +331,6 @@ export function ImportReview({
             ? 'Importando…'
             : `Importar ${ready.length} ${ready.length === 1 ? 'lançamento' : 'lançamentos'}`}
         </Button>
-        {/* Room at the end, so the fixed button never covers the last row on the phone. */}
-        <div aria-hidden className="h-12 md:hidden" />
       </div>
 
       <ResponsiveDialog

@@ -487,6 +487,8 @@ export function TransactionsPage() {
             // Fixed above the tab bar on the phone, within reach of the thumb; in the header
             // from md (ADR 0036).
             <Button
+              // The layout keeps room for it below the footer (data-fab).
+              data-fab
               onClick={(event) => openForm(null, event.currentTarget)}
               className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 shadow-lg md:static md:shadow-none"
             >
@@ -591,8 +593,6 @@ export function TransactionsPage() {
         ))}
       {canEdit && ready && (
         <>
-          {/* Room at the end, so the fixed button never covers the last row on the phone. */}
-          <div aria-hidden className="h-12 md:hidden" />
           <TransactionDialog
             key={form.openings}
             workspaceId={workspaceId}

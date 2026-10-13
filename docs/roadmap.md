@@ -207,7 +207,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Mensagens da API sobre destinos e pessoas aparecendo na tela, em vez do erro genérico
   - [x] ADR e glossário com a ponte entre a tela e o código
   - [x] Telas, toasts, mensagens da API e planilha modelo com os termos novos (a planilha antiga continua sendo lida), rótulos de tipo e situação em `packages/shared`, capturas e axe zerado
-- [ ] Lançamentos no celular: no fim da página, o botão fixo "Novo lançamento" cobre parte do link "Privacidade" do rodapé (os lançamentos ficam livres; visto nas capturas do ADR 0051)
+- [x] Lançamentos no celular: no fim da página, o botão fixo "Novo lançamento" cobre parte do link "Privacidade" do rodapé (os lançamentos ficam livres; visto nas capturas do ADR 0051). O layout reserva o espaço do botão abaixo do rodapé (`data-fab`), também na revisão da importação
 
 **Ideias futuras:**
 
