@@ -62,6 +62,7 @@ function mockTransactions(overrides: Record<string, { status?: number; body: unk
     'GET /api/me': { body: verifiedUser },
     [`GET /api/workspaces/${houseId}`]: { body: house },
     [`GET /api/workspaces/${houseId}/people`]: { body: [] },
+    [`GET /api/workspaces/${houseId}/merchants`]: { body: [] },
     [`GET /api/workspaces/${houseId}/categories`]: {
       body: [salaryCategory, energyCategory, marketCategory],
     },
@@ -814,6 +815,7 @@ describe('TransactionsPage', () => {
       'GET /api/me': { body: verifiedUser },
       [`GET /api/workspaces/${houseId}`]: { body: house },
       [`GET /api/workspaces/${houseId}/people`]: { body: [] },
+      [`GET /api/workspaces/${houseId}/merchants`]: { body: [] },
       [`GET /api/workspaces/${houseId}/categories`]: { body: [investmentsCategory] },
       get [`GET ${base}`]() {
         return { body: [settled ? paid : pending] };
@@ -918,6 +920,7 @@ describe('TransactionsPage', () => {
         amountCents: 17_250,
         dueDate: '2026-10-10',
         personId: null,
+        merchantId: null,
       }),
     });
     expect(await screen.findByText('Lançamento salvo')).toBeInTheDocument();
@@ -1213,7 +1216,7 @@ describe('TransactionsPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Novo lançamento' }));
     let form = await screen.findByRole('dialog', { name: 'Novo lançamento' });
     const more = () => within(form).getByText(/^Mais opções/);
-    expect(more()).toHaveTextContent('Mais opções (observações, pessoa, dividir)');
+    expect(more()).toHaveTextContent('Mais opções (observações, estabelecimento, pessoa, dividir)');
     expect(more().closest('details')).not.toHaveAttribute('open');
     await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
 
@@ -1225,6 +1228,98 @@ describe('TransactionsPage', () => {
     expect(
       within(form).getByRole('combobox', { name: 'A receber de (opcional)' }),
     ).toHaveTextContent('Ana');
+  });
+
+  it('names a new merchant on a new transaction, creating it first', async () => {
+    const mercado = {
+      id: '01920000-0000-7000-8000-000000000601',
+      name: 'Mercado A',
+      archived: false,
+      inUse: false,
+    };
+    const fetchMock = mockTransactions({
+      [`GET /api/workspaces/${houseId}/merchants`]: {
+        body: [{ ...mercado, id: '01920000-0000-7000-8000-000000000602', name: 'Padaria' }],
+      },
+      [`POST /api/workspaces/${houseId}/merchants`]: { status: 201, body: mercado },
+      [`POST ${base}`]: { status: 201, body: { ...shopping, merchantId: mercado.id } },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Compras');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '50');
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    await userEvent.click(
+      within(form).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+    );
+    await userEvent.type(
+      await screen.findByPlaceholderText('Buscar ou adicionar estabelecimento'),
+      'Mercado A',
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Adicionar “Mercado A”' }));
+    expect(
+      within(form).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+    ).toHaveTextContent('Mercado A');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/merchants`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Mercado A' }),
+    });
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Compras',
+        notes: null,
+        categoryId: marketCategory.id,
+        amountCents: 5_000,
+        dueDate: null,
+        period: '2026-10',
+        personId: null,
+        merchantId: mercado.id,
+      }),
+    });
+  });
+
+  it('shows the merchant on the row, finds it by the search, and keeps it archived on edit', async () => {
+    const padaria = {
+      id: '01920000-0000-7000-8000-000000000603',
+      name: 'Padaria Pão Quente',
+      archived: true,
+      inUse: true,
+    };
+    const fetchMock = mockTransactions({
+      [`GET /api/workspaces/${houseId}/merchants`]: { body: [padaria] },
+      [`GET ${base}`]: { body: [salary, light, { ...shopping, merchantId: padaria.id }] },
+      [`PATCH ${base}/${shopping.id}`]: { body: { ...shopping, merchantId: padaria.id } },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    expect(row(await section('Saídas'), 'Compras da semana')).toHaveTextContent(
+      'Padaria Pão Quente',
+    );
+    await userEvent.type(screen.getByLabelText('Buscar lançamento'), 'pao quente');
+    const found = await section('Saídas');
+    expect(within(found).queryByText('Conta de luz')).not.toBeInTheDocument();
+    expect(within(found).getByText('Compras da semana')).toBeInTheDocument();
+
+    const menu = await openActions('Compras da semana');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    expect(
+      within(form).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+    ).toHaveTextContent('Padaria Pão Quente');
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));
+
+    // Kept as it is: no reactivation of the archived merchant.
+    await expectCall(fetchMock, `${base}/${shopping.id}`, {
+      method: 'PATCH',
+      body: expect.stringContaining(`"merchantId":"${padaria.id}"`) as unknown,
+    });
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/merchants/'))).toBe(false);
   });
 
   it('is read-only for a VIEWER', async () => {

@@ -121,7 +121,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - [ ] **Estabelecimento** ([ADR 0053](adr/0053-estabelecimentos.md)): onde se comprou ou quem pagou ("Mercado A", "Netflix", "Empresa X"), um cadastro do espaço e um campo opcional em saídas e entradas, separado da categoria e da pessoa. Pessoa responde "com quem"; estabelecimento responde "onde". Usar Pessoa para lojas foi descartado: os saldos de Pessoas contariam uma compra pendente como dívida com a loja, as lojas apareceriam em "Dividir com alguém" e um lançamento não teria como ter loja e pessoa ao mesmo tempo.
   - [x] ADR: cadastro próprio (e não texto livre, subcategorias ou etiquetas), saídas e entradas, "Estabelecimento" na tela e `Merchant` no código, no glossário
   - [x] API: tabela `merchants` com RLS (nome único no espaço, arquivar em vez de excluir), `merchant_id` opcional em lançamentos, recorrências e parcelamentos, exportação de dados
-  - [ ] Tela: seletor no formulário (o mesmo componente do de pessoa), o estabelecimento na linha do lançamento e na busca
+  - [x] Tela: seletor no formulário (o mesmo componente do de pessoa), o estabelecimento na linha do lançamento e na busca
   - [ ] Tela: página Estabelecimentos (no Mais) para renomear, arquivar, reativar e excluir os arquivados sem uso
   - [ ] Análise por estabelecimento dentro de uma categoria (ex.: quanto foi para cada mercado)
   - [ ] Coluna opcional "Estabelecimento" na planilha modelo
