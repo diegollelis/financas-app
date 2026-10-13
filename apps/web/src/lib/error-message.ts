@@ -18,6 +18,10 @@ const ptBrCodes = new Set([
   'PERSON_EXISTS',
   'PERSON_IN_USE',
   'INVALID_PERSON',
+  'PERSON_IS_MEMBER',
+  'MERCHANT_EXISTS',
+  'MERCHANT_IN_USE',
+  'INVALID_MERCHANT',
 ]);
 
 /** Turns an error from our own API routes (not /api/auth) into a message for the user. */

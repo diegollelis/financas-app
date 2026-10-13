@@ -123,7 +123,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] ADR: cadastro próprio (e não texto livre, subcategorias ou etiquetas), saídas e entradas, "Estabelecimento" na tela e `Merchant` no código, no glossário
   - [x] API: tabela `merchants` com RLS (nome único no espaço, arquivar em vez de excluir), `merchant_id` opcional em lançamentos, recorrências e parcelamentos, exportação de dados
   - [x] Tela: seletor no formulário (o mesmo componente do de pessoa), o estabelecimento na linha do lançamento e na busca
-  - [ ] Tela: página Estabelecimentos (no Mais) para renomear, arquivar, reativar e excluir os arquivados sem uso
+  - [x] Tela: página Estabelecimentos (no Mais) para renomear, arquivar, reativar e excluir os arquivados sem uso
   - [ ] Análise por estabelecimento dentro de uma categoria (ex.: quanto foi para cada mercado)
   - [ ] Coluna opcional "Estabelecimento" na planilha modelo
   - [ ] Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição
