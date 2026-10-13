@@ -252,8 +252,9 @@ function WorkspaceFrame({
         <AppHeader workspace={switcher()} />
       )}
       {/* The page column: the footer is outside <main>, which holds only the page, so it stays a
-          contentinfo landmark. */}
-      <div className="flex min-w-0 flex-1 flex-col px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] text-base sm:px-6 md:pb-8 md:text-sm">
+          contentinfo landmark. On the phone, a page with a button fixed above the tab bar
+          (data-fab) gets room for it below the footer: nothing at the end is ever under it. */}
+      <div className="flex min-w-0 flex-1 flex-col px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] text-base sm:px-6 max-md:has-[[data-fab]]:pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pb-8 md:text-sm">
         <main
           id="conteudo"
           tabIndex={-1}
