@@ -96,6 +96,7 @@ describe('analysis', () => {
           period: '2026-09',
           type: 'DEBIT',
           categoryId: mercado,
+          merchantId: null,
           plannedCents: 65_000,
           settledCents: 40_000,
         },
@@ -103,6 +104,7 @@ describe('analysis', () => {
           period: '2026-10',
           type: 'CREDIT',
           categoryId: salario,
+          merchantId: null,
           plannedCents: 500_000,
           settledCents: 500_000,
         },
@@ -110,11 +112,58 @@ describe('analysis', () => {
           period: '2026-10',
           type: 'DEBIT',
           categoryId: mercado,
+          merchantId: null,
           plannedCents: 30_000,
           settledCents: 30_000,
         },
       ],
     });
+  });
+
+  it('sums each merchant apart, never anything but sums (ADR 0053)', async () => {
+    const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+    const mercado = (await categoryIds(browser, id))('Mercado', 'DEBIT');
+    const merchant = async (name: string) =>
+      (
+        (await browser.post(`/api/workspaces/${id}/merchants`).send({ name }).expect(201)).body as {
+          id: string;
+        }
+      ).id;
+    const bomPreco = await merchant('Mercado Bom Preço');
+    const debit = (amountCents: number, merchantId: string | null) =>
+      create(browser, id, {
+        type: 'DEBIT',
+        description: 'Compras',
+        categoryId: mercado,
+        amountCents,
+        period: '2026-10',
+        settledAt: null,
+        merchantId,
+      });
+    await debit(30_000, bomPreco);
+    await debit(20_000, bomPreco);
+    await debit(15_000, null);
+
+    const result = await analysis(browser, id, '2026-10', '2026-10');
+
+    expect(result.rows).toEqual([
+      {
+        period: '2026-10',
+        type: 'DEBIT',
+        categoryId: mercado,
+        merchantId: null,
+        plannedCents: 15_000,
+        settledCents: 0,
+      },
+      {
+        period: '2026-10',
+        type: 'DEBIT',
+        categoryId: mercado,
+        merchantId: bomPreco,
+        plannedCents: 50_000,
+        settledCents: 0,
+      },
+    ]);
   });
 
   it('a range without transactions has no rows', async () => {

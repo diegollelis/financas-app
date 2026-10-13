@@ -35,7 +35,8 @@ const row = (
   categoryId: string,
   plannedCents: number,
   settledCents = plannedCents,
-) => ({ period, type, categoryId, plannedCents, settledCents });
+  merchantId: string | null = null,
+) => ({ period, type, categoryId, merchantId, plannedCents, settledCents });
 
 const rows = [
   row('2026-09', 'CREDIT', salario.id, 500_000),
@@ -52,6 +53,7 @@ function mockAnalysis(
   body: { from: string; to: string; rows: unknown[] } = { from, to, rows },
   before: unknown[] = [],
   categories: unknown[] = [salario, aluguel, mercado],
+  merchants: unknown[] = [],
 ) {
   // The range right before, compared with (empty unless a test gives it rows).
   const previous = previousRange(body.from, body.to);
@@ -63,6 +65,7 @@ function mockAnalysis(
     'GET /api/workspaces': { body: [house] },
     [`GET ${base}`]: { body: house },
     [`GET ${base}/categories`]: { body: categories },
+    [`GET ${base}/merchants`]: { body: merchants },
     [`GET ${base}/analysis`]: { body },
   };
   return mockApi(routes);
@@ -317,10 +320,54 @@ describe('AnalysisPage', () => {
     );
     const lastMonth = within(detail).getAllByRole('row').at(-1);
     expect(nbsp(lastMonth?.textContent)).toBe('outubro de 2026R$ 700,00');
+    // No merchant given yet: a hint says where to give one (ADR 0053).
+    expect(within(detail).getByRole('region', { name: 'Por estabelecimento' })).toHaveTextContent(
+      'Nenhum lançamento desta categoria tem estabelecimento no período.',
+    );
 
     await userEvent.keyboard('{Escape}');
     await vi.waitFor(() => expect(router.state.location.search).toBe(''));
     await vi.waitFor(() => expect(screen.getByRole('button', { name: /^Mercado/ })).toHaveFocus());
+  });
+
+  it("splits a category's money by merchant, the transactions with none at the end", async () => {
+    const bomPreco = {
+      id: '01920000-0000-7000-8000-000000000601',
+      name: 'Mercado Bom Preço',
+      archived: false,
+      inUse: true,
+    };
+    const feira = { ...bomPreco, id: '01920000-0000-7000-8000-000000000602', name: 'Feira' };
+    mockAnalysis(
+      '2026-09',
+      '2026-10',
+      {
+        from: '2026-09',
+        to: '2026-10',
+        rows: [
+          row('2026-09', 'DEBIT', mercado.id, 20_000, 20_000, feira.id),
+          row('2026-09', 'DEBIT', mercado.id, 40_000, 40_000, bomPreco.id),
+          row('2026-10', 'DEBIT', mercado.id, 30_000, 30_000, bomPreco.id),
+          row('2026-10', 'DEBIT', mercado.id, 10_000),
+        ],
+      },
+      [],
+      [salario, aluguel, mercado],
+      [bomPreco, feira],
+    );
+    renderApp(`/espacos/${houseId}/analise?de=2026-09&ate=2026-10&categoria=${mercado.id}`);
+
+    const detail = await screen.findByRole('dialog', { name: 'Mercado' });
+    const merchants = within(detail).getByRole('region', { name: 'Por estabelecimento' });
+    expect(
+      within(merchants)
+        .getAllByRole('listitem')
+        .map((item) => nbsp(item.textContent)),
+    ).toEqual([
+      'Mercado Bom PreçoR$ 700,0070% do totalmédia de R$ 350,00 por mês',
+      'FeiraR$ 200,0020% do totalmédia de R$ 100,00 por mês',
+      'Sem estabelecimentoR$ 100,0010% do totalmédia de R$ 50,00 por mês',
+    ]);
   });
 
   it('folds the smallest categories into "Outras", and shows them all on request', async () => {
