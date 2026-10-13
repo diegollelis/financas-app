@@ -23,6 +23,7 @@ export const EXPORTED_TABLES: Record<string, string> = {
   budget_shares: 'budgets[].shares',
   recurrences: 'recurrences',
   recurrence_occurrences: 'recurrences[].generatedPeriods',
+  recurrence_shares: 'recurrences[].split',
   installment_plans: 'installmentPlans',
   imports: 'imports',
 };
@@ -129,7 +130,10 @@ export class DataExportService {
       }),
       db.recurrence.findMany({
         where,
-        include: { occurrences: { select: { period: true }, orderBy: { period: 'asc' } } },
+        include: {
+          occurrences: { select: { period: true }, orderBy: { period: 'asc' } },
+          shares: { orderBy: { createdAt: 'asc' } },
+        },
         orderBy: { createdAt: 'asc' },
       }),
       db.installmentPlan.findMany({ where, orderBy: { createdAt: 'asc' } }),
@@ -223,6 +227,11 @@ export class DataExportService {
         startPeriod: recurrence.startPeriod,
         endPeriod: recurrence.endPeriod,
         generatedPeriods: recurrence.occurrences.map((occurrence) => occurrence.period),
+        split: recurrence.shares.map(({ personId, amountCents, basisPoints }) => ({
+          personId,
+          amountCents,
+          basisPoints,
+        })),
         createdAt: iso(recurrence.createdAt),
       })),
       installmentPlans: installmentPlans.map((plan) => ({

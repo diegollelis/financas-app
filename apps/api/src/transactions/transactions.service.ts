@@ -164,6 +164,11 @@ export class TransactionsService {
         },
         include: withOrigin,
       });
+      // A month of a split recurrence: its pending shares in percentages follow the amount given
+      // (ADR 0052).
+      if (input.amountCents !== undefined && input.amountCents !== current.amountCents) {
+        await this.recurrences.followAmount(workspaceId, transactionId, input.amountCents);
+      }
       return toTransactionResponse(transaction);
     } catch (error) {
       // Deleted by someone else between the read and the update.
