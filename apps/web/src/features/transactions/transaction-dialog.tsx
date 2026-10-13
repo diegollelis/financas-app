@@ -1,7 +1,9 @@
 import {
   formatPeriod,
+  normalizeName,
   parsePercent,
   type Category,
+  type Merchant,
   type Person,
   type Transaction,
 } from '@financas/shared';
@@ -9,6 +11,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { useCreateInstallmentPlan } from '@/features/installments/use-installments';
+import { useResolveMerchant } from '@/features/merchants/use-merchants';
 import { findPerson, useResolvePerson } from '@/features/people/use-people';
 import { useCreateRecurrence } from '@/features/recurrences/use-recurrences';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
@@ -29,6 +32,7 @@ export function TransactionDialog({
   period,
   categories,
   people,
+  merchants = [],
   editing,
   preset,
   open,
@@ -39,6 +43,8 @@ export function TransactionDialog({
   period: string;
   categories: Category[];
   people: Person[];
+  /** The workspace's merchants (ADR 0053); none for an application to a destination. */
+  merchants?: Merchant[];
   /** The transaction being edited; null to create one. */
   editing: Transaction | null;
   /** For a new one: values to start from (an application to a destination, ADR 0047). */
@@ -55,6 +61,7 @@ export function TransactionDialog({
   const createPlan = useCreateInstallmentPlan(workspaceId);
   const update = useUpdateTransaction(workspaceId);
   const person = useResolvePerson(workspaceId, people);
+  const merchant = useResolveMerchant(workspaceId, merchants);
   // Which kind of creation was last submitted: its pending state and error are the form's.
   const [repeat, setRepeat] = useState<TransactionFormValues['repeat']>('NONE');
   const mutation = editing
@@ -94,11 +101,18 @@ export function TransactionDialog({
       splitting
         ? `${message}, dividido com ${split.length} ${split.length === 1 ? 'pessoa' : 'pessoas'}`
         : message;
+    // The merchant being edited stays as it is, even archived: resolving it would reactivate it.
+    const current = merchants.find((item) => item.id === editing?.merchantId);
     let personId: string | null;
+    let merchantId: string | null;
     try {
       personId = splitting ? null : await person.resolve(values.person);
+      merchantId =
+        current && normalizeName(current.name) === normalizeName(values.merchant)
+          ? current.id
+          : await merchant.resolve(values.merchant);
     } catch {
-      return; // Shown by the form, from person.error.
+      return; // Shown by the form, from person.error or merchant.error.
     }
     const fields = {
       type: values.type,
@@ -107,9 +121,11 @@ export function TransactionDialog({
       categoryId: values.categoryId,
       amountCents: values.amount,
     };
+    // A new one names its merchant only when there is one; an edit always does (null unlinks).
+    const withMerchant = merchantId ? { merchantId } : {};
     if (editing) {
       update.mutate(
-        { id: editing.id, ...fields, dueDate: values.dueDate, personId },
+        { id: editing.id, ...fields, dueDate: values.dueDate, personId, merchantId },
         { onSuccess: done('Lançamento salvo') },
       );
     } else if (values.repeat === 'INSTALLMENTS') {
@@ -128,6 +144,7 @@ export function TransactionDialog({
           firstPeriod: period,
           dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
           personId,
+          ...withMerchant,
           ...(splitting && { split }),
         },
         { onSuccess: done(withPeople(`Parcelamento adicionado: ${installments} parcelas`)) },
@@ -142,6 +159,7 @@ export function TransactionDialog({
           startPeriod: period,
           variableAmount: values.amountKind === 'VARIABLE',
           personId,
+          ...withMerchant,
           ...(splitting && { split: recurrenceSplit }),
         },
         { onSuccess: done(withPeople('Lançamento adicionado, repetindo todo mês')) },
@@ -150,13 +168,13 @@ export function TransactionDialog({
       // The transaction and one share per person on the other side, at once (ADRs 0042, 0052).
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, period, split },
+        { ...fields, dueDate: values.dueDate, period, ...withMerchant, split },
         { onSuccess: done(withPeople('Lançamento adicionado')) },
       );
     } else {
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, period, personId },
+        { ...fields, dueDate: values.dueDate, period, personId, ...withMerchant },
         { onSuccess: done('Lançamento adicionado') },
       );
     }
@@ -192,6 +210,7 @@ export function TransactionDialog({
         idPrefix={editing?.id ?? 'new'}
         categories={categories}
         people={people}
+        merchants={merchants}
         initial={editing ?? undefined}
         preset={editing ? undefined : preset}
         submitLabel={
@@ -203,8 +222,8 @@ export function TransactionDialog({
               ? 'Adicionando…'
               : 'Adicionar'
         }
-        pending={mutation.isPending || person.isPending}
-        error={person.error ?? mutation.error}
+        pending={mutation.isPending || person.isPending || merchant.isPending}
+        error={person.error ?? merchant.error ?? mutation.error}
         onSubmit={(values) => void submit(values)}
         onCancel={() => onOpenChange(false)}
         allowRepeat={!editing}

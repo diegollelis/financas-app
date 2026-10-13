@@ -43,6 +43,7 @@ import {
 import { useCategories } from '@/features/categories/use-categories';
 import { useEndInstallmentPlan } from '@/features/installments/use-installments';
 import { useEndRecurrence } from '@/features/recurrences/use-recurrences';
+import { useMerchants } from '@/features/merchants/use-merchants';
 import { usePeople } from '@/features/people/use-people';
 import {
   matchesSearch,
@@ -241,6 +242,7 @@ function TransactionItem({
   workspaceId,
   transaction,
   category,
+  merchantName,
   personName,
   sharedWith,
   canEdit,
@@ -250,6 +252,8 @@ function TransactionItem({
   workspaceId: string;
   transaction: Transaction;
   category: Category | undefined;
+  /** Where it was bought or who paid it (ADR 0053), when given. */
+  merchantName: string | null;
   /** The person it is linked to (ADR 0042), when any. */
   personName: string | null;
   /** The people its shares are owed by, when it is a split debit. */
@@ -294,6 +298,7 @@ function TransactionItem({
         <p className="font-medium break-words">{description}</p>
         <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
           <span>{category?.name ?? 'Categoria'}</span>
+          {merchantName && <span>{merchantName}</span>}
           {transaction.dueDate && <span>Vence em {formatIsoDate(transaction.dueDate)}</span>}
         </p>
         {transaction.notes && (
@@ -440,7 +445,11 @@ export function TransactionsPage() {
   const categories = useCategories(workspaceId);
   const transactions = useTransactions(workspaceId, period);
   const people = usePeople(workspaceId);
-  const ready = categories.isSuccess && transactions.isSuccess && people.isSuccess;
+  const merchants = useMerchants(workspaceId);
+  const ready =
+    categories.isSuccess && transactions.isSuccess && people.isSuccess && merchants.isSuccess;
+  const merchantName = (merchantId: string | null) =>
+    (merchantId && merchants.data?.find((item) => item.id === merchantId)?.name) || null;
   const personName = (personId: string | null) =>
     (personId && people.data?.find((item) => item.id === personId)?.name) || null;
   const [form, setForm] = useState({
@@ -463,6 +472,7 @@ export function TransactionsPage() {
       transaction.description,
       categories.data?.find((item) => item.id === transaction.categoryId)?.name,
       personName(transaction.personId),
+      merchantName(transaction.merchantId),
     );
 
   return (
@@ -509,7 +519,7 @@ export function TransactionsPage() {
           </div>
         )}
       </PageHeader>
-      <QueryState queries={[categories, transactions, people]} />
+      <QueryState queries={[categories, transactions, people, merchants]} />
       {ready &&
         (transactions.data.length === 0 ? (
           // Says what is missing and points to the page's main action, already on screen; it
@@ -560,6 +570,7 @@ export function TransactionsPage() {
                         category={categories.data.find(
                           (item) => item.id === transaction.categoryId,
                         )}
+                        merchantName={merchantName(transaction.merchantId)}
                         personName={personName(transaction.personId)}
                         // The shares of a split debit are credits of the same competência.
                         sharedWith={transactions.data
@@ -586,6 +597,7 @@ export function TransactionsPage() {
             period={period}
             categories={categories.data}
             people={people.data}
+            merchants={merchants.data}
             editing={form.editing}
             open={form.open}
             onOpenChange={(open) => setForm((current) => ({ ...current, open }))}

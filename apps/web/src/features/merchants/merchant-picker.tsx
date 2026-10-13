@@ -1,0 +1,59 @@
+import { normalizeName, type Merchant } from '@financas/shared';
+import { useState } from 'react';
+import { NameList, PickerShell } from '@/components/name-picker';
+
+const sameName = (a: string, b: string) => normalizeName(a) === normalizeName(b);
+
+/**
+ * The merchant field (ADR 0053), the same picker as the person's: a search over the active
+ * merchants and "Adicionar 'Nome'" for one not listed yet. Its value is a name, resolved on save
+ * (a new one becomes a merchant then); "Nenhum" clears it. FormField hands it the id and the
+ * error wiring.
+ */
+export function MerchantSelect({
+  id,
+  value,
+  onChange,
+  merchants,
+  ...aria
+}: {
+  id?: string;
+  value: string;
+  onChange: (name: string) => void;
+  merchants: Merchant[];
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const pick = (name: string) => {
+    onChange(name);
+    setOpen(false);
+  };
+
+  return (
+    <PickerShell
+      id={id}
+      text={value || 'Nenhum'}
+      placeholder={!value}
+      title="Estabelecimento"
+      description="Toque num estabelecimento, ou digite um nome para buscar ou adicionar."
+      open={open}
+      onOpenChange={setOpen}
+      aria={aria}
+      list={(autoFocus) => (
+        <NameList
+          groups={[{ items: merchants.filter((merchant) => !merchant.archived) }]}
+          knownNames={merchants.map((merchant) => merchant.name)}
+          isPicked={(name) => sameName(name, value)}
+          onPick={pick}
+          clearLabel={value ? 'Nenhum' : undefined}
+          multiple={false}
+          autoFocus={autoFocus}
+          searchLabel="Buscar estabelecimento"
+          placeholder="Buscar ou adicionar estabelecimento"
+          emptyText="Digite o nome de um estabelecimento para adicionar."
+        />
+      )}
+    />
+  );
+}

@@ -7,7 +7,9 @@ import {
   isoDateSchema,
   PERSON_NAME_MAX_LENGTH,
   reaisInputSchema,
+  MERCHANT_NAME_MAX_LENGTH,
   type Category,
+  type Merchant,
   type Person,
   type Transaction,
   transactionTypeLabels,
@@ -24,6 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { CategorySelect } from '@/features/categories/category-picker';
+import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PersonSelect } from '@/features/people/person-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 import { shareCents } from './split';
@@ -53,6 +56,11 @@ const transactionFormSchema = plainTransactionInputSchema
     installments: z.string(),
     /** Of installments: whether the amount typed is the whole purchase or each installment. */
     amountIs: z.enum(['TOTAL', 'INSTALLMENT']),
+    /** Where it was bought or who paid it (ADR 0053): a name; a new one is created on save. */
+    merchant: z
+      .string()
+      .trim()
+      .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
     /** A receber de / a pagar para (ADR 0042): a name; a new one becomes a person on save. */
     person: z
       .string()
@@ -194,6 +202,7 @@ export function TransactionForm({
   idPrefix,
   categories,
   people = [],
+  merchants = [],
   initial,
   preset,
   submitLabel,
@@ -208,6 +217,8 @@ export function TransactionForm({
   categories: Category[];
   /** The workspace's people, suggested in the "Pessoa" and "Dividir" fields (ADR 0042). */
   people?: Person[];
+  /** The workspace's merchants, offered in "Estabelecimento" (ADR 0053). */
+  merchants?: Merchant[];
   initial?: Transaction;
   /** For a new transaction: what it starts with. Ignored when editing. */
   preset?: TransactionPreset;
@@ -240,6 +251,7 @@ export function TransactionForm({
       amountKind: 'FIXED',
       installments: '',
       amountIs: 'TOTAL',
+      merchant: merchants.find((merchant) => merchant.id === initial?.merchantId)?.name ?? '',
       person: people.find((person) => person.id === initial?.personId)?.name ?? '',
       splitOn: false,
       shareMode: 'REAIS',
@@ -283,11 +295,14 @@ export function TransactionForm({
   );
   const id = (field: string) => `${idPrefix}-${field}`;
   // Opened from the start when the transaction being edited uses one of them.
-  const [moreOpen, setMoreOpen] = useState(Boolean(initial?.notes || initial?.personId));
+  const [moreOpen, setMoreOpen] = useState(
+    Boolean(initial?.notes || initial?.personId || initial?.merchantId),
+  );
   const application = initial ? undefined : preset?.applicationTo;
   // What "Mais opções" holds, named on it so nothing is hidden by surprise.
   const moreContents = [
     'observações',
+    !application && 'estabelecimento',
     showPerson && !application && 'pessoa',
     canSplit && !application && 'dividir',
   ]
@@ -304,7 +319,7 @@ export function TransactionForm({
       onSubmit={(event) =>
         void handleSubmit(onSubmit, (errors) => {
           // A mistake in a folded field must be seen.
-          if (errors.notes || errors.person || errors.shares) setMoreOpen(true);
+          if (errors.notes || errors.merchant || errors.person || errors.shares) setMoreOpen(true);
         })(event)
       }
     >
@@ -478,6 +493,25 @@ export function TransactionForm({
           >
             <Input autoComplete="off" {...register('notes')} />
           </FormField>
+          {!application && (
+            <Controller
+              control={control}
+              name="merchant"
+              render={({ field, fieldState }) => (
+                <FormField
+                  id={id('merchant')}
+                  label="Estabelecimento (opcional)"
+                  error={fieldState.error?.message}
+                >
+                  <MerchantSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    merchants={merchants}
+                  />
+                </FormField>
+              )}
+            />
+          )}
           {showPerson && !application && (
             <Controller
               control={control}
