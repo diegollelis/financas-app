@@ -1,5 +1,5 @@
 import { normalizeName, type Category } from '@financas/shared';
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
 import {
@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import { mostUsed } from './most-used';
+import { newCategoryName, newCategoryValue } from './new-category';
 
 const label = (category: Category) =>
   category.archived ? `${category.name} (arquivada)` : category.name;
@@ -28,13 +29,21 @@ function CategoryList({
   value,
   onPick,
   autoFocus,
+  allowAdd,
 }: {
   options: Category[];
   value: string;
   onPick: (id: string) => void;
   autoFocus: boolean;
+  allowAdd: boolean;
 }) {
   const [search, setSearch] = useState('');
+  const typed = search.trim();
+  // A name none of the options has: offered to add (an archived one comes back on save).
+  const isNew =
+    allowAdd &&
+    typed !== '' &&
+    !options.some((category) => normalizeName(category.name) === normalizeName(typed));
   // While searching, only the full list: the group would show the same names twice.
   const top = search ? [] : mostUsed(options);
   const item = (category: Category, group: string) => (
@@ -61,13 +70,14 @@ function CategoryList({
       <CommandInput
         value={search}
         onValueChange={setSearch}
-        placeholder="Buscar categoria"
+        placeholder={allowAdd ? 'Buscar ou adicionar categoria' : 'Buscar categoria'}
         autoFocus={autoFocus}
         // The whole 44px box is the target, not only the line of text.
         className="h-full self-stretch text-base md:text-sm"
       />
       <CommandList className="max-h-[50svh] md:max-h-72">
-        <CommandEmpty>Nenhuma categoria com esse nome.</CommandEmpty>
+        {/* With a new name typed, "Adicionar" is there: the list is never empty then. */}
+        {!isNew && <CommandEmpty>Nenhuma categoria com esse nome.</CommandEmpty>}
         {top.length > 0 && (
           <CommandGroup heading="Mais usadas">
             {top.map((category) => item(category, 'top'))}
@@ -76,13 +86,28 @@ function CategoryList({
         <CommandGroup heading={top.length > 0 ? 'Todas' : undefined}>
           {options.map((category) => item(category, 'all'))}
         </CommandGroup>
+        {/* Outside any group: cmdk hides a group whose items the search filtered out. */}
+        {isNew && (
+          <CommandItem
+            // Always shown while the name is new: the filter would hide it otherwise.
+            forceMount
+            value="__new__"
+            onSelect={() => onPick(newCategoryValue(typed))}
+            className="min-h-11 text-base md:min-h-0 md:text-sm"
+          >
+            <Plus aria-hidden />
+            Adicionar “{typed}”
+          </CommandItem>
+        )}
       </CommandList>
     </Command>
   );
 }
 
 /**
- * The category field: a search over the names, with the most used ones first. A popover from md;
+ * The category field: a search over the names, with the most used ones first. With `allowAdd`,
+ * "Adicionar 'Nome'" offers a name not listed: the value is then `newCategoryValue(name)`, and
+ * the form creates the category on save (`useResolveCategory`). A popover from md;
  * on the phone a sheet of its own, which stays above the virtual keyboard (ADR 0036). FormField
  * hands it the id and the error wiring for its trigger. `options` come already filtered by type.
  */
@@ -91,12 +116,15 @@ export function CategorySelect({
   value,
   onChange,
   options,
+  allowAdd = false,
   ...aria
 }: {
   id?: string;
   value: string;
   onChange: (value: string) => void;
   options: Category[];
+  /** Offers "Adicionar 'Nome'" for a category not listed yet. */
+  allowAdd?: boolean;
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
 }) {
@@ -104,6 +132,7 @@ export function CategorySelect({
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const selected = options.find((category) => category.id === value);
+  const added = newCategoryName(value);
   const pick = (categoryId: string) => {
     onChange(categoryId);
     setOpen(false);
@@ -120,11 +149,11 @@ export function CategorySelect({
       onClick={desktop ? undefined : () => setOpen(true)}
       className={cn(
         'border-input-border focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:hover:bg-input/50 flex h-11 w-full items-center justify-between gap-1.5 rounded-lg border bg-transparent py-2 pr-2 pl-2.5 text-left text-base outline-none focus-visible:ring-3 aria-invalid:ring-3 md:h-8 md:text-sm',
-        !selected && 'text-muted-foreground',
+        !selected && added === null && 'text-muted-foreground',
       )}
       {...aria}
     >
-      <span className="line-clamp-1">{selected ? label(selected) : 'Escolha…'}</span>
+      <span className="line-clamp-1">{selected ? label(selected) : (added ?? 'Escolha…')}</span>
       <ChevronDownIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
     </button>
   );
@@ -134,7 +163,13 @@ export function CategorySelect({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
         <PopoverContent align="start" className="w-(--radix-popover-trigger-width) min-w-56 p-0">
-          <CategoryList options={options} value={value} onPick={pick} autoFocus />
+          <CategoryList
+            options={options}
+            value={value}
+            onPick={pick}
+            autoFocus
+            allowAdd={allowAdd}
+          />
         </PopoverContent>
       </Popover>
     );
@@ -147,10 +182,20 @@ export function CategorySelect({
         onOpenChange={setOpen}
         returnFocusTo={triggerRef}
         title="Escolher categoria"
-        description="Toque numa categoria ou busque pelo nome."
+        description={
+          allowAdd
+            ? 'Toque numa categoria, ou digite um nome para buscar ou adicionar.'
+            : 'Toque numa categoria ou busque pelo nome.'
+        }
       >
         {/* No autofocus: the keyboard would cover the list, and most picks need no typing. */}
-        <CategoryList options={options} value={value} onPick={pick} autoFocus={false} />
+        <CategoryList
+          options={options}
+          value={value}
+          onPick={pick}
+          autoFocus={false}
+          allowAdd={allowAdd}
+        />
       </ResponsiveDialog>
     </>
   );

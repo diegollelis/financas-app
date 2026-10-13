@@ -1230,6 +1230,89 @@ describe('TransactionsPage', () => {
     ).toHaveTextContent('Ana');
   });
 
+  it('adds a category from the form, creating it only on save', async () => {
+    const farmacia = {
+      id: '01920000-0000-7000-8000-000000000105',
+      name: 'Farmácia',
+      type: 'DEBIT',
+      archived: false,
+    };
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/categories`]: { status: 201, body: farmacia },
+      [`POST ${base}`]: { status: 201, body: { ...shopping, categoryId: farmacia.id } },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Remédios');
+    await userEvent.click(within(form).getByRole('combobox', { name: 'Categoria' }));
+    const search = await screen.findByPlaceholderText('Buscar ou adicionar categoria');
+    // A name already there, whatever the accents: nothing to add.
+    await userEvent.type(search, 'mercádo');
+    expect(screen.queryByRole('option', { name: /^Adicionar/ })).not.toBeInTheDocument();
+    await userEvent.clear(search);
+    await userEvent.type(search, 'Farmácia');
+    await userEvent.click(await screen.findByRole('option', { name: 'Adicionar “Farmácia”' }));
+    expect(within(form).getByRole('combobox', { name: 'Categoria' })).toHaveTextContent('Farmácia');
+    // Nothing is created before the transaction is saved.
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '42');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/categories`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Farmácia', type: 'DEBIT' }),
+    });
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: expect.stringContaining(`"categoryId":"${farmacia.id}"`) as unknown,
+    });
+  });
+
+  it('brings back an archived category of the name added, instead of creating another', async () => {
+    const archived = {
+      id: '01920000-0000-7000-8000-000000000106',
+      name: 'Farmácia',
+      type: 'DEBIT',
+      archived: true,
+    };
+    const fetchMock = mockTransactions({
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [salaryCategory, energyCategory, marketCategory, archived],
+      },
+      [`PATCH /api/workspaces/${houseId}/categories/${archived.id}`]: {
+        body: { ...archived, archived: false },
+      },
+      [`POST ${base}`]: { status: 201, body: { ...shopping, categoryId: archived.id } },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Remédios');
+    await userEvent.click(within(form).getByRole('combobox', { name: 'Categoria' }));
+    await userEvent.type(
+      await screen.findByPlaceholderText('Buscar ou adicionar categoria'),
+      'farmacia',
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Adicionar “farmacia”' }));
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '42');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/categories/${archived.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ archived: false }),
+    });
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: expect.stringContaining(`"categoryId":"${archived.id}"`) as unknown,
+    });
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) => String(url).endsWith('/categories') && init?.method === 'POST',
+      ),
+    ).toBe(false);
+  });
+
   it('names a new merchant on a new transaction, creating it first', async () => {
     const mercado = {
       id: '01920000-0000-7000-8000-000000000601',

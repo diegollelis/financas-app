@@ -40,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCurrentUser } from '@/features/auth/use-me';
+import { useResolveCategory } from '@/features/categories/new-category';
 import { useCategories } from '@/features/categories/use-categories';
 import {
   useEndInstallmentPlan,
@@ -182,7 +183,16 @@ function EditRecurrence({
   const user = useCurrentUser();
   const update = useUpdateRecurrence(workspaceId);
   const person = useResolvePerson(workspaceId, people);
+  const category = useResolveCategory(workspaceId, categories);
   const save = async (changes: UpdateRecurrenceInput, personName: string | undefined) => {
+    if (changes.categoryId !== undefined) {
+      // A category added in the form is created first (or an archived one comes back).
+      try {
+        changes.categoryId = await category.resolve(changes.categoryId, recurrence.type);
+      } catch {
+        return; // Shown by the form, from category.error.
+      }
+    }
     if (personName !== undefined) {
       // A new name becomes a person first (ADR 0042); '' unlinks.
       try {
@@ -210,8 +220,8 @@ function EditRecurrence({
       categories={categories}
       people={people}
       userId={user.id}
-      pending={update.isPending || person.isPending}
-      error={person.error ?? update.error}
+      pending={update.isPending || person.isPending || category.isPending}
+      error={category.error ?? person.error ?? update.error}
       onSubmit={(changes, personName) => void save(changes, personName)}
       onCancel={onDone}
     />

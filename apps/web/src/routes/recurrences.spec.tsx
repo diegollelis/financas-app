@@ -183,6 +183,40 @@ describe('RecurrencesPage', () => {
     expect(within(dialog).getByText(/A divisão não muda aqui/)).toBeInTheDocument();
   });
 
+  it('adds a category while editing a recurrence, creating it first', async () => {
+    const lazer = {
+      id: '01920000-0000-7000-8000-000000000109',
+      name: 'Lazer',
+      type: 'DEBIT',
+      archived: false,
+      recentUses: 0,
+    };
+    const fetchMock = mockRecurrences({
+      [`POST ${base}/categories`]: { status: 201, body: lazer },
+      [`PATCH ${base}/recurrences/${aluguel.id}`]: { body: { ...aluguel, categoryId: lazer.id } },
+    });
+    renderApp(page);
+
+    await choose('Aluguel', 'Editar');
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Categoria' }));
+    await userEvent.type(
+      await screen.findByPlaceholderText('Buscar ou adicionar categoria'),
+      'Lazer',
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Adicionar “Lazer”' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/categories`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Lazer', type: 'DEBIT' }),
+    });
+    await expectCall(fetchMock, `${base}/recurrences/${aluguel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ categoryId: lazer.id }),
+    });
+  });
+
   it('sends only what changed when editing a recurrence', async () => {
     const fetchMock = mockRecurrences({
       [`PATCH ${base}/recurrences/${aluguel.id}`]: {

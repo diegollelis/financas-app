@@ -136,7 +136,12 @@ export function RecurrenceForm({
         name="categoryId"
         render={({ field, fieldState }) => (
           <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
-            <CategorySelect value={field.value} onChange={field.onChange} options={options} />
+            <CategorySelect
+              value={field.value}
+              onChange={field.onChange}
+              options={options}
+              allowAdd
+            />
           </FormField>
         )}
       />
