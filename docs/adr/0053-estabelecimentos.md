@@ -82,3 +82,13 @@ Escolhidos com o dono do projeto: **cadastro próprio (opção 1)**, **saídas e
   5. Análise por estabelecimento dentro de uma categoria (quanto foi para cada mercado).
   6. Coluna opcional "Estabelecimento" na planilha modelo, criando os novos na importação.
   7. Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição.
+
+## Nota de 2026-10-13: a sugestão de categoria
+
+Decidido com o dono do projeto, no passo 7:
+
+- **De onde vem:** do histórico do espaço nos últimos 12 meses, do mesmo tipo. Primeiro a categoria mais usada com o estabelecimento; sem ele, a mais usada com a mesma descrição, ignorando maiúsculas, acentos e espaços. As partes de uma divisão ficam de fora.
+- **Como chega:** `GET /workspaces/:workspaceId/categories/hints` manda as dicas de uma vez (até 500 descrições, as mais usadas). O formulário consulta enquanto a pessoa digita, sem uma requisição por letra. Só saem nomes e ids, nunca valores.
+- **Como aparece:** num lançamento novo, a categoria **vazia** é preenchida, com a nota "Sugerida pelo histórico". A sugestão só troca o que ela mesma preencheu; uma categoria escolhida à mão nunca muda. Não vale na edição nem no "Guardar" do Painel.
+- **O estabelecimento não é sugerido:** continua escolhido à mão.
+- **Na prática, a descrição é quem mais sugere:** o estabelecimento fica em "Mais opções", abaixo da categoria.

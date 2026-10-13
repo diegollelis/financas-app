@@ -8,7 +8,9 @@ import {
   PERSON_NAME_MAX_LENGTH,
   reaisInputSchema,
   MERCHANT_NAME_MAX_LENGTH,
+  suggestCategory,
   type Category,
+  type CategoryHints,
   type Merchant,
   type Person,
   type Transaction,
@@ -16,7 +18,7 @@ import {
   type TransactionType,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch, type Control } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
@@ -27,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
+import { findMerchant } from '@/features/merchants/use-merchants';
 import { PersonSelect } from '@/features/people/person-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 import { shareCents } from './split';
@@ -40,6 +43,8 @@ const transactionFormSchema = plainTransactionInputSchema
   .pick({ type: true, description: true, notes: true })
   .extend({
     categoryId: z.string().min(1, 'Escolha uma categoria.'),
+    /** The category the history filled in (ADR 0053); '' when none. Never sent. */
+    suggestedCategoryId: z.string(),
     amount: reaisInputSchema,
     dueDate: z
       .string()
@@ -203,6 +208,7 @@ export function TransactionForm({
   categories,
   people = [],
   merchants = [],
+  hints,
   initial,
   preset,
   submitLabel,
@@ -219,6 +225,8 @@ export function TransactionForm({
   people?: Person[];
   /** The workspace's merchants, offered in "Estabelecimento" (ADR 0053). */
   merchants?: Merchant[];
+  /** The history's categories (ADR 0053): a new transaction's empty category is filled from it. */
+  hints?: CategoryHints;
   initial?: Transaction;
   /** For a new transaction: what it starts with. Ignored when editing. */
   preset?: TransactionPreset;
@@ -241,6 +249,7 @@ export function TransactionForm({
       description: initial?.description ?? preset?.description ?? '',
       notes: initial?.notes ?? '',
       categoryId: initial?.categoryId ?? preset?.categoryId ?? '',
+      suggestedCategoryId: '',
       amount: initial
         ? amountText.format(initial.amountCents / 100)
         : preset?.amountCents
@@ -294,6 +303,31 @@ export function TransactionForm({
       category.type === type && (!category.archived || category.id === initial?.categoryId),
   );
   const id = (field: string) => `${idPrefix}-${field}`;
+  // The category of the history (ADR 0053), for a new transaction: the merchant's, else the
+  // description's. It fills an empty category, or replaces one it filled itself; a category the
+  // person picked is never changed.
+  const description = useWatch({ control, name: 'description' });
+  const merchantName = useWatch({ control, name: 'merchant' });
+  const categoryId = useWatch({ control, name: 'categoryId' });
+  const suggested = useWatch({ control, name: 'suggestedCategoryId' });
+  const suggestion =
+    hints && !initial && !preset
+      ? suggestCategory(hints, {
+          type,
+          description: description ?? '',
+          merchantId: findMerchant(merchants, merchantName ?? '')?.id ?? null,
+        })
+      : null;
+  const usable = options.some((category) => category.id === suggestion && !category.archived)
+    ? suggestion
+    : null;
+  useEffect(() => {
+    if (!usable || usable === categoryId) return;
+    if (categoryId === '' || categoryId === suggested) {
+      setValue('categoryId', usable, { shouldValidate: categoryId !== '' });
+      setValue('suggestedCategoryId', usable);
+    }
+  }, [usable, categoryId, suggested, setValue]);
   // Opened from the start when the transaction being edited uses one of them.
   const [moreOpen, setMoreOpen] = useState(
     Boolean(initial?.notes || initial?.personId || initial?.merchantId),
@@ -359,14 +393,20 @@ export function TransactionForm({
           control={control}
           name="categoryId"
           render={({ field, fieldState }) => (
-            <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
-              <CategorySelect
-                value={field.value}
-                onChange={field.onChange}
-                options={options}
-                allowAdd
-              />
-            </FormField>
+            <div className="grid gap-1">
+              <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
+                <CategorySelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={options}
+                  allowAdd
+                />
+              </FormField>
+              {/* Says why it is filled in; gone once the person picks one (ADR 0053). */}
+              {field.value !== '' && field.value === suggested && (
+                <p className="text-muted-foreground text-sm">Sugerida pelo histórico.</p>
+              )}
+            </div>
           )}
         />
       )}

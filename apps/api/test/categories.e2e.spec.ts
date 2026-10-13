@@ -1,6 +1,8 @@
 import {
   DEFAULT_BUDGET_DESTINATIONS,
+  CATEGORY_HINT_MONTHS,
   CATEGORY_USAGE_MONTHS,
+  categoryHintsSchema,
   categoryListResponseSchema,
   categorySchema,
   currentPeriod,
@@ -33,6 +35,7 @@ const categoryRoutes: WorkspaceRoute[] = [
     body: { archived: true },
   },
   { method: 'delete', path: (id) => `/api/workspaces/${id}/categories/${SOME_ID}` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/categories/hints` },
   {
     method: 'post',
     path: (id) => `/api/workspaces/${id}/categories/copy`,
@@ -134,6 +137,58 @@ describe('categories', () => {
       expect(uses(mercado.id)).toBe(2);
       expect(uses(energia.id)).toBe(1);
       expect(after.filter((category) => category.recentUses > 0)).toHaveLength(2);
+    });
+  });
+
+  describe('hints (ADR 0053)', () => {
+    it('says the category most used with each merchant and description, leaving shares out', async () => {
+      const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+      const categories = await list(browser, id);
+      const named = (name: string) => categories.find((category) => category.name === name)!;
+      const mercado = named('Mercado');
+      const lazer = named('Lazer');
+      const now = currentPeriod();
+      const merchant = (
+        (
+          await browser
+            .post(`/api/workspaces/${id}/merchants`)
+            .send({ name: 'Bom Preço' })
+            .expect(201)
+        ).body as { id: string }
+      ).id;
+      const add = (fields: object) =>
+        browser
+          .post(`/api/workspaces/${id}/transactions`)
+          .send({ type: 'DEBIT', amountCents: 1000, period: now, ...fields })
+          .expect(201);
+
+      await add({ description: 'Compras', categoryId: mercado.id, merchantId: merchant });
+      await add({ description: 'compras', categoryId: mercado.id, merchantId: merchant });
+      await add({ description: 'Compras', categoryId: lazer.id, merchantId: merchant });
+      // Too old: out of the history.
+      await add({
+        description: 'Cinema',
+        categoryId: lazer.id,
+        period: shiftPeriod(now, -CATEGORY_HINT_MONTHS),
+      });
+      // A split's share ("Ana: parte de …") says nothing about the purchase.
+      await add({
+        description: 'Jantar',
+        categoryId: lazer.id,
+        split: [{ newPersonName: 'Ana', amountCents: 500 }],
+      });
+
+      const hints = categoryHintsSchema.parse(
+        (await browser.get(`/api/workspaces/${id}/categories/hints`).expect(200)).body,
+      );
+
+      expect(hints.merchants).toEqual([
+        { merchantId: merchant, type: 'DEBIT', categoryId: mercado.id },
+      ]);
+      expect(hints.descriptions).toEqual([
+        { description: 'compras', type: 'DEBIT', categoryId: mercado.id },
+        { description: 'jantar', type: 'DEBIT', categoryId: lazer.id },
+      ]);
     });
   });
 

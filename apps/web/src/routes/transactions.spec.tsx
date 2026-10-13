@@ -66,6 +66,9 @@ function mockTransactions(overrides: Record<string, { status?: number; body: unk
     [`GET /api/workspaces/${houseId}/categories`]: {
       body: [salaryCategory, energyCategory, marketCategory],
     },
+    [`GET /api/workspaces/${houseId}/categories/hints`]: {
+      body: { merchants: [], descriptions: [] },
+    },
     [`GET ${base}`]: { body: [salary, light, shopping] },
     ...overrides,
   });
@@ -1228,6 +1231,68 @@ describe('TransactionsPage', () => {
     expect(
       within(form).getByRole('combobox', { name: 'A receber de (opcional)' }),
     ).toHaveTextContent('Ana');
+  });
+
+  it('fills an empty category from the history, never one the person picked (ADR 0053)', async () => {
+    mockTransactions({
+      [`GET /api/workspaces/${houseId}/categories/hints`]: {
+        body: {
+          merchants: [],
+          descriptions: [
+            { description: 'conta de luz', type: 'DEBIT', categoryId: energyCategory.id },
+          ],
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    const category = () => within(form).getByRole('combobox', { name: 'Categoria' });
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Conta de Luz');
+    expect(category()).toHaveTextContent('Energia');
+    expect(within(form).getByText('Sugerida pelo histórico.')).toBeInTheDocument();
+    // An entrada: the history of saídas says nothing.
+    await userEvent.click(within(form).getByRole('radio', { name: 'Entrada' }));
+    expect(category()).toHaveTextContent('Escolha…');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Saída' }));
+    expect(category()).toHaveTextContent('Energia');
+
+    // Picked by hand: it stays, and the note goes.
+    await chooseCategory(form, 'Mercado');
+    await userEvent.type(within(form).getByLabelText('Descrição'), ' ');
+    expect(category()).toHaveTextContent('Mercado');
+    expect(within(form).queryByText('Sugerida pelo histórico.')).not.toBeInTheDocument();
+  });
+
+  it("suggests the merchant's category, even after the description's", async () => {
+    const bomPreco = {
+      id: '01920000-0000-7000-8000-000000000601',
+      name: 'Mercado Bom Preço',
+      archived: false,
+      inUse: true,
+    };
+    mockTransactions({
+      [`GET /api/workspaces/${houseId}/merchants`]: { body: [bomPreco] },
+      [`GET /api/workspaces/${houseId}/categories/hints`]: {
+        body: {
+          merchants: [{ merchantId: bomPreco.id, type: 'DEBIT', categoryId: marketCategory.id }],
+          descriptions: [{ description: 'compras', type: 'DEBIT', categoryId: energyCategory.id }],
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Compras');
+    expect(within(form).getByRole('combobox', { name: 'Categoria' })).toHaveTextContent('Energia');
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    await userEvent.click(
+      within(form).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Mercado Bom Preço' }));
+
+    expect(within(form).getByRole('combobox', { name: 'Categoria' })).toHaveTextContent('Mercado');
+    expect(within(form).getByText('Sugerida pelo histórico.')).toBeInTheDocument();
   });
 
   it('adds a category from the form, creating it only on save', async () => {

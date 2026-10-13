@@ -1,4 +1,5 @@
 import {
+  categoryHintsSchema,
   categoryListResponseSchema,
   categorySchema,
   copyCategoriesInputSchema,
@@ -6,6 +7,7 @@ import {
   createCategoryInputSchema,
   updateCategoryInputSchema,
   type Category,
+  type CategoryHints,
   type CopyCategoriesInput,
   type CopyCategoriesResult,
   type CreateCategoryInput,
@@ -51,6 +53,16 @@ export class CategoriesController {
   })
   list(@CurrentMembership() membership: WorkspaceMembership): Promise<Category[]> {
     return this.categories.list(membership.workspaceId);
+  }
+
+  @Get('hints')
+  @ApiOkResponse({
+    description:
+      'The category most used with each merchant and each description in the last 12 months (ADR 0053).',
+    schema: openApi(categoryHintsSchema),
+  })
+  hints(@CurrentMembership() membership: WorkspaceMembership): Promise<CategoryHints> {
+    return this.categories.hints(membership.workspaceId);
   }
 
   @Post()

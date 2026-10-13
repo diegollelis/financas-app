@@ -1,5 +1,8 @@
 import {
+  CATEGORY_HINT_MONTHS,
   CATEGORY_USAGE_MONTHS,
+  MAX_DESCRIPTION_HINTS,
+  type CategoryHints,
   currentPeriod,
   normalizeName,
   shiftPeriod,
@@ -96,6 +99,71 @@ export class CategoriesService {
           used.has(category.id),
         ),
       );
+  }
+
+  /**
+   * Which category usually goes with each merchant and each description, per type (ADR 0053),
+   * from the last 12 months: what the form fills an empty category with. Shares of a split are
+   * left out ("Ana: parte de …" says nothing about the purchase). Only names and ids, no amount.
+   */
+  async hints(workspaceId: string): Promise<CategoryHints> {
+    const db = this.prisma.forWorkspace(workspaceId);
+    const now = currentPeriod();
+    const where = {
+      workspaceId,
+      splitOfId: null,
+      period: { gte: shiftPeriod(now, 1 - CATEGORY_HINT_MONTHS), lte: now },
+    };
+    const [byMerchant, byDescription] = await Promise.all([
+      db.transaction.groupBy({
+        by: ['merchantId', 'type', 'categoryId'],
+        where: { ...where, merchantId: { not: null } },
+        _count: { _all: true },
+      }),
+      db.transaction.groupBy({
+        by: ['description', 'type', 'categoryId'],
+        where,
+        _count: { _all: true },
+      }),
+    ]);
+    // The most used category of each key; descriptions are merged as normalizeName gives them.
+    const best = <T>(rows: { key: string; value: T; categoryId: string; count: number }[]) => {
+      const totals = new Map<string, { value: T; categoryId: string; count: number }>();
+      for (const row of rows) {
+        const id = `${row.key}|${row.categoryId}`;
+        const total = totals.get(id);
+        totals.set(id, { ...row, count: (total?.count ?? 0) + row.count });
+      }
+      const top = new Map<string, { value: T; categoryId: string; count: number }>();
+      for (const [id, total] of totals) {
+        const key = id.slice(0, id.lastIndexOf('|'));
+        if ((top.get(key)?.count ?? 0) < total.count) top.set(key, total);
+      }
+      return [...top.values()].sort((a, b) => b.count - a.count);
+    };
+    const merchants = best(
+      byMerchant.map((row) => ({
+        key: `${row.merchantId}|${row.type}`,
+        value: { merchantId: row.merchantId!, type: row.type },
+        categoryId: row.categoryId,
+        count: row._count._all,
+      })),
+    );
+    const descriptions = best(
+      byDescription.map((row) => {
+        const description = normalizeName(row.description);
+        return {
+          key: `${description}|${row.type}`,
+          value: { description, type: row.type },
+          categoryId: row.categoryId,
+          count: row._count._all,
+        };
+      }),
+    ).slice(0, MAX_DESCRIPTION_HINTS);
+    return {
+      merchants: merchants.map(({ value, categoryId }) => ({ ...value, categoryId })),
+      descriptions: descriptions.map(({ value, categoryId }) => ({ ...value, categoryId })),
+    };
   }
 
   async create(workspaceId: string, input: CreateCategoryInput): Promise<Category> {

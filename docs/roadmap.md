@@ -104,7 +104,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [ ] "Tornar recorrente" no menu de um lançamento existente: criar a recorrência adotando o lançamento como o primeiro mês, sem duplicar
 - [x] Escolha de categoria com busca (sem depender de acentos) e "Mais usadas" dos últimos 6 meses (`recentUses` na lista de categorias)
   - [x] "Adicionar 'Nome'" no seletor de categoria do lançamento e da recorrência: criada ao salvar, com o tipo do lançamento; uma arquivada de mesmo nome volta
-  - [ ] Sugerir a categoria pela descrição, a partir dos lançamentos anteriores
+  - [x] Sugerir a categoria pela descrição, a partir dos lançamentos anteriores ([ADR 0053](adr/0053-estabelecimentos.md): preenche a categoria vazia com "Sugerida pelo histórico")
 - [ ] Rateio de lançamentos e pessoas ([ADR 0042](adr/0042-pessoas-e-rateio.md))
   - [x] API: pessoas, lançamento ligado a uma pessoa, dividir um gasto e categoria Reembolso
   - [x] Tela: "Dividir com alguém" no novo lançamento, "A receber de / A pagar para", selos e excluir com as partes
@@ -120,14 +120,14 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
     - [x] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês; em % numa variável, acompanhando o valor real (API, depois tela)
   - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
   - [ ] Divisão das contas da casa por percentual entre os membros (ADR próprio)
-- [ ] **Estabelecimento** ([ADR 0053](adr/0053-estabelecimentos.md)): onde se comprou ou quem pagou ("Mercado A", "Netflix", "Empresa X"), um cadastro do espaço e um campo opcional em saídas e entradas, separado da categoria e da pessoa. Pessoa responde "com quem"; estabelecimento responde "onde". Usar Pessoa para lojas foi descartado: os saldos de Pessoas contariam uma compra pendente como dívida com a loja, as lojas apareceriam em "Dividir com alguém" e um lançamento não teria como ter loja e pessoa ao mesmo tempo.
+- [x] **Estabelecimento** ([ADR 0053](adr/0053-estabelecimentos.md)): onde se comprou ou quem pagou ("Mercado A", "Netflix", "Empresa X"), um cadastro do espaço e um campo opcional em saídas e entradas, separado da categoria e da pessoa. Pessoa responde "com quem"; estabelecimento responde "onde". Usar Pessoa para lojas foi descartado: os saldos de Pessoas contariam uma compra pendente como dívida com a loja, as lojas apareceriam em "Dividir com alguém" e um lançamento não teria como ter loja e pessoa ao mesmo tempo.
   - [x] ADR: cadastro próprio (e não texto livre, subcategorias ou etiquetas), saídas e entradas, "Estabelecimento" na tela e `Merchant` no código, no glossário
   - [x] API: tabela `merchants` com RLS (nome único no espaço, arquivar em vez de excluir), `merchant_id` opcional em lançamentos, recorrências e parcelamentos, exportação de dados
   - [x] Tela: seletor no formulário (o mesmo componente do de pessoa), o estabelecimento na linha do lançamento e na busca
   - [x] Tela: página Estabelecimentos (no Mais) para renomear, arquivar, reativar e excluir os arquivados sem uso
   - [x] Análise por estabelecimento dentro de uma categoria (ex.: quanto foi para cada mercado)
   - [x] Coluna opcional "Estabelecimento" na planilha modelo (um nome novo vira estabelecimento ao importar; um arquivado volta; desfazer a importação não os apaga)
-  - [ ] Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição
+  - [x] Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição (o estabelecimento vale mais; 12 meses de histórico; nunca troca uma categoria escolhida)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês
