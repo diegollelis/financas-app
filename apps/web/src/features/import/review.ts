@@ -2,7 +2,7 @@ import {
   plainTransactionInputSchema,
   normalizeName,
   type Category,
-  type CreateTransactionInput,
+  type ImportTransactionInput,
   type TemplateDraft,
   type TemplateRow,
   type TransactionType,
@@ -20,6 +20,8 @@ export type ReviewRow = {
   description: string;
   notes: string | null;
   categoryName: string;
+  /** Where it was bought or who paid it (ADR 0053); '' when none. A new name is created. */
+  merchantName: string;
   /** Chosen in the form; otherwise the category comes from the name. */
   categoryId: string | null;
   amountCents: number | null;
@@ -99,7 +101,7 @@ export function unmatchedCategories(
 export function toTransaction(
   row: ReviewRow,
   categoryId: string | null,
-): { ok: true; transaction: CreateTransactionInput } | { ok: false; problems: string[] } {
+): { ok: true; transaction: ImportTransactionInput } | { ok: false; problems: string[] } {
   if (!categoryId) return { ok: false, problems: ['Escolha a categoria.'] };
   const result = plainTransactionInputSchema.safeParse({
     type: row.type,
@@ -111,7 +113,13 @@ export function toTransaction(
     dueDate: row.dueDate,
     settledAt: row.settledAt,
   });
-  if (result.success) return { ok: true, transaction: result.data };
+  if (result.success) {
+    const merchantName = row.merchantName.trim();
+    return {
+      ok: true,
+      transaction: merchantName ? { ...result.data, merchantName } : result.data,
+    };
+  }
   return { ok: false, problems: [...new Set(result.error.issues.map((issue) => issue.message))] };
 }
 
@@ -120,7 +128,7 @@ export function readyTransactions(
   rows: ReviewRow[],
   categories: Category[],
   matches: ReadonlyMap<string, string>,
-): CreateTransactionInput[] {
+): ImportTransactionInput[] {
   return rows.flatMap((row) => {
     if (!row.included) return [];
     const result = toTransaction(row, resolveCategory(row, categories, matches));

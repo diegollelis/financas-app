@@ -31,6 +31,7 @@ const parsedRow = (line: number, overrides: Partial<TemplateRow> = {}): Template
   description: 'Supermercado',
   notes: null,
   categoryName: 'mercado',
+  merchantName: '',
   amountCents: 64_035,
   period: '2026-09',
   dueDate: '2026-09-10',
@@ -131,6 +132,13 @@ describe('toTransaction', () => {
         settledAt: null,
       },
     });
+  });
+
+  it('names the merchant only when the row has one (ADR 0053)', () => {
+    const result = toTransaction(reviewRow({ merchantName: ' Feira ' }), mercado.id);
+
+    expect(result.ok && result.transaction.merchantName).toBe('Feira');
+    expect(toTransaction(reviewRow(), mercado.id)).not.toHaveProperty('transaction.merchantName');
   });
 
   it('says what is still wrong, with the shared messages', () => {

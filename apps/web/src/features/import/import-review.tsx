@@ -76,6 +76,7 @@ function RowItem({
           <span>
             {categoryName ?? `${row.categoryName || 'Sem categoria'} (sem correspondência)`}
           </span>
+          {row.merchantName && <span>{row.merchantName}</span>}
           {row.dueDate && <span>Vence em {formatIsoDate(row.dueDate)}</span>}
           <span>
             {row.settledAt

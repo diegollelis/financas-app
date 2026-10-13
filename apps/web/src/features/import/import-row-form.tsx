@@ -1,5 +1,6 @@
 import {
   isoDateSchema,
+  MERCHANT_NAME_MAX_LENGTH,
   periodSchema,
   reaisInputSchema,
   transactionDescriptionSchema,
@@ -36,6 +37,11 @@ const rowFormSchema = z.object({
   dueDate: optionalDate,
   settledAt: optionalDate,
   notes: transactionNotesSchema,
+  /** A name; a new one becomes a merchant in the import (ADR 0053). */
+  merchant: z
+    .string()
+    .trim()
+    .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
 });
 
 type FormInput = z.input<typeof rowFormSchema>;
@@ -79,6 +85,7 @@ export function ImportRowForm({
       dueDate: row.dueDate ?? '',
       settledAt: row.settledAt ?? '',
       notes: row.notes ?? '',
+      merchant: row.merchantName,
     },
   });
   const type = useWatch({ control, name: 'type' });
@@ -91,6 +98,7 @@ export function ImportRowForm({
       type: values.type,
       description: values.description,
       notes: values.notes,
+      merchantName: values.merchant,
       categoryId: values.categoryId,
       amountCents: values.amount,
       period: values.period,
@@ -132,6 +140,13 @@ export function ImportRowForm({
           </FormField>
         )}
       />
+      <FormField
+        id={id('merchant')}
+        label="Estabelecimento (opcional)"
+        error={formState.errors.merchant?.message}
+      >
+        <Input autoComplete="off" {...register('merchant')} />
+      </FormField>
       {/* One column on the phone, two from sm. */}
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField id={id('amount')} label="Valor (R$)" error={formState.errors.amount?.message}>
