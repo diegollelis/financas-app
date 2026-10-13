@@ -1,4 +1,5 @@
 import {
+  categoryHintsSchema,
   categoryListResponseSchema,
   categorySchema,
   copyCategoriesResultSchema,
@@ -13,6 +14,17 @@ import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 /** Under ['workspaces', id, ...], like everything else of one workspace. */
 const categoriesKey = (workspaceId: string) =>
   [...workspacesQueryKey, workspaceId, 'categories'] as const;
+
+/**
+ * Which category usually goes with each merchant and description (ADR 0053): what the transaction
+ * form fills an empty category with. Under the categories key, so their changes refresh it.
+ */
+export function useCategoryHints(workspaceId: string) {
+  return useQuery({
+    queryKey: [...categoriesKey(workspaceId), 'hints'],
+    queryFn: () => apiGet(`/api/workspaces/${workspaceId}/categories/hints`, categoryHintsSchema),
+  });
+}
 
 /** All categories of the workspace, archived too: credits first, then debits, by name. */
 export function useCategories(workspaceId: string) {

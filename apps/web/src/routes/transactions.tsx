@@ -40,7 +40,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useCategories } from '@/features/categories/use-categories';
+import { useCategories, useCategoryHints } from '@/features/categories/use-categories';
 import { useEndInstallmentPlan } from '@/features/installments/use-installments';
 import { useEndRecurrence } from '@/features/recurrences/use-recurrences';
 import { useMerchants } from '@/features/merchants/use-merchants';
@@ -446,6 +446,8 @@ export function TransactionsPage() {
   const transactions = useTransactions(workspaceId, period);
   const people = usePeople(workspaceId);
   const merchants = useMerchants(workspaceId);
+  // Only to fill a new transaction's category: the page does not wait for it (ADR 0053).
+  const hints = useCategoryHints(workspaceId);
   const ready =
     categories.isSuccess && transactions.isSuccess && people.isSuccess && merchants.isSuccess;
   const merchantName = (merchantId: string | null) =>
@@ -598,6 +600,7 @@ export function TransactionsPage() {
             categories={categories.data}
             people={people.data}
             merchants={merchants.data}
+            hints={hints.data}
             editing={form.editing}
             open={form.open}
             onOpenChange={(open) => setForm((current) => ({ ...current, open }))}

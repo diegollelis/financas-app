@@ -3,6 +3,7 @@ export * from './auth.ts';
 export * from './budget.ts';
 export * from './budget-destination.ts';
 export * from './category.ts';
+export * from './category-hints.ts';
 export * from './data-export.ts';
 export * from './error-reporting.ts';
 export * from './health.ts';

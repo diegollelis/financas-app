@@ -3,6 +3,7 @@ import {
   normalizeName,
   parsePercent,
   type Category,
+  type CategoryHints,
   type Merchant,
   type Person,
   type Transaction,
@@ -34,6 +35,7 @@ export function TransactionDialog({
   categories,
   people,
   merchants = [],
+  hints,
   editing,
   preset,
   open,
@@ -46,6 +48,8 @@ export function TransactionDialog({
   people: Person[];
   /** The workspace's merchants (ADR 0053); none for an application to a destination. */
   merchants?: Merchant[];
+  /** The history's categories (ADR 0053), to fill a new transaction's category. */
+  hints?: CategoryHints;
   /** The transaction being edited; null to create one. */
   editing: Transaction | null;
   /** For a new one: values to start from (an application to a destination, ADR 0047). */
@@ -216,6 +220,7 @@ export function TransactionDialog({
         categories={categories}
         people={people}
         merchants={merchants}
+        hints={hints}
         initial={editing ?? undefined}
         preset={editing ? undefined : preset}
         submitLabel={
