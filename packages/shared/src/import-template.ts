@@ -1,5 +1,6 @@
 import type { TransactionType } from './category.ts';
 import { MAX_IMPORT_TRANSACTIONS } from './import.ts';
+import { merchantNameSchema } from './merchant.ts';
 import { amountCentsSchema, isoDateSchema, parseReais, periodSchema } from './money-and-dates.ts';
 import { transactionDescriptionSchema, transactionNotesSchema } from './transaction.ts';
 
@@ -27,6 +28,8 @@ const columns = [
   { key: 'type', title: 'Tipo', formerTitles: [], required: true },
   { key: 'description', title: 'Descrição', formerTitles: [], required: true },
   { key: 'category', title: 'Categoria', formerTitles: [], required: true },
+  // Optional (ADR 0053): a template without it is read as before.
+  { key: 'merchant', title: 'Estabelecimento', formerTitles: [], required: false },
   { key: 'amount', title: 'Valor', formerTitles: [], required: true },
   { key: 'dueDate', title: 'Vencimento', formerTitles: [], required: false },
   {
@@ -49,6 +52,7 @@ export const TEMPLATE_EXAMPLE: readonly string[] = [
   'Saída',
   'Aluguel',
   'Moradia',
+  'Imobiliária Exemplo',
   '1.500,00',
   '10/09/2026',
   '10/09/2026',
@@ -63,6 +67,8 @@ export type TemplateRow = {
   description: string;
   notes: string | null;
   categoryName: string;
+  /** Where it was bought or who paid it (ADR 0053), as a name; '' when none. */
+  merchantName: string;
   amountCents: number;
   period: string;
   dueDate: string | null;
@@ -79,6 +85,7 @@ export type TemplateDraft = {
   description: string;
   notes: string | null;
   categoryName: string;
+  merchantName: string;
   /** Null when missing or unreadable; a zero or negative amount stays, to be corrected. */
   amountCents: number | null;
   period: string | null;
@@ -205,6 +212,11 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
       errors.push(description.error.issues[0]?.message ?? 'Descrição inválida.');
     const categoryName = text(cell('category'));
     if (!categoryName) errors.push('Informe a categoria.');
+    const merchantName = text(cell('merchant'));
+    const merchant = merchantNameSchema.safeParse(merchantName);
+    if (merchantName && !merchant.success) {
+      errors.push(`Estabelecimento: ${merchant.error.issues[0]?.message ?? 'nome inválido.'}`);
+    }
     const amountCents = readAmount(cell('amount'));
     const amount = amountCentsSchema.safeParse(amountCents);
     if (amountCents === null) errors.push('Valor inválido: use números, como 1.500,00.');
@@ -232,6 +244,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
         description: text(cell('description')),
         notes: text(cell('notes')) || null,
         categoryName,
+        merchantName,
         amountCents,
         period,
         dueDate: dueDate ?? null,
@@ -271,6 +284,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
       description: description.data,
       notes: notes.success ? notes.data : null,
       categoryName,
+      merchantName: merchant.success ? merchant.data : '',
       amountCents: amount.data,
       period,
       dueDate: dueDate ?? null,

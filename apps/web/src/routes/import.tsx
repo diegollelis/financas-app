@@ -175,7 +175,8 @@ export function ImportPage() {
               1. Baixe o modelo
             </h2>
             <p>
-              Uma linha por lançamento, com mês de referência, tipo, descrição, categoria e valor. A
+              Uma linha por lançamento, com mês de referência, tipo, descrição, categoria e valor; o
+              estabelecimento é opcional, e um nome novo vira estabelecimento ao importar. A
               planilha já vem com um exemplo e a lista das categorias deste espaço.
             </p>
             <Button variant="outline" className="justify-self-start" onClick={download}>

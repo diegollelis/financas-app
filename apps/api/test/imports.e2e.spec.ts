@@ -116,6 +116,47 @@ describe('imports', () => {
     expect(list[0]?.id).toBe(created.id);
   });
 
+  it('names merchants: a new one is created, an existing one reused, an archived one comes back', async () => {
+    const { browser, base, rows, transactionsOf } = await setUp();
+    const existing = (
+      await browser.post(`${base}/merchants`).send({ name: 'Açougue Central' }).expect(201)
+    ).body as { id: string };
+    const archived = (await browser.post(`${base}/merchants`).send({ name: 'Feira' }).expect(201))
+      .body as { id: string };
+    await browser.patch(`${base}/merchants/${archived.id}`).send({ archived: true }).expect(200);
+    const [salary, grocery, salary2, grocery2] = rows;
+
+    await browser
+      .post(`${base}/imports`)
+      .send({
+        transactions: [
+          { ...salary, merchantName: 'Empresa Exemplo' },
+          { ...grocery, merchantName: 'acougue central' },
+          { ...salary2, merchantName: 'EMPRESA EXEMPLO' },
+          { ...grocery2, merchantName: 'feira' },
+        ],
+      })
+      .expect(201);
+
+    const merchants = (await browser.get(`${base}/merchants`).expect(200)).body as {
+      id: string;
+      name: string;
+      archived: boolean;
+    }[];
+    const created = merchants.find((merchant) => merchant.name === 'Empresa Exemplo');
+    expect(merchants.map(({ name, archived }) => [name, archived])).toEqual([
+      ['Açougue Central', false],
+      ['Empresa Exemplo', false],
+      ['Feira', false],
+    ]);
+    const august = await transactionsOf('2026-08');
+    const september = await transactionsOf('2026-09');
+    expect(august.find((item) => item.type === 'CREDIT')?.merchantId).toBe(created?.id);
+    expect(august.find((item) => item.type === 'DEBIT')?.merchantId).toBe(existing.id);
+    expect(september.find((item) => item.type === 'CREDIT')?.merchantId).toBe(created?.id);
+    expect(september.find((item) => item.type === 'DEBIT')?.merchantId).toBe(archived.id);
+  });
+
   it('refuses the whole batch when one category is of the wrong type, saving nothing', async () => {
     const { browser, base, rows, categoryId, transactionsOf } = await setUp();
     const wrong = { ...rows[1]!, categoryId: categoryId('Salário', 'CREDIT') };

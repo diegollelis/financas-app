@@ -40,6 +40,7 @@ describe('parseTemplateRows', () => {
         description: 'Supermercado',
         notes: null,
         categoryName: 'Mercado',
+        merchantName: '',
         amountCents: 64_035,
         period: '2026-09',
         dueDate: '2026-09-10',
@@ -95,6 +96,7 @@ describe('parseTemplateRows', () => {
       type: 'DEBIT',
       description: 'Aluguel',
       categoryName: 'Moradia',
+      merchantName: 'Imobiliária Exemplo',
       amountCents: 150_000,
       period: '2026-09',
       dueDate: '2026-09-10',
@@ -181,6 +183,7 @@ describe('parseTemplateRows', () => {
         description: 'Supermercado',
         notes: 'Conferir na fatura',
         categoryName: 'Mercado',
+        merchantName: '',
         // The zero stays, to be corrected; the unreadable date comes empty.
         amountCents: 0,
         period: '2026-09',
@@ -256,6 +259,37 @@ describe('parseTemplateRows', () => {
     const { issues } = parseTemplateRows([header, ...many]);
 
     expect(issues).toContainEqual(expect.objectContaining({ line: null, severity: 'error' }));
+  });
+});
+
+describe('the merchant column (ADR 0053)', () => {
+  it('reads the merchant by name, and a spreadsheet without the column as before', () => {
+    const withMerchant = parseTemplateRows([
+      header,
+      row({ Estabelecimento: ' Mercado Bom Preço ' }),
+    ]);
+    const before = header.filter((title) => title !== 'Estabelecimento');
+    const without = parseTemplateRows([
+      before,
+      before.map((title) => (title === 'Valor' ? 640.35 : (row()[header.indexOf(title)] ?? null))),
+    ]);
+
+    expect(withMerchant.rows[0]?.merchantName).toBe('Mercado Bom Preço');
+    expect(without.issues).toEqual([]);
+    expect(without.rows[0]?.merchantName).toBe('');
+  });
+
+  it('leaves out a row whose merchant name is too long', () => {
+    const { rows, drafts, issues } = parseTemplateRows([
+      header,
+      row({ Estabelecimento: 'M'.repeat(101) }),
+    ]);
+
+    expect(rows).toEqual([]);
+    expect(drafts).toHaveLength(1);
+    expect(issues).toEqual([
+      { line: 2, severity: 'error', message: 'Estabelecimento: Use no máximo 100 caracteres.' },
+    ]);
   });
 });
 

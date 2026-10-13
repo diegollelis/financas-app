@@ -126,7 +126,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Tela: seletor no formulário (o mesmo componente do de pessoa), o estabelecimento na linha do lançamento e na busca
   - [x] Tela: página Estabelecimentos (no Mais) para renomear, arquivar, reativar e excluir os arquivados sem uso
   - [x] Análise por estabelecimento dentro de uma categoria (ex.: quanto foi para cada mercado)
-  - [ ] Coluna opcional "Estabelecimento" na planilha modelo
+  - [x] Coluna opcional "Estabelecimento" na planilha modelo (um nome novo vira estabelecimento ao importar; um arquivado volta; desfazer a importação não os apaga)
   - [ ] Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`

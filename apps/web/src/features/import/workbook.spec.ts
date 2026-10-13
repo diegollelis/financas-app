@@ -30,6 +30,7 @@ describe('planilha modelo', () => {
         description: 'Aluguel',
         notes: null,
         categoryName: 'Moradia',
+        merchantName: 'Imobiliária Exemplo',
         amountCents: 150_000,
         period: '2026-09',
         dueDate: '2026-09-10',

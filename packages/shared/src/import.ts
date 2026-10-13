@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { merchantNameSchema } from './merchant.ts';
 import { periodSchema } from './money-and-dates.ts';
 import { plainTransactionInputSchema } from './transaction.ts';
 
@@ -9,9 +10,19 @@ import { plainTransactionInputSchema } from './transaction.ts';
 /** A spreadsheet holds a few years of months; more than this in one go is a mistake. */
 export const MAX_IMPORT_TRANSACTIONS = 2000;
 
+/**
+ * One imported transaction: the plain fields, plus the merchant by name (ADR 0053). A name the
+ * workspace does not have becomes a merchant in the import; an archived one comes back.
+ */
+export const importTransactionInputSchema = plainTransactionInputSchema.extend({
+  merchantName: merchantNameSchema.optional(),
+});
+
+export type ImportTransactionInput = z.infer<typeof importTransactionInputSchema>;
+
 export const createImportInputSchema = z.object({
   transactions: z
-    .array(plainTransactionInputSchema)
+    .array(importTransactionInputSchema)
     .min(1, 'Escolha ao menos um lançamento para importar.')
     .max(
       MAX_IMPORT_TRANSACTIONS,
