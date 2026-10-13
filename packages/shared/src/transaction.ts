@@ -41,13 +41,19 @@ export const transactionFieldsSchema = z.object({
   dueDate: isoDateSchema.nullable().optional(),
   settledAt: isoDateSchema.nullable().optional(),
   personId: z.uuid().nullable().optional(),
+  /** Where it was bought or who paid it (ADR 0053). */
+  merchantId: z.uuid().nullable().optional(),
 });
 
 /**
- * One transaction with no person and no split: what a spreadsheet import brings (ADR 0040).
- * Without refinements, so forms can `.pick()` from it (Zod refuses that on refined objects).
+ * One transaction with no person, no merchant and no split: what a spreadsheet import brings
+ * (ADR 0040). Without refinements, so forms can `.pick()` from it (Zod refuses that on refined
+ * objects).
  */
-export const plainTransactionInputSchema = transactionFieldsSchema.omit({ personId: true });
+export const plainTransactionInputSchema = transactionFieldsSchema.omit({
+  personId: true,
+  merchantId: true,
+});
 
 export type PlainTransactionInput = z.infer<typeof plainTransactionInputSchema>;
 
@@ -123,6 +129,8 @@ export const transactionSchema = z.object({
     .default(null),
   /** A receber de / a pagar para this person (ADR 0042); null when not linked. */
   personId: z.uuid().nullable().default(null),
+  /** Where it was bought or who paid it (ADR 0053); null when not given. */
+  merchantId: z.uuid().nullable().default(null),
   /** The debit this share was split from (ADR 0042); null otherwise. */
   splitOfId: z.uuid().nullable().default(null),
 });

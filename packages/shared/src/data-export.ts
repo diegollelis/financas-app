@@ -40,6 +40,8 @@ const exportTransactionSchema = z.object({
   importId: z.uuid().nullable(),
   /** A receber de / a pagar para this person, and the debit a share was split from. */
   personId: z.uuid().nullable(),
+  /** Where it was bought or who paid it (ADR 0053). */
+  merchantId: z.uuid().nullable(),
   splitOfId: z.uuid().nullable(),
   createdAt: instant,
   updatedAt: instant,
@@ -50,6 +52,14 @@ const exportPersonSchema = z.object({
   name: z.string(),
   /** Linked to this member's account (by id), while it was one. */
   memberUserId: z.uuid().nullable(),
+  archivedAt: instant.nullable(),
+  createdAt: instant,
+});
+
+/** Where transactions were bought or who paid them (ADR 0053). */
+const exportMerchantSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
   archivedAt: instant.nullable(),
   createdAt: instant,
 });
@@ -83,6 +93,7 @@ const exportRecurrenceSchema = z.object({
   variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
   personId: z.uuid().nullable(),
+  merchantId: z.uuid().nullable(),
   startPeriod: period,
   endPeriod: period.nullable(),
   /** The competências it already generated a transaction for. */
@@ -109,6 +120,7 @@ const exportInstallmentPlanSchema = z.object({
   firstPeriod: period,
   dueDay: z.number().int().nullable(),
   personId: z.uuid().nullable(),
+  merchantId: z.uuid().nullable(),
   endedAt: instant.nullable(),
   createdAt: instant,
 });
@@ -150,6 +162,7 @@ const ownedWorkspaceSchema = z.object({
   invitations: z.array(exportInvitationSchema),
   categories: z.array(exportCategorySchema),
   people: z.array(exportPersonSchema),
+  merchants: z.array(exportMerchantSchema),
   transactions: z.array(exportTransactionSchema),
   budgets: z.array(exportBudgetSchema),
   budgetDestinations: z.array(exportBudgetDestinationSchema),

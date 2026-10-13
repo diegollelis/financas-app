@@ -9,6 +9,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
+import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -46,6 +47,7 @@ export function toTransactionResponse(transaction: TransactionRow): Transaction 
           }
         : null,
     personId: transaction.personId,
+    merchantId: transaction.merchantId,
     splitOfId: transaction.splitOfId,
   };
 }
@@ -86,6 +88,7 @@ export class TransactionsService {
   async create(workspaceId: string, input: CreateTransactionInput): Promise<Transaction> {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
+    if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     const shares = input.split ? await this.shares(workspaceId, input, input.split) : [];
     const transaction = await this.prisma.forWorkspace(workspaceId).transaction.create({
       data: {
@@ -99,6 +102,7 @@ export class TransactionsService {
         dueDate: optionalDate(input.dueDate) ?? null,
         settledAt: optionalDate(input.settledAt) ?? null,
         personId: input.personId ?? null,
+        merchantId: input.merchantId ?? null,
         ...(shares.length > 0 && { shares: { create: shares } }),
       },
       include: withOrigin,
@@ -135,6 +139,10 @@ export class TransactionsService {
   ): Promise<Transaction> {
     const current = await this.find(workspaceId, transactionId);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
+    // Only a change is checked, as with the category: it may keep a merchant archived later.
+    if (input.merchantId && input.merchantId !== current.merchantId) {
+      await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
+    }
     const type = input.type ?? current.type;
     const categoryId = input.categoryId ?? current.categoryId;
     // Only a change is checked: a transaction may keep a category archived after it was made.
@@ -155,6 +163,7 @@ export class TransactionsService {
           dueDate: optionalDate(input.dueDate),
           settledAt: optionalDate(input.settledAt),
           personId: input.personId,
+          merchantId: input.merchantId,
           // Giving the amount, or settling, confirms an estimate (ADR 0038). Undoing a settlement
           // does not make it an estimate again.
           amountEstimated:

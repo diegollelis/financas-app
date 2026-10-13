@@ -33,6 +33,8 @@ export const recurrenceFieldsSchema = z.object({
   variableAmount: z.boolean().optional(),
   /** "A receber de" / "a pagar para" (ADR 0052): copied to every month it generates. */
   personId: z.uuid().nullable().optional(),
+  /** Where it is bought or who pays it (ADR 0053): copied to every month it generates. */
+  merchantId: z.uuid().nullable().optional(),
   /** The first competência; its transaction is created right away. */
   startPeriod: periodSchema,
 });
@@ -117,6 +119,7 @@ export const recurrenceSchema = z.object({
   variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
   personId: z.uuid().nullable().default(null),
+  merchantId: z.uuid().nullable().default(null),
   startPeriod: periodSchema,
   /** The last competência it generated; null while active. */
   endPeriod: periodSchema.nullable(),

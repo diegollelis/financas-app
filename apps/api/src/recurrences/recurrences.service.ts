@@ -18,6 +18,7 @@ import {
   type Recurrence as RecurrenceRow,
   type RecurrenceShare as RecurrenceShareRow,
 } from '../generated/prisma/client.js';
+import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
@@ -35,6 +36,7 @@ function toResponse(recurrence: RecurrenceWithShares): Recurrence {
     variableAmount: recurrence.variableAmount,
     dueDay: recurrence.dueDay,
     personId: recurrence.personId,
+    merchantId: recurrence.merchantId,
     startPeriod: recurrence.startPeriod,
     endPeriod: recurrence.endPeriod,
     split: recurrence.shares.map(({ personId, amountCents, basisPoints }) => ({
@@ -85,6 +87,7 @@ export class RecurrencesService {
   async create(workspaceId: string, input: CreateRecurrenceInput): Promise<Recurrence> {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
+    if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     // Who shares it (ADR 0052): each person resolved, or created, before the write.
     const people = await Promise.all(
       (input.split ?? []).map((share) => resolveSplitPerson(this.prisma, workspaceId, share)),
@@ -100,6 +103,7 @@ export class RecurrencesService {
         variableAmount: input.variableAmount ?? false,
         dueDay: input.dueDay ?? null,
         personId: input.personId ?? null,
+        merchantId: input.merchantId ?? null,
         startPeriod: input.startPeriod,
         shares: {
           create: (input.split ?? []).map((share, index) => ({
@@ -132,6 +136,9 @@ export class RecurrencesService {
     if (input.personId && input.personId !== current.personId) {
       await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     }
+    if (input.merchantId && input.merchantId !== current.merchantId) {
+      await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
+    }
     // The shares in reais must still fit, and a variable amount is shared in percentages only.
     const fixedShares = current.shares.filter((share) => share.amountCents !== null);
     if (input.variableAmount && fixedShares.length > 0) {
@@ -154,6 +161,7 @@ export class RecurrencesService {
         variableAmount: input.variableAmount,
         dueDay: input.dueDay,
         personId: input.personId,
+        merchantId: input.merchantId,
       },
       include: { shares: true },
     });
@@ -172,6 +180,7 @@ export class RecurrencesService {
           notes: input.notes,
           categoryId: input.categoryId,
           personId: input.personId,
+          merchantId: input.merchantId,
           amountCents: keepsAmount ? undefined : input.amountCents,
           // Turned fixed: what was an estimate becomes the amount.
           amountEstimated: input.variableAmount === false ? false : undefined,
@@ -314,6 +323,7 @@ export class RecurrencesService {
               notes: recurrence.notes,
               categoryId: recurrence.categoryId,
               personId: recurrence.personId,
+              merchantId: recurrence.merchantId,
               amountCents,
               amountEstimated: recurrence.variableAmount,
               period,
