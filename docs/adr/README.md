@@ -56,3 +56,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0050](0050-versionamento.md)                                    | Versões: tags com versionamento semântico e releases no GitHub                      | Aceita |
 | [0051](0051-vocabulario-da-interface.md)                         | Vocabulário da interface: os termos do mercado, sem mudar o código                  | Aceita |
 | [0052](0052-divisao-em-entradas-recorrencias-e-parcelamentos.md) | Pessoa e divisão em entradas, recorrências e parcelamentos; seletor de pessoa       | Aceita |
+| [0053](0053-estabelecimentos.md)                                 | Estabelecimentos: onde se comprou ou quem pagou, num cadastro próprio               | Aceita |

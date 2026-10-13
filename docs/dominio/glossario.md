@@ -37,6 +37,7 @@ O nome que a pessoa vê na tela e o nome no código são independentes ([ADR 005
 | Repasse                                | `PASS_THROUGH_CATEGORY_NAME`      | A categoria de saída das partes de uma entrada dividida ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)) |
 | Com quem?                              | `PeopleMultiSelect`, `split`      | Na divisão, escolhe várias pessoas de uma vez; cada uma ganha a sua linha                                                             |
 | Adicionar 'Nome'                       | `PersonSelect`                    | No seletor de pessoa, cadastra quem ainda não está na lista, ao salvar                                                                |
+| Estabelecimento                        | `Merchant`, `merchantId`          | Onde se comprou ou quem pagou (Mercado A, Netflix, Empresa X), em saídas e entradas ([ADR 0053](../adr/0053-estabelecimentos.md))     |
 | Importação                             | `TransactionImport`               | Lançamentos trazidos de uma planilha, desfazível                                                                                      |
 
 ### Orçamento e Painel
