@@ -52,6 +52,7 @@ export function SplitFields({
   people,
   userId,
   installments,
+  monthly,
 }: {
   idPrefix: string;
   control: Control<SplitFormFields>;
@@ -71,6 +72,11 @@ export function SplitFields({
    * total or of each installment, and every installment gets its part of them.
    */
   installments?: { count: number; amountIs: 'TOTAL' | 'INSTALLMENT' };
+  /**
+   * A recurrence (ADR 0052): every month gets the shares. A variable amount takes percentages
+   * only, which follow the real amount of each month.
+   */
+  monthly?: { variable: boolean };
 }) {
   const { fields, replace, remove } = useFieldArray({ control, name: 'shares' });
   const mode = useWatch({ control, name: 'shareMode' });
@@ -83,10 +89,21 @@ export function SplitFields({
   const names = shares.map((share) => share.name);
   const whoId = `${idPrefix}-split-who`;
   const whoError = errors.shares?.root?.message ?? errors.shares?.message;
+  const percentOnly = monthly?.variable === true;
+  const count = shares.length;
+
+  // A variable amount is split in percentages only: reais typed would not follow it.
+  useEffect(() => {
+    if (!percentOnly || mode === 'PERCENT') return;
+    setValue('shareMode', 'PERCENT');
+    // The numbers typed meant reais: start again from equal shares.
+    evenShareValues(0, count, 'PERCENT').forEach((value, index) =>
+      setValue(`shares.${index}.value`, value, { shouldValidate: false }),
+    );
+  }, [percentOnly, mode, count, setValue]);
 
   // Keeps the shares equal while nobody typed one: as people come and go, and as the amount or
   // the unit changes.
-  const count = shares.length;
   useEffect(() => {
     if (manual || count === 0 || (mode === 'REAIS' && totalCents === null)) return;
     evenShareValues(totalCents ?? 0, count, mode).forEach((value, index) =>
@@ -96,11 +113,15 @@ export function SplitFields({
 
   // "Sua parte: R$ 400,00 do total. Por parcela: Ana R$ 133,33. Cada pessoa vira…"
   const summary = (myCents: number) => {
-    const meaning = !installments
-      ? ''
-      : installments.amountIs === 'TOTAL'
-        ? ' do total'
-        : ' por parcela';
+    const meaning = monthly
+      ? monthly.variable
+        ? ' do valor estimado'
+        : ' por mês'
+      : !installments
+        ? ''
+        : installments.amountIs === 'TOTAL'
+          ? ' do total'
+          : ' por parcela';
     const parts = [`Sua parte: ${formatCents(myCents)}${meaning}.`];
     if (installments?.amountIs === 'TOTAL' && installments.count >= 2) {
       // Each share divided like the installments themselves, the leftover cents on the last.
@@ -113,12 +134,13 @@ export function SplitFields({
         `Por parcela: ${each.join('; ')}${uneven ? ', a última com os centavos que sobram' : ''}.`,
       );
     }
-    const where = installments ? ' em cada parcela' : '';
+    const where = monthly ? ' em cada mês' : installments ? ' em cada parcela' : '';
     parts.push(
       type === 'CREDIT'
         ? `Cada pessoa vira um valor a pagar${where}, na categoria Repasse.`
         : `Cada pessoa vira um valor a receber${where}, na categoria Reembolso.`,
     );
+    if (monthly?.variable) parts.push('As partes acompanham o valor real de cada mês.');
     return parts.join(' ');
   };
 
@@ -155,22 +177,28 @@ export function SplitFields({
       </div>
       {fields.length > 0 && (
         <>
-          <Controller
-            control={control}
-            name="shareMode"
-            render={({ field }) => (
-              <SegmentedControl
-                label="Partes"
-                options={modeOptions}
-                value={field.value}
-                onChange={(value) => {
-                  field.onChange(value);
-                  // The numbers typed meant the other unit: start again from equal shares.
-                  setManual(false);
-                }}
-              />
-            )}
-          />
+          {percentOnly ? (
+            <p className="text-muted-foreground text-sm">
+              Partes em %, porque o valor varia todo mês.
+            </p>
+          ) : (
+            <Controller
+              control={control}
+              name="shareMode"
+              render={({ field }) => (
+                <SegmentedControl
+                  label="Partes"
+                  options={modeOptions}
+                  value={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    // The numbers typed meant the other unit: start again from equal shares.
+                    setManual(false);
+                  }}
+                />
+              )}
+            />
+          )}
           <ul className="grid gap-3">
             {fields.map((field, index) => {
               const name = shares[index]?.name ?? field.name;

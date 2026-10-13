@@ -1,4 +1,10 @@
-import { formatPeriod, type Category, type Person, type Transaction } from '@financas/shared';
+import {
+  formatPeriod,
+  parsePercent,
+  type Category,
+  type Person,
+  type Transaction,
+} from '@financas/shared';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
@@ -65,17 +71,25 @@ export function TransactionDialog({
   const submit = async (values: TransactionFormValues) => {
     // The name picked in "A receber de" / "A pagar para": the person, created when new (ADR 0042),
     // for a recurrence or an installment plan too (ADR 0052). A split names its people itself.
-    const splitting = values.splitOn && values.repeat !== 'MONTHLY';
-    // Each share as the API takes it (ADRs 0042, 0052): a name already listed goes by id, a new
-    // one becomes a person in the same request. In an installment plan, in the meaning of the
-    // amount typed (of the total, or of each installment).
-    const split = values.shares.map((share) => {
-      const listed = findPerson(people, share.name);
-      const amountCents = shareCents(values.amount, share.value, values.shareMode) ?? 0;
-      return listed && !listed.archived
-        ? { personId: listed.id, amountCents }
-        : { newPersonName: share.name.trim(), amountCents };
-    });
+    const splitting = values.splitOn;
+    // Each share's person as the API takes it (ADRs 0042, 0052): a name already listed goes by
+    // id, a new one becomes a person in the same request.
+    const who = (name: string) => {
+      const listed = findPerson(people, name);
+      return listed && !listed.archived ? { personId: listed.id } : { newPersonName: name.trim() };
+    };
+    // In reais; in an installment plan, in the meaning of the amount typed (of the total, or of
+    // each installment).
+    const split = values.shares.map((share) => ({
+      ...who(share.name),
+      amountCents: shareCents(values.amount, share.value, values.shareMode) ?? 0,
+    }));
+    // A recurrence keeps a percentage as one, so it follows the amount of each month.
+    const recurrenceSplit = values.shares.map((share) =>
+      values.shareMode === 'PERCENT'
+        ? { ...who(share.name), basisPoints: parsePercent(share.value) ?? 0 }
+        : { ...who(share.name), amountCents: shareCents(values.amount, share.value, 'REAIS') ?? 0 },
+    );
     const withPeople = (message: string) =>
       splitting
         ? `${message}, dividido com ${split.length} ${split.length === 1 ? 'pessoa' : 'pessoas'}`
@@ -128,8 +142,9 @@ export function TransactionDialog({
           startPeriod: period,
           variableAmount: values.amountKind === 'VARIABLE',
           personId,
+          ...(splitting && { split: recurrenceSplit }),
         },
-        { onSuccess: done('Lançamento adicionado, repetindo todo mês') },
+        { onSuccess: done(withPeople('Lançamento adicionado, repetindo todo mês')) },
       );
     } else if (splitting) {
       // The transaction and one share per person on the other side, at once (ADRs 0042, 0052).

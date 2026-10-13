@@ -380,6 +380,122 @@ describe('TransactionsPage', () => {
     });
   });
 
+  it('splits a variable monthly bill in percentages, which follow each month', async () => {
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`POST /api/workspaces/${houseId}/recurrences`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000303',
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 18_000,
+          variableAmount: true,
+          dueDay: null,
+          startPeriod: '2026-10',
+          endPeriod: null,
+          split: [{ personId: ana.id, amountCents: null, basisPoints: 5_000 }],
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Conta de luz');
+    await chooseCategory(form, 'Energia');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo mês' }));
+    await userEvent.click(within(form).getByRole('radio', { name: 'Variável' }));
+    await userEvent.type(within(form).getByLabelText('Valor estimado (R$)'), '180');
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    await pickPeople(form, ['Ana']);
+    // Reais would not follow the amount: only percentages, half each to start.
+    expect(within(form).queryByRole('radiogroup', { name: 'Partes' })).not.toBeInTheDocument();
+    expect(
+      within(form).getByText('Partes em %, porque o valor varia todo mês.'),
+    ).toBeInTheDocument();
+    expect(within(form).getByLabelText('Parte de Ana (%)')).toHaveValue('50,00');
+    expect(nbsp(within(form).getByText(/^Sua parte/).textContent)).toBe(
+      'Sua parte: R$ 90,00 do valor estimado. Cada pessoa vira um valor a receber em cada mês, na categoria Reembolso. As partes acompanham o valor real de cada mês.',
+    );
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Conta de luz',
+        notes: null,
+        categoryId: energyCategory.id,
+        amountCents: 18_000,
+        dueDay: null,
+        startPeriod: '2026-10',
+        variableAmount: true,
+        personId: null,
+        split: [{ personId: ana.id, basisPoints: 5_000 }],
+      }),
+    });
+    expect(
+      await screen.findByText('Lançamento adicionado, repetindo todo mês, dividido com 1 pessoa'),
+    ).toBeInTheDocument();
+  });
+
+  it('splits a fixed monthly one in reais, with a new person', async () => {
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`POST /api/workspaces/${houseId}/recurrences`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000304',
+          type: 'DEBIT',
+          description: 'Internet',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 12_000,
+          variableAmount: false,
+          dueDay: null,
+          startPeriod: '2026-10',
+          endPeriod: null,
+          split: [],
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Internet');
+    await chooseCategory(form, 'Energia');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo mês' }));
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '120');
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    await pickPeople(form, ['Ana'], ['Bruno']);
+    expect(within(form).getByRole('radio', { name: 'Em reais' })).toBeChecked();
+    expect(nbsp(within(form).getByText(/^Sua parte/).textContent)).toBe(
+      'Sua parte: R$ 40,00 por mês. Cada pessoa vira um valor a receber em cada mês, na categoria Reembolso.',
+    );
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Internet',
+        notes: null,
+        categoryId: energyCategory.id,
+        amountCents: 12_000,
+        dueDay: null,
+        startPeriod: '2026-10',
+        variableAmount: false,
+        personId: null,
+        split: [
+          { personId: ana.id, amountCents: 4_000 },
+          { newPersonName: 'Bruno', amountCents: 4_000 },
+        ],
+      }),
+    });
+  });
+
   it('asks for the bill amount when settling an estimate; a fixed one settles in one tap', async () => {
     const estimate = {
       ...light,

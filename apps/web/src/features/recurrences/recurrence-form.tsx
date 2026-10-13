@@ -191,28 +191,36 @@ export function RecurrenceForm({
           ? 'Um valor novo substitui as estimativas pendentes; os meses cujo valor já foi informado ficam como estão. Os meses seguintes começam pela média dos 3 últimos pagos.'
           : 'Num mês sem esse dia, o vencimento é o último dia do mês.'}
       </p>
-      <Controller
-        control={control}
-        name="person"
-        render={({ field, fieldState }) => (
-          <FormField
-            id={id('person')}
-            label={
-              recurrence.type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'
-            }
-            error={fieldState.error?.message}
-          >
-            <PersonSelect
-              value={field.value}
-              onChange={field.onChange}
-              people={people}
-              userId={userId}
-              optional
-              title={recurrence.type === 'CREDIT' ? 'A receber de' : 'A pagar para'}
-            />
-          </FormField>
-        )}
-      />
+      {recurrence.split.length > 0 ? (
+        // Changing the split is not offered yet (ADR 0052): end it and create another.
+        <p className="text-muted-foreground text-sm">
+          A divisão não muda aqui. Para dividir de outro jeito, encerre esta recorrência e crie
+          outra.
+        </p>
+      ) : (
+        <Controller
+          control={control}
+          name="person"
+          render={({ field, fieldState }) => (
+            <FormField
+              id={id('person')}
+              label={
+                recurrence.type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'
+              }
+              error={fieldState.error?.message}
+            >
+              <PersonSelect
+                value={field.value}
+                onChange={field.onChange}
+                people={people}
+                userId={userId}
+                optional
+                title={recurrence.type === 'CREDIT' ? 'A receber de' : 'A pagar para'}
+              />
+            </FormField>
+          )}
+        />
+      )}
       <FormField
         id={id('notes')}
         label="Observações (opcional)"

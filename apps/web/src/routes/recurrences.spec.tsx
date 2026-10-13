@@ -161,6 +161,28 @@ describe('RecurrencesPage', () => {
     expect(screen.queryByRole('button', { name: 'Ações de Sofá' })).not.toBeInTheDocument();
   });
 
+  it('shows who a recurrence is split with, and does not change the split when editing', async () => {
+    const split = {
+      ...energia,
+      split: [
+        { personId: ana.id, amountCents: null, basisPoints: 5_000 },
+        { personId: bruno.id, amountCents: 3_000, basisPoints: null },
+      ],
+    };
+    mockRecurrences({ [`GET ${base}/recurrences`]: { body: [aluguel, split] } });
+    renderApp(page);
+
+    const monthly = await section('Todo mês');
+    expect(nbsp(monthly.textContent)).toContain('Dividido com Ana (50%) e Bruno (R$ 30,00)');
+
+    await choose('Conta de luz', 'Editar');
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Conta de luz' });
+    expect(
+      within(dialog).queryByRole('combobox', { name: /A pagar para/ }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/A divisão não muda aqui/)).toBeInTheDocument();
+  });
+
   it('sends only what changed when editing a recurrence', async () => {
     const fetchMock = mockRecurrences({
       [`PATCH ${base}/recurrences/${aluguel.id}`]: {

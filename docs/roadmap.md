@@ -109,15 +109,15 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Membros do espaço compartilhado como pessoas (nota de 2026-10-12 no ADR 0042)
     - [x] API: criadas ao aceitar o convite e ao listar, ligando a pessoa de mesmo nome; `isMember` e `PERSON_IS_MEMBER`
     - [x] Tela: selos "Membro" e "Você" em Pessoas, e você fora das sugestões
-  - [ ] Pessoa e divisão em entradas, recorrências e parcelamentos ([ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
+  - [x] Pessoa e divisão em entradas, recorrências e parcelamentos ([ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
     - [x] Seletor de pessoa como o de categoria: busca, "Membros" e "Pessoas", "Adicionar 'Nome'"
     - [x] Uma pessoa em "Todo mês" e "Parcelado" (API e tela)
     - [x] Dividir uma entrada: as partes viram saídas pendentes em Repasse
     - [x] Dividir um parcelamento: a parte de cada pessoa em cada parcela, criadas junto (API, depois tela)
-    - [ ] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês; em % numa variável, acompanhando o valor real (API, depois tela)
+    - [x] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês; em % numa variável, acompanhando o valor real (API, depois tela)
   - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
   - [ ] Divisão das contas da casa por percentual entre os membros (ADR próprio)
-- [ ] **Estabelecimento** (ADR próprio, depois dos passos que faltam do ADR 0052): onde se comprou ou de quem se recebeu ("Mercado A", "Netflix"), um campo opcional do lançamento, separado da categoria e da pessoa. Pessoa responde "com quem"; estabelecimento responde "onde". Usar Pessoa para lojas foi descartado: os saldos de Pessoas contariam uma compra pendente como dívida com a loja, as lojas apareceriam em "Dividir com alguém" e um lançamento não teria como ter loja e pessoa ao mesmo tempo.
+- [ ] **Estabelecimento** (ADR próprio, agora que o ADR 0052 está completo): onde se comprou ou de quem se recebeu ("Mercado A", "Netflix"), um campo opcional do lançamento, separado da categoria e da pessoa. Pessoa responde "com quem"; estabelecimento responde "onde". Usar Pessoa para lojas foi descartado: os saldos de Pessoas contariam uma compra pendente como dívida com a loja, as lojas apareceriam em "Dividir com alguém" e um lançamento não teria como ter loja e pessoa ao mesmo tempo.
   - [ ] ADR: o termo na tela ("Estabelecimento", talvez "Onde" no formulário; `Merchant` no código) entra antes no glossário; comparar com subcategorias e etiquetas
   - [ ] API: tabela `merchants` com RLS (nome único no espaço, arquivar em vez de excluir), `merchant_id` opcional em lançamentos, recorrências e parcelamentos, exportação de dados
   - [ ] Tela: seletor no formulário (o mesmo componente do de pessoa), o estabelecimento na linha do lançamento e uma página para renomear e arquivar
