@@ -102,6 +102,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Tela "Recorrências" no Mais: listar, editar (só o que mudou) e encerrar
   - [ ] "Tornar recorrente" no menu de um lançamento existente: criar a recorrência adotando o lançamento como o primeiro mês, sem duplicar
 - [x] Escolha de categoria com busca (sem depender de acentos) e "Mais usadas" dos últimos 6 meses (`recentUses` na lista de categorias)
+  - [x] "Adicionar 'Nome'" no seletor de categoria do lançamento e da recorrência: criada ao salvar, com o tipo do lançamento; uma arquivada de mesmo nome volta
   - [ ] Sugerir a categoria pela descrição, a partir dos lançamentos anteriores
 - [ ] Rateio de lançamentos e pessoas ([ADR 0042](adr/0042-pessoas-e-rateio.md))
   - [x] API: pessoas, lançamento ligado a uma pessoa, dividir um gasto e categoria Reembolso

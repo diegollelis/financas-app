@@ -10,6 +10,7 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { useResolveCategory } from '@/features/categories/new-category';
 import { useCreateInstallmentPlan } from '@/features/installments/use-installments';
 import { useResolveMerchant } from '@/features/merchants/use-merchants';
 import { findPerson, useResolvePerson } from '@/features/people/use-people';
@@ -62,6 +63,7 @@ export function TransactionDialog({
   const update = useUpdateTransaction(workspaceId);
   const person = useResolvePerson(workspaceId, people);
   const merchant = useResolveMerchant(workspaceId, merchants);
+  const category = useResolveCategory(workspaceId, categories);
   // Which kind of creation was last submitted: its pending state and error are the form's.
   const [repeat, setRepeat] = useState<TransactionFormValues['repeat']>('NONE');
   const mutation = editing
@@ -105,20 +107,23 @@ export function TransactionDialog({
     const current = merchants.find((item) => item.id === editing?.merchantId);
     let personId: string | null;
     let merchantId: string | null;
+    let categoryId: string;
     try {
+      // A category added in the form is created now (or an archived one of that name comes back).
+      categoryId = await category.resolve(values.categoryId, values.type);
       personId = splitting ? null : await person.resolve(values.person);
       merchantId =
         current && normalizeName(current.name) === normalizeName(values.merchant)
           ? current.id
           : await merchant.resolve(values.merchant);
     } catch {
-      return; // Shown by the form, from person.error or merchant.error.
+      return; // Shown by the form, from the resolver's error.
     }
     const fields = {
       type: values.type,
       description: values.description,
       notes: values.notes ?? null,
-      categoryId: values.categoryId,
+      categoryId,
       amountCents: values.amount,
     };
     // A new one names its merchant only when there is one; an edit always does (null unlinks).
@@ -222,8 +227,8 @@ export function TransactionDialog({
               ? 'Adicionando…'
               : 'Adicionar'
         }
-        pending={mutation.isPending || person.isPending || merchant.isPending}
-        error={person.error ?? merchant.error ?? mutation.error}
+        pending={mutation.isPending || person.isPending || merchant.isPending || category.isPending}
+        error={category.error ?? person.error ?? merchant.error ?? mutation.error}
         onSubmit={(values) => void submit(values)}
         onCancel={() => onOpenChange(false)}
         allowRepeat={!editing}
