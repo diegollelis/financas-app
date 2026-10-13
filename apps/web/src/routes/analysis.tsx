@@ -8,6 +8,7 @@ import {
   type Analysis,
   type AnalysisFilters,
   type Category,
+  type Merchant,
 } from '@financas/shared';
 import { SlidersHorizontal } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
@@ -28,6 +29,7 @@ import { MonthlyChart, MonthlyTable } from '@/features/analysis/monthly-chart';
 import { savingCategoryIds, seriesStyles, visibleSeries } from '@/features/analysis/series';
 import { useAnalysis } from '@/features/analysis/use-analysis';
 import { useCategories } from '@/features/categories/use-categories';
+import { useMerchants } from '@/features/merchants/use-merchants';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
@@ -193,6 +195,8 @@ export function AnalysisPage() {
   const previous = previousRange(settings.from, settings.to);
   const before = useAnalysis(workspace.id, previous.from, previous.to);
   const categories = useCategories(workspace.id);
+  // Only to name the merchants of a category: the page does not wait for them.
+  const merchants = useMerchants(workspace.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [asTable, setAsTable] = useState(false);
@@ -255,6 +259,7 @@ export function AnalysisPage() {
             before={before.isSuccess && before.data.rows.length > 0 ? before.data : null}
             settings={settings}
             categories={categories.data}
+            merchants={merchants.data ?? []}
             onChange={update}
             asTable={asTable}
             onToggle={() => setAsTable((value) => !value)}
@@ -269,6 +274,7 @@ function Results({
   before,
   settings,
   categories,
+  merchants,
   onChange,
   asTable,
   onToggle,
@@ -278,6 +284,7 @@ function Results({
   before: Analysis | null;
   settings: AnalysisSettings;
   categories: Category[];
+  merchants: Merchant[];
   onChange: (change: Partial<AnalysisSettings>) => void;
   asTable: boolean;
   onToggle: () => void;
@@ -324,6 +331,7 @@ function Results({
         analysis={analysis}
         settings={settings}
         categories={categories}
+        merchants={merchants}
         onChange={onChange}
       />
     </div>

@@ -4,7 +4,7 @@ import { transactionTypeSchema, type TransactionType } from './category.ts';
 import { periodSchema } from './money-and-dates.ts';
 
 // Analysis of a range of competências (ADR 0037). The API sums the transactions by competência,
-// type and category; these pure functions turn those sums into what the page shows, applying
+// type, category and merchant (ADR 0053); these pure functions turn those sums into what the page shows, applying
 // the filters on the client so changing them needs no new request.
 
 /** The longest range: two years, enough to compare a month with the same one a year before. */
@@ -52,11 +52,15 @@ export const analysisQuerySchema = z
 
 export type AnalysisQuery = z.infer<typeof analysisQuerySchema>;
 
-/** The sums of one competência, type and category: everything launched, and what was settled. */
+/**
+ * The sums of one competência, type, category and merchant (none: null): everything launched, and
+ * what was settled.
+ */
 export const analysisRowSchema = z.object({
   period: periodSchema,
   type: transactionTypeSchema,
   categoryId: z.uuid(),
+  merchantId: z.uuid().nullable().default(null),
   plannedCents: z.number().int().nonnegative(),
   settledCents: z.number().int().nonnegative(),
 });
@@ -207,4 +211,43 @@ export function categorySeries(
   const series = [...points.entries()].map(([period, cents]) => ({ period, cents }));
   const total = series.reduce((sum, point) => sum + point.cents, 0);
   return { series, averageCents: Math.round(total / series.length) };
+}
+
+export interface MerchantShare {
+  /** null: the transactions with no merchant. */
+  merchantId: string | null;
+  totalCents: number;
+  /** Over every month of the range, including the ones without this merchant. */
+  averageCents: number;
+  /** Of the category's total, in basis points (10000 = 100%). */
+  shareBp: number;
+}
+
+/**
+ * Where the money of one category went in the range (ADR 0053): each merchant, largest first,
+ * and what had no merchant at the end. "Quanto foi para cada mercado."
+ */
+export function merchantRanking(
+  analysis: Analysis,
+  categoryId: string,
+  view: AnalysisFilters['view'],
+): MerchantShare[] {
+  const months = periodsBetween(analysis.from, analysis.to).length;
+  const totals = new Map<string | null, number>();
+  for (const row of analysis.rows) {
+    if (row.categoryId !== categoryId) continue;
+    totals.set(row.merchantId, (totals.get(row.merchantId) ?? 0) + amountOf(row, view));
+  }
+  const grand = [...totals.values()].reduce((sum, cents) => sum + cents, 0);
+  return [...totals.entries()]
+    .filter(([, cents]) => cents > 0)
+    .map(([merchantId, totalCents]) => ({
+      merchantId,
+      totalCents,
+      averageCents: Math.round(totalCents / months),
+      shareBp: Math.round((totalCents * FULL_BASIS_POINTS) / grand),
+    }))
+    .sort((a, b) =>
+      a.merchantId === null ? 1 : b.merchantId === null ? -1 : b.totalCents - a.totalCents,
+    );
 }

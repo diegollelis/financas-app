@@ -3,9 +3,11 @@ import {
   categorySeries,
   formatBasisPoints,
   formatCents,
+  merchantRanking,
   type Analysis,
   type Category,
   type CategoryShare,
+  type Merchant,
   type MonthlyPoint,
 } from '@financas/shared';
 import { useRef, useState } from 'react';
@@ -31,12 +33,15 @@ function RankingRow({
   name,
   largest,
   credit,
+  muted = false,
   onOpen,
 }: {
-  share: CategoryShare;
+  share: Pick<CategoryShare, 'totalCents' | 'averageCents' | 'shareBp'>;
   name: string;
   largest: number;
   credit: boolean;
+  /** A gray bar: a line that is not a category or merchant of its own ("Outras", none). */
+  muted?: boolean;
   onOpen?: (button: HTMLButtonElement) => void;
 }) {
   const content = (
@@ -49,7 +54,7 @@ function RankingRow({
         <span
           className={cn(
             'block h-full rounded-r-full',
-            onOpen ? (credit ? 'bg-chart-1' : 'bg-chart-2') : 'bg-muted-foreground/40',
+            muted ? 'bg-muted-foreground/40' : credit ? 'bg-chart-1' : 'bg-chart-2',
           )}
           style={{ width: `${Math.max((share.totalCents / largest) * 100, 1)}%` }}
         />
@@ -87,16 +92,74 @@ function others(rest: CategoryShare[]): CategoryShare {
   };
 }
 
-/** One category month by month, with its average as a reference line, and the same in a table. */
-function CategoryDetail({
+/**
+ * Where one category's money went, merchant by merchant (ADR 0053): "quanto foi para cada
+ * mercado". What had no merchant comes last; with none at all, a hint says where to give one.
+ */
+function MerchantBreakdown({
   analysis,
   settings,
   categoryId,
+  merchants,
   credit,
 }: {
   analysis: Analysis;
   settings: AnalysisSettings;
   categoryId: string;
+  merchants: Merchant[];
+  credit: boolean;
+}) {
+  const ranking = merchantRanking(analysis, categoryId, settings.view);
+  const named = ranking.filter((share) => share.merchantId !== null);
+  const largest = ranking.reduce((max, share) => Math.max(max, share.totalCents), 1);
+  return (
+    <section aria-labelledby="analysis-merchants-title" className="grid gap-2">
+      <h3 id="analysis-merchants-title" className="font-medium">
+        Por estabelecimento
+      </h3>
+      {named.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          Nenhum lançamento desta categoria tem estabelecimento no período. Escolha um no
+          lançamento, em Mais opções, para ver aqui para onde foi o dinheiro.
+        </p>
+      ) : (
+        <ul className="-mx-3 grid">
+          {ranking.map((share) => (
+            <RankingRow
+              key={share.merchantId ?? 'none'}
+              share={share}
+              name={
+                share.merchantId === null
+                  ? 'Sem estabelecimento'
+                  : (merchants.find((merchant) => merchant.id === share.merchantId)?.name ??
+                    'Estabelecimento removido')
+              }
+              largest={largest}
+              credit={credit}
+              muted={share.merchantId === null}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * One category month by month, with its average as a reference line, the same in a table, and
+ * its merchants.
+ */
+function CategoryDetail({
+  analysis,
+  settings,
+  categoryId,
+  merchants,
+  credit,
+}: {
+  analysis: Analysis;
+  settings: AnalysisSettings;
+  categoryId: string;
+  merchants: Merchant[];
   credit: boolean;
 }) {
   const { series, averageCents } = categorySeries(analysis, categoryId, settings.view);
@@ -127,6 +190,13 @@ function CategoryDetail({
         reference={{ cents: averageCents, label: `Média ${formatCents(averageCents)}` }}
       />
       <MonthlyTable series={points} type={type} />
+      <MerchantBreakdown
+        analysis={analysis}
+        settings={settings}
+        categoryId={categoryId}
+        merchants={merchants}
+        credit={credit}
+      />
     </div>
   );
 }
@@ -139,11 +209,14 @@ export function CategoryRanking({
   analysis,
   settings,
   categories,
+  merchants,
   onChange,
 }: {
   analysis: Analysis;
   settings: AnalysisSettings;
   categories: Category[];
+  /** The workspace's merchants, to name each one of a category (ADR 0053). */
+  merchants: Merchant[];
   onChange: (change: Partial<AnalysisSettings>) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
@@ -191,6 +264,7 @@ export function CategoryRanking({
                 name={`Outras ${ranking.length - VISIBLE + 1} categorias`}
                 largest={largest}
                 credit={credit}
+                muted
               />
             )}
           </ul>
@@ -219,6 +293,7 @@ export function CategoryRanking({
             analysis={analysis}
             settings={settings}
             categoryId={open.id}
+            merchants={merchants}
             credit={open.type === 'CREDIT'}
           />
         )}

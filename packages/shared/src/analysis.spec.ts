@@ -4,6 +4,7 @@ import {
   categoryRanking,
   categorySeries,
   defaultAnalysisFilters,
+  merchantRanking,
   monthlySeries,
   periodsBetween,
   previousRange,
@@ -24,7 +25,8 @@ const row = (
   categoryId: string,
   plannedCents: number,
   settledCents = plannedCents,
-): AnalysisRow => ({ period, type, categoryId, plannedCents, settledCents });
+  merchantId: string | null = null,
+): AnalysisRow => ({ period, type, categoryId, merchantId, plannedCents, settledCents });
 
 // August had nothing at all; in October, part of it is still to be paid.
 const analysis: Analysis = {
@@ -190,5 +192,36 @@ describe('categorySeries', () => {
       ],
       averageCents: 52_500,
     });
+  });
+});
+
+describe('merchantRanking', () => {
+  const mercadoA = '01920000-0000-7000-8000-000000000601';
+  const mercadoB = '01920000-0000-7000-8000-000000000602';
+  const byMerchant: Analysis = {
+    from: '2026-09',
+    to: '2026-10',
+    rows: [
+      row('2026-09', 'DEBIT', market, 30_000, 30_000, mercadoA),
+      row('2026-09', 'DEBIT', market, 50_000, 50_000, mercadoB),
+      row('2026-10', 'DEBIT', market, 40_000, 0, mercadoA),
+      row('2026-10', 'DEBIT', market, 90_000, 90_000),
+      row('2026-10', 'DEBIT', rent, 180_000, 180_000, mercadoA),
+    ],
+  };
+
+  it('sums each merchant of one category, largest first, the ones with none at the end', () => {
+    expect(merchantRanking(byMerchant, market, 'PLANNED')).toEqual([
+      { merchantId: mercadoA, totalCents: 70_000, averageCents: 35_000, shareBp: 3333 },
+      { merchantId: mercadoB, totalCents: 50_000, averageCents: 25_000, shareBp: 2381 },
+      { merchantId: null, totalCents: 90_000, averageCents: 45_000, shareBp: 4286 },
+    ]);
+  });
+
+  it('counts only what was settled in that view, leaving out what is zero', () => {
+    expect(merchantRanking(byMerchant, market, 'SETTLED').map((share) => share.merchantId)).toEqual(
+      [mercadoB, mercadoA, null],
+    );
+    expect(merchantRanking(byMerchant, fuel, 'PLANNED')).toEqual([]);
   });
 });
