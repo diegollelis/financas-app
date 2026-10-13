@@ -1,5 +1,6 @@
 import {
   currentPeriod,
+  formatBasisPoints,
   formatCents,
   formatPeriod,
   hasRole,
@@ -224,6 +225,20 @@ function personLine(type: TransactionType, personId: string | null, people: Pers
   return `${type === 'CREDIT' ? 'A receber de' : 'A pagar para'} ${name}`;
 }
 
+/** "Dividido com Ana (50%) e Bruno (R$ 30,00)" (ADR 0052); null when not split. */
+function splitLine(split: Recurrence['split'], people: Person[]) {
+  if (split.length === 0) return null;
+  const parts = split.map((share) => {
+    const name = people.find((person) => person.id === share.personId)?.name ?? 'Pessoa';
+    const value =
+      share.basisPoints === null
+        ? formatCents(share.amountCents ?? 0)
+        : formatBasisPoints(share.basisPoints);
+    return `${name} (${value})`;
+  });
+  return `Dividido com ${new Intl.ListFormat('pt-BR').format(parts)}`;
+}
+
 function RecurrenceItem({
   workspaceId,
   recurrence,
@@ -258,6 +273,7 @@ function RecurrenceItem({
         typeLabel[recurrence.type],
         category?.name ?? 'Categoria',
         personLine(recurrence.type, recurrence.personId, people),
+        splitLine(recurrence.split, people),
         recurrence.dueDay === null ? null : `Vence dia ${recurrence.dueDay}`,
         ended ? `Até ${formatPeriod(recurrence.endPeriod ?? '')}` : since(recurrence.startPeriod),
       ]}

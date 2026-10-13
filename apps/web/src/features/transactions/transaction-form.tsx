@@ -58,13 +58,13 @@ const transactionFormSchema = plainTransactionInputSchema
       .string()
       .trim()
       .max(PERSON_NAME_MAX_LENGTH, `Use no máximo ${PERSON_NAME_MAX_LENGTH} caracteres.`),
-    /** Only when creating a transaction launched once: "Dividir com alguém" (ADRs 0042, 0052). */
+    /** Only when creating: "Dividir com alguém" (ADRs 0042, 0052). */
     splitOn: z.boolean(),
     shareMode: z.enum(['REAIS', 'PERCENT']),
     shares: z.array(z.object({ name: z.string(), value: z.string() })),
   })
   .superRefine((values, ctx) => {
-    if (values.splitOn && values.repeat !== 'MONTHLY') {
+    if (values.splitOn) {
       // A share of an installment plan's total is divided among its installments (ADR 0052).
       const installments =
         values.repeat === 'INSTALLMENTS' && values.amountIs === 'TOTAL'
@@ -254,9 +254,9 @@ export function TransactionForm({
   const typedAmount = useWatch({ control, name: 'amount' });
   const typedInstallments = useWatch({ control, name: 'installments' });
   const splitOn = useWatch({ control, name: 'splitOn' });
-  // A new transaction, a credit too, launched once or in installments, may be split; anything
-  // else may name one person, a recurrence too, copied to each month (ADRs 0042, 0052).
-  const canSplit = allowRepeat && repeat !== 'MONTHLY';
+  // A new transaction, a credit too, launched once, every month or in installments, may be
+  // split; anything else may name one person, copied to each month (ADRs 0042, 0052).
+  const canSplit = allowRepeat;
   const splitting = canSplit && splitOn;
   const showPerson = !splitting;
   const user = useCurrentUser();
@@ -541,6 +541,7 @@ export function TransactionForm({
                       ? { count: Number(typedInstallments), amountIs: amountIs ?? 'TOTAL' }
                       : undefined
                   }
+                  monthly={repeat === 'MONTHLY' ? { variable } : undefined}
                 />
               )}
             </div>
