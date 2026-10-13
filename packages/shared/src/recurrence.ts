@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
 import { amountCentsSchema, periodSchema } from './money-and-dates.ts';
+import { MAX_SPLIT_PEOPLE, personNameSchema } from './person.ts';
 import { transactionDescriptionSchema, transactionNotesSchema } from './transaction.ts';
 
 // Recorrências (ADR 0038): a transaction that repeats every month. Opening a competência creates
@@ -14,7 +15,11 @@ export const dueDaySchema = z
   .min(1, 'Use um dia entre 1 e 31.')
   .max(31, 'Use um dia entre 1 e 31.');
 
-export const createRecurrenceInputSchema = z.object({
+/**
+ * The fields of a recurrence, without the split: what an update and the web form `.omit()` or
+ * `.pick()` from, since Zod refuses both on the refined create schema.
+ */
+export const recurrenceFieldsSchema = z.object({
   type: transactionTypeSchema,
   description: transactionDescriptionSchema,
   notes: transactionNotesSchema.optional(),
@@ -32,10 +37,68 @@ export const createRecurrenceInputSchema = z.object({
   startPeriod: periodSchema,
 });
 
+/**
+ * One person's share of a split recurrence (ADR 0052): someone already listed or a new name, and
+ * a fixed amount or a percentage (basis points) of each month's amount.
+ */
+export const recurrenceShareInputSchema = z
+  .object({
+    personId: z.uuid().optional(),
+    newPersonName: personNameSchema.optional(),
+    amountCents: amountCentsSchema.optional(),
+    basisPoints: z
+      .number()
+      .int('Use um percentual de até duas casas.')
+      .min(1, 'De 0 a 100%.')
+      .max(10_000, 'De 0 a 100%.')
+      .optional(),
+  })
+  .refine((share) => (share.personId === undefined) !== (share.newPersonName === undefined), {
+    message: 'Escolha a pessoa de cada parte.',
+  })
+  .refine((share) => (share.amountCents === undefined) !== (share.basisPoints === undefined), {
+    message: 'Informe a parte em reais ou em percentual.',
+  });
+
+export type RecurrenceShareInput = z.infer<typeof recurrenceShareInputSchema>;
+
+export const createRecurrenceInputSchema = recurrenceFieldsSchema
+  .extend({
+    /**
+     * Splits it with other people (ADR 0052): every month it generates gets one pending share per
+     * person, on the opposite side. A variable amount takes percentages only, which follow the
+     * real amount of each month; a fixed one, all in reais or all in percentages.
+     */
+    split: z
+      .array(recurrenceShareInputSchema)
+      .min(1, 'Informe com quem dividir.')
+      .max(MAX_SPLIT_PEOPLE, `Divida com no máximo ${MAX_SPLIT_PEOPLE} pessoas.`)
+      .optional(),
+  })
+  .superRefine((input, context) => {
+    if (!input.split) return;
+    const issue = (message: string) =>
+      context.addIssue({ code: 'custom', message, path: ['split'] });
+    if (input.personId) issue('Um lançamento dividido não fica ligado a uma só pessoa.');
+    const inReais = input.split.filter((share) => share.amountCents !== undefined);
+    if (input.variableAmount && inReais.length > 0) {
+      issue('Num valor que varia, divida em percentual.');
+    } else if (inReais.length > 0 && inReais.length < input.split.length) {
+      issue('Use só reais ou só percentual nas partes.');
+    }
+    const cents = inReais.reduce((sum, share) => sum + (share.amountCents ?? 0), 0);
+    const points = input.split.reduce((sum, share) => sum + (share.basisPoints ?? 0), 0);
+    if (cents > input.amountCents || points > 10_000) {
+      issue('As partes dos outros passam do valor do lançamento.');
+    }
+    const people = input.split.map((share) => share.personId ?? share.newPersonName?.toLowerCase());
+    if (new Set(people).size !== people.length) issue('A mesma pessoa aparece duas vezes.');
+  });
+
 export type CreateRecurrenceInput = z.infer<typeof createRecurrenceInputSchema>;
 
 /** The type and the start do not change: end it and create another instead. */
-export const updateRecurrenceInputSchema = createRecurrenceInputSchema
+export const updateRecurrenceInputSchema = recurrenceFieldsSchema
   .omit({ type: true, startPeriod: true })
   .partial()
   .refine((input) => Object.values(input).some((value) => value !== undefined), {
@@ -57,7 +120,29 @@ export const recurrenceSchema = z.object({
   startPeriod: periodSchema,
   /** The last competência it generated; null while active. */
   endPeriod: periodSchema.nullable(),
+  /** Who shares it (ADR 0052): each person with a fixed amount or a percentage. */
+  split: z
+    .array(
+      z.object({
+        personId: z.uuid(),
+        amountCents: z.number().int().nullable(),
+        basisPoints: z.number().int().nullable(),
+      }),
+    )
+    .default([]),
 });
+
+/**
+ * The cents of one share of a month's amount (ADR 0052): a fixed amount as it is, a percentage
+ * rounded to the cent. `shareOfAmount(24_000, { amountCents: null, basisPoints: 5_000 })` →
+ * 12_000.
+ */
+export function shareOfAmount(
+  amountCents: number,
+  share: { amountCents: number | null; basisPoints: number | null },
+): number {
+  return share.amountCents ?? Math.round((amountCents * (share.basisPoints ?? 0)) / 10_000);
+}
 
 export type Recurrence = z.infer<typeof recurrenceSchema>;
 

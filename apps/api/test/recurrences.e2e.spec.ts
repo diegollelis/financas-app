@@ -9,6 +9,7 @@ import {
   transactionListResponseSchema,
   workspaceSchema,
   type CreateRecurrenceInput,
+  type Transaction,
   type TransactionType,
 } from '@financas/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -328,6 +329,161 @@ describe('recurrences', () => {
       await browser.delete(`${base}/transactions/${generated?.id}`).expect(204);
       const inUse = await browser.delete(`${base}/people/${ana.id}`).expect(409);
       expect(inUse.body).toMatchObject({ code: 'PERSON_IN_USE' });
+    });
+  });
+
+  describe('split (ADR 0052)', () => {
+    /** The pending shares of a month's transaction: who, and how much. */
+    async function sharesIn(
+      transactionsOf: (period: string) => Promise<Transaction[]>,
+      period: string,
+    ) {
+      const list = await transactionsOf(period);
+      const parent = list.find((t) => t.splitOfId === null && t.description.startsWith('Conta'));
+      return list
+        .filter((t) => t.splitOfId === parent?.id)
+        .map(({ description, amountCents, type, settledAt }) => ({
+          description,
+          amountCents,
+          type,
+          settledAt,
+        }));
+    }
+    it('gives every month it generates the shares, in reais or in percentages', async () => {
+      const { create, energy, transactionsOf, categoryId, base, browser } = await setUp();
+      const ana = personSchema.parse(
+        (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201)).body,
+      );
+
+      const recurrence = await create(
+        energy({
+          split: [
+            { personId: ana.id, amountCents: 6_000 },
+            { newPersonName: 'Bruno', amountCents: 4_000 },
+          ],
+        }),
+      );
+
+      expect(recurrence.split).toEqual(
+        expect.arrayContaining([
+          { personId: ana.id, amountCents: 6_000, basisPoints: null },
+          expect.objectContaining({ amountCents: 4_000, basisPoints: null }),
+        ]),
+      );
+      for (const period of [thisMonth, month(1)]) {
+        expect(await sharesIn(transactionsOf, period)).toEqual(
+          expect.arrayContaining([
+            {
+              description: 'Ana: parte de Conta de luz',
+              amountCents: 6_000,
+              type: 'CREDIT',
+              settledAt: null,
+            },
+            {
+              description: 'Bruno: parte de Conta de luz',
+              amountCents: 4_000,
+              type: 'CREDIT',
+              settledAt: null,
+            },
+          ]),
+        );
+      }
+      const shares = (await transactionsOf(thisMonth)).filter((t) => t.splitOfId !== null);
+      expect(new Set(shares.map((t) => t.categoryId))).toEqual(
+        new Set([categoryId('Reembolso', 'CREDIT')]),
+      );
+    });
+
+    it('a variable one: the pending shares in % follow the real amount, settled ones stay', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      await create(
+        energy({ variableAmount: true, split: [{ newPersonName: 'Ana', basisPoints: 5_000 }] }),
+      );
+      const [luzNow] = (await transactionsOf(thisMonth)).filter((t) => t.splitOfId === null);
+      expect((await sharesIn(transactionsOf, thisMonth))[0]?.amountCents).toBe(9_000);
+
+      // The bill came: R$ 240,00.
+      await browser
+        .patch(`${base}/transactions/${luzNow?.id}`)
+        .send({ amountCents: 24_000 })
+        .expect(200);
+      expect((await sharesIn(transactionsOf, thisMonth))[0]?.amountCents).toBe(12_000);
+
+      // Ana paid her part; a later correction of the bill no longer changes it.
+      const share = (await transactionsOf(thisMonth)).find((t) => t.splitOfId === luzNow?.id)!;
+      await browser
+        .patch(`${base}/transactions/${share.id}`)
+        .send({ settledAt: `${thisMonth}-12` })
+        .expect(200);
+      await browser
+        .patch(`${base}/transactions/${luzNow?.id}`)
+        .send({ amountCents: 26_000 })
+        .expect(200);
+      expect((await sharesIn(transactionsOf, thisMonth))[0]?.amountCents).toBe(12_000);
+    });
+
+    it('a new amount recomputes the pending shares in % from this month on only', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const recurrence = await create(
+        energy({ startPeriod: month(-1), split: [{ newPersonName: 'Ana', basisPoints: 5_000 }] }),
+      );
+      await transactionsOf(month(-1));
+      await transactionsOf(month(1));
+
+      await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ amountCents: 20_000 })
+        .expect(200);
+
+      expect((await sharesIn(transactionsOf, month(-1)))[0]?.amountCents).toBe(9_000);
+      expect((await sharesIn(transactionsOf, thisMonth))[0]?.amountCents).toBe(10_000);
+      expect((await sharesIn(transactionsOf, month(1)))[0]?.amountCents).toBe(10_000);
+    });
+
+    it('refuses an amount below the shares in reais, or turning them variable', async () => {
+      const { create, energy, base, browser } = await setUp();
+      const recurrence = await create(
+        energy({ split: [{ newPersonName: 'Ana', amountCents: 10_000 }] }),
+      );
+
+      const lower = await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ amountCents: 9_999 })
+        .expect(400);
+      expect(lower.body).toMatchObject({
+        message: 'As partes dos outros passam do valor do lançamento.',
+      });
+      await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ variableAmount: true })
+        .expect(400);
+      const invalid = await browser
+        .post(`${base}/recurrences`)
+        .send(energy({ variableAmount: true, split: [{ newPersonName: 'Bia', amountCents: 100 }] }))
+        .expect(400);
+      expect(invalid.body).toMatchObject({ message: 'Num valor que varia, divida em percentual.' });
+    });
+
+    it('ends it with the shares still pending of the months removed', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const recurrence = await create(
+        energy({ startPeriod: month(-1), split: [{ newPersonName: 'Ana', amountCents: 9_000 }] }),
+      );
+      await transactionsOf(month(1));
+      // Ana already paid this month's part.
+      const paid = (await transactionsOf(thisMonth)).find((t) => t.splitOfId !== null)!;
+      await browser
+        .patch(`${base}/transactions/${paid.id}`)
+        .send({ settledAt: `${thisMonth}-02` })
+        .expect(200);
+
+      await browser.delete(`${base}/recurrences/${recurrence.id}`).expect(204);
+
+      expect(await transactionsOf(month(-1))).toHaveLength(2);
+      expect(await transactionsOf(thisMonth)).toEqual([
+        expect.objectContaining({ id: paid.id, splitOfId: null }),
+      ]);
+      expect(await transactionsOf(month(1))).toEqual([]);
     });
   });
 

@@ -1,5 +1,5 @@
 import {
-  createRecurrenceInputSchema,
+  recurrenceFieldsSchema,
   dueDaySchema,
   normalizeName,
   reaisInputSchema,
@@ -20,7 +20,7 @@ import { PersonSelect } from '@/features/people/person-picker';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /** What can change in a recurrence: not its type nor its start (ADR 0038). */
-const recurrenceFormSchema = createRecurrenceInputSchema
+const recurrenceFormSchema = recurrenceFieldsSchema
   .pick({ description: true, notes: true })
   .extend({
     categoryId: z.string().min(1, 'Escolha uma categoria.'),

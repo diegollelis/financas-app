@@ -3,6 +3,7 @@ import {
   createRecurrenceInputSchema,
   dueDateIn,
   estimateAmount,
+  shareOfAmount,
   updateRecurrenceInputSchema,
 } from './recurrence.ts';
 
@@ -60,5 +61,68 @@ describe('recurrence schemas', () => {
     expect(updateRecurrenceInputSchema.parse({ amountCents: 1, type: 'CREDIT' })).toEqual({
       amountCents: 1,
     });
+  });
+});
+
+describe('split recurrences (ADR 0052)', () => {
+  // Fictitious ids (ADR 0019).
+  const valid = {
+    type: 'DEBIT',
+    description: 'Conta de luz',
+    categoryId: '01920000-0000-7000-8000-000000000101',
+    amountCents: 20_000,
+    startPeriod: '2026-10',
+  };
+  const ana = '01920000-0000-7000-8000-000000000301';
+  const message = (input: object) =>
+    createRecurrenceInputSchema.safeParse({ ...valid, ...input }).error?.issues[0]?.message;
+
+  it('takes shares in reais or in percentages, each person once', () => {
+    expect(message({ split: [{ personId: ana, amountCents: 10_000 }] })).toBeUndefined();
+    expect(message({ split: [{ newPersonName: 'Bia', basisPoints: 5_000 }] })).toBeUndefined();
+    expect(
+      message({
+        split: [
+          { newPersonName: 'Bia', basisPoints: 100 },
+          { newPersonName: 'bia', basisPoints: 100 },
+        ],
+      }),
+    ).toBe('A mesma pessoa aparece duas vezes.');
+    expect(message({ split: [{ personId: ana }] })).toBe(
+      'Informe a parte em reais ou em percentual.',
+    );
+  });
+
+  it('takes only percentages when the amount varies, and never both kinds at once', () => {
+    expect(message({ variableAmount: true, split: [{ personId: ana, amountCents: 1_000 }] })).toBe(
+      'Num valor que varia, divida em percentual.',
+    );
+    expect(
+      message({
+        split: [
+          { personId: ana, amountCents: 1_000 },
+          { newPersonName: 'Bia', basisPoints: 1_000 },
+        ],
+      }),
+    ).toBe('Use só reais ou só percentual nas partes.');
+  });
+
+  it('refuses shares bigger than the amount', () => {
+    expect(message({ split: [{ personId: ana, amountCents: 20_001 }] })).toBe(
+      'As partes dos outros passam do valor do lançamento.',
+    );
+    expect(
+      message({
+        split: [
+          { personId: ana, basisPoints: 6_000 },
+          { newPersonName: 'Bia', basisPoints: 5_000 },
+        ],
+      }),
+    ).toBe('As partes dos outros passam do valor do lançamento.');
+  });
+
+  it('computes a share of a month: a fixed amount as it is, a percentage to the cent', () => {
+    expect(shareOfAmount(24_000, { amountCents: 5_000, basisPoints: null })).toBe(5_000);
+    expect(shareOfAmount(24_001, { amountCents: null, basisPoints: 5_000 })).toBe(12_001);
   });
 });

@@ -33,6 +33,7 @@ model Workspace {
   people             Person[]
   budgetDestinations BudgetDestination[]
   budgetShares       BudgetShare[]
+  recurrenceShares   RecurrenceShare[]
   createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -320,6 +321,7 @@ model Person {
   transactions     Transaction[]
   recurrences      Recurrence[]
   installmentPlans InstallmentPlan[]
+  recurrenceShares RecurrenceShare[]
 
   @@unique([workspaceId, name])
   @@unique([workspaceId, memberUserId])
@@ -405,6 +407,7 @@ model Recurrence {
   createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
   occurrences    RecurrenceOccurrence[]
+  shares         RecurrenceShare[]
 
   @@index([workspaceId])
   @@map("recurrences")
@@ -426,6 +429,26 @@ model RecurrenceOccurrence {
   @@id([recurrenceId, period])
   @@index([workspaceId, period])
   @@map("recurrence_occurrences")
+}
+
+// Parte de uma recorrência dividida (ADR 0052): who shares it and how much, a fixed amount or a
+// percentage (basis points) of each month's amount, exactly one of them (CHECK in the migration).
+// Each month the recurrence generates gets one pending share per row, on the opposite side.
+model RecurrenceShare {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  workspaceId  String     @map("workspace_id") @db.Uuid
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recurrenceId String     @map("recurrence_id") @db.Uuid
+  recurrence   Recurrence @relation(fields: [recurrenceId], references: [id], onDelete: Cascade)
+  personId     String     @map("person_id") @db.Uuid
+  person       Person     @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  amountCents  Int?       @map("amount_cents")
+  basisPoints  Int?       @map("basis_points")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([recurrenceId, personId])
+  @@index([workspaceId])
+  @@map("recurrence_shares")
 }
 
 // Budget of one competência (ADRs 0030, 0047): the net income, base of the expenses goal, and

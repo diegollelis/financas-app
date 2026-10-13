@@ -31,7 +31,7 @@ export async function ensureUsablePerson(
 export async function resolveSplitPerson(
   prisma: PrismaService,
   workspaceId: string,
-  share: SplitShareInput,
+  share: Pick<SplitShareInput, 'personId' | 'newPersonName'>,
 ) {
   if (share.personId) return ensureUsablePerson(prisma, workspaceId, share.personId);
   const db = prisma.forWorkspace(workspaceId);

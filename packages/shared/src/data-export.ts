@@ -87,6 +87,14 @@ const exportRecurrenceSchema = z.object({
   endPeriod: period.nullable(),
   /** The competências it already generated a transaction for. */
   generatedPeriods: z.array(period),
+  /** Who shares it (ADR 0052): a fixed amount or a percentage (basis points) each. */
+  split: z.array(
+    z.object({
+      personId: z.uuid(),
+      amountCents: z.number().int().nullable(),
+      basisPoints: z.number().int().nullable(),
+    }),
+  ),
   createdAt: instant,
 });
 
