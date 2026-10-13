@@ -175,7 +175,14 @@ describe('WorkspaceLayout', () => {
       within(sheet)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Recorrências', 'Pessoas', 'Importar planilha', 'Categorias', 'Membros']);
+    ).toEqual([
+      'Recorrências',
+      'Pessoas',
+      'Estabelecimentos',
+      'Importar planilha',
+      'Categorias',
+      'Membros',
+    ]);
     await userEvent.click(within(sheet).getByRole('link', { name: 'Categorias' }));
 
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/categorias`);

@@ -38,7 +38,8 @@ export function PrivacyPage() {
           </li>
           <li>
             <strong>Dados financeiros:</strong> o que você mesmo cadastra: lançamentos (com as
-            descrições), categorias, orçamentos e metas, recorrências e parcelamentos.
+            descrições), categorias, estabelecimentos, orçamentos e metas, recorrências e
+            parcelamentos.
           </li>
           <li>
             <strong>Pessoas:</strong> o nome das pessoas que você cadastra para dividir contas ou

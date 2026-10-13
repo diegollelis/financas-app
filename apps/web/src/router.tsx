@@ -25,6 +25,7 @@ import { InvitationPage } from '@/routes/invitation';
 import { AccountPage } from '@/routes/account';
 import { AccountDeletedPage } from '@/routes/account-deleted';
 import { DeleteAccountPage } from '@/routes/delete-account';
+import { MerchantsPage } from '@/routes/merchants';
 import { PeoplePage } from '@/routes/people';
 import { PrivacyPage } from '@/routes/privacy';
 import { TermsPage } from '@/routes/terms';
@@ -77,6 +78,8 @@ export const routes: RouteObject[] = [
               // Recurrences and installment plans (ADR 0038).
               { path: 'recorrencias', element: <RecurrencesPage /> },
               { path: 'pessoas', element: <PeoplePage /> },
+              // Where a transaction was bought or who paid it (ADR 0053).
+              { path: 'estabelecimentos', element: <MerchantsPage /> },
               // The spreadsheet is read in the browser; only confirmed rows go out (ADR 0040).
               { path: 'importar', element: <ImportPage /> },
             ],
