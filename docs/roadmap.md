@@ -105,9 +105,9 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] "Parcelado" no "Novo lançamento", selo "Parcela n/N" e "Encerrar parcelamento" no menu
   - [x] Tela "Recorrências" no Mais: listar, editar (só o que mudou) e encerrar
   - [x] "Tornar recorrente" no menu de um lançamento existente: criar a recorrência adotando o lançamento como o primeiro mês, sem duplicar (não aparece para um que já repete, uma parcela, um lançamento dividido ou uma parte)
-  - [ ] Vencimento no mês seguinte numa recorrência ou num parcelamento (visto em 2026-10-13 com a conta de luz: lançada em outubro, vence em 10/11; nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
+  - [x] Vencimento no mês seguinte numa recorrência ou num parcelamento (visto em 2026-10-13 com a conta de luz: lançada em outubro, vence em 10/11; nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
     - [x] API: `dueMonthOffset` (0 ou 1) na recorrência e no parcelamento, usado em cada mês gerado e em cada parcela; mudá-lo recalcula os pendentes deste mês em diante; "Tornar recorrente" tira a distância da data do lançamento
-    - [ ] Tela: o formulário manda a distância da data digitada, Recorrências mostra "Vence dia 10 do mês seguinte" e a edição oferece "Mesmo mês / Mês seguinte"
+    - [x] Tela: o formulário manda a distância da data digitada, Recorrências mostra "Vence dia 10 do mês seguinte" e a edição oferece "Mesmo mês / Mês seguinte"
 - [x] Escolha de categoria com busca (sem depender de acentos) e "Mais usadas" dos últimos 6 meses (`recentUses` na lista de categorias)
   - [x] "Adicionar 'Nome'" no seletor de categoria do lançamento e da recorrência: criada ao salvar, com o tipo do lançamento; uma arquivada de mesmo nome volta
   - [x] Sugerir a categoria pela descrição, a partir dos lançamentos anteriores ([ADR 0053](adr/0053-estabelecimentos.md): preenche a categoria vazia com "Sugerida pelo histórico")
