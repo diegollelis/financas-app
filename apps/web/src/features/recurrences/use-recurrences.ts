@@ -2,6 +2,7 @@ import {
   recurrenceListResponseSchema,
   recurrenceSchema,
   type CreateRecurrenceInput,
+  type RepeatTransactionInput,
   type UpdateRecurrenceInput,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -38,6 +39,23 @@ export function useCreateRecurrence(workspaceId: string) {
   return useMutation({
     mutationFn: (input: CreateRecurrenceInput) =>
       apiPost(`/api/workspaces/${workspaceId}/recurrences`, input, recurrenceSchema),
+    onSuccess,
+  });
+}
+
+/**
+ * "Tornar recorrente": a transaction launched once becomes the first month of a new recurrence;
+ * nothing is duplicated.
+ */
+export function useRepeatTransaction(workspaceId: string) {
+  const onSuccess = useInvalidateRecurrences(workspaceId);
+  return useMutation({
+    mutationFn: (input: RepeatTransactionInput) =>
+      apiPost(
+        `/api/workspaces/${workspaceId}/recurrences/from-transaction`,
+        input,
+        recurrenceSchema,
+      ),
     onSuccess,
   });
 }
