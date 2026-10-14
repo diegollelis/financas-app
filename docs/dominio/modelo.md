@@ -67,6 +67,10 @@ Pessoa (`Person`): um contato do espaço, só o nome, para quem usa ou não o ap
 
 Onde se comprou ou quem pagou: um cadastro do espaço, só o nome (único no espaço, ignorando maiúsculas e acentos), sem tipo e sem categoria fixa. Lançamentos, recorrências e parcelamentos têm um `merchant_id` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Pessoa responde "com quem", estabelecimento responde "onde", e um lançamento pode ter os dois. Arquiva-se em vez de excluir; só um arquivado sem uso é excluído (`MERCHANT_IN_USE`).
 
+### PaymentMethod (Meio de pagamento) — fase 5 ([ADR 0054](../adr/0054-meio-de-pagamento.md))
+
+Como se pagou ou recebeu, numa lista fixa: Pix, Débito, Crédito, Dinheiro, Boleto, Transferência e Débito automático. Lançamentos, recorrências e parcelamentos têm um `payment_method` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Na tela, "Meio de pagamento" numa saída e "Meio de recebimento" numa entrada. Não é uma conta nem um cartão com saldo e fatura: isso, se vier, terá um ADR próprio.
+
 ## Indicadores do painel (por espaço e competência)
 
 Calculados na API a partir dos lançamentos, nunca armazenados, nas visões prevista (tudo) e efetivada (só o recebido e o pago), pela função `summarizePeriod` do `packages/shared` ([ADR 0031](../adr/0031-painel-do-mes-previsto-e-efetivado.md)). Fórmulas de referência em [planilha-origem.md](planilha-origem.md#indicadores-fórmulas).
