@@ -67,7 +67,12 @@ export const routes: RouteObject[] = [
               { index: true, element: <WorkspacePage /> },
               { path: 'categorias', element: <CategoriesPage /> },
               // The competência travels as ?competencia=YYYY-MM (default: this month).
-              { path: 'lancamentos', element: <TransactionsPage /> },
+              // "Ver como: Lista | Tabela": the table takes the wide column (ADR 0045 note).
+              {
+                path: 'lancamentos',
+                element: <TransactionsPage />,
+                handle: { table: 'lancamentos' },
+              },
               // The budget page became a dialog on the dashboard (ADR 0046): old links land there.
               { path: 'orcamento', element: <BudgetRedirect /> },
               // A dashboard of blocks side by side: the wide column (ADR 0045).

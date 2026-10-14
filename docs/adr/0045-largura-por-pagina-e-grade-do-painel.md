@@ -56,3 +56,11 @@ Com o [ADR 0047](0047-orcamento-real-por-destino.md), Despesas e os destinos de 
 3. **Destinos de guardar:** a tabela (cartões no celular) só com eles. Uma linha **"Sem destino"** aparece quando a soma fica abaixo de 100%; o valor vem do resumo (`unallocated`, calculado em `summarizePeriod`). A linha **Total** mostra 100% e o próprio disponível, porque a soma das metas arredondadas pode errar por um centavo.
 
 Do xl em diante, os blocos 1 e 2 ficam lado a lado, e a tabela ocupa a largura toda embaixo.
+
+## Nota (2026-10-14): listas que viram tabela
+
+- **Lançamentos (e, no próximo passo, Recorrências) podem ser vistas como tabela:** "Ver como: Lista | Tabela", acima da busca, lembrado neste navegador (`localStorage`, `features/view-mode/`).
+- **Só a partir de 1280 px (xl).** Em 768 e em 1024, ao lado da barra lateral, sobram de 500 a 740 px, e a descrição ficava espremida entre seis colunas. Abaixo disso o seletor nem aparece, e a página continua a lista; no celular, também com "Tabela" escolhida.
+- **A tabela usa a coluna larga** desta ADR, mas só enquanto é tabela: a rota declara `handle: { table: 'lancamentos' }`, e a `WorkspaceLayout` passa a `max-w-6xl` quando a página dessa rota mostra a tabela (`useShowsTable`). A lista continua na largura de leitura.
+- **Colunas de largura fixa** (`table-fixed`), para as tabelas de Entradas e Saídas se alinharem; a descrição fica com o resto.
+- **Clicar no título ordena** (`sortRows`, `SortableHead` com `aria-sort`); de novo, inverte. A ordem inicial é a da lista, por vencimento, os sem data no fim.

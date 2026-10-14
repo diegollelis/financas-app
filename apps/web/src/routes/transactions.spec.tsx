@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { verifiedUser, mockApi } from '@/test/mock-api';
+import { stubPrefersDark } from '@/test/match-media';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019).
@@ -665,7 +666,7 @@ describe('TransactionsPage', () => {
     expect(row(debits, 'Conta de luz')).toHaveTextContent('Estimado');
     expect(row(debits, 'Compras da semana')).not.toHaveTextContent('Estimado');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Marcar como pago: Conta de luz' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Pagar: Conta de luz' }));
     const dialog = await screen.findByRole('dialog', { name: 'Marcar como pago: Conta de luz' });
     const amount = within(dialog).getByLabelText('Valor da fatura (R$)');
     expect(amount).toHaveValue('159,90');
@@ -990,7 +991,7 @@ describe('TransactionsPage', () => {
     expect(item()).toHaveTextContent('Pendente');
 
     await userEvent.click(
-      within(debits).getByRole('button', { name: 'Marcar como pago: Aporte em Investimentos' }),
+      within(debits).getByRole('button', { name: 'Pagar: Aporte em Investimentos' }),
     );
     // Today's date, the one the app sends (it can be changed later by editing).
     await expectCall(fetchMock, `${base}/${pending.id}`, {
@@ -1017,9 +1018,15 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Marcar como pago: Conta de luz' }),
-    );
+    // The row says it short; the menu says it in full (ADR 0036 note).
+    const settle = await screen.findByRole('button', { name: 'Pagar: Conta de luz' });
+    expect(settle).toHaveTextContent('Pagar');
+    const pendingMenu = await openActions('Compras da semana');
+    expect(
+      within(pendingMenu).getByRole('menuitem', { name: 'Marcar como pago' }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(settle);
     await expectCall(fetchMock, `${base}/${light.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ settledAt: '2026-10-15' }),
@@ -1039,9 +1046,7 @@ describe('TransactionsPage', () => {
     mockTransactions({ [`PATCH ${base}/${light.id}`]: { status: 500, body: {} } });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Marcar como pago: Conta de luz' }),
-    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Pagar: Conta de luz' }));
 
     expect(
       await screen.findByText('Não foi possível concluir agora. Tente de novo em instantes.'),
@@ -1645,5 +1650,64 @@ describe('TransactionsPage', () => {
 
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/lancamentos`);
     expect(await screen.findByRole('heading', { name: 'Lançamentos' })).toBeInTheDocument();
+  });
+  describe('as a table (from xl)', () => {
+    /** The descriptions of a section's table rows, top to bottom. */
+    const tableRows = (container: HTMLElement) =>
+      within(within(container).getByRole('table'))
+        .getAllByRole('row')
+        .slice(1)
+        .map((tableRow) => within(tableRow).getAllByRole('cell')[1]?.textContent);
+
+    it('offers "Ver como" only where a table fits, and keeps the list on the phone', async () => {
+      window.localStorage.setItem('financas:visao:lancamentos', 'TABLE');
+      mockTransactions();
+      renderApp(`/espacos/${houseId}/lancamentos`);
+
+      const debits = await section('Saídas');
+      expect(screen.queryByRole('radiogroup', { name: 'Ver como' })).not.toBeInTheDocument();
+      expect(within(debits).queryByRole('table')).not.toBeInTheDocument();
+      expect(row(debits, 'Conta de luz')).toBeInTheDocument();
+    });
+
+    it('shows each section as a table, sorted by the column clicked, and remembers it', async () => {
+      stubPrefersDark(false, { wide: true });
+      mockTransactions();
+      renderApp(`/espacos/${houseId}/lancamentos`);
+
+      await userEvent.click(await screen.findByRole('radio', { name: 'Tabela' }));
+
+      const debits = await section('Saídas');
+      expect(within(debits).getByRole('columnheader', { name: 'Situação' })).toBeInTheDocument();
+      // By due date at first, one without a date last.
+      expect(tableRows(debits)).toEqual(['Conta de luz', 'Compras da semana']);
+      const amount = within(debits).getByRole('columnheader', { name: /Valor/ });
+      await userEvent.click(within(amount).getByRole('button', { name: /Valor/ }));
+      await userEvent.click(within(amount).getByRole('button', { name: /Valor/ }));
+      expect(amount).toHaveAttribute('aria-sort', 'descending');
+      expect(tableRows(debits)).toEqual(['Compras da semana', 'Conta de luz']);
+      expect(within(debits).getByRole('row', { name: /Conta de luz/ })).toHaveTextContent(
+        /10\/10\/2026.*Energia.*Vencido.*R\$.159,90/,
+      );
+      expect(window.localStorage.getItem('financas:visao:lancamentos')).toBe('TABLE');
+    });
+
+    it('settles from a table row and keeps the menu', async () => {
+      stubPrefersDark(false, { wide: true });
+      window.localStorage.setItem('financas:visao:lancamentos', 'TABLE');
+      const fetchMock = mockTransactions({
+        [`PATCH ${base}/${light.id}`]: { body: { ...light, settledAt: '2026-10-15' } },
+      });
+      renderApp(`/espacos/${houseId}/lancamentos`);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Pagar: Conta de luz' }));
+
+      await expectCall(fetchMock, `${base}/${light.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ settledAt: '2026-10-15' }),
+      });
+      const menu = await openActions('Compras da semana');
+      expect(within(menu).getByRole('menuitem', { name: 'Editar' })).toBeInTheDocument();
+    });
   });
 });
