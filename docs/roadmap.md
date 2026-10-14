@@ -18,6 +18,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.6.1** (2026-10-13): no celular, o botão fixo "Novo lançamento" (e "Importar N lançamentos", na revisão da importação) não cobre mais os links do rodapé no fim da página.
 - **1.7.0** (2026-10-14): "Tornar recorrente" no menu de um lançamento avulso: ele vira o primeiro mês de uma recorrência com a mesma categoria, valor, vencimento, pessoa e estabelecimento, fixa ou variável, e os próximos meses aparecem pendentes ao abrir cada um ([ADR 0038](adr/0038-recorrencias-e-parcelamentos.md)).
 - **1.8.0** (2026-10-14): o vencimento de uma recorrência ou de um parcelamento pode cair no mês seguinte ao do lançamento, como a conta de luz de outubro que vence em 10/11 ou a fatura do cartão: o formulário avisa "Cada mês vence no dia 10 do mês seguinte", Recorrências mostra "Vence dia 10 do mês seguinte" e a edição ganha "Vence no: Mesmo mês / Mês seguinte", que corrige também as recorrências criadas antes ([ADR 0038](adr/0038-recorrencias-e-parcelamentos.md)).
+- **1.9.0** (2026-10-14): Lançamentos e Recorrências também como tabela, a partir de 1280 px ("Ver como: Lista | Tabela", lembrado no navegador), com as colunas alinhadas e ordenadas pelo título clicado ([ADR 0045](adr/0045-largura-por-pagina-e-grade-do-painel.md)); o botão da linha de um lançamento vira "○ Pagar" / "○ Receber", com contorno, e o menu ⋯ ganha "Marcar como pago / recebido" ([ADR 0036](adr/0036-design-mobile-first.md)); e o link ativo da barra lateral com contraste de texto.
 
 ## Fase 0 — Planejamento ✅
 
