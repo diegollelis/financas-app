@@ -17,6 +17,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.6.0** (2026-10-13): o [ADR 0053](adr/0053-estabelecimentos.md) completo: na Análise, uma categoria aberta mostra "Por estabelecimento", quanto foi para cada um no período; a planilha modelo ganha a coluna opcional "Estabelecimento", e um nome novo vira estabelecimento ao importar; e, num lançamento novo, a categoria vazia vem preenchida pelo histórico (o estabelecimento, depois a descrição), com "Sugerida pelo histórico", sem nunca trocar uma escolha sua.
 - **1.6.1** (2026-10-13): no celular, o botão fixo "Novo lançamento" (e "Importar N lançamentos", na revisão da importação) não cobre mais os links do rodapé no fim da página.
 - **1.7.0** (2026-10-14): "Tornar recorrente" no menu de um lançamento avulso: ele vira o primeiro mês de uma recorrência com a mesma categoria, valor, vencimento, pessoa e estabelecimento, fixa ou variável, e os próximos meses aparecem pendentes ao abrir cada um ([ADR 0038](adr/0038-recorrencias-e-parcelamentos.md)).
+- **1.8.0** (2026-10-14): o vencimento de uma recorrência ou de um parcelamento pode cair no mês seguinte ao do lançamento, como a conta de luz de outubro que vence em 10/11 ou a fatura do cartão: o formulário avisa "Cada mês vence no dia 10 do mês seguinte", Recorrências mostra "Vence dia 10 do mês seguinte" e a edição ganha "Vence no: Mesmo mês / Mês seguinte", que corrige também as recorrências criadas antes ([ADR 0038](adr/0038-recorrencias-e-parcelamentos.md)).
 
 ## Fase 0 — Planejamento ✅
 
