@@ -47,6 +47,7 @@ import {
   useInstallmentPlans,
 } from '@/features/installments/use-installments';
 import { usePeople, useResolvePerson } from '@/features/people/use-people';
+import { dueDayLabel } from '@/features/recurrences/due';
 import { RecurrenceForm } from '@/features/recurrences/recurrence-form';
 import {
   useEndRecurrence,
@@ -284,7 +285,9 @@ function RecurrenceItem({
         category?.name ?? 'Categoria',
         personLine(recurrence.type, recurrence.personId, people),
         splitLine(recurrence.split, people),
-        recurrence.dueDay === null ? null : `Vence dia ${recurrence.dueDay}`,
+        recurrence.dueDay === null
+          ? null
+          : `Vence ${dueDayLabel(recurrence.dueDay, recurrence.dueMonthOffset)}`,
         ended ? `Até ${formatPeriod(recurrence.endPeriod ?? '')}` : since(recurrence.startPeriod),
       ]}
       amount={formatCents(recurrence.amountCents)}

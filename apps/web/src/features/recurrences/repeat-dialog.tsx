@@ -5,6 +5,7 @@ import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { apiErrorMessage } from '@/lib/error-message';
+import { dueDayLabel, dueOf } from './due';
 import { useRepeatTransaction } from './use-recurrences';
 
 const amountKindOptions = [
@@ -28,7 +29,7 @@ function RepeatForm({
 }) {
   const repeat = useRepeatTransaction(workspaceId);
   const [amountKind, setAmountKind] = useState<'FIXED' | 'VARIABLE'>('FIXED');
-  const dueDay = transaction.dueDate ? Number(transaction.dueDate.slice(8)) : null;
+  const { dueDay, dueMonthOffset } = dueOf(transaction.period, transaction.dueDate);
   const submit = () =>
     repeat.mutate(
       { transactionId: transaction.id, variableAmount: amountKind === 'VARIABLE' },
@@ -44,8 +45,10 @@ function RepeatForm({
     <div className="grid gap-4">
       <p>
         Todo mês a partir de {formatPeriod(transaction.period)}
-        {dueDay === null ? ', sem vencimento.' : `, vencendo no dia ${dueDay}.`} Este lançamento
-        vira o primeiro mês; os próximos aparecem pendentes ao abrir cada mês.
+        {dueDay === null
+          ? ', sem vencimento.'
+          : `, vencendo no ${dueDayLabel(dueDay, dueMonthOffset)}.`}{' '}
+        Este lançamento vira o primeiro mês; os próximos aparecem pendentes ao abrir cada mês.
       </p>
       <div className="grid gap-2">
         <p aria-hidden className="text-sm font-medium">

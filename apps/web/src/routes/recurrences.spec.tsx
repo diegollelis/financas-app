@@ -244,6 +244,28 @@ describe('RecurrencesPage', () => {
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('shows a bill due in the next month, and moves it back to the same month', async () => {
+    const nextMonth = { ...aluguel, dueMonthOffset: 1 };
+    const fetchMock = mockRecurrences({
+      [`GET ${base}/recurrences`]: { body: [nextMonth] },
+      [`PATCH ${base}/recurrences/${aluguel.id}`]: { body: aluguel },
+    });
+    renderApp(page);
+
+    const monthly = await section('Todo mês');
+    expect(monthly).toHaveTextContent('Vence dia 10 do mês seguinte');
+    await choose('Aluguel', 'Editar');
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
+    expect(within(dialog).getByRole('radio', { name: 'Mês seguinte' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Mesmo mês' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/recurrences/${aluguel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ dueMonthOffset: 0 }),
+    });
+  });
+
   it('changes the person of a recurrence, a new name becoming a person first', async () => {
     const carla = person(3, 'Carla');
     const fetchMock = mockRecurrences({

@@ -270,6 +270,7 @@ describe('TransactionsPage', () => {
           amountCents: 9_990,
           variableAmount: false,
           dueDay: 20,
+          dueMonthOffset: 0,
           startPeriod: '2026-10',
           endPeriod: null,
         },
@@ -298,6 +299,7 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 9_990,
         dueDay: 20,
+        dueMonthOffset: 0,
         startPeriod: '2026-10',
         variableAmount: false,
         personId: ana.id,
@@ -306,6 +308,63 @@ describe('TransactionsPage', () => {
     expect(
       await screen.findByText('Lançamento adicionado, repetindo todo mês'),
     ).toBeInTheDocument();
+  });
+
+  it('repeats a bill due in the next month, and refuses a due date further away', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/recurrences`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000306',
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 15_990,
+          variableAmount: false,
+          dueDay: 10,
+          dueMonthOffset: 1,
+          startPeriod: '2026-10',
+          endPeriod: null,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Conta de luz');
+    await chooseCategory(form, 'Energia');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '159,90');
+    const dueDate = within(form).getByLabelText('Vencimento (opcional)');
+    await userEvent.type(dueDate, '2026-12-10');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo mês' }));
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+    expect(
+      await within(form).findByText(
+        'Numa recorrência ou num parcelamento, o vencimento fica no mês do lançamento ou no seguinte.',
+      ),
+    ).toBeInTheDocument();
+
+    await userEvent.clear(dueDate);
+    await userEvent.type(dueDate, '2026-11-10');
+    expect(within(form).getByText('Cada mês vence no dia 10 do mês seguinte.')).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Conta de luz',
+        notes: null,
+        categoryId: energyCategory.id,
+        amountCents: 15_990,
+        dueDay: 10,
+        dueMonthOffset: 1,
+        startPeriod: '2026-10',
+        variableAmount: false,
+        personId: null,
+      }),
+    });
   });
 
   it('makes a transaction launched once recurrent, from its menu', async () => {
@@ -321,6 +380,7 @@ describe('TransactionsPage', () => {
           amountCents: 15_990,
           variableAmount: true,
           dueDay: 10,
+          dueMonthOffset: 0,
           startPeriod: '2026-10',
           endPeriod: null,
         },
@@ -431,6 +491,7 @@ describe('TransactionsPage', () => {
           amountCents: 18_000,
           variableAmount: true,
           dueDay: null,
+          dueMonthOffset: 0,
           startPeriod: '2026-10',
           endPeriod: null,
         },
@@ -458,6 +519,7 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 18_000,
         dueDay: null,
+        dueMonthOffset: 0,
         startPeriod: '2026-10',
         variableAmount: true,
         personId: null,
@@ -479,6 +541,7 @@ describe('TransactionsPage', () => {
           amountCents: 18_000,
           variableAmount: true,
           dueDay: null,
+          dueMonthOffset: 0,
           startPeriod: '2026-10',
           endPeriod: null,
           split: [{ personId: ana.id, amountCents: null, basisPoints: 5_000 }],
@@ -515,6 +578,7 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 18_000,
         dueDay: null,
+        dueMonthOffset: 0,
         startPeriod: '2026-10',
         variableAmount: true,
         personId: null,
@@ -540,6 +604,7 @@ describe('TransactionsPage', () => {
           amountCents: 12_000,
           variableAmount: false,
           dueDay: null,
+          dueMonthOffset: 0,
           startPeriod: '2026-10',
           endPeriod: null,
           split: [],
@@ -570,6 +635,7 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 12_000,
         dueDay: null,
+        dueMonthOffset: 0,
         startPeriod: '2026-10',
         variableAmount: false,
         personId: null,
@@ -630,6 +696,7 @@ describe('TransactionsPage', () => {
           installments: 3,
           firstPeriod: '2026-10',
           dueDay: null,
+          dueMonthOffset: 0,
           endedAt: null,
           settledCount: 0,
         },
@@ -661,6 +728,7 @@ describe('TransactionsPage', () => {
         amountIs: 'TOTAL',
         firstPeriod: '2026-10',
         dueDay: null,
+        dueMonthOffset: 0,
         personId: null,
       }),
     });
@@ -683,6 +751,7 @@ describe('TransactionsPage', () => {
           installments: 3,
           firstPeriod: '2026-10',
           dueDay: null,
+          dueMonthOffset: 0,
           endedAt: null,
           settledCount: 0,
         },
@@ -716,6 +785,7 @@ describe('TransactionsPage', () => {
         amountIs: 'TOTAL',
         firstPeriod: '2026-10',
         dueDay: null,
+        dueMonthOffset: 0,
         personId: null,
         split: [{ personId: ana.id, amountCents: 50_000 }],
       }),

@@ -15,6 +15,7 @@ import { useResolveCategory } from '@/features/categories/new-category';
 import { useCreateInstallmentPlan } from '@/features/installments/use-installments';
 import { useResolveMerchant } from '@/features/merchants/use-merchants';
 import { findPerson, useResolvePerson } from '@/features/people/use-people';
+import { dueOf } from '@/features/recurrences/due';
 import { useCreateRecurrence } from '@/features/recurrences/use-recurrences';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { shareCents } from './split';
@@ -151,7 +152,7 @@ export function TransactionDialog({
           amountCents: fields.amountCents,
           amountIs: values.amountIs,
           firstPeriod: period,
-          dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
+          ...dueOf(period, values.dueDate),
           personId,
           ...withMerchant,
           ...(splitting && { split }),
@@ -159,12 +160,12 @@ export function TransactionDialog({
         { onSuccess: done(withPeople(`Parcelamento adicionado: ${installments} parcelas`)) },
       );
     } else if (values.repeat === 'MONTHLY') {
-      // Every month from this one, due on the same day (ADR 0038).
+      // Every month from this one, due on the same day, in its month or the next (ADR 0038).
       setRepeat('MONTHLY');
       createRecurrence.mutate(
         {
           ...fields,
-          dueDay: values.dueDate ? Number(values.dueDate.slice(8)) : null,
+          ...dueOf(period, values.dueDate),
           startPeriod: period,
           variableAmount: values.amountKind === 'VARIABLE',
           personId,
@@ -223,6 +224,7 @@ export function TransactionDialog({
         hints={hints}
         initial={editing ?? undefined}
         preset={editing ? undefined : preset}
+        period={period}
         submitLabel={
           editing
             ? update.isPending

@@ -32,6 +32,8 @@ const recurrenceFormSchema = recurrenceFieldsSchema
       .transform((day) => (day === '' ? null : Number(day)))
       .pipe(dueDaySchema.nullable()),
     amountKind: z.enum(['FIXED', 'VARIABLE']),
+    /** Due in the same month as each competência or in the next (ADR 0038 note). */
+    dueMonth: z.enum(['SAME', 'NEXT']),
     /** A receber de / a pagar para (ADR 0052): a name, resolved to a person on save. */
     person: z.string().trim(),
   });
@@ -46,6 +48,11 @@ const amountKindOptions = [
   { value: 'VARIABLE', label: 'Variável' },
 ] as const;
 
+const dueMonthOptions = [
+  { value: 'SAME', label: 'Mesmo mês' },
+  { value: 'NEXT', label: 'Mês seguinte' },
+] as const;
+
 /**
  * Only the fields that changed: the API copies every field it gets to the pending transactions
  * from this month on, and an unchanged one would undo a month adjusted by hand.
@@ -57,6 +64,8 @@ function recurrenceChanges(recurrence: Recurrence, values: FormValues) {
   if (values.categoryId !== recurrence.categoryId) changes.categoryId = values.categoryId;
   if (values.amount !== recurrence.amountCents) changes.amountCents = values.amount;
   if (values.dueDay !== recurrence.dueDay) changes.dueDay = values.dueDay;
+  const dueMonthOffset = values.dueMonth === 'NEXT' ? 1 : 0;
+  if (dueMonthOffset !== recurrence.dueMonthOffset) changes.dueMonthOffset = dueMonthOffset;
   const variableAmount = values.amountKind === 'VARIABLE';
   if (variableAmount !== recurrence.variableAmount) changes.variableAmount = variableAmount;
   return changes;
@@ -97,6 +106,7 @@ export function RecurrenceForm({
       amount: amountText.format(recurrence.amountCents / 100),
       dueDay: recurrence.dueDay === null ? '' : String(recurrence.dueDay),
       amountKind: recurrence.variableAmount ? 'VARIABLE' : 'FIXED',
+      dueMonth: recurrence.dueMonthOffset === 1 ? 'NEXT' : 'SAME',
       person: currentPerson,
     },
   });
@@ -190,6 +200,23 @@ export function RecurrenceForm({
             {...register('dueDay')}
           />
         </FormField>
+      </div>
+      <div className="grid gap-2">
+        <p aria-hidden className="text-sm font-medium">
+          Vence no
+        </p>
+        <Controller
+          control={control}
+          name="dueMonth"
+          render={({ field }) => (
+            <SegmentedControl
+              label="Vence no"
+              options={dueMonthOptions}
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
       </div>
       <p className="text-muted-foreground text-sm">
         {variable

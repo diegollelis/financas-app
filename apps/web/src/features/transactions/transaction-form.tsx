@@ -2,6 +2,7 @@ import {
   plainTransactionInputSchema,
   formatCents,
   installmentCountSchema,
+  MAX_DUE_MONTH_OFFSET,
   parseReais,
   splitInstallments,
   isoDateSchema,
@@ -31,6 +32,7 @@ import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { findMerchant } from '@/features/merchants/use-merchants';
 import { PersonSelect } from '@/features/people/person-picker';
+import { dueDayLabel, dueOf } from '@/features/recurrences/due';
 import { apiErrorMessage } from '@/lib/error-message';
 import { shareCents } from './split';
 import { SplitFields, type SplitFormFields } from './split-fields';
@@ -50,6 +52,8 @@ const transactionFormSchema = plainTransactionInputSchema
       .string()
       .transform((date) => date || null)
       .pipe(isoDateSchema.nullable()),
+    /** The competência it is launched in: how far a repeated one's due date may fall. Never sent. */
+    period: z.string(),
     /**
      * Only when creating: once, every month from this competência on, or in installments
      * (ADR 0038).
@@ -125,6 +129,18 @@ const transactionFormSchema = plainTransactionInputSchema
           code: 'custom',
           path: ['shares'],
           message: 'As partes dos outros passam do valor do lançamento.',
+        });
+      }
+    }
+    // Every month is due as far from its competência as the first: the same month or the next.
+    if (values.repeat !== 'NONE' && values.period) {
+      const { dueMonthOffset } = dueOf(values.period, values.dueDate);
+      if (dueMonthOffset < 0 || dueMonthOffset > MAX_DUE_MONTH_OFFSET) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['dueDate'],
+          message:
+            'Numa recorrência ou num parcelamento, o vencimento fica no mês do lançamento ou no seguinte.',
         });
       }
     }
@@ -211,6 +227,7 @@ export function TransactionForm({
   hints,
   initial,
   preset,
+  period,
   submitLabel,
   pending,
   error,
@@ -230,6 +247,8 @@ export function TransactionForm({
   initial?: Transaction;
   /** For a new transaction: what it starts with. Ignored when editing. */
   preset?: TransactionPreset;
+  /** The competência a new one is launched in, for the due date of a repeated one. */
+  period?: string;
   submitLabel: string;
   pending: boolean;
   error: unknown;
@@ -256,6 +275,7 @@ export function TransactionForm({
           ? amountText.format(preset.amountCents / 100)
           : '',
       dueDate: initial?.dueDate ?? '',
+      period: initial?.period ?? period ?? '',
       repeat: 'NONE',
       amountKind: 'FIXED',
       installments: '',
@@ -275,6 +295,7 @@ export function TransactionForm({
   const typedAmount = useWatch({ control, name: 'amount' });
   const typedInstallments = useWatch({ control, name: 'installments' });
   const splitOn = useWatch({ control, name: 'splitOn' });
+  const typedDueDate = useWatch({ control, name: 'dueDate' });
   // A new transaction, a credit too, launched once, every month or in installments, may be
   // split; anything else may name one person, copied to each month (ADRs 0042, 0052).
   const canSplit = allowRepeat;
@@ -294,6 +315,16 @@ export function TransactionForm({
         ? 'Valor total (R$)'
         : 'Valor da parcela (R$)'
       : 'Valor (R$)';
+  // When each month or installment is due, said as the date is typed (ADR 0038 note).
+  const due = dueOf(period ?? '', isoDateSchema.safeParse(typedDueDate).data ?? null);
+  const dueNote =
+    repeat !== 'NONE' &&
+    period &&
+    due.dueDay !== null &&
+    due.dueMonthOffset >= 0 &&
+    due.dueMonthOffset <= MAX_DUE_MONTH_OFFSET
+      ? `${installments ? 'Cada parcela' : 'Cada mês'} vence no ${dueDayLabel(due.dueDay, due.dueMonthOffset)}.`
+      : null;
   const preview = installments
     ? installmentsPreview(typedAmount ?? '', typedInstallments ?? '', amountIs ?? 'TOTAL')
     : null;
@@ -453,10 +484,11 @@ export function TransactionForm({
           />
           {repeat === 'MONTHLY' && (
             <p className="text-muted-foreground text-sm">
-              Um lançamento pendente em cada mês, a partir deste, no mesmo dia de vencimento. Para
-              parar, use "Encerrar recorrência" no menu do lançamento.
+              Um lançamento pendente em cada mês, a partir deste. Para parar, use "Encerrar
+              recorrência" no menu do lançamento.
             </p>
           )}
+          {dueNote && <p className="text-muted-foreground text-sm">{dueNote}</p>}
         </div>
       )}
       {allowRepeat && repeat === 'MONTHLY' && (
