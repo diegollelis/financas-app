@@ -34,6 +34,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -54,8 +62,13 @@ import {
   useRecurrences,
   useUpdateRecurrence,
 } from '@/features/recurrences/use-recurrences';
+import { sortRows, useSort, type SortValue } from '@/features/view-mode/sort';
+import { SortableHead } from '@/features/view-mode/sortable-head';
+import { useShowsTable } from '@/features/view-mode/view-mode';
+import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
+import { cn } from '@/lib/utils';
 
 const MONTHLY_TITLE_ID = 'recurrences-monthly';
 const PLANS_TITLE_ID = 'recurrences-plans';
@@ -118,6 +131,16 @@ function EndDialog({
   );
 }
 
+/** The amount, and what it means under it ("Varia todo mês", "total em 10 de R$ 99,90"). */
+function SeriesAmount({ amount, note }: { amount: string; note: string | null }) {
+  return (
+    <span className="grid justify-items-end text-right">
+      <span className="text-base font-semibold tabular-nums">{amount}</span>
+      {note && <span className="text-muted-foreground text-xs">{note}</span>}
+    </span>
+  );
+}
+
 /**
  * A row: what it is on the left, the amount on the right, and the menu for EDITORs. On the phone
  * the details take the whole width under them, so they do not wrap word by word beside the
@@ -140,10 +163,7 @@ function SeriesRow({
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 py-3">
       <p className="font-medium break-words">{title}</p>
       <div className="flex items-start gap-2 md:row-span-2 md:gap-1">
-        <span className="grid justify-items-end text-right">
-          <span className="text-base font-semibold tabular-nums">{amount}</span>
-          {amountNote && <span className="text-muted-foreground text-xs">{amountNote}</span>}
-        </span>
+        <SeriesAmount amount={amount} note={amountNote} />
         {menu}
       </div>
       <p className="text-muted-foreground col-span-2 flex flex-wrap gap-x-3 text-sm md:col-span-1">
@@ -155,6 +175,84 @@ function SeriesRow({
       </p>
     </li>
   );
+}
+
+/** A column of a series table: its title, width, alignment and, when it sorts, by what. */
+type Column<T> = {
+  label: string;
+  /** A Tailwind width (`w-32`); the one without takes what is left. */
+  width?: string;
+  align?: 'right';
+  sort?: (row: T) => SortValue;
+};
+
+/**
+ * Series as a table, from xl ("Ver como: Tabela", ADR 0045 note): fixed columns, so the table of
+ * the active ones lines up with the past ones', sorted by the column clicked (by description at
+ * first, as the list). The actions column only where rows have a menu.
+ */
+function SeriesTable<T>({
+  rows,
+  columns,
+  actions,
+  renderRow,
+}: {
+  rows: T[];
+  columns: Column<T>[];
+  actions: boolean;
+  renderRow: (row: T) => ReactNode;
+}) {
+  const sort = useSort<string>('0');
+  const sortBy = columns[Number(sort.key)]?.sort;
+  const sorted = sortBy ? sortRows(rows, sortBy, sort.direction) : rows;
+  return (
+    <div className="rounded-xl border px-2">
+      <Table className="table-fixed">
+        <colgroup>
+          {columns.map((column) => (
+            <col key={column.label} className={column.width} />
+          ))}
+          {actions && <col className="w-14" />}
+        </colgroup>
+        <TableHeader>
+          <TableRow>
+            {columns.map((column, index) =>
+              column.sort ? (
+                <SortableHead
+                  key={column.label}
+                  label={column.label}
+                  active={sort.key === String(index)}
+                  direction={sort.direction}
+                  onSort={() => sort.toggle(String(index))}
+                  align={column.align}
+                />
+              ) : (
+                <TableHead
+                  key={column.label}
+                  className={cn(column.align === 'right' && 'text-right')}
+                >
+                  {column.label}
+                </TableHead>
+              ),
+            )}
+            {actions && (
+              <TableHead>
+                <span className="sr-only">Ações</span>
+              </TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>{sorted.map(renderRow)}</TableBody>
+      </Table>
+    </div>
+  );
+}
+
+/** "Dia 10", or "Dia 10 do mês seguinte"; a dash without a due day. */
+function dueCell(dueDay: number | null, dueMonthOffset: number) {
+  if (dueDay === null) return '—';
+  const label = dueDayLabel(dueDay, dueMonthOffset);
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function ActionsButton({ name, ref }: { name: string; ref: RefObject<HTMLButtonElement | null> }) {
@@ -256,12 +354,15 @@ function RecurrenceItem({
   categories,
   people,
   canEdit,
+  asTable,
 }: {
   workspaceId: string;
   recurrence: Recurrence;
   categories: Category[];
   people: Person[];
   canEdit: boolean;
+  /** A table row ("Ver como: Tabela"), or a list row. */
+  asTable: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
@@ -277,6 +378,74 @@ function RecurrenceItem({
       document.getElementById(MONTHLY_TITLE_ID)?.focus();
     }, showError);
 
+  const who =
+    personLine(recurrence.type, recurrence.personId, people) ?? splitLine(recurrence.split, people);
+  const period = ended
+    ? `Até ${formatPeriod(recurrence.endPeriod ?? '')}`
+    : since(recurrence.startPeriod);
+  // A variable one: the amount typed is only the starting estimate (ADR 0038).
+  const amountNote = recurrence.variableAmount ? 'Varia todo mês' : null;
+  const menu = canEdit && !ended && (
+    <>
+      <DropdownMenu>
+        <ActionsButton name={description} ref={actionsRef} />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setEditing(true)}>Editar</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
+            Encerrar recorrência
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ResponsiveDialog
+        open={editing}
+        onOpenChange={setEditing}
+        returnFocusTo={actionsRef}
+        title={`Editar ${description}`}
+        description="As mudanças valem para os lançamentos pendentes deste mês em diante. Os já pagos ou recebidos e os meses anteriores ficam como estão."
+      >
+        <EditRecurrence
+          workspaceId={workspaceId}
+          recurrence={recurrence}
+          categories={categories}
+          people={people}
+          onDone={() => setEditing(false)}
+        />
+      </ResponsiveDialog>
+      <EndDialog
+        open={confirmingEnd}
+        onOpenChange={setConfirmingEnd}
+        returnFocusTo={actionsRef}
+        title={`Encerrar a recorrência ${description}?`}
+        description="Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já pagos ou recebidos ficam."
+        action="Encerrar recorrência"
+        onConfirm={confirmEnd}
+      />
+    </>
+  );
+
+  if (asTable) {
+    return (
+      <TableRow>
+        <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
+        <TableCell>{typeLabel[recurrence.type]}</TableCell>
+        <TableCell className="whitespace-normal">{category?.name ?? 'Categoria'}</TableCell>
+        <TableCell className="whitespace-normal">{who ?? '—'}</TableCell>
+        <TableCell className="whitespace-normal">
+          {dueCell(recurrence.dueDay, recurrence.dueMonthOffset)}
+        </TableCell>
+        <TableCell className="whitespace-normal">{period}</TableCell>
+        <TableCell>
+          <SeriesAmount amount={formatCents(recurrence.amountCents)} note={amountNote} />
+        </TableCell>
+        {menu && (
+          <TableCell>
+            <div className="flex justify-end">{menu}</div>
+          </TableCell>
+        )}
+      </TableRow>
+    );
+  }
+
   return (
     <SeriesRow
       title={description}
@@ -288,51 +457,11 @@ function RecurrenceItem({
         recurrence.dueDay === null
           ? null
           : `Vence ${dueDayLabel(recurrence.dueDay, recurrence.dueMonthOffset)}`,
-        ended ? `Até ${formatPeriod(recurrence.endPeriod ?? '')}` : since(recurrence.startPeriod),
+        period,
       ]}
       amount={formatCents(recurrence.amountCents)}
-      // A variable one: the amount typed is only the starting estimate (ADR 0038).
-      amountNote={recurrence.variableAmount ? 'Varia todo mês' : null}
-      menu={
-        canEdit &&
-        !ended && (
-          <>
-            <DropdownMenu>
-              <ActionsButton name={description} ref={actionsRef} />
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setEditing(true)}>Editar</DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
-                  Encerrar recorrência
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <ResponsiveDialog
-              open={editing}
-              onOpenChange={setEditing}
-              returnFocusTo={actionsRef}
-              title={`Editar ${description}`}
-              description="As mudanças valem para os lançamentos pendentes deste mês em diante. Os já pagos ou recebidos e os meses anteriores ficam como estão."
-            >
-              <EditRecurrence
-                workspaceId={workspaceId}
-                recurrence={recurrence}
-                categories={categories}
-                people={people}
-                onDone={() => setEditing(false)}
-              />
-            </ResponsiveDialog>
-            <EndDialog
-              open={confirmingEnd}
-              onOpenChange={setConfirmingEnd}
-              returnFocusTo={actionsRef}
-              title={`Encerrar a recorrência ${description}?`}
-              description="Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já pagos ou recebidos ficam."
-              action="Encerrar recorrência"
-              onConfirm={confirmEnd}
-            />
-          </>
-        )
-      }
+      amountNote={amountNote}
+      menu={menu}
     />
   );
 }
@@ -343,12 +472,15 @@ function PlanItem({
   categories,
   people,
   canEdit,
+  asTable,
 }: {
   workspaceId: string;
   plan: InstallmentPlan;
   categories: Category[];
   people: Person[];
   canEdit: boolean;
+  /** A table row ("Ver como: Tabela"), or a list row. */
+  asTable: boolean;
 }) {
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
@@ -364,6 +496,65 @@ function PlanItem({
       document.getElementById(PLANS_TITLE_ID)?.focus();
     }, showError);
 
+  const status =
+    plan.endedAt !== null
+      ? 'Encerrado'
+      : plan.settledCount >= plan.installments
+        ? settledLabels[plan.type]
+        : remaining(plan);
+  // The amount is the purchase's total: "total em 10 de R$ 99,90", or just how many when the
+  // leftover cents make the last one differ.
+  const amountNote =
+    parts.at(-1) === first
+      ? `total em ${plan.installments} de ${formatCents(first)}`
+      : `total em ${plan.installments} parcelas`;
+  const menu = canEdit && !over && (
+    <>
+      <DropdownMenu>
+        <ActionsButton name={description} ref={actionsRef} />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
+            Encerrar parcelamento
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <EndDialog
+        open={confirmingEnd}
+        onOpenChange={setConfirmingEnd}
+        returnFocusTo={actionsRef}
+        title={`Encerrar o parcelamento ${description}?`}
+        description="As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada."
+        action="Encerrar parcelamento"
+        onConfirm={confirmEnd}
+      />
+    </>
+  );
+
+  if (asTable) {
+    return (
+      <TableRow>
+        <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
+        <TableCell>{typeLabel[plan.type]}</TableCell>
+        <TableCell className="whitespace-normal">{category?.name ?? 'Categoria'}</TableCell>
+        <TableCell className="whitespace-normal">
+          {personLine(plan.type, plan.personId, people) ?? '—'}
+        </TableCell>
+        <TableCell className="tabular-nums">
+          {plan.settledCount} de {plan.installments}
+        </TableCell>
+        <TableCell className="whitespace-normal">{status}</TableCell>
+        <TableCell>
+          <SeriesAmount amount={formatCents(plan.totalCents)} note={amountNote} />
+        </TableCell>
+        {menu && (
+          <TableCell>
+            <div className="flex justify-end">{menu}</div>
+          </TableCell>
+        )}
+      </TableRow>
+    );
+  }
+
   return (
     <SeriesRow
       title={description}
@@ -372,44 +563,11 @@ function PlanItem({
         category?.name ?? 'Categoria',
         personLine(plan.type, plan.personId, people),
         `${plan.settledCount} de ${plan.installments} pagas`,
-        plan.endedAt !== null
-          ? 'Encerrado'
-          : plan.settledCount >= plan.installments
-            ? settledLabels[plan.type]
-            : remaining(plan),
+        status,
       ]}
       amount={formatCents(plan.totalCents)}
-      // The amount is the purchase's total: "total em 10 de R$ 99,90", or just how many when the
-      // leftover cents make the last one differ.
-      amountNote={
-        parts.at(-1) === first
-          ? `total em ${plan.installments} de ${formatCents(first)}`
-          : `total em ${plan.installments} parcelas`
-      }
-      menu={
-        canEdit &&
-        !over && (
-          <>
-            <DropdownMenu>
-              <ActionsButton name={description} ref={actionsRef} />
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
-                  Encerrar parcelamento
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <EndDialog
-              open={confirmingEnd}
-              onOpenChange={setConfirmingEnd}
-              returnFocusTo={actionsRef}
-              title={`Encerrar o parcelamento ${description}?`}
-              description="As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada."
-              action="Encerrar parcelamento"
-              onConfirm={confirmEnd}
-            />
-          </>
-        )
-      }
+      amountNote={amountNote}
+      menu={menu}
     />
   );
 }
@@ -462,9 +620,11 @@ function Section({
   empty: string;
   /** A line under the title, e.g. what the active ones add up to. */
   summary?: string | null;
-  active: ReactNode[];
+  /** The active ones, as a list or a table; null when there is none. */
+  active: ReactNode;
   pastTitle: string;
-  past: ReactNode[];
+  /** The past ones, the same way; null when there is none. */
+  past: ReactNode;
 }) {
   return (
     <section aria-labelledby={titleId} className="grid gap-3">
@@ -473,15 +633,11 @@ function Section({
         {title}
       </h2>
       {summary && <p className="tabular-nums">{summary}</p>}
-      {active.length === 0 ? (
-        <p className="text-muted-foreground">{empty}</p>
-      ) : (
-        <ul className="divide-y rounded-xl border px-4">{active}</ul>
-      )}
-      {past.length > 0 && (
+      {active ?? <p className="text-muted-foreground">{empty}</p>}
+      {past && (
         <div className="grid gap-2">
           <h3 className="text-muted-foreground font-medium">{pastTitle}</h3>
-          <ul className="divide-y rounded-xl border px-4">{past}</ul>
+          {past}
         </div>
       )}
     </section>
@@ -498,6 +654,13 @@ export function RecurrencesPage() {
   const ready =
     recurrences.isSuccess && plans.isSuccess && categories.isSuccess && people.isSuccess;
 
+  // "Ver como: Tabela", from xl (ADR 0045 note); the list everywhere else.
+  const asTable = useShowsTable('recorrencias');
+  const categoryName = (categoryId: string) =>
+    categories.data?.find((item) => item.id === categoryId)?.name ?? null;
+  const personName = (personId: string | null) =>
+    (personId && people.data?.find((item) => item.id === personId)?.name) || null;
+
   const recurrenceItem = (recurrence: Recurrence) => (
     <RecurrenceItem
       key={recurrence.id}
@@ -506,6 +669,7 @@ export function RecurrencesPage() {
       categories={categories.data ?? []}
       people={people.data ?? []}
       canEdit={canEdit}
+      asTable={asTable}
     />
   );
   const planItem = (plan: InstallmentPlan) => (
@@ -516,15 +680,53 @@ export function RecurrencesPage() {
       categories={categories.data ?? []}
       people={people.data ?? []}
       canEdit={canEdit}
+      asTable={asTable}
     />
   );
+  const recurrenceColumns: Column<Recurrence>[] = [
+    { label: 'Descrição', sort: (item) => item.description },
+    { label: 'Tipo', width: 'w-20' },
+    { label: 'Categoria', width: 'w-32', sort: (item) => categoryName(item.categoryId) },
+    { label: 'Pessoa', width: 'w-44' },
+    {
+      label: 'Vence',
+      width: 'w-32',
+      // The next month's day 1 comes after this month's 31.
+      sort: (item) => (item.dueDay === null ? null : item.dueMonthOffset * 31 + item.dueDay),
+    },
+    { label: 'Período', width: 'w-36', sort: (item) => item.endPeriod ?? item.startPeriod },
+    { label: 'Valor', width: 'w-32', align: 'right', sort: (item) => item.amountCents },
+  ];
+  const planColumns: Column<InstallmentPlan>[] = [
+    { label: 'Descrição', sort: (item) => item.description },
+    { label: 'Tipo', width: 'w-20' },
+    { label: 'Categoria', width: 'w-32', sort: (item) => categoryName(item.categoryId) },
+    { label: 'Pessoa', width: 'w-36', sort: (item) => personName(item.personId) },
+    { label: 'Pagas', width: 'w-24', sort: (item) => item.settledCount / item.installments },
+    { label: 'Falta', width: 'w-48', sort: (item) => item.pendingCents },
+    { label: 'Total', width: 'w-36', align: 'right', sort: (item) => item.totalCents },
+  ];
+  /** The rows as a table or a list; null when there is none, so the section says it is empty. */
+  const show = <T,>(
+    rows: T[],
+    columns: Column<T>[],
+    item: (row: T) => ReactNode,
+    actions: boolean,
+  ) =>
+    rows.length === 0 ? null : asTable ? (
+      <SeriesTable rows={rows} columns={columns} actions={actions} renderRow={item} />
+    ) : (
+      <ul className="divide-y rounded-xl border px-4">{rows.map(item)}</ul>
+    );
 
   return (
     <>
       <PageHeader
         title="Recorrências"
         description="O que se repete todo mês e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi pago ou recebido não muda."
-      />
+      >
+        <ViewModeToggle page="recorrencias" />
+      </PageHeader>
       <QueryState queries={[recurrences, plans, categories, people]} />
       {ready &&
         (recurrences.data.length === 0 && plans.data.length === 0 ? (
@@ -539,19 +741,33 @@ export function RecurrencesPage() {
               title="Todo mês"
               empty="Nenhuma recorrência ativa."
               summary={monthlyTotal(recurrences.data.filter((item) => item.endPeriod === null))}
-              active={recurrences.data
-                .filter((item) => item.endPeriod === null)
-                .map(recurrenceItem)}
+              active={show(
+                recurrences.data.filter((item) => item.endPeriod === null),
+                recurrenceColumns,
+                recurrenceItem,
+                canEdit,
+              )}
               pastTitle="Encerradas"
-              past={recurrences.data.filter((item) => item.endPeriod !== null).map(recurrenceItem)}
+              // History has nothing to act on: no actions column.
+              past={show(
+                recurrences.data.filter((item) => item.endPeriod !== null),
+                recurrenceColumns,
+                recurrenceItem,
+                false,
+              )}
             />
             <Section
               titleId={PLANS_TITLE_ID}
               title="Parcelamentos"
               empty="Nenhum parcelamento em andamento."
-              active={plans.data.filter((plan) => !planIsOver(plan)).map(planItem)}
+              active={show(
+                plans.data.filter((plan) => !planIsOver(plan)),
+                planColumns,
+                planItem,
+                canEdit,
+              )}
               pastTitle="Encerrados e pagos"
-              past={plans.data.filter(planIsOver).map(planItem)}
+              past={show(plans.data.filter(planIsOver), planColumns, planItem, false)}
             />
           </>
         ))}
