@@ -383,28 +383,30 @@ model TransactionImport {
 // pending installments from this month on and stamps ended_at. Same composite category key as
 // transactions; CHECKs on amount, count and periods are in the migration.
 model InstallmentPlan {
-  id           String          @id @default(uuid(7)) @db.Uuid
-  workspaceId  String          @map("workspace_id") @db.Uuid
-  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  type         TransactionType
-  description  String          @db.VarChar(200)
-  notes        String?         @db.VarChar(1000)
-  categoryId   String          @map("category_id") @db.Uuid
-  category     Category        @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
-  totalCents   Int             @map("total_cents")
-  installments Int             @db.SmallInt
-  firstPeriod  String          @map("first_period") @db.Char(7)
-  dueDay       Int?            @map("due_day") @db.SmallInt
+  id             String          @id @default(uuid(7)) @db.Uuid
+  workspaceId    String          @map("workspace_id") @db.Uuid
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type           TransactionType
+  description    String          @db.VarChar(200)
+  notes          String?         @db.VarChar(1000)
+  categoryId     String          @map("category_id") @db.Uuid
+  category       Category        @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
+  totalCents     Int             @map("total_cents")
+  installments   Int             @db.SmallInt
+  firstPeriod    String          @map("first_period") @db.Char(7)
+  dueDay         Int?            @map("due_day") @db.SmallInt
+  // Each installment due in its own month (0) or in the next one (1), ADR 0038 note.
+  dueMonthOffset Int             @default(0) @map("due_month_offset") @db.SmallInt
   // "A receber de" / "a pagar para" (ADR 0052), copied to every installment.
-  personId     String?         @map("person_id") @db.Uuid
-  person       Person?         @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  personId       String?         @map("person_id") @db.Uuid
+  person         Person?         @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   // Where it was bought or who pays it (ADR 0053), copied to every installment.
-  merchantId   String?         @map("merchant_id") @db.Uuid
-  merchant     Merchant?       @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
-  endedAt      DateTime?       @map("ended_at") @db.Timestamptz(3)
-  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
-  transactions Transaction[]
+  merchantId     String?         @map("merchant_id") @db.Uuid
+  merchant       Merchant?       @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  endedAt        DateTime?       @map("ended_at") @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions   Transaction[]
 
   @@index([workspaceId])
   @@map("installment_plans")
@@ -428,6 +430,8 @@ model Recurrence {
   variableAmount Boolean                @default(false) @map("variable_amount")
   // Day of the month it is due (1-31); a longer number than the month has means its last day.
   dueDay         Int?                   @map("due_day") @db.SmallInt
+  // Due in the same month (0) or in the next one (1): energy of October due on November 10th.
+  dueMonthOffset Int                    @default(0) @map("due_month_offset") @db.SmallInt
   // "A receber de" / "a pagar para" (ADR 0052), copied to every month it generates.
   personId       String?                @map("person_id") @db.Uuid
   person         Person?                @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)

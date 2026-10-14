@@ -1,6 +1,6 @@
 import {
   currentPeriod,
-  dueDateIn,
+  dueDateFor,
   installmentPlanTotal,
   shareDescription,
   shiftPeriod,
@@ -38,6 +38,7 @@ function toResponse(
     installments: plan.installments,
     firstPeriod: plan.firstPeriod,
     dueDay: plan.dueDay,
+    dueMonthOffset: plan.dueMonthOffset,
     personId: plan.personId,
     merchantId: plan.merchantId,
     endedAt: plan.endedAt?.toISOString() ?? null,
@@ -111,6 +112,7 @@ export class InstallmentsService {
     const totalCents = installmentPlanTotal(input);
     const amounts = splitInstallments(totalCents, input.installments);
     const dueDay = input.dueDay ?? null;
+    const dueMonthOffset = input.dueMonthOffset ?? 0;
     const personId = input.personId ?? null;
     const merchantId = input.merchantId ?? null;
     const sharesOf = input.split ? await this.shares(workspaceId, input, input.split) : () => [];
@@ -125,6 +127,7 @@ export class InstallmentsService {
         installments: input.installments,
         firstPeriod: input.firstPeriod,
         dueDay,
+        dueMonthOffset,
         personId,
         merchantId,
         transactions: {
@@ -140,7 +143,7 @@ export class InstallmentsService {
               merchantId,
               amountCents,
               period,
-              dueDate: dueDay === null ? null : toDate(dueDateIn(period, dueDay)),
+              dueDate: dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset)),
               installmentNumber: index + 1,
               ...(input.split && { shares: { create: sharesOf(index, period) } }),
             };

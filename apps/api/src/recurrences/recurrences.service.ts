@@ -1,6 +1,8 @@
 import {
   currentPeriod,
-  dueDateIn,
+  dueDateFor as dueIsoDateFor,
+  dueMonthOffsetOf,
+  MAX_DUE_MONTH_OFFSET,
   estimateAmount,
   shareDescription,
   shareOfAmount,
@@ -41,6 +43,7 @@ function toResponse(recurrence: RecurrenceWithShares): Recurrence {
     amountCents: recurrence.amountCents,
     variableAmount: recurrence.variableAmount,
     dueDay: recurrence.dueDay,
+    dueMonthOffset: recurrence.dueMonthOffset,
     personId: recurrence.personId,
     merchantId: recurrence.merchantId,
     startPeriod: recurrence.startPeriod,
@@ -63,8 +66,9 @@ const tooBig = () =>
     message: 'As partes dos outros passam do valor do lançamento.',
   });
 
-const dueDateFor = (period: string, dueDay: number | null) =>
-  dueDay === null ? null : toDate(dueDateIn(period, dueDay));
+/** The due date of a month, in the same month or the next (`dueMonthOffset`, ADR 0038 note). */
+const dueDateFor = (period: string, dueDay: number | null, dueMonthOffset: number) =>
+  dueDay === null ? null : toDate(dueIsoDateFor(period, dueDay, dueMonthOffset));
 
 /** P2002: the occurrence already exists (opened at the same time elsewhere). */
 const isDuplicate = (error: unknown) =>
@@ -108,6 +112,7 @@ export class RecurrencesService {
         amountCents: input.amountCents,
         variableAmount: input.variableAmount ?? false,
         dueDay: input.dueDay ?? null,
+        dueMonthOffset: input.dueMonthOffset ?? 0,
         personId: input.personId ?? null,
         merchantId: input.merchantId ?? null,
         startPeriod: input.startPeriod,
@@ -149,6 +154,14 @@ export class RecurrencesService {
         'Um lançamento dividido não se torna recorrente por aqui: crie a recorrência dividida pelo Novo lançamento.',
       );
     }
+    // Each month due as far from its competência as this one, when that is a month at most.
+    const dueDate = transaction.dueDate ? toIsoDate(transaction.dueDate) : null;
+    const dueMonthOffset = dueDate ? dueMonthOffsetOf(transaction.period, dueDate) : 0;
+    if (dueMonthOffset < 0 || dueMonthOffset > MAX_DUE_MONTH_OFFSET) {
+      throw refuse(
+        'O vencimento deste lançamento fica longe demais do mês dele para repetir todo mês.',
+      );
+    }
     // What every month will carry must still be usable.
     await ensureUsableCategory(this.prisma, workspaceId, transaction.categoryId, transaction.type);
     if (transaction.personId) {
@@ -167,7 +180,8 @@ export class RecurrencesService {
           categoryId: transaction.categoryId,
           amountCents: transaction.amountCents,
           variableAmount: input.variableAmount ?? false,
-          dueDay: transaction.dueDate ? Number(toIsoDate(transaction.dueDate).slice(8)) : null,
+          dueDay: dueDate ? Number(dueDate.slice(8)) : null,
+          dueMonthOffset,
           personId: transaction.personId,
           merchantId: transaction.merchantId,
           startPeriod: transaction.period,
@@ -226,12 +240,14 @@ export class RecurrencesService {
         amountCents: input.amountCents,
         variableAmount: input.variableAmount,
         dueDay: input.dueDay,
+        dueMonthOffset: input.dueMonthOffset,
         personId: input.personId,
         merchantId: input.merchantId,
       },
       include: { shares: true },
     });
 
+    const dueChanged = input.dueDay !== undefined || input.dueMonthOffset !== undefined;
     const pending = await db.transaction.findMany({
       where: this.pendingFromThisMonth(workspaceId, recurrenceId),
       select: { id: true, period: true, amountEstimated: true },
@@ -250,9 +266,10 @@ export class RecurrencesService {
           amountCents: keepsAmount ? undefined : input.amountCents,
           // Turned fixed: what was an estimate becomes the amount.
           amountEstimated: input.variableAmount === false ? false : undefined,
-          // Only when the day changed: each month has its own date.
-          dueDate:
-            input.dueDay === undefined ? undefined : dueDateFor(transaction.period, input.dueDay),
+          // Only when the day or its month changed: each month has its own date.
+          dueDate: dueChanged
+            ? dueDateFor(transaction.period, recurrence.dueDay, recurrence.dueMonthOffset)
+            : undefined,
         },
       });
       // Its pending shares in percentages follow the new amount (ADR 0052).
@@ -393,7 +410,7 @@ export class RecurrencesService {
               amountCents,
               amountEstimated: recurrence.variableAmount,
               period,
-              dueDate: dueDateFor(period, recurrence.dueDay),
+              dueDate: dueDateFor(period, recurrence.dueDay, recurrence.dueMonthOffset),
               occurrence: { create: { recurrenceId: recurrence.id, period, workspaceId } },
               ...(shareCategory && {
                 shares: {
