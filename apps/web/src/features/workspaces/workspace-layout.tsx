@@ -32,6 +32,7 @@ import { VerifyEmailBanner } from '@/features/auth/verify-email-banner';
 import { AppFooter } from '@/features/shell/app-footer';
 import { AppHeader, SidebarAccount, SkipLink } from '@/features/shell/app-header';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
+import { useShowsTable, type TablePage } from '@/features/view-mode/view-mode';
 import { cn } from '@/lib/utils';
 import { CurrentWorkspaceContext } from './current-workspace';
 import { pickWorkspace, rememberLastWorkspace } from './last-workspace';
@@ -64,13 +65,14 @@ const sections: Section[] = [
 
 // One element, two layouts: a tab of the bottom bar on the phone, a row of the sidebar from md.
 // The active one is told by more than its color (ADR 0043): a pill behind the icon on the
-// phone; from md, a filled row in bold with a blue bar at its left edge.
+// phone; from md, a filled row in bold with a blue bar at its left edge and a blue icon. There
+// the text keeps the foreground color: blue on the blue fill falls below 4.5:1 (WCAG 1.4.3).
 const navItemClassName =
-  'group text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex h-14 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium outline-none focus-visible:ring-3 md:h-9 md:flex-row md:justify-start md:gap-3 md:px-3 md:text-sm md:hover:bg-sidebar-accent aria-[current=page]:text-primary relative md:aria-[current=page]:bg-primary/15 md:aria-[current=page]:font-semibold md:aria-[current=page]:before:absolute md:aria-[current=page]:before:inset-y-2 md:aria-[current=page]:before:left-0 md:aria-[current=page]:before:w-[3px] md:aria-[current=page]:before:rounded-full md:aria-[current=page]:before:bg-primary';
+  'group text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex h-14 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium outline-none focus-visible:ring-3 md:h-9 md:flex-row md:justify-start md:gap-3 md:px-3 md:text-sm md:hover:bg-sidebar-accent aria-[current=page]:text-primary md:aria-[current=page]:text-foreground relative md:aria-[current=page]:bg-primary/15 md:aria-[current=page]:font-semibold md:aria-[current=page]:before:absolute md:aria-[current=page]:before:inset-y-2 md:aria-[current=page]:before:left-0 md:aria-[current=page]:before:w-[3px] md:aria-[current=page]:before:rounded-full md:aria-[current=page]:before:bg-primary';
 
 /** The icon of a tab; on the phone, the active tab's icon sits in a pill. */
 const navIconClassName =
-  'flex h-7 w-14 items-center justify-center rounded-full group-aria-[current=page]:bg-primary/15 group-data-[active=true]:bg-primary/15 md:contents';
+  'flex h-7 w-14 items-center justify-center rounded-full group-aria-[current=page]:bg-primary/15 group-data-[active=true]:bg-primary/15 md:contents md:group-aria-[current=page]:text-primary';
 
 function useSectionLinks(workspaceId: string) {
   const [searchParams] = useSearchParams();
@@ -218,7 +220,12 @@ function WorkspaceFrame({
   const desktop = useMediaQuery(DESKTOP_QUERY);
   // Lists and forms keep a reading width; a page of blocks side by side (the dashboard) asks
   // for more with `handle: { wide: true }` on its route (ADR 0045).
-  const wide = useMatches().some((match) => (match.handle as { wide?: boolean } | undefined)?.wide);
+  const handles = useMatches().map(
+    (match) => (match.handle as { wide?: boolean; table?: TablePage } | undefined) ?? {},
+  );
+  // A list shown as a table also takes the wide column, only while it is a table (ADR 0045 note).
+  const table = useShowsTable(handles.find((handle) => handle.table)?.table);
+  const wide = handles.some((handle) => handle.wide) || table;
   const width = wide ? 'max-w-6xl' : 'max-w-3xl';
   const opened = workspace.isSuccess ? workspace.data.id : null;
   useEffect(() => {

@@ -582,12 +582,13 @@ async function main() {
         for (const problem of problems)
           console.log(`  ${target.name} (${viewport.width}px): ${problem}`);
       }
-      // Accessibility, on the phone in each theme: the layout matters less than the colors.
-      if (viewport.width < 768) {
+      // Accessibility in each theme, on the phone and on the desktop: the sidebar only exists on
+      // the second, and its active row once failed contrast unseen.
+      if (viewport.width < 768 || viewport.width >= 1280) {
         const violations = await accessibilityChecks(page);
         a11yCount += violations.length;
         for (const violation of violations)
-          console.log(`  ${target.name} (${colorScheme}): ${violation}`);
+          console.log(`  ${target.name} (${viewport.width}px, ${colorScheme}): ${violation}`);
       }
       await page.close();
     }

@@ -16,11 +16,14 @@ export const settledLabels = {
   DEBIT: 'Pago',
 } as const satisfies Record<TransactionType, string>;
 
-/** The action that settles a transaction, and the one that takes it back. */
+/**
+ * The action that settles a transaction, its short label on the row's button (beside the status
+ * badge, it reads as what to do; the full one is in the menu), and the one that takes it back.
+ */
 export const settleActionLabels = {
-  CREDIT: { settle: 'Marcar como recebido', unsettle: 'Desmarcar recebimento' },
-  DEBIT: { settle: 'Marcar como pago', unsettle: 'Desmarcar pagamento' },
-} as const satisfies Record<TransactionType, { settle: string; unsettle: string }>;
+  CREDIT: { settle: 'Marcar como recebido', short: 'Receber', unsettle: 'Desmarcar recebimento' },
+  DEBIT: { settle: 'Marcar como pago', short: 'Pagar', unsettle: 'Desmarcar pagamento' },
+} as const satisfies Record<TransactionType, { settle: string; short: string; unsettle: string }>;
 
 /** The statuses that are not settled; the settled one depends on the type (`settledLabels`). */
 export const PENDING_LABEL = 'Pendente';

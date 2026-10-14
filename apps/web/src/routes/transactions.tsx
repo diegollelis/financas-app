@@ -14,8 +14,8 @@ import {
   type Transaction,
   type TransactionType,
 } from '@financas/shared';
-import { CreditCard, Ellipsis, Plus, Repeat, Users } from 'lucide-react';
-import { useRef, useState, type RefObject } from 'react';
+import { Circle, CreditCard, Ellipsis, Plus, Repeat, Users } from 'lucide-react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { toast } from 'sonner';
 import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
@@ -34,6 +34,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +69,10 @@ import {
   useTransactions,
   useUpdateTransaction,
 } from '@/features/transactions/use-transactions';
+import { sortRows, useSort, type SortValue } from '@/features/view-mode/sort';
+import { SortableHead } from '@/features/view-mode/sortable-head';
+import { useShowsTable } from '@/features/view-mode/view-mode';
+import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -235,21 +247,46 @@ function EndSeriesDialog({
  */
 const WRAPPING_BADGE = 'h-auto max-w-full justify-start rounded-md text-left whitespace-normal';
 
-/**
- * One transaction: what it is, how much, its status and, for EDITORs, one inline action
- * (settle) plus the rest in a menu (ADR 0036).
- */
-function TransactionItem({
-  workspaceId,
+/** What a transaction is part of and who it involves: the same badges in the list and the table. */
+function LinkBadges({
   transaction,
-  category,
-  merchantName,
   personName,
   sharedWith,
-  canEdit,
-  today,
-  onEdit,
 }: {
+  transaction: Transaction;
+  personName: string | null;
+  sharedWith: string[];
+}) {
+  return (
+    <>
+      {transaction.recurrenceId && (
+        <Badge variant="secondary">
+          <Repeat aria-hidden />
+          Todo mês
+        </Badge>
+      )}
+      {transaction.installment && (
+        <Badge variant="secondary">
+          <CreditCard aria-hidden />
+          Parcela {transaction.installment.number}/{transaction.installment.count}
+        </Badge>
+      )}
+      {personName && (
+        <Badge variant="secondary" className={WRAPPING_BADGE}>
+          {transaction.type === 'CREDIT' ? 'A receber de' : 'A pagar para'} {personName}
+        </Badge>
+      )}
+      {sharedWith.length > 0 && (
+        <Badge variant="secondary" className={WRAPPING_BADGE}>
+          <Users aria-hidden />
+          Dividido com {sharedWith.join(', ')}
+        </Badge>
+      )}
+    </>
+  );
+}
+
+type RowProps = {
   workspaceId: string;
   transaction: Transaction;
   category: Category | undefined;
@@ -262,7 +299,19 @@ function TransactionItem({
   canEdit: boolean;
   today: string;
   onEdit: (transaction: Transaction, returnFocusTo: HTMLElement | null) => void;
-}) {
+};
+
+/**
+ * What an EDITOR can do with a transaction, for a row of the list or of the table: one inline
+ * action (settle) and the rest in a menu, with the dialogs they open (ADR 0036).
+ */
+function useRowActions({
+  workspaceId,
+  transaction,
+  sharedWith,
+  today,
+  onEdit,
+}: Pick<RowProps, 'workspaceId' | 'transaction' | 'sharedWith' | 'today' | 'onEdit'>) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [repeating, setRepeating] = useState(false);
@@ -296,61 +345,103 @@ function TransactionItem({
       },
     );
 
-  return (
-    <li className="flex items-start gap-3 py-3">
-      <div className="grid min-w-0 flex-1 justify-items-start gap-1">
-        <p className="font-medium break-words">{description}</p>
-        <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
-          <span>{category?.name ?? 'Categoria'}</span>
-          {merchantName && <span>{merchantName}</span>}
-          {transaction.dueDate && <span>Vence em {formatIsoDate(transaction.dueDate)}</span>}
-        </p>
-        {transaction.notes && (
-          <p className="text-muted-foreground text-sm break-words">{transaction.notes}</p>
+  // Settles today in one tap; an estimate first asks for the bill's amount.
+  const settleNow = () => (estimated ? setAskingAmount(true) : settle(today, settledToast));
+
+  return {
+    estimated,
+    settleRef,
+    settleButton: {
+      short: labels.short,
+      // Starts with the visible text, so a voice command finds it (WCAG 2.5.3).
+      ariaLabel: `${labels.short}: ${description}`,
+      disabled: update.isPending,
+      onClick: settleNow,
+    },
+    menu: (
+      <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              ref={actionsRef}
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Ações de ${description}`}
+            >
+              <Ellipsis aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-max">
+            <DropdownMenuItem onSelect={() => onEdit(transaction, actionsRef.current)}>
+              Editar
+            </DropdownMenuItem>
+            {!transaction.settledAt && (
+              // Also in words here: the row's button is the short "Pagar" / "Receber".
+              <DropdownMenuItem disabled={update.isPending} onSelect={settleNow}>
+                {labels.settle}
+              </DropdownMenuItem>
+            )}
+            {transaction.settledAt && (
+              <DropdownMenuItem
+                disabled={update.isPending}
+                onSelect={() =>
+                  settle(
+                    null,
+                    transaction.type === 'CREDIT'
+                      ? 'Recebimento desmarcado'
+                      : 'Pagamento desmarcado',
+                  )
+                }
+              >
+                {labels.unsettle}
+              </DropdownMenuItem>
+            )}
+            {repeatable && (
+              <DropdownMenuItem onSelect={() => setRepeating(true)}>
+                Tornar recorrente
+              </DropdownMenuItem>
+            )}
+            {inSeries && (
+              <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
+                {transaction.installment ? 'Encerrar parcelamento' : 'Encerrar recorrência'}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
+              {transaction.installment
+                ? 'Excluir só esta parcela'
+                : transaction.recurrenceId
+                  ? 'Excluir só este mês'
+                  : 'Excluir'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <DeleteDialog
+          workspaceId={workspaceId}
+          transaction={transaction}
+          shares={{ names: sharedWith, count: sharedWith.length }}
+          open={confirmingDelete}
+          onOpenChange={setConfirmingDelete}
+          returnFocusTo={actionsRef}
+        />
+        {repeatable && (
+          <RepeatDialog
+            workspaceId={workspaceId}
+            transaction={transaction}
+            open={repeating}
+            onOpenChange={setRepeating}
+            returnFocusTo={actionsRef}
+          />
         )}
-        <span className="flex flex-wrap gap-1.5">
-          <StatusBadge transaction={transaction} today={today} />
-          {transaction.recurrenceId && (
-            <Badge variant="secondary">
-              <Repeat aria-hidden />
-              Todo mês
-            </Badge>
-          )}
-          {transaction.installment && (
-            <Badge variant="secondary">
-              <CreditCard aria-hidden />
-              Parcela {transaction.installment.number}/{transaction.installment.count}
-            </Badge>
-          )}
-          {personName && (
-            <Badge variant="secondary" className={WRAPPING_BADGE}>
-              {transaction.type === 'CREDIT' ? 'A receber de' : 'A pagar para'} {personName}
-            </Badge>
-          )}
-          {sharedWith.length > 0 && (
-            <Badge variant="secondary" className={WRAPPING_BADGE}>
-              <Users aria-hidden />
-              Dividido com {sharedWith.join(', ')}
-            </Badge>
-          )}
-        </span>
-        {canEdit && !transaction.settledAt && (
-          // One tap: settled today; an estimate first asks for the bill's amount. The date can be
-          // fixed later by editing. Under the badges, not beside the amount: "Marcar como
-          // recebido" does not fit next to the description on a 360px screen (ADR 0051).
-          <Button
-            ref={settleRef}
-            variant="secondary"
-            size="sm"
-            className="mt-1"
-            aria-label={`${labels.settle}: ${description}`}
-            disabled={update.isPending}
-            onClick={() => (estimated ? setAskingAmount(true) : settle(today, settledToast))}
-          >
-            {labels.settle}
-          </Button>
+        {inSeries && (
+          <EndSeriesDialog
+            workspaceId={workspaceId}
+            transaction={transaction}
+            open={confirmingEnd}
+            onOpenChange={setConfirmingEnd}
+            returnFocusTo={actionsRef}
+          />
         )}
-        {canEdit && estimated && (
+        {estimated && (
           <SettleWithAmount
             transaction={transaction}
             open={askingAmount}
@@ -361,96 +452,203 @@ function TransactionItem({
             onSettle={settleWithAmount}
           />
         )}
+      </>
+    ),
+  };
+}
+
+/**
+ * "Pagar" / "Receber" on the row, beside the menu (ADR 0036 note): an empty circle, as a to-do
+ * not yet ticked; one tap, the same in the list and the table; named with the transaction for screen readers.
+ */
+function SettleButton({
+  settleRef,
+  short,
+  ariaLabel,
+  disabled,
+  onClick,
+}: {
+  settleRef: RefObject<HTMLButtonElement | null>;
+  short: string;
+  ariaLabel: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      ref={settleRef}
+      // Outlined: plainly a button beside the status badges, without the brand color of the
+      // page's main action.
+      variant="outline"
+      size="sm"
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <Circle aria-hidden />
+      {short}
+    </Button>
+  );
+}
+
+/** The amount, and "Estimado" under it while a variable bill's month is an estimate. */
+function Amount({ transaction, estimated }: { transaction: Transaction; estimated: boolean }) {
+  return (
+    <span className="grid justify-items-end">
+      <span className="text-base font-semibold tabular-nums">
+        {formatCents(transaction.amountCents)}
+      </span>
+      {/* In words, in text colors: an estimate is not a status of its own (ADR 0038). */}
+      {estimated && <span className="text-muted-foreground text-xs">Estimado</span>}
+    </span>
+  );
+}
+
+/**
+ * One transaction in the list: what it is, how much, its status and, for EDITORs, one inline
+ * action ("Pagar" / "Receber") plus the rest in a menu (ADR 0036).
+ */
+function TransactionItem(props: RowProps) {
+  const { transaction, category, merchantName, personName, sharedWith, canEdit, today } = props;
+  const { estimated, settleRef, settleButton, menu } = useRowActions(props);
+
+  return (
+    <li className="flex items-start gap-3 py-3">
+      <div className="grid min-w-0 flex-1 justify-items-start gap-1">
+        <p className="font-medium break-words">{transaction.description}</p>
+        <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
+          <span>{category?.name ?? 'Categoria'}</span>
+          {merchantName && <span>{merchantName}</span>}
+          {transaction.dueDate && <span>Vence em {formatIsoDate(transaction.dueDate)}</span>}
+        </p>
+        {transaction.notes && (
+          <p className="text-muted-foreground text-sm break-words">{transaction.notes}</p>
+        )}
+        <span className="flex flex-wrap gap-1.5">
+          <StatusBadge transaction={transaction} today={today} />
+          <LinkBadges transaction={transaction} personName={personName} sharedWith={sharedWith} />
+        </span>
       </div>
       <div className="grid shrink-0 justify-items-end gap-2">
-        <span className="grid justify-items-end">
-          <span className="text-base font-semibold tabular-nums">
-            {formatCents(transaction.amountCents)}
-          </span>
-          {/* In words, in text colors: an estimate is not a status of its own (ADR 0038). */}
-          {estimated && <span className="text-muted-foreground text-xs">Estimado</span>}
-        </span>
+        <Amount transaction={transaction} estimated={estimated} />
         {canEdit && (
-          <div className="flex items-center gap-2 md:gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  ref={actionsRef}
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Ações de ${description}`}
-                >
-                  <Ellipsis aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-max">
-                <DropdownMenuItem onSelect={() => onEdit(transaction, actionsRef.current)}>
-                  Editar
-                </DropdownMenuItem>
-                {transaction.settledAt && (
-                  <DropdownMenuItem
-                    disabled={update.isPending}
-                    onSelect={() =>
-                      settle(
-                        null,
-                        transaction.type === 'CREDIT'
-                          ? 'Recebimento desmarcado'
-                          : 'Pagamento desmarcado',
-                      )
-                    }
-                  >
-                    {labels.unsettle}
-                  </DropdownMenuItem>
-                )}
-                {repeatable && (
-                  <DropdownMenuItem onSelect={() => setRepeating(true)}>
-                    Tornar recorrente
-                  </DropdownMenuItem>
-                )}
-                {inSeries && (
-                  <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
-                    {transaction.installment ? 'Encerrar parcelamento' : 'Encerrar recorrência'}
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
-                  {transaction.installment
-                    ? 'Excluir só esta parcela'
-                    : transaction.recurrenceId
-                      ? 'Excluir só este mês'
-                      : 'Excluir'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DeleteDialog
-              workspaceId={workspaceId}
-              transaction={transaction}
-              shares={{ names: sharedWith, count: sharedWith.length }}
-              open={confirmingDelete}
-              onOpenChange={setConfirmingDelete}
-              returnFocusTo={actionsRef}
-            />
-            {repeatable && (
-              <RepeatDialog
-                workspaceId={workspaceId}
-                transaction={transaction}
-                open={repeating}
-                onOpenChange={setRepeating}
-                returnFocusTo={actionsRef}
-              />
-            )}
-            {inSeries && (
-              <EndSeriesDialog
-                workspaceId={workspaceId}
-                transaction={transaction}
-                open={confirmingEnd}
-                onOpenChange={setConfirmingEnd}
-                returnFocusTo={actionsRef}
-              />
-            )}
+          // The date can be fixed later by editing.
+          // Stacked on the phone, so the description keeps its width; side by side from md.
+          <div className="flex flex-col items-end gap-2 md:flex-row md:items-center md:gap-1">
+            {!transaction.settledAt && <SettleButton settleRef={settleRef} {...settleButton} />}
+            {menu}
           </div>
         )}
       </div>
     </li>
+  );
+}
+
+/** One transaction as a table row, from xl ("Ver como: Tabela"): the same data and actions. */
+function TransactionRow(props: RowProps) {
+  const { transaction, category, merchantName, personName, sharedWith, canEdit, today } = props;
+  const { estimated, settleRef, settleButton, menu } = useRowActions(props);
+
+  return (
+    <TableRow>
+      <TableCell className="tabular-nums">
+        {transaction.dueDate ? formatIsoDate(transaction.dueDate) : '—'}
+      </TableCell>
+      <TableCell className="whitespace-normal">
+        <div className="grid justify-items-start gap-1">
+          <span className="font-medium break-words">{transaction.description}</span>
+          {transaction.notes && (
+            <span className="text-muted-foreground break-words">{transaction.notes}</span>
+          )}
+          <span className="flex flex-wrap gap-1.5 empty:hidden">
+            <LinkBadges transaction={transaction} personName={personName} sharedWith={sharedWith} />
+          </span>
+        </div>
+      </TableCell>
+      <TableCell className="whitespace-normal">{category?.name ?? 'Categoria'}</TableCell>
+      <TableCell className="whitespace-normal">{merchantName ?? '—'}</TableCell>
+      <TableCell>
+        <StatusBadge transaction={transaction} today={today} />
+      </TableCell>
+      <TableCell className="text-right">
+        <Amount transaction={transaction} estimated={estimated} />
+      </TableCell>
+      {canEdit && (
+        <TableCell>
+          <div className="flex items-center justify-end gap-1">
+            {!transaction.settledAt && <SettleButton settleRef={settleRef} {...settleButton} />}
+            {menu}
+          </div>
+        </TableCell>
+      )}
+    </TableRow>
+  );
+}
+
+type SortKey = 'dueDate' | 'description' | 'category' | 'merchant' | 'amount';
+
+/** A section's transactions as a table, sorted by the column clicked (by due date at first). */
+function TransactionTable({
+  rows,
+  canEdit,
+  categoryName,
+  merchantName,
+  renderRow,
+}: {
+  rows: Transaction[];
+  canEdit: boolean;
+  categoryName: (transaction: Transaction) => string | null;
+  merchantName: (transaction: Transaction) => string | null;
+  renderRow: (transaction: Transaction) => ReactNode;
+}) {
+  const sort = useSort<SortKey>('dueDate');
+  const values: Record<SortKey, (transaction: Transaction) => SortValue> = {
+    dueDate: (transaction) => transaction.dueDate,
+    description: (transaction) => transaction.description,
+    category: categoryName,
+    merchant: merchantName,
+    amount: (transaction) => transaction.amountCents,
+  };
+  const head = (key: SortKey, label: string, align?: 'right') => (
+    <SortableHead
+      label={label}
+      active={sort.key === key}
+      direction={sort.direction}
+      onSort={() => sort.toggle(key)}
+      align={align}
+    />
+  );
+  return (
+    <div className="rounded-xl border px-2">
+      {/* Fixed widths: the tables of both sections line up, and the description takes the rest. */}
+      <Table className="table-fixed">
+        <colgroup>
+          <col className="w-28" />
+          <col />
+          <col className="w-32" />
+          <col className="w-36" />
+          <col className="w-32" />
+          <col className="w-28" />
+          {canEdit && <col className="w-32" />}
+        </colgroup>
+        <TableHeader>
+          <TableRow>
+            {head('dueDate', 'Vencimento')}
+            {head('description', 'Descrição')}
+            {head('category', 'Categoria')}
+            {head('merchant', 'Estabelecimento')}
+            <TableHead>Situação</TableHead>
+            {head('amount', 'Valor', 'right')}
+            {canEdit && (
+              <TableHead>
+                <span className="sr-only">Ações</span>
+              </TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>{sortRows(rows, values[sort.key], sort.direction).map(renderRow)}</TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -484,6 +682,28 @@ export function TransactionsPage() {
   // Finding one in a long month: by status (in the address) and by what was typed.
   const [statusFilter, setStatusFilter] = useStatusFilter();
   const [search, setSearch] = useState('');
+  // "Ver como: Tabela", from xl (ADR 0045 note); the list everywhere else.
+  const asTable = useShowsTable('lancamentos');
+  const categoryName = (transaction: Transaction) =>
+    categories.data?.find((item) => item.id === transaction.categoryId)?.name ?? null;
+  // One transaction, as a list item or a table row: the same data either way.
+  const row = (transaction: Transaction, Row: typeof TransactionItem) => (
+    <Row
+      key={transaction.id}
+      workspaceId={workspaceId}
+      transaction={transaction}
+      category={categories.data?.find((item) => item.id === transaction.categoryId)}
+      merchantName={merchantName(transaction.merchantId)}
+      personName={personName(transaction.personId)}
+      // The shares of a split debit are credits of the same competência.
+      sharedWith={(transactions.data ?? [])
+        .filter((item) => item.splitOfId === transaction.id)
+        .map((item) => personName(item.personId) ?? 'alguém')}
+      canEdit={canEdit}
+      today={today}
+      onEdit={openForm}
+    />
+  );
   const filtering = statusFilter !== 'todos' || search.trim() !== '';
   const shown = (transaction: Transaction) =>
     matchesStatus(transaction, statusFilter, today) &&
@@ -517,6 +737,7 @@ export function TransactionsPage() {
         }
       >
         <PeriodNav period={period} />
+        <ViewModeToggle page="lancamentos" />
         {ready && transactions.data.length > 0 && (
           // The search on a row of its own at every width: beside the filter it was squeezed to a
           // sliver once the filter read "Pagos e recebidos" (ADR 0051).
@@ -582,27 +803,17 @@ export function TransactionsPage() {
                       ? `Nenhuma ${singular} com esse filtro.`
                       : `Nenhuma ${singular} em ${formatPeriod(period)}.`}
                   </p>
+                ) : asTable ? (
+                  <TransactionTable
+                    rows={items}
+                    canEdit={canEdit}
+                    categoryName={categoryName}
+                    merchantName={(transaction) => merchantName(transaction.merchantId)}
+                    renderRow={(transaction) => row(transaction, TransactionRow)}
+                  />
                 ) : (
                   <ul className="divide-y rounded-xl border px-4">
-                    {items.map((transaction) => (
-                      <TransactionItem
-                        key={transaction.id}
-                        workspaceId={workspaceId}
-                        transaction={transaction}
-                        category={categories.data.find(
-                          (item) => item.id === transaction.categoryId,
-                        )}
-                        merchantName={merchantName(transaction.merchantId)}
-                        personName={personName(transaction.personId)}
-                        // The shares of a split debit are credits of the same competência.
-                        sharedWith={transactions.data
-                          .filter((item) => item.splitOfId === transaction.id)
-                          .map((item) => personName(item.personId) ?? 'alguém')}
-                        canEdit={canEdit}
-                        today={today}
-                        onEdit={openForm}
-                      />
-                    ))}
+                    {items.map((transaction) => row(transaction, TransactionItem))}
                   </ul>
                 )}
               </section>

@@ -168,3 +168,13 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
   - **"Ir para o mês atual" fica dentro do seletor,** e só fora do mês atual.
   - O seletor abre numa **gaveta no celular** (`ResponsiveDialog`) e num **balão no desktop** (`Popover` do shadcn, sem escurecer a tela).
 - **Fora do mês atual,** um pequeno ponto ao lado do nome avisa que você não está no mês de hoje. O mesmo aviso vai no nome acessível do botão ("…, fora do mês atual"), para não depender só do visual.
+
+## Nota (ação da linha de um lançamento, 2026-10-14)
+
+- **"○ Pagar" / "○ Receber",** um botão com contorno ao lado do ⋯, no lugar de "Marcar como pago" por extenso embaixo dos selos. O cartão perde uma linha no celular, e a lista e a tabela têm os mesmos dois controles.
+- **Por que essas palavras:** o botão diz o que fazer, ao lado do selo que diz o estado ("Pendente", "Vencido"). "Paguei" e "Recebi" foram testados e liam como um estado já cumprido. O círculo vazio é a convenção de "a fazer"; o ✓ diria "feito".
+- **Por que contorno:** o fundo cinza claro da variante `secondary` se confundia com os selos. O azul cheio fica só para a ação principal da página ("Novo lançamento").
+- **O menu ⋯ ganha "Marcar como pago / recebido"** por extenso, ao lado de "Desmarcar"; uma conta estimada continua pedindo o valor real pelos dois caminhos.
+- **O nome acessível começa pelo texto visível** ("Pagar: Conta de luz"), para quem usa comando de voz (WCAG 2.5.3). O axe apontou o nome anterior.
+- **No celular,** os dois botões ficam empilhados embaixo do valor, para a descrição manter a largura; do md em diante, lado a lado.
+- **Na mesma rodada,** o link ativo da barra lateral passou a ter o texto na cor normal (o azul sobre o fundo azul claro dava 3,89:1), com o ícone e a barrinha azuis marcando a seção; e o script de capturas passou a rodar o axe também em 1280 px, onde a barra lateral existe.
