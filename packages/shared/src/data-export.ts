@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
+import { paymentMethodSchema } from './payment-method.ts';
 import { workspaceRoleSchema } from './workspace.ts';
 
 /**
@@ -42,6 +43,7 @@ const exportTransactionSchema = z.object({
   personId: z.uuid().nullable(),
   /** Where it was bought or who paid it (ADR 0053). */
   merchantId: z.uuid().nullable(),
+  paymentMethod: paymentMethodSchema.nullable(),
   splitOfId: z.uuid().nullable(),
   createdAt: instant,
   updatedAt: instant,
@@ -95,6 +97,7 @@ const exportRecurrenceSchema = z.object({
   dueMonthOffset: z.number().int(),
   personId: z.uuid().nullable(),
   merchantId: z.uuid().nullable(),
+  paymentMethod: paymentMethodSchema.nullable(),
   startPeriod: period,
   endPeriod: period.nullable(),
   /** The competências it already generated a transaction for. */
@@ -123,6 +126,7 @@ const exportInstallmentPlanSchema = z.object({
   dueMonthOffset: z.number().int(),
   personId: z.uuid().nullable(),
   merchantId: z.uuid().nullable(),
+  paymentMethod: paymentMethodSchema.nullable(),
   endedAt: instant.nullable(),
   createdAt: instant,
 });

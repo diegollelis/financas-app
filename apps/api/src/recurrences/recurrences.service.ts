@@ -46,6 +46,7 @@ function toResponse(recurrence: RecurrenceWithShares): Recurrence {
     dueMonthOffset: recurrence.dueMonthOffset,
     personId: recurrence.personId,
     merchantId: recurrence.merchantId,
+    paymentMethod: recurrence.paymentMethod,
     startPeriod: recurrence.startPeriod,
     endPeriod: recurrence.endPeriod,
     split: recurrence.shares.map(({ personId, amountCents, basisPoints }) => ({
@@ -115,6 +116,7 @@ export class RecurrencesService {
         dueMonthOffset: input.dueMonthOffset ?? 0,
         personId: input.personId ?? null,
         merchantId: input.merchantId ?? null,
+        paymentMethod: input.paymentMethod ?? null,
         startPeriod: input.startPeriod,
         shares: {
           create: (input.split ?? []).map((share, index) => ({
@@ -184,6 +186,7 @@ export class RecurrencesService {
           dueMonthOffset,
           personId: transaction.personId,
           merchantId: transaction.merchantId,
+          paymentMethod: transaction.paymentMethod,
           startPeriod: transaction.period,
           // The transaction is this month's: it keeps its amount, real even in a variable one.
           occurrences: {
@@ -243,6 +246,7 @@ export class RecurrencesService {
         dueMonthOffset: input.dueMonthOffset,
         personId: input.personId,
         merchantId: input.merchantId,
+        paymentMethod: input.paymentMethod,
       },
       include: { shares: true },
     });
@@ -263,6 +267,7 @@ export class RecurrencesService {
           categoryId: input.categoryId,
           personId: input.personId,
           merchantId: input.merchantId,
+          paymentMethod: input.paymentMethod,
           amountCents: keepsAmount ? undefined : input.amountCents,
           // Turned fixed: what was an estimate becomes the amount.
           amountEstimated: input.variableAmount === false ? false : undefined,
@@ -407,6 +412,7 @@ export class RecurrencesService {
               categoryId: recurrence.categoryId,
               personId: recurrence.personId,
               merchantId: recurrence.merchantId,
+              paymentMethod: recurrence.paymentMethod,
               amountCents,
               amountEstimated: recurrence.variableAmount,
               period,

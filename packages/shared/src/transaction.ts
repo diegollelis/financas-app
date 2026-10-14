@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
 import { amountCentsSchema, isoDateSchema, periodSchema } from './money-and-dates.ts';
+import { paymentMethodSchema } from './payment-method.ts';
 import { MAX_SPLIT_PEOPLE, personNameSchema } from './person.ts';
 
 /** Matches the `transactions.description` column (varchar 200). */
@@ -43,6 +44,8 @@ export const transactionFieldsSchema = z.object({
   personId: z.uuid().nullable().optional(),
   /** Where it was bought or who paid it (ADR 0053). */
   merchantId: z.uuid().nullable().optional(),
+  /** How it was paid or received (ADR 0054). */
+  paymentMethod: paymentMethodSchema.nullable().optional(),
 });
 
 /**
@@ -131,6 +134,8 @@ export const transactionSchema = z.object({
   personId: z.uuid().nullable().default(null),
   /** Where it was bought or who paid it (ADR 0053); null when not given. */
   merchantId: z.uuid().nullable().default(null),
+  /** How it was paid or received (ADR 0054); null when not given. */
+  paymentMethod: paymentMethodSchema.nullable().default(null),
   /** The debit this share was split from (ADR 0042); null otherwise. */
   splitOfId: z.uuid().nullable().default(null),
 });

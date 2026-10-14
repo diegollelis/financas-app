@@ -81,11 +81,11 @@ Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras
 
 **Créditos:** Salário, Renda extra, Rendimentos, Reembolso, Outros
 
-**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Educação, Lazer, Compras, Assinaturas, Cartão de crédito, Impostos e taxas, Repasse, Outros
+**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Educação, Lazer, Compras, Assinaturas, Impostos e taxas, Repasse, Outros
 
 - **"Reembolso"** recebe as partes de uma saída dividida ([ADR 0042](../adr/0042-pessoas-e-rateio.md)), e **"Repasse"** as de uma entrada dividida ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)).
 - **Os destinos de guardar padrão** são Reserva de emergência e Investimentos, e cada um cria a sua categoria de débito com o mesmo nome ([ADR 0047](../adr/0047-orcamento-real-por-destino.md)).
 
 **Histórico:** até a versão 1.0.0, a lista vinha da planilha pessoal de origem, com 14 categorias de crédito e 26 de débito, como PLR, Lote, Inglês e IPVA. Ela foi trocada pela atual antes da 1.0.0 (nota de 2026-10-10 no [ADR 0024](../adr/0024-espacos-membros-e-espaco-pessoal.md)). Os espaços criados antes continuam com as categorias que receberam. "Viagem" saiu junto com o destino padrão "Viagens".
 
-> Observação: "Cartão de crédito" como categoria esconde o que foi comprado. Uma evolução futura é tratar o cartão como **conta/fatura** com itens categorizados (novo ADR).
+> Observação: "Cartão de crédito" deixou de ser categoria padrão: como se pagou é o meio de pagamento ([ADR 0054](../adr/0054-meio-de-pagamento.md)), e a compra fica na categoria do que se comprou. Os espaços criados antes continuam com a categoria; arquivá-la a tira dos seletores. Tratar o cartão como conta com fatura continua sendo uma evolução possível (novo ADR).
