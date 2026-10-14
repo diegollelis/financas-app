@@ -99,6 +99,18 @@ export const createRecurrenceInputSchema = recurrenceFieldsSchema
 
 export type CreateRecurrenceInput = z.infer<typeof createRecurrenceInputSchema>;
 
+/**
+ * "Tornar recorrente": a transaction launched once becomes the first month of a new recurrence,
+ * which takes everything from it; nothing is duplicated.
+ */
+export const repeatTransactionInputSchema = z.object({
+  transactionId: z.uuid('Escolha um lançamento.'),
+  /** The amount changes every month (energy, water): the next months start from an estimate. */
+  variableAmount: z.boolean().optional(),
+});
+
+export type RepeatTransactionInput = z.infer<typeof repeatTransactionInputSchema>;
+
 /** The type and the start do not change: end it and create another instead. */
 export const updateRecurrenceInputSchema = recurrenceFieldsSchema
   .omit({ type: true, startPeriod: true })

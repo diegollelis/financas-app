@@ -29,6 +29,11 @@ const recurrenceRoutes: WorkspaceRoute[] = [
   { method: 'get', path: (id) => `/api/workspaces/${id}/recurrences` },
   { method: 'post', path: (id) => `/api/workspaces/${id}/recurrences`, body: {} },
   {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/recurrences/from-transaction`,
+    body: { transactionId: '01920000-0000-7000-8000-000000000999' },
+  },
+  {
     method: 'patch',
     path: (id) => `/api/workspaces/${id}/recurrences/01920000-0000-7000-8000-000000000999`,
     body: { amountCents: 100 },
@@ -255,6 +260,138 @@ describe('recurrences', () => {
 
     await viewer.browser.get(`/api/workspaces/${workspaceId}/recurrences`).expect(200);
     await viewer.browser.post(`/api/workspaces/${workspaceId}/recurrences`).send({}).expect(403);
+  });
+
+  describe('"Tornar recorrente"', () => {
+    async function launched(
+      browser: Browser,
+      base: string,
+      fields: Record<string, unknown>,
+    ): Promise<{ id: string }> {
+      const response = await browser
+        .post(`${base}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'Internet',
+          amountCents: 12_000,
+          period: thisMonth,
+          ...fields,
+        })
+        .expect(201);
+      return response.body as { id: string };
+    }
+
+    it('adopts the transaction as the first month, never duplicating it', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const merchant = (
+        (await browser.post(`${base}/merchants`).send({ name: 'Provedor Exemplo' }).expect(201))
+          .body as { id: string }
+      ).id;
+      const transaction = await launched(browser, base, {
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
+        notes: 'Plano de 500 MB',
+        dueDate: `${thisMonth}-15`,
+        merchantId: merchant,
+      });
+
+      const response = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: transaction.id })
+        .expect(201);
+
+      expect(recurrenceSchema.parse(response.body)).toMatchObject({
+        type: 'DEBIT',
+        description: 'Internet',
+        notes: 'Plano de 500 MB',
+        amountCents: 12_000,
+        dueDay: 15,
+        merchantId: merchant,
+        startPeriod: thisMonth,
+        variableAmount: false,
+        endPeriod: null,
+      });
+      const recurrenceId = (response.body as { id: string }).id;
+      const now = await transactionsOf(thisMonth);
+      expect(now).toEqual([expect.objectContaining({ id: transaction.id, recurrenceId })]);
+      expect(await transactionsOf(month(1))).toEqual([
+        expect.objectContaining({
+          description: 'Internet',
+          amountCents: 12_000,
+          dueDate: `${month(1)}-15`,
+          merchantId: merchant,
+          recurrenceId,
+        }),
+      ]);
+    });
+
+    it('keeps the real amount of the first month of a variable one', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const transaction = await launched(browser, base, {
+        description: 'Conta de luz',
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
+        amountCents: 17_250,
+      });
+
+      await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: transaction.id, variableAmount: true })
+        .expect(201);
+
+      expect((await transactionsOf(thisMonth))[0]).toMatchObject({
+        amountCents: 17_250,
+        amountEstimated: false,
+      });
+      expect((await transactionsOf(month(1)))[0]).toMatchObject({ amountEstimated: true });
+    });
+
+    it('refuses one already repeating, an installment, a split one and a share', async () => {
+      const { browser, base, categoryId, create, energy, transactionsOf } = await setUp();
+      const category = categoryId('Contas da casa', 'DEBIT');
+      await create(energy());
+      const generated = (await transactionsOf(thisMonth))[0]!;
+      await browser
+        .post(`${base}/installments`)
+        .send({
+          type: 'DEBIT',
+          description: 'Sofá',
+          categoryId: category,
+          installments: 3,
+          amountCents: 90_000,
+          amountIs: 'TOTAL',
+          firstPeriod: month(2),
+        })
+        .expect(201);
+      const installment = (await transactionsOf(month(2))).find((item) => item.installment)!;
+      const split = await launched(browser, base, {
+        description: 'Jantar',
+        categoryId: category,
+        split: [{ newPersonName: 'Ana', amountCents: 6_000 }],
+      });
+      const share = (await transactionsOf(thisMonth)).find((item) => item.splitOfId === split.id)!;
+      const repeat = (transactionId: string) =>
+        browser.post(`${base}/recurrences/from-transaction`).send({ transactionId }).expect(409);
+
+      for (const id of [generated.id, installment.id, split.id, share.id]) {
+        expect((await repeat(id)).body).toMatchObject({ code: 'NOT_REPEATABLE' });
+      }
+    });
+
+    it('answers 404 for a transaction of another workspace', async () => {
+      const { browser, base } = await setUp();
+      const other = await t.signUp(joao);
+      const otherCategory = (await categoryIds(other.browser, other.personalWorkspaceId))(
+        'Contas da casa',
+        'DEBIT',
+      );
+      const theirs = await launched(other.browser, `/api/workspaces/${other.personalWorkspaceId}`, {
+        categoryId: otherCategory,
+      });
+
+      await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: theirs.id })
+        .expect(404);
+    });
   });
 
   describe('person (ADR 0052)', () => {

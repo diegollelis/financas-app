@@ -7,9 +7,15 @@ import {
   shiftPeriod,
   type CreateRecurrenceInput,
   type Recurrence,
+  type RepeatTransactionInput,
   type UpdateRecurrenceInput,
 } from '@financas/shared';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
@@ -21,7 +27,7 @@ import {
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { toDate } from '../transactions/dates.js';
+import { toDate, toIsoDate } from '../transactions/dates.js';
 
 type RecurrenceWithShares = RecurrenceRow & { shares: RecurrenceShareRow[] };
 
@@ -117,6 +123,66 @@ export class RecurrencesService {
       include: { shares: true },
     });
     await this.materialize(workspaceId, [input.startPeriod]);
+    return toResponse(recurrence);
+  }
+
+  /**
+   * "Tornar recorrente": the transaction becomes the first month of a new recurrence that takes
+   * everything from it (type, description, notes, category, amount, due day, person, merchant),
+   * linked by its occurrence, so it is not generated again. One already in a recurrence or a
+   * plan, a split one and a share are refused: the screen does not offer them.
+   */
+  async repeat(workspaceId: string, input: RepeatTransactionInput): Promise<Recurrence> {
+    const db = this.prisma.forWorkspace(workspaceId);
+    const transaction = await db.transaction.findFirst({
+      where: { id: input.transactionId, workspaceId },
+      include: { occurrence: true, _count: { select: { shares: true } } },
+    });
+    if (!transaction) throw new NotFoundException();
+    const refuse = (message: string) => new ConflictException({ code: 'NOT_REPEATABLE', message });
+    if (transaction.occurrence) throw refuse('Este lançamento já é de uma recorrência.');
+    if (transaction.installmentPlanId)
+      throw refuse('Este lançamento é a parcela de um parcelamento.');
+    if (transaction.splitOfId) throw refuse('Esta é a parte de uma divisão.');
+    if (transaction._count.shares > 0) {
+      throw refuse(
+        'Um lançamento dividido não se torna recorrente por aqui: crie a recorrência dividida pelo Novo lançamento.',
+      );
+    }
+    // What every month will carry must still be usable.
+    await ensureUsableCategory(this.prisma, workspaceId, transaction.categoryId, transaction.type);
+    if (transaction.personId) {
+      await ensureUsablePerson(this.prisma, workspaceId, transaction.personId);
+    }
+    if (transaction.merchantId) {
+      await ensureUsableMerchant(this.prisma, workspaceId, transaction.merchantId);
+    }
+    const recurrence = await db.recurrence
+      .create({
+        data: {
+          workspaceId,
+          type: transaction.type,
+          description: transaction.description,
+          notes: transaction.notes,
+          categoryId: transaction.categoryId,
+          amountCents: transaction.amountCents,
+          variableAmount: input.variableAmount ?? false,
+          dueDay: transaction.dueDate ? Number(toIsoDate(transaction.dueDate).slice(8)) : null,
+          personId: transaction.personId,
+          merchantId: transaction.merchantId,
+          startPeriod: transaction.period,
+          // The transaction is this month's: it keeps its amount, real even in a variable one.
+          occurrences: {
+            create: { period: transaction.period, workspaceId, transactionId: transaction.id },
+          },
+        },
+        include: { shares: true },
+      })
+      .catch((error: unknown) => {
+        // Made recurrent at the same time by another request: its occurrence came first.
+        if (isDuplicate(error)) throw refuse('Este lançamento já é de uma recorrência.');
+        throw error;
+      });
     return toResponse(recurrence);
   }
 
