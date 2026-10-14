@@ -81,7 +81,11 @@ export const routes: RouteObject[] = [
               // Charts and the category ranking side by side from xl (ADR 0045).
               { path: 'analise', element: <AnalysisPage />, handle: { wide: true } },
               // Recurrences and installment plans (ADR 0038).
-              { path: 'recorrencias', element: <RecurrencesPage /> },
+              {
+                path: 'recorrencias',
+                element: <RecurrencesPage />,
+                handle: { table: 'recorrencias' },
+              },
               { path: 'pessoas', element: <PeoplePage /> },
               // Where a transaction was bought or who paid it (ADR 0053).
               { path: 'estabelecimentos', element: <MerchantsPage /> },

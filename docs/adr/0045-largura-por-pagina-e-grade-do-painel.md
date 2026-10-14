@@ -59,8 +59,8 @@ Do xl em diante, os blocos 1 e 2 ficam lado a lado, e a tabela ocupa a largura t
 
 ## Nota (2026-10-14): listas que viram tabela
 
-- **Lançamentos (e, no próximo passo, Recorrências) podem ser vistas como tabela:** "Ver como: Lista | Tabela", acima da busca, lembrado neste navegador (`localStorage`, `features/view-mode/`).
+- **Lançamentos e Recorrências podem ser vistas como tabela:** "Ver como: Lista | Tabela", acima da busca, lembrado neste navegador (`localStorage`, `features/view-mode/`).
 - **Só a partir de 1280 px (xl).** Em 768 e em 1024, ao lado da barra lateral, sobram de 500 a 740 px, e a descrição ficava espremida entre seis colunas. Abaixo disso o seletor nem aparece, e a página continua a lista; no celular, também com "Tabela" escolhida.
-- **A tabela usa a coluna larga** desta ADR, mas só enquanto é tabela: a rota declara `handle: { table: 'lancamentos' }`, e a `WorkspaceLayout` passa a `max-w-6xl` quando a página dessa rota mostra a tabela (`useShowsTable`). A lista continua na largura de leitura.
-- **Colunas de largura fixa** (`table-fixed`), para as tabelas de Entradas e Saídas se alinharem; a descrição fica com o resto.
+- **A tabela usa a coluna larga** desta ADR, mas só enquanto é tabela: a rota declara `handle: { table: 'lancamentos' }` (ou `'recorrencias'`), e a `WorkspaceLayout` passa a `max-w-6xl` quando a página dessa rota mostra a tabela (`useShowsTable`). A lista continua na largura de leitura.
+- **Colunas de largura fixa** (`table-fixed`), para as tabelas de Entradas e Saídas (e as ativas e encerradas de Recorrências) se alinharem; a descrição fica com o resto. Em Recorrências, a tabela é genérica (`SeriesTable`, com as colunas declaradas pela página), e as encerradas não têm coluna de ações.
 - **Clicar no título ordena** (`sortRows`, `SortableHead` com `aria-sort`); de novo, inverte. A ordem inicial é a da lista, por vencimento, os sem data no fim.

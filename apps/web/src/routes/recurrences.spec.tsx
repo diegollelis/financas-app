@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { verifiedUser, mockApi } from '@/test/mock-api';
+import { stubPrefersDark } from '@/test/match-media';
 import { renderApp } from '@/test/render';
 
 // Fictitious data (ADR 0019).
@@ -385,5 +386,54 @@ describe('RecurrencesPage', () => {
       'href',
       `/espacos/${houseId}/lancamentos`,
     );
+  });
+
+  describe('as a table (from xl)', () => {
+    /** The first cell of each body row of a table: the descriptions, top to bottom. */
+    const descriptions = (table: HTMLElement) =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+
+    it('keeps the list on the phone, even with the table chosen', async () => {
+      window.localStorage.setItem('financas:visao:recorrencias', 'TABLE');
+      mockRecurrences();
+      renderApp(page);
+
+      const monthly = await section('Todo mês');
+      expect(screen.queryByRole('radiogroup', { name: 'Ver como' })).not.toBeInTheDocument();
+      expect(within(monthly).queryByRole('table')).not.toBeInTheDocument();
+    });
+
+    it('shows each part as a table, sorted by the column clicked, with the menu on active rows', async () => {
+      stubPrefersDark(false, { wide: true });
+      mockRecurrences();
+      renderApp(page);
+
+      await userEvent.click(await screen.findByRole('radio', { name: 'Tabela' }));
+
+      const monthly = await section('Todo mês');
+      const [active, ended] = within(monthly).getAllByRole('table');
+      expect(within(active!).getByRole('row', { name: /Aluguel/ })).toHaveTextContent(
+        /Aluguel.*Saída.*Moradia.*A pagar para Ana.*Dia 10.*Desde janeiro de 2026.*R\$.1\.500,00/,
+      );
+      // By description at first; by amount, highest first, after two clicks.
+      expect(descriptions(active!)).toEqual(['Aluguel', 'Conta de luz']);
+      const amount = within(active!).getByRole('columnheader', { name: /Valor/ });
+      await userEvent.click(within(amount).getByRole('button', { name: /Valor/ }));
+      expect(descriptions(active!)).toEqual(['Conta de luz', 'Aluguel']);
+      await userEvent.click(within(amount).getByRole('button', { name: /Valor/ }));
+      expect(amount).toHaveAttribute('aria-sort', 'descending');
+      expect(descriptions(active!)).toEqual(['Aluguel', 'Conta de luz']);
+      expect(screen.getByRole('button', { name: 'Ações de Aluguel' })).toBeInTheDocument();
+      // History: no actions column.
+      expect(within(ended!).queryByRole('columnheader', { name: 'Ações' })).not.toBeInTheDocument();
+
+      const plans = await section('Parcelamentos');
+      expect(within(plans).getAllByRole('table')[0]).toHaveTextContent(
+        /Geladeira.*A pagar para Bruno.*1 de 3.*Faltam 2 parcelas/,
+      );
+    });
   });
 });
