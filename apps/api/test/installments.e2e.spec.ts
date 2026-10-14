@@ -175,6 +175,21 @@ describe('installments', () => {
     await browser.delete(`${base}/installments/${plan.id}`).expect(204);
   });
 
+  it('makes each installment due in the next month, as a card bill is', async () => {
+    const { create, fridge, transactionsOf, base, browser } = await setUp();
+
+    const plan = await create(fridge({ dueMonthOffset: 1 }));
+
+    expect(plan.dueMonthOffset).toBe(1);
+    for (const offset of [0, 1, 2]) {
+      expect((await transactionsOf(month(offset)))[0]?.dueDate).toBe(`${month(offset + 1)}-15`);
+    }
+    await browser
+      .post(`${base}/installments`)
+      .send(fridge({ dueMonthOffset: 2 }))
+      .expect(400);
+  });
+
   it('refuses an invalid number of installments or category', async () => {
     const { fridge, categoryId, base, browser } = await setUp();
 

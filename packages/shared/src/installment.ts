@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
 import { amountCentsSchema, MAX_AMOUNT_CENTS, periodSchema } from './money-and-dates.ts';
 import { MAX_SPLIT_PEOPLE } from './person.ts';
-import { dueDaySchema } from './recurrence.ts';
+import { dueDaySchema, dueMonthOffsetSchema } from './recurrence.ts';
 import {
   splitShareInputSchema,
   transactionDescriptionSchema,
@@ -36,6 +36,8 @@ export const createInstallmentPlanInputSchema = z
     /** The competência of the first installment. */
     firstPeriod: periodSchema,
     dueDay: dueDaySchema.nullable().optional(),
+    /** Each installment due in its own month (0, the default) or in the next one (1). */
+    dueMonthOffset: dueMonthOffsetSchema.optional(),
     /** "A receber de" / "a pagar para" (ADR 0052): copied to every installment. */
     personId: z.uuid().nullable().optional(),
     /** Where it was bought or who pays it (ADR 0053): copied to every installment. */
@@ -89,6 +91,7 @@ export const installmentPlanSchema = z.object({
   installments: z.number().int(),
   firstPeriod: periodSchema,
   dueDay: z.number().int().nullable(),
+  dueMonthOffset: z.number().int().default(0),
   personId: z.uuid().nullable().default(null),
   merchantId: z.uuid().nullable().default(null),
   /** When it was ended; null while it runs. */

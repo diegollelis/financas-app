@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   createRecurrenceInputSchema,
+  dueDateFor,
   dueDateIn,
+  dueMonthOffsetOf,
   estimateAmount,
   shareOfAmount,
   updateRecurrenceInputSchema,
@@ -17,6 +19,22 @@ describe('dueDateIn', () => {
     expect(dueDateIn('2026-02', 31)).toBe('2026-02-28');
     expect(dueDateIn('2028-02', 30)).toBe('2028-02-29');
     expect(dueDateIn('2026-04', 31)).toBe('2026-04-30');
+  });
+});
+
+describe('dueDateFor and dueMonthOffsetOf (ADR 0038 note)', () => {
+  it('puts the due date in the month the offset says, across the year', () => {
+    expect(dueDateFor('2026-10', 10, 0)).toBe('2026-10-10');
+    expect(dueDateFor('2026-10', 10, 1)).toBe('2026-11-10');
+    expect(dueDateFor('2026-12', 10, 1)).toBe('2027-01-10');
+    expect(dueDateFor('2027-01', 31, 1)).toBe('2027-02-28');
+  });
+
+  it('counts the months from the competência to a date', () => {
+    expect(dueMonthOffsetOf('2026-10', '2026-10-31')).toBe(0);
+    expect(dueMonthOffsetOf('2026-10', '2026-11-10')).toBe(1);
+    expect(dueMonthOffsetOf('2026-12', '2027-01-10')).toBe(1);
+    expect(dueMonthOffsetOf('2026-10', '2026-09-30')).toBe(-1);
   });
 });
 

@@ -262,6 +262,59 @@ describe('recurrences', () => {
     await viewer.browser.post(`/api/workspaces/${workspaceId}/recurrences`).send({}).expect(403);
   });
 
+  describe('due in the next month (ADR 0038 note)', () => {
+    it('makes each month due in the next one, its last day when shorter', async () => {
+      const { create, energy, transactionsOf } = await setUp();
+
+      const recurrence = await create(energy({ dueMonthOffset: 1 }));
+      await create(
+        energy({ description: 'Água', dueDay: 31, dueMonthOffset: 1, startPeriod: '2027-01' }),
+      );
+
+      expect(recurrence.dueMonthOffset).toBe(1);
+      expect((await transactionsOf(thisMonth))[0]?.dueDate).toBe(`${month(1)}-10`);
+      expect((await transactionsOf(month(1)))[0]?.dueDate).toBe(`${month(2)}-10`);
+      expect(
+        (await transactionsOf('2027-01')).find((item) => item.description === 'Água'),
+      ).toMatchObject({
+        dueDate: '2027-02-28',
+      });
+    });
+
+    it('moves the due month of the pending transactions from this month on only', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const recurrence = await create(energy({ startPeriod: month(-1) }));
+      const [settledNow] = await transactionsOf(thisMonth);
+      await transactionsOf(month(1));
+      await browser
+        .patch(`${base}/transactions/${settledNow?.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      const response = await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ dueMonthOffset: 1 })
+        .expect(200);
+
+      expect(recurrenceSchema.parse(response.body)).toMatchObject({
+        dueDay: 10,
+        dueMonthOffset: 1,
+      });
+      expect((await transactionsOf(month(-1)))[0]?.dueDate).toBe(`${month(-1)}-10`);
+      expect((await transactionsOf(thisMonth))[0]?.dueDate).toBe(`${thisMonth}-10`);
+      expect((await transactionsOf(month(1)))[0]?.dueDate).toBe(`${month(2)}-10`);
+    });
+
+    it('refuses a due date two months later', async () => {
+      const { energy, base, browser } = await setUp();
+
+      await browser
+        .post(`${base}/recurrences`)
+        .send(energy({ dueMonthOffset: 2 }))
+        .expect(400);
+    });
+  });
+
   describe('"Tornar recorrente"', () => {
     async function launched(
       browser: Browser,
@@ -322,6 +375,40 @@ describe('recurrences', () => {
           recurrenceId,
         }),
       ]);
+    });
+
+    it('keeps a due date in the next month, and refuses one further away', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const category = categoryId('Contas da casa', 'DEBIT');
+      const nextMonth = await launched(browser, base, {
+        description: 'Conta de luz',
+        categoryId: category,
+        dueDate: `${month(1)}-10`,
+      });
+      const farAway = await launched(browser, base, {
+        categoryId: category,
+        dueDate: `${month(2)}-10`,
+      });
+
+      const response = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: nextMonth.id })
+        .expect(201);
+      const refused = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: farAway.id })
+        .expect(409);
+
+      expect(recurrenceSchema.parse(response.body)).toMatchObject({
+        dueDay: 10,
+        dueMonthOffset: 1,
+      });
+      expect(
+        (await transactionsOf(month(1))).find((item) => item.description === 'Conta de luz'),
+      ).toMatchObject({
+        dueDate: `${month(2)}-10`,
+      });
+      expect(refused.body).toMatchObject({ code: 'NOT_REPEATABLE' });
     });
 
     it('keeps the real amount of the first month of a variable one', async () => {

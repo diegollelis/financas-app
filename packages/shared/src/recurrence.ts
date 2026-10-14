@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
-import { amountCentsSchema, periodSchema } from './money-and-dates.ts';
+import { amountCentsSchema, periodSchema, shiftPeriod } from './money-and-dates.ts';
 import { MAX_SPLIT_PEOPLE, personNameSchema } from './person.ts';
 import { transactionDescriptionSchema, transactionNotesSchema } from './transaction.ts';
 
@@ -15,6 +15,19 @@ export const dueDaySchema = z
   .min(1, 'Use um dia entre 1 e 31.')
   .max(31, 'Use um dia entre 1 e 31.');
 
+/** The latest month a recurrence or a plan may be due in, counted from its own (ADR 0038 note). */
+export const MAX_DUE_MONTH_OFFSET = 1;
+
+/**
+ * How many months after its competência each month is due: 0 in the same month, 1 in the next
+ * (an energy bill of October due on November 10th).
+ */
+export const dueMonthOffsetSchema = z
+  .number()
+  .int('Use 0 (mesmo mês) ou 1 (mês seguinte).')
+  .min(0, 'Use 0 (mesmo mês) ou 1 (mês seguinte).')
+  .max(MAX_DUE_MONTH_OFFSET, 'Use 0 (mesmo mês) ou 1 (mês seguinte).');
+
 /**
  * The fields of a recurrence, without the split: what an update and the web form `.omit()` or
  * `.pick()` from, since Zod refuses both on the refined create schema.
@@ -26,6 +39,8 @@ export const recurrenceFieldsSchema = z.object({
   categoryId: z.uuid('Escolha uma categoria.'),
   amountCents: amountCentsSchema,
   dueDay: dueDaySchema.nullable().optional(),
+  /** Due in the same month (0, the default) or in the next one (1). */
+  dueMonthOffset: dueMonthOffsetSchema.optional(),
   /**
    * The amount changes every month (energy, water): each month starts from the average of the
    * last 3 settled, and stays an estimate until the real one is given. Otherwise it is fixed.
@@ -130,6 +145,7 @@ export const recurrenceSchema = z.object({
   amountCents: z.number().int(),
   variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
+  dueMonthOffset: z.number().int().default(0),
   personId: z.uuid().nullable().default(null),
   merchantId: z.uuid().nullable().default(null),
   startPeriod: periodSchema,
@@ -187,4 +203,22 @@ export function dueDateIn(period: string, dueDay: number): string {
   // Day 0 of the next month is the last day of this one (UTC, so no time zone can shift it).
   const lastDay = new Date(Date.UTC(year ?? 0, month ?? 1, 0)).getUTCDate();
   return `${period}-${String(Math.min(dueDay, lastDay)).padStart(2, '0')}`;
+}
+
+/**
+ * The due date of a month that is due `dueMonthOffset` months after its competência:
+ * `dueDateFor('2026-10', 10, 1)` → '2026-11-10'.
+ */
+export function dueDateFor(period: string, dueDay: number, dueMonthOffset: number): string {
+  return dueDateIn(shiftPeriod(period, dueMonthOffset), dueDay);
+}
+
+/**
+ * How many months after the competência a date falls: `dueMonthOffsetOf('2026-12', '2027-01-10')`
+ * → 1. Negative when it falls before.
+ */
+export function dueMonthOffsetOf(period: string, isoDate: string): number {
+  const [year, month] = period.split('-').map(Number);
+  const [dueYear, dueMonth] = isoDate.split('-').map(Number);
+  return ((dueYear ?? 0) - (year ?? 0)) * 12 + (dueMonth ?? 1) - (month ?? 1);
 }

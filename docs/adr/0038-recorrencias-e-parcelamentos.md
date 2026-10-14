@@ -115,3 +115,12 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
 - **Editar uma recorrência** (descrição, categoria, Fixo | Variável, valor, dia, observações) **envia só os campos que mudaram.** A API copia cada campo recebido para os pendentes deste mês em diante. Mandar um campo igual desfaria um mês ajustado à mão, por exemplo uma observação ou um valor corrigido. Sem mudança, o formulário fecha sem chamar a API.
 - **Encerrar** pede confirmação, nas recorrências e nos parcelamentos, com o mesmo texto do menu de Lançamentos. O que é histórico (encerrado ou quitado) não tem menu, e VIEWERs só leem.
 - **Parcelamentos não se editam:** as parcelas já existem. Para mudar uma, edita-se a parcela em Lançamentos; para quitar antes, encerra-se o parcelamento.
+
+## Nota (vencimento no mês seguinte, 2026-10-14)
+
+- **O problema:** a recorrência e o parcelamento guardavam só o dia do vencimento (`dueDay`), e cada mês gerado vencia no próprio mês. A conta de luz de outubro que vence em 10/11 passava a vencer em 10/10 já no primeiro mês, e aparecia "Atrasada" antes da hora. A fatura do cartão tem o mesmo jeito: a parcela de outubro vence em novembro.
+- **Decisão:** `recurrences` e `installment_plans` ganham `due_month_offset` (0 ou 1, `CHECK`, padrão 0), quantos meses depois do mês de referência cada mês vence. O vencimento de um mês é `dueDateFor(período, dia, distância)` (`packages/shared/src/recurrence.ts`), e um dia que o mês não tem continua caindo no último dia.
+- **Só até o mês seguinte:** cobre as contas de consumo e a fatura do cartão, e a edição fica com uma escolha simples ("Mesmo mês / Mês seguinte"). Um vencimento antes do mês de referência, ou dois meses depois, é recusado.
+- **Os registros antigos ficam com 0,** como eram. Para corrigir uma recorrência criada antes, edita-se a distância, e a API recalcula o vencimento dos pendentes deste mês em diante, como já fazia com o dia. Os pagos e os meses passados ficam como estão.
+- **"Tornar recorrente"** tira a distância da data do próprio lançamento, e um lançamento que vence longe demais do seu mês é recusado (`NOT_REPEATABLE`).
+- **Na tela,** o formulário calcula o dia e a distância da data digitada em "Todo mês" e "Parcelado". O lançamento avulso continua aceitando qualquer data.
