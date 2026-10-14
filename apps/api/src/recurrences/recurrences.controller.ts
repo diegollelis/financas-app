@@ -2,18 +2,22 @@ import {
   createRecurrenceInputSchema,
   recurrenceListResponseSchema,
   recurrenceSchema,
+  repeatTransactionInputSchema,
   updateRecurrenceInputSchema,
   type CreateRecurrenceInput,
   type Recurrence,
+  type RepeatTransactionInput,
   type UpdateRecurrenceInput,
 } from '@financas/shared';
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
   type SchemaObject,
@@ -60,6 +64,28 @@ export class RecurrencesController {
     @Body({ schema: createRecurrenceInputSchema }) input: CreateRecurrenceInput,
   ): Promise<Recurrence> {
     return this.recurrences.create(membership.workspaceId, input);
+  }
+
+  @Post('from-transaction')
+  @RequireRole('EDITOR')
+  @ApiBody({ schema: openApi(repeatTransactionInputSchema) })
+  @ApiCreatedResponse({
+    description: 'Created with the transaction as its first month ("Tornar recorrente").',
+    schema: openApi(recurrenceSchema),
+  })
+  @ApiBadRequestResponse({
+    description: 'INVALID_INPUT, or an archived category, person or merchant.',
+  })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  @ApiNotFoundResponse({ description: 'Not a transaction of this workspace.' })
+  @ApiConflictResponse({
+    description: 'NOT_REPEATABLE: already in a recurrence or a plan, split, or a share.',
+  })
+  repeat(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Body({ schema: repeatTransactionInputSchema }) input: RepeatTransactionInput,
+  ): Promise<Recurrence> {
+    return this.recurrences.repeat(membership.workspaceId, input);
   }
 
   @Patch(':recurrenceId')
