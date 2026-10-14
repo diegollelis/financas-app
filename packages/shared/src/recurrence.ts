@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
 import { amountCentsSchema, periodSchema, shiftPeriod } from './money-and-dates.ts';
+import { paymentMethodSchema } from './payment-method.ts';
 import { MAX_SPLIT_PEOPLE, personNameSchema } from './person.ts';
 import { transactionDescriptionSchema, transactionNotesSchema } from './transaction.ts';
 
@@ -50,6 +51,8 @@ export const recurrenceFieldsSchema = z.object({
   personId: z.uuid().nullable().optional(),
   /** Where it is bought or who pays it (ADR 0053): copied to every month it generates. */
   merchantId: z.uuid().nullable().optional(),
+  /** How it is paid or received (ADR 0054): copied to every month it generates. */
+  paymentMethod: paymentMethodSchema.nullable().optional(),
   /** The first competência; its transaction is created right away. */
   startPeriod: periodSchema,
 });
@@ -148,6 +151,7 @@ export const recurrenceSchema = z.object({
   dueMonthOffset: z.number().int().default(0),
   personId: z.uuid().nullable().default(null),
   merchantId: z.uuid().nullable().default(null),
+  paymentMethod: paymentMethodSchema.nullable().default(null),
   startPeriod: periodSchema,
   /** The last competência it generated; null while active. */
   endPeriod: periodSchema.nullable(),

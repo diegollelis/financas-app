@@ -68,7 +68,7 @@ describe('installments', () => {
     ): CreateInstallmentPlanInput => ({
       type: 'DEBIT',
       description: 'Geladeira',
-      categoryId: categoryId('Cartão de crédito', 'DEBIT'),
+      categoryId: categoryId('Compras', 'DEBIT'),
       installments: 3,
       amountCents: 100_000,
       amountIs: 'TOTAL',

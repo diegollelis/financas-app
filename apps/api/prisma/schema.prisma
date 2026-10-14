@@ -184,6 +184,19 @@ model Invitation {
 // ---------------------------------------------------------------------------
 
 // Money in (CREDIT) or out (DEBIT): the type of categories and, later, of transactions.
+// How a transaction was paid or received (ADR 0054).
+enum PaymentMethod {
+  PIX
+  DEBIT_CARD
+  CREDIT_CARD
+  CASH
+  BOLETO
+  TRANSFER
+  AUTO_DEBIT
+
+  @@map("payment_method")
+}
+
 enum TransactionType {
   CREDIT
   DEBIT
@@ -296,6 +309,8 @@ model Transaction {
   shares            Transaction[]         @relation("Split")
   // Where it was bought or who paid it (ADR 0053). Same composite key as the person.
   merchantId        String?               @map("merchant_id") @db.Uuid
+  // How it is paid or received (ADR 0054); a split's shares do not inherit it.
+  paymentMethod     PaymentMethod?        @map("payment_method")
   merchant          Merchant?             @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([installmentPlanId, installmentNumber])
@@ -402,6 +417,8 @@ model InstallmentPlan {
   person         Person?         @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   // Where it was bought or who pays it (ADR 0053), copied to every installment.
   merchantId     String?         @map("merchant_id") @db.Uuid
+  // How it is paid or received (ADR 0054); a split's shares do not inherit it.
+  paymentMethod  PaymentMethod?  @map("payment_method")
   merchant       Merchant?       @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   endedAt        DateTime?       @map("ended_at") @db.Timestamptz(3)
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -437,6 +454,8 @@ model Recurrence {
   person         Person?                @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   // Where it is bought or who pays it (ADR 0053), copied to every month it generates.
   merchantId     String?                @map("merchant_id") @db.Uuid
+  // How it is paid or received (ADR 0054); a split's shares do not inherit it.
+  paymentMethod  PaymentMethod?         @map("payment_method")
   merchant       Merchant?              @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   startPeriod    String                 @map("start_period") @db.Char(7)
   endPeriod      String?                @map("end_period") @db.Char(7)

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
 import { amountCentsSchema, MAX_AMOUNT_CENTS, periodSchema } from './money-and-dates.ts';
 import { MAX_SPLIT_PEOPLE } from './person.ts';
+import { paymentMethodSchema } from './payment-method.ts';
 import { dueDaySchema, dueMonthOffsetSchema } from './recurrence.ts';
 import {
   splitShareInputSchema,
@@ -42,6 +43,8 @@ export const createInstallmentPlanInputSchema = z
     personId: z.uuid().nullable().optional(),
     /** Where it was bought or who pays it (ADR 0053): copied to every installment. */
     merchantId: z.uuid().nullable().optional(),
+    /** How it is paid or received (ADR 0054): copied to every installment. */
+    paymentMethod: paymentMethodSchema.nullable().optional(),
     /**
      * Splits it with other people (ADR 0052): each share in the same meaning as `amountCents`
      * (of the total, or of each installment). Every installment gets one pending share per
@@ -94,6 +97,7 @@ export const installmentPlanSchema = z.object({
   dueMonthOffset: z.number().int().default(0),
   personId: z.uuid().nullable().default(null),
   merchantId: z.uuid().nullable().default(null),
+  paymentMethod: paymentMethodSchema.nullable().default(null),
   /** When it was ended; null while it runs. */
   endedAt: z.iso.datetime().nullable(),
   /** How many installments were already settled. */

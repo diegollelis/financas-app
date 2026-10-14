@@ -41,6 +41,7 @@ function toResponse(
     dueMonthOffset: plan.dueMonthOffset,
     personId: plan.personId,
     merchantId: plan.merchantId,
+    paymentMethod: plan.paymentMethod,
     endedAt: plan.endedAt?.toISOString() ?? null,
     settledCount,
     pendingCount: pending.count,
@@ -115,6 +116,7 @@ export class InstallmentsService {
     const dueMonthOffset = input.dueMonthOffset ?? 0;
     const personId = input.personId ?? null;
     const merchantId = input.merchantId ?? null;
+    const paymentMethod = input.paymentMethod ?? null;
     const sharesOf = input.split ? await this.shares(workspaceId, input, input.split) : () => [];
     const plan = await this.prisma.forWorkspace(workspaceId).installmentPlan.create({
       data: {
@@ -130,6 +132,7 @@ export class InstallmentsService {
         dueMonthOffset,
         personId,
         merchantId,
+        paymentMethod,
         transactions: {
           create: amounts.map((amountCents, index) => {
             const period = shiftPeriod(input.firstPeriod, index);
@@ -141,6 +144,7 @@ export class InstallmentsService {
               categoryId: input.categoryId,
               personId,
               merchantId,
+              paymentMethod,
               amountCents,
               period,
               dueDate: dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset)),

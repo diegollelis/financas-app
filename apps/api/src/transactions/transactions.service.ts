@@ -48,6 +48,7 @@ export function toTransactionResponse(transaction: TransactionRow): Transaction 
         : null,
     personId: transaction.personId,
     merchantId: transaction.merchantId,
+    paymentMethod: transaction.paymentMethod,
     splitOfId: transaction.splitOfId,
   };
 }
@@ -103,6 +104,7 @@ export class TransactionsService {
         settledAt: optionalDate(input.settledAt) ?? null,
         personId: input.personId ?? null,
         merchantId: input.merchantId ?? null,
+        paymentMethod: input.paymentMethod ?? null,
         ...(shares.length > 0 && { shares: { create: shares } }),
       },
       include: withOrigin,
@@ -164,6 +166,7 @@ export class TransactionsService {
           settledAt: optionalDate(input.settledAt),
           personId: input.personId,
           merchantId: input.merchantId,
+          paymentMethod: input.paymentMethod,
           // Giving the amount, or settling, confirms an estimate (ADR 0038). Undoing a settlement
           // does not make it an estimate again.
           amountEstimated:
