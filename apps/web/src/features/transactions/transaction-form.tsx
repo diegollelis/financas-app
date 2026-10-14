@@ -9,6 +9,8 @@ import {
   PERSON_NAME_MAX_LENGTH,
   reaisInputSchema,
   MERCHANT_NAME_MAX_LENGTH,
+  paymentMethodFieldLabels,
+  paymentMethodSchema,
   suggestCategory,
   type Category,
   type CategoryHints,
@@ -35,6 +37,7 @@ import { PersonSelect } from '@/features/people/person-picker';
 import { dueDayLabel, dueOf } from '@/features/recurrences/due';
 import { apiErrorMessage } from '@/lib/error-message';
 import { shareCents } from './split';
+import { PaymentMethodSelect } from './payment-method-select';
 import { SplitFields, type SplitFormFields } from './split-fields';
 
 /**
@@ -70,6 +73,8 @@ const transactionFormSchema = plainTransactionInputSchema
       .string()
       .trim()
       .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
+    /** How it was paid or received (ADR 0054); '' for none. */
+    paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
     /** A receber de / a pagar para (ADR 0042): a name; a new one becomes a person on save. */
     person: z
       .string()
@@ -281,6 +286,7 @@ export function TransactionForm({
       installments: '',
       amountIs: 'TOTAL',
       merchant: merchants.find((merchant) => merchant.id === initial?.merchantId)?.name ?? '',
+      paymentMethod: initial?.paymentMethod ?? '',
       person: people.find((person) => person.id === initial?.personId)?.name ?? '',
       splitOn: false,
       shareMode: 'REAIS',
@@ -361,13 +367,14 @@ export function TransactionForm({
   }, [usable, categoryId, suggested, setValue]);
   // Opened from the start when the transaction being edited uses one of them.
   const [moreOpen, setMoreOpen] = useState(
-    Boolean(initial?.notes || initial?.personId || initial?.merchantId),
+    Boolean(initial?.notes || initial?.personId || initial?.merchantId || initial?.paymentMethod),
   );
   const application = initial ? undefined : preset?.applicationTo;
   // What "Mais opções" holds, named on it so nothing is hidden by surprise.
   const moreContents = [
     'observações',
     !application && 'estabelecimento',
+    paymentMethodFieldLabels[type].toLowerCase(),
     showPerson && !application && 'pessoa',
     canSplit && !application && 'dividir',
   ]
@@ -589,6 +596,19 @@ export function TransactionForm({
               )}
             />
           )}
+          <Controller
+            control={control}
+            name="paymentMethod"
+            render={({ field, fieldState }) => (
+              <FormField
+                id={id('payment-method')}
+                label={`${paymentMethodFieldLabels[type]} (opcional)`}
+                error={fieldState.error?.message}
+              >
+                <PaymentMethodSelect value={field.value} onChange={field.onChange} />
+              </FormField>
+            )}
+          />
           {showPerson && !application && (
             <Controller
               control={control}

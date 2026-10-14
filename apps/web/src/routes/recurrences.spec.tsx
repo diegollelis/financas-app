@@ -267,6 +267,28 @@ describe('RecurrencesPage', () => {
     });
   });
 
+  it('changes how a recurrence is paid, sending only that (ADR 0054)', async () => {
+    const fetchMock = mockRecurrences({
+      [`PATCH ${base}/recurrences/${aluguel.id}`]: {
+        body: { ...aluguel, paymentMethod: 'AUTO_DEBIT' },
+      },
+    });
+    renderApp(page);
+
+    await choose('Aluguel', 'Editar');
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
+    await userEvent.click(
+      within(dialog).getByRole('combobox', { name: 'Meio de pagamento (opcional)' }),
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Débito automático' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/recurrences/${aluguel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ paymentMethod: 'AUTO_DEBIT' }),
+    });
+  });
+
   it('changes the person of a recurrence, a new name becoming a person first', async () => {
     const carla = person(3, 'Carla');
     const fetchMock = mockRecurrences({

@@ -2,6 +2,8 @@ import {
   recurrenceFieldsSchema,
   dueDaySchema,
   normalizeName,
+  paymentMethodFieldLabels,
+  paymentMethodSchema,
   reaisInputSchema,
   type Category,
   type Person,
@@ -17,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { PersonSelect } from '@/features/people/person-picker';
+import { PaymentMethodSelect } from '@/features/transactions/payment-method-select';
 import { apiErrorMessage } from '@/lib/error-message';
 
 /** What can change in a recurrence: not its type nor its start (ADR 0038). */
@@ -34,6 +37,8 @@ const recurrenceFormSchema = recurrenceFieldsSchema
     amountKind: z.enum(['FIXED', 'VARIABLE']),
     /** Due in the same month as each competência or in the next (ADR 0038 note). */
     dueMonth: z.enum(['SAME', 'NEXT']),
+    /** How it is paid or received (ADR 0054); '' for none. */
+    paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
     /** A receber de / a pagar para (ADR 0052): a name, resolved to a person on save. */
     person: z.string().trim(),
   });
@@ -66,6 +71,8 @@ function recurrenceChanges(recurrence: Recurrence, values: FormValues) {
   if (values.dueDay !== recurrence.dueDay) changes.dueDay = values.dueDay;
   const dueMonthOffset = values.dueMonth === 'NEXT' ? 1 : 0;
   if (dueMonthOffset !== recurrence.dueMonthOffset) changes.dueMonthOffset = dueMonthOffset;
+  const paymentMethod = values.paymentMethod || null;
+  if (paymentMethod !== recurrence.paymentMethod) changes.paymentMethod = paymentMethod;
   const variableAmount = values.amountKind === 'VARIABLE';
   if (variableAmount !== recurrence.variableAmount) changes.variableAmount = variableAmount;
   return changes;
@@ -107,6 +114,7 @@ export function RecurrenceForm({
       dueDay: recurrence.dueDay === null ? '' : String(recurrence.dueDay),
       amountKind: recurrence.variableAmount ? 'VARIABLE' : 'FIXED',
       dueMonth: recurrence.dueMonthOffset === 1 ? 'NEXT' : 'SAME',
+      paymentMethod: recurrence.paymentMethod ?? '',
       person: currentPerson,
     },
   });
@@ -253,6 +261,19 @@ export function RecurrenceForm({
           )}
         />
       )}
+      <Controller
+        control={control}
+        name="paymentMethod"
+        render={({ field, fieldState }) => (
+          <FormField
+            id={id('payment-method')}
+            label={`${paymentMethodFieldLabels[recurrence.type]} (opcional)`}
+            error={fieldState.error?.message}
+          >
+            <PaymentMethodSelect value={field.value} onChange={field.onChange} />
+          </FormField>
+        )}
+      />
       <FormField
         id={id('notes')}
         label="Observações (opcional)"
