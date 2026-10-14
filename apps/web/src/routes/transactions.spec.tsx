@@ -1080,6 +1080,7 @@ describe('TransactionsPage', () => {
         dueDate: '2026-10-10',
         personId: null,
         merchantId: null,
+        paymentMethod: null,
       }),
     });
     expect(await screen.findByText('Lançamento salvo')).toBeInTheDocument();
@@ -1375,7 +1376,9 @@ describe('TransactionsPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Novo lançamento' }));
     let form = await screen.findByRole('dialog', { name: 'Novo lançamento' });
     const more = () => within(form).getByText(/^Mais opções/);
-    expect(more()).toHaveTextContent('Mais opções (observações, estabelecimento, pessoa, dividir)');
+    expect(more()).toHaveTextContent(
+      'Mais opções (observações, estabelecimento, meio de pagamento, pessoa, dividir)',
+    );
     expect(more().closest('details')).not.toHaveAttribute('open');
     await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
 
@@ -1651,6 +1654,47 @@ describe('TransactionsPage', () => {
     expect(router.state.location.pathname).toBe(`/espacos/${houseId}/lancamentos`);
     expect(await screen.findByRole('heading', { name: 'Lançamentos' })).toBeInTheDocument();
   });
+  it('records how it was paid, shows it on the row and finds it by it (ADR 0054)', async () => {
+    const fetchMock = mockTransactions({
+      [`GET ${base}`]: { body: [salary, light, { ...shopping, paymentMethod: 'PIX' }] },
+      [`POST ${base}`]: { status: 201, body: { ...shopping, paymentMethod: 'CREDIT_CARD' } },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Saídas');
+    expect(row(debits, 'Compras da semana')).toHaveTextContent('Pix');
+    await userEvent.type(screen.getByLabelText('Buscar lançamento'), 'pix');
+    expect(within(debits).queryByText('Conta de luz')).not.toBeInTheDocument();
+    expect(row(debits, 'Compras da semana')).toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText('Buscar lançamento'));
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Padaria');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '25,00');
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    await userEvent.click(
+      within(form).getByRole('combobox', { name: 'Meio de pagamento (opcional)' }),
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Crédito' }));
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'Padaria',
+        notes: null,
+        categoryId: marketCategory.id,
+        amountCents: 2_500,
+        dueDate: null,
+        period: '2026-10',
+        personId: null,
+        paymentMethod: 'CREDIT_CARD',
+      }),
+    });
+  });
+
   describe('as a table (from xl)', () => {
     /** The descriptions of a section's table rows, top to bottom. */
     const tableRows = (container: HTMLElement) =>

@@ -4,12 +4,14 @@ import {
   formatCents,
   formatPeriod,
   hasRole,
+  paymentMethodLabels,
   settledLabels,
   shiftPeriod,
   splitInstallments,
   transactionTypeLabels,
   type Category,
   type InstallmentPlan,
+  type PaymentMethod,
   type Person,
   type Recurrence,
   type TransactionType,
@@ -255,6 +257,22 @@ function dueCell(dueDay: number | null, dueMonthOffset: number) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+/** A category cell of a series table, with how it is paid under it (ADR 0054). */
+function CategoryAndMethod({
+  category,
+  method,
+}: {
+  category: string | undefined;
+  method: PaymentMethod | null;
+}) {
+  return (
+    <span className="grid">
+      <span>{category ?? 'Categoria'}</span>
+      {method && <span className="text-muted-foreground">{paymentMethodLabels[method]}</span>}
+    </span>
+  );
+}
+
 function ActionsButton({ name, ref }: { name: string; ref: RefObject<HTMLButtonElement | null> }) {
   return (
     <DropdownMenuTrigger asChild>
@@ -428,7 +446,9 @@ function RecurrenceItem({
       <TableRow>
         <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
         <TableCell>{typeLabel[recurrence.type]}</TableCell>
-        <TableCell className="whitespace-normal">{category?.name ?? 'Categoria'}</TableCell>
+        <TableCell className="whitespace-normal">
+          <CategoryAndMethod category={category?.name} method={recurrence.paymentMethod} />
+        </TableCell>
         <TableCell className="whitespace-normal">{who ?? '—'}</TableCell>
         <TableCell className="whitespace-normal">
           {dueCell(recurrence.dueDay, recurrence.dueMonthOffset)}
@@ -452,6 +472,7 @@ function RecurrenceItem({
       meta={[
         typeLabel[recurrence.type],
         category?.name ?? 'Categoria',
+        recurrence.paymentMethod && paymentMethodLabels[recurrence.paymentMethod],
         personLine(recurrence.type, recurrence.personId, people),
         splitLine(recurrence.split, people),
         recurrence.dueDay === null
@@ -535,7 +556,9 @@ function PlanItem({
       <TableRow>
         <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
         <TableCell>{typeLabel[plan.type]}</TableCell>
-        <TableCell className="whitespace-normal">{category?.name ?? 'Categoria'}</TableCell>
+        <TableCell className="whitespace-normal">
+          <CategoryAndMethod category={category?.name} method={plan.paymentMethod} />
+        </TableCell>
         <TableCell className="whitespace-normal">
           {personLine(plan.type, plan.personId, people) ?? '—'}
         </TableCell>
@@ -561,6 +584,7 @@ function PlanItem({
       meta={[
         typeLabel[plan.type],
         category?.name ?? 'Categoria',
+        plan.paymentMethod && paymentMethodLabels[plan.paymentMethod],
         personLine(plan.type, plan.personId, people),
         `${plan.settledCount} de ${plan.installments} pagas`,
         status,

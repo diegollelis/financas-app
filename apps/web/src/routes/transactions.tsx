@@ -4,6 +4,7 @@ import {
   formatPeriod,
   hasRole,
   OVERDUE_LABEL,
+  paymentMethodLabels,
   PENDING_LABEL,
   settleActionLabels,
   settledLabels,
@@ -519,6 +520,9 @@ function TransactionItem(props: RowProps) {
         <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
           <span>{category?.name ?? 'Categoria'}</span>
           {merchantName && <span>{merchantName}</span>}
+          {transaction.paymentMethod && (
+            <span>{paymentMethodLabels[transaction.paymentMethod]}</span>
+          )}
           {transaction.dueDate && <span>Vence em {formatIsoDate(transaction.dueDate)}</span>}
         </p>
         {transaction.notes && (
@@ -566,7 +570,18 @@ function TransactionRow(props: RowProps) {
         </div>
       </TableCell>
       <TableCell className="whitespace-normal">{category?.name ?? 'Categoria'}</TableCell>
-      <TableCell className="whitespace-normal">{merchantName ?? '—'}</TableCell>
+      <TableCell className="whitespace-normal">
+        {/* Where and how (ADR 0054): the method under the merchant, in the same column. */}
+        <span className="grid">
+          {/* The dash only when there is neither. */}
+          {(merchantName || !transaction.paymentMethod) && <span>{merchantName ?? '—'}</span>}
+          {transaction.paymentMethod && (
+            <span className="text-muted-foreground">
+              {paymentMethodLabels[transaction.paymentMethod]}
+            </span>
+          )}
+        </span>
+      </TableCell>
       <TableCell>
         <StatusBadge transaction={transaction} today={today} />
       </TableCell>
@@ -713,6 +728,7 @@ export function TransactionsPage() {
       categories.data?.find((item) => item.id === transaction.categoryId)?.name,
       personName(transaction.personId),
       merchantName(transaction.merchantId),
+      transaction.paymentMethod && paymentMethodLabels[transaction.paymentMethod],
     );
 
   return (

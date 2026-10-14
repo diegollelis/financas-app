@@ -131,11 +131,16 @@ export function TransactionDialog({
       categoryId,
       amountCents: values.amount,
     };
-    // A new one names its merchant only when there is one; an edit always does (null unlinks).
-    const withMerchant = merchantId ? { merchantId } : {};
+    // A new one names its merchant and its payment method (ADR 0054) only when there is one; an
+    // edit always does (null takes it away).
+    const paymentMethod = values.paymentMethod || null;
+    const withMerchant = {
+      ...(merchantId && { merchantId }),
+      ...(paymentMethod && { paymentMethod }),
+    };
     if (editing) {
       update.mutate(
-        { id: editing.id, ...fields, dueDate: values.dueDate, personId, merchantId },
+        { id: editing.id, ...fields, dueDate: values.dueDate, personId, merchantId, paymentMethod },
         { onSuccess: done('Lançamento salvo') },
       );
     } else if (values.repeat === 'INSTALLMENTS') {
