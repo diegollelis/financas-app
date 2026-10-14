@@ -22,6 +22,7 @@ const ptBrCodes = new Set([
   'MERCHANT_EXISTS',
   'MERCHANT_IN_USE',
   'INVALID_MERCHANT',
+  'NOT_REPEATABLE',
 ]);
 
 /** Turns an error from our own API routes (not /api/auth) into a message for the user. */

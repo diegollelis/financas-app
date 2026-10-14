@@ -44,6 +44,7 @@ import { useCategories, useCategoryHints } from '@/features/categories/use-categ
 import { useEndInstallmentPlan } from '@/features/installments/use-installments';
 import { useEndRecurrence } from '@/features/recurrences/use-recurrences';
 import { useMerchants } from '@/features/merchants/use-merchants';
+import { RepeatDialog } from '@/features/recurrences/repeat-dialog';
 import { usePeople } from '@/features/people/use-people';
 import {
   matchesSearch,
@@ -264,6 +265,7 @@ function TransactionItem({
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [repeating, setRepeating] = useState(false);
   const [askingAmount, setAskingAmount] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const settleRef = useRef<HTMLButtonElement>(null);
@@ -273,6 +275,8 @@ function TransactionItem({
   const estimated = transaction.amountEstimated && !transaction.settledAt;
   // Part of a recurrence or of an installment plan, which can be ended from here (ADR 0038).
   const inSeries = Boolean(transaction.recurrenceId ?? transaction.installment);
+  // Launched once, not a split nor a share: it can become a recurrence ("Tornar recorrente").
+  const repeatable = !inSeries && !transaction.splitOfId && sharedWith.length === 0;
   const labels = settleActionLabels[transaction.type];
   const settledToast =
     transaction.type === 'CREDIT' ? 'Marcado como recebido' : 'Marcado como pago';
@@ -379,7 +383,7 @@ function TransactionItem({
                   <Ellipsis aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-max">
                 <DropdownMenuItem onSelect={() => onEdit(transaction, actionsRef.current)}>
                   Editar
                 </DropdownMenuItem>
@@ -396,6 +400,11 @@ function TransactionItem({
                     }
                   >
                     {labels.unsettle}
+                  </DropdownMenuItem>
+                )}
+                {repeatable && (
+                  <DropdownMenuItem onSelect={() => setRepeating(true)}>
+                    Tornar recorrente
                   </DropdownMenuItem>
                 )}
                 {inSeries && (
@@ -420,6 +429,15 @@ function TransactionItem({
               onOpenChange={setConfirmingDelete}
               returnFocusTo={actionsRef}
             />
+            {repeatable && (
+              <RepeatDialog
+                workspaceId={workspaceId}
+                transaction={transaction}
+                open={repeating}
+                onOpenChange={setRepeating}
+                returnFocusTo={actionsRef}
+              />
+            )}
             {inSeries && (
               <EndSeriesDialog
                 workspaceId={workspaceId}

@@ -103,7 +103,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Tela de valor variável: "Fixo | Variável", aviso "Estimado" e "Efetivar" pedindo o valor
   - [x] "Parcelado" no "Novo lançamento", selo "Parcela n/N" e "Encerrar parcelamento" no menu
   - [x] Tela "Recorrências" no Mais: listar, editar (só o que mudou) e encerrar
-  - [ ] "Tornar recorrente" no menu de um lançamento existente: criar a recorrência adotando o lançamento como o primeiro mês, sem duplicar
+  - [x] "Tornar recorrente" no menu de um lançamento existente: criar a recorrência adotando o lançamento como o primeiro mês, sem duplicar (não aparece para um que já repete, uma parcela, um lançamento dividido ou uma parte)
   - [ ] Vencimento em outro mês numa recorrência ou num parcelamento (visto em 2026-10-13 com a conta de luz: lançada em outubro, vence em 10/11). Hoje só o dia do vencimento é guardado (`dueDay`), e cada mês gerado vence no próprio mês, então a data digitada muda sem aviso. Proposta: guardar também a distância em meses entre o lançamento e o vencimento (calculada da primeira data, 0 para os que já existem, nunca antes do mês do lançamento), mostrar "Vence dia 10 do mês seguinte" em Recorrências e oferecer "no mesmo mês / no mês seguinte" na edição; nota no ADR 0038
 - [x] Escolha de categoria com busca (sem depender de acentos) e "Mais usadas" dos últimos 6 meses (`recentUses` na lista de categorias)
   - [x] "Adicionar 'Nome'" no seletor de categoria do lançamento e da recorrência: criada ao salvar, com o tipo do lançamento; uma arquivada de mesmo nome volta

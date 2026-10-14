@@ -308,6 +308,87 @@ describe('TransactionsPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('makes a transaction launched once recurrent, from its menu', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/recurrences/from-transaction`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000305',
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 15_990,
+          variableAmount: true,
+          dueDay: 10,
+          startPeriod: '2026-10',
+          endPeriod: null,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Tornar recorrente' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Tornar Conta de luz recorrente' });
+    expect(dialog).toHaveTextContent(
+      'Todo mês a partir de outubro de 2026, vencendo no dia 10. Este lançamento vira o primeiro mês',
+    );
+    expect(within(dialog).getByRole('radio', { name: 'Fixo' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Variável' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tornar recorrente' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences/from-transaction`, {
+      method: 'POST',
+      body: JSON.stringify({ transactionId: light.id, variableAmount: true }),
+    });
+    expect(await screen.findByText('Agora se repete todo mês')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('offers "Tornar recorrente" only for a transaction launched once, not split', async () => {
+    const jantar = transaction(4, {
+      type: 'DEBIT',
+      description: 'Jantar',
+      categoryId: marketCategory.id,
+      amountCents: 12_000,
+    });
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Ana: parte de Jantar',
+      categoryId: salaryCategory.id,
+      amountCents: 6_000,
+      splitOfId: jantar.id,
+    });
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [
+          share,
+          { ...light, recurrenceId: '01920000-0000-7000-8000-000000000301' },
+          {
+            ...shopping,
+            installment: { planId: '01920000-0000-7000-8000-000000000401', number: 2, count: 3 },
+          },
+          jantar,
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    for (const description of [
+      'Conta de luz',
+      'Compras da semana',
+      'Jantar',
+      'Ana: parte de Jantar',
+    ]) {
+      const menu = await openActions(description);
+      expect(
+        within(menu).queryByRole('menuitem', { name: 'Tornar recorrente' }),
+      ).not.toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+    }
+  });
+
   it('marks a generated transaction and ends its recurrence from the menu', async () => {
     const recurrenceId = '01920000-0000-7000-8000-000000000301';
     const fetchMock = mockTransactions({
