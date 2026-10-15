@@ -3,6 +3,7 @@ import {
   categoryListResponseSchema,
   workspaceSchema,
   type CreateTransactionInput,
+  type PaymentMethod,
   type TransactionType,
 } from '@financas/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -97,6 +98,7 @@ describe('analysis', () => {
           type: 'DEBIT',
           categoryId: mercado,
           merchantId: null,
+          paymentMethod: null,
           plannedCents: 65_000,
           settledCents: 40_000,
         },
@@ -105,6 +107,7 @@ describe('analysis', () => {
           type: 'CREDIT',
           categoryId: salario,
           merchantId: null,
+          paymentMethod: null,
           plannedCents: 500_000,
           settledCents: 500_000,
         },
@@ -113,11 +116,39 @@ describe('analysis', () => {
           type: 'DEBIT',
           categoryId: mercado,
           merchantId: null,
+          paymentMethod: null,
           plannedCents: 30_000,
           settledCents: 30_000,
         },
       ],
     });
+  });
+
+  it('sums each payment method apart (ADR 0054)', async () => {
+    const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+    const mercado = (await categoryIds(browser, id))('Mercado', 'DEBIT');
+    const debit = (amountCents: number, paymentMethod: PaymentMethod | null) =>
+      create(browser, id, {
+        type: 'DEBIT',
+        description: 'Compras',
+        categoryId: mercado,
+        amountCents,
+        period: '2026-10',
+        settledAt: null,
+        paymentMethod,
+      });
+    await debit(30_000, 'MEAL_VOUCHER');
+    await debit(20_000, 'MEAL_VOUCHER');
+    await debit(15_000, null);
+
+    const result = await analysis(browser, id, '2026-10', '2026-10');
+
+    expect(
+      result.rows.map(({ paymentMethod, plannedCents }) => ({ paymentMethod, plannedCents })),
+    ).toEqual([
+      { paymentMethod: null, plannedCents: 15_000 },
+      { paymentMethod: 'MEAL_VOUCHER', plannedCents: 50_000 },
+    ]);
   });
 
   it('sums each merchant apart, never anything but sums (ADR 0053)', async () => {
@@ -152,6 +183,7 @@ describe('analysis', () => {
         type: 'DEBIT',
         categoryId: mercado,
         merchantId: null,
+        paymentMethod: null,
         plannedCents: 15_000,
         settledCents: 0,
       },
@@ -160,6 +192,7 @@ describe('analysis', () => {
         type: 'DEBIT',
         categoryId: mercado,
         merchantId: bomPreco,
+        paymentMethod: null,
         plannedCents: 50_000,
         settledCents: 0,
       },

@@ -28,7 +28,7 @@ const categoryName = (categories: Category[], id: string) =>
  * One category in the ranking: name, total, its bar (proportional to the largest) and, below,
  * the share of the total and the monthly average. The whole line opens the month-by-month view.
  */
-function RankingRow({
+export function RankingRow({
   share,
   name,
   largest,
@@ -40,7 +40,7 @@ function RankingRow({
   name: string;
   largest: number;
   credit: boolean;
-  /** A gray bar: a line that is not a category or merchant of its own ("Outras", none). */
+  /** A gray bar: a line that is not one of its own ("Outras", none). */
   muted?: boolean;
   onOpen?: (button: HTMLButtonElement) => void;
 }) {

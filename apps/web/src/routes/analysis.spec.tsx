@@ -36,7 +36,8 @@ const row = (
   plannedCents: number,
   settledCents = plannedCents,
   merchantId: string | null = null,
-) => ({ period, type, categoryId, merchantId, plannedCents, settledCents });
+  paymentMethod: string | null = null,
+) => ({ period, type, categoryId, merchantId, paymentMethod, plannedCents, settledCents });
 
 const rows = [
   row('2026-09', 'CREDIT', salario.id, 500_000),
@@ -367,6 +368,31 @@ describe('AnalysisPage', () => {
       'Mercado Bom PreçoR$ 700,0070% do totalmédia de R$ 350,00 por mês',
       'FeiraR$ 200,0020% do totalmédia de R$ 100,00 por mês',
       'Sem estabelecimentoR$ 100,0010% do totalmédia de R$ 50,00 por mês',
+    ]);
+  });
+
+  it('shows how the money went out, by payment method, with what had none last (ADR 0054)', async () => {
+    mockAnalysis('2026-09', '2026-10', {
+      from: '2026-09',
+      to: '2026-10',
+      rows: [
+        row('2026-09', 'DEBIT', mercado.id, 60_000, 60_000, null, 'MEAL_VOUCHER'),
+        row('2026-10', 'DEBIT', mercado.id, 40_000, 40_000, null, 'MEAL_VOUCHER'),
+        row('2026-10', 'DEBIT', aluguel.id, 180_000, 180_000, null, 'PIX'),
+        row('2026-10', 'DEBIT', aluguel.id, 20_000),
+      ],
+    });
+    renderApp(`/espacos/${houseId}/analise?de=2026-09&ate=2026-10`);
+
+    const methods = await screen.findByRole('region', { name: 'Despesas por meio de pagamento' });
+    expect(
+      within(methods)
+        .getAllByRole('listitem')
+        .map((item) => nbsp(item.textContent)),
+    ).toEqual([
+      'PixR$ 1.800,0060% do totalmédia de R$ 900,00 por mês',
+      'Vale-alimentação/refeiçãoR$ 1.000,0033,33% do totalmédia de R$ 500,00 por mês',
+      'Sem meioR$ 200,006,67% do totalmédia de R$ 100,00 por mês',
     ]);
   });
 

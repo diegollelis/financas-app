@@ -148,7 +148,8 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Tela: o campo em "Mais opções" e na edição da recorrência, o meio na linha, na tabela e na busca
   - [x] Sugestão pelo histórico (como a da categoria): o meio vazio vem do estabelecimento ou da descrição, com "Sugerido pelo histórico", sem trocar uma escolha feita à mão
   - [x] Meio "Vale-alimentação/refeição" (o vale do empregador, também o de um só estabelecimento) e "Bônus" entre as categorias padrão de entrada dos espaços novos (nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
-  - [ ] Análise "Por meio de pagamento" e a coluna opcional na planilha modelo
+  - [x] Análise "Despesas por meio de pagamento" (ou "Entradas por meio de recebimento"), com os mesmos filtros das categorias e "Sem meio" por último
+  - [ ] Coluna opcional "Meio de pagamento" na planilha modelo
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês

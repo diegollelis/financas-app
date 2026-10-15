@@ -24,6 +24,7 @@ import {
   type AnalysisSettings,
 } from '@/features/analysis/filters';
 import { CategoryRanking } from '@/features/analysis/category-ranking';
+import { PaymentMethodRanking } from '@/features/analysis/payment-method-ranking';
 import { FiltersPanel } from '@/features/analysis/filters-panel';
 import { MonthlyChart, MonthlyTable } from '@/features/analysis/monthly-chart';
 import { savingCategoryIds, seriesStyles, visibleSeries } from '@/features/analysis/series';
@@ -327,13 +328,17 @@ function Results({
           </>
         )}
       </section>
-      <CategoryRanking
-        analysis={analysis}
-        settings={settings}
-        categories={categories}
-        merchants={merchants}
-        onChange={onChange}
-      />
+      {/* The categories and, under them, how the money went out (ADR 0054). */}
+      <div className="grid content-start gap-8">
+        <CategoryRanking
+          analysis={analysis}
+          settings={settings}
+          categories={categories}
+          merchants={merchants}
+          onChange={onChange}
+        />
+        <PaymentMethodRanking analysis={analysis} settings={settings} saving={saving} />
+      </div>
     </div>
   );
 }
