@@ -30,12 +30,12 @@ export class AnalysisService {
     const range = { workspaceId, period: { gte: from, lte: to } };
     const [planned, settled] = await Promise.all([
       db.transaction.groupBy({
-        by: ['period', 'type', 'categoryId', 'merchantId'],
+        by: ['period', 'type', 'categoryId', 'merchantId', 'paymentMethod'],
         where: range,
         _sum: { amountCents: true },
       }),
       db.transaction.groupBy({
-        by: ['period', 'type', 'categoryId', 'merchantId'],
+        by: ['period', 'type', 'categoryId', 'merchantId', 'paymentMethod'],
         where: { ...range, settledAt: { not: null } },
         _sum: { amountCents: true },
       }),
@@ -46,7 +46,9 @@ export class AnalysisService {
       type: string;
       categoryId: string;
       merchantId: string | null;
-    }) => `${row.period}|${row.type}|${row.categoryId}|${row.merchantId ?? ''}`;
+      paymentMethod: string | null;
+    }) =>
+      `${row.period}|${row.type}|${row.categoryId}|${row.merchantId ?? ''}|${row.paymentMethod ?? ''}`;
     const settledByKey = new Map(settled.map((row) => [key(row), row._sum.amountCents ?? 0]));
     const rows: AnalysisRow[] = planned
       .map((row) => ({
@@ -54,6 +56,7 @@ export class AnalysisService {
         type: row.type,
         categoryId: row.categoryId,
         merchantId: row.merchantId,
+        paymentMethod: row.paymentMethod,
         plannedCents: row._sum.amountCents ?? 0,
         settledCents: settledByKey.get(key(row)) ?? 0,
       }))

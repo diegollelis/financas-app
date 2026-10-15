@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { FULL_BASIS_POINTS } from './budget.ts';
 import { transactionTypeSchema, type TransactionType } from './category.ts';
 import { periodSchema } from './money-and-dates.ts';
+import { paymentMethodSchema, type PaymentMethod } from './payment-method.ts';
 
 // Analysis of a range of competências (ADR 0037). The API sums the transactions by competência,
 // type, category and merchant (ADR 0053); these pure functions turn those sums into what the page shows, applying
@@ -53,14 +54,16 @@ export const analysisQuerySchema = z
 export type AnalysisQuery = z.infer<typeof analysisQuerySchema>;
 
 /**
- * The sums of one competência, type, category and merchant (none: null): everything launched, and
- * what was settled.
+ * The sums of one competência, type, category, merchant and payment method (none: null):
+ * everything launched, and what was settled.
  */
 export const analysisRowSchema = z.object({
   period: periodSchema,
   type: transactionTypeSchema,
   categoryId: z.uuid(),
   merchantId: z.uuid().nullable().default(null),
+  /** How it was paid or received (ADR 0054); null when not given. */
+  paymentMethod: paymentMethodSchema.nullable().default(null),
   plannedCents: z.number().int().nonnegative(),
   settledCents: z.number().int().nonnegative(),
 });
@@ -249,5 +252,50 @@ export function merchantRanking(
     }))
     .sort((a, b) =>
       a.merchantId === null ? 1 : b.merchantId === null ? -1 : b.totalCents - a.totalCents,
+    );
+}
+
+export interface PaymentMethodShare {
+  /** null: the transactions with no method ("Sem meio"). */
+  paymentMethod: PaymentMethod | null;
+  totalCents: number;
+  /** Over every month of the range, including the ones without this method. */
+  averageCents: number;
+  /** Of the total, in basis points (10000 = 100%). */
+  shareBp: number;
+}
+
+/**
+ * How the money went out in the range (ADR 0054), as the category ranking sees it: the expenses
+ * (no applications), or the credits with the type filter on them, within the categories picked.
+ * Each method, largest first, and what had none last ("Sem meio": what is left to fill in).
+ */
+export function paymentMethodRanking(
+  analysis: Analysis,
+  filters: AnalysisFilters,
+  savingCategoryIds: ReadonlySet<string> = NONE,
+): PaymentMethodShare[] {
+  const type: TransactionType = filters.type === 'CREDIT' ? 'CREDIT' : 'DEBIT';
+  const months = periodsBetween(analysis.from, analysis.to).length;
+  const totals = new Map<PaymentMethod | null, number>();
+  for (const row of analysis.rows) {
+    if (row.type !== type || !matches(row, { ...filters, type })) continue;
+    if (type === 'DEBIT' && savingCategoryIds.has(row.categoryId)) continue;
+    totals.set(
+      row.paymentMethod,
+      (totals.get(row.paymentMethod) ?? 0) + amountOf(row, filters.view),
+    );
+  }
+  const grand = [...totals.values()].reduce((sum, cents) => sum + cents, 0);
+  return [...totals.entries()]
+    .filter(([, cents]) => cents > 0)
+    .map(([paymentMethod, totalCents]) => ({
+      paymentMethod,
+      totalCents,
+      averageCents: Math.round(totalCents / months),
+      shareBp: Math.round((totalCents * FULL_BASIS_POINTS) / grand),
+    }))
+    .sort((a, b) =>
+      a.paymentMethod === null ? 1 : b.paymentMethod === null ? -1 : b.totalCents - a.totalCents,
     );
 }

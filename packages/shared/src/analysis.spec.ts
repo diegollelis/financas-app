@@ -5,6 +5,7 @@ import {
   categorySeries,
   defaultAnalysisFilters,
   merchantRanking,
+  paymentMethodRanking,
   monthlySeries,
   periodsBetween,
   previousRange,
@@ -26,7 +27,16 @@ const row = (
   plannedCents: number,
   settledCents = plannedCents,
   merchantId: string | null = null,
-): AnalysisRow => ({ period, type, categoryId, merchantId, plannedCents, settledCents });
+  paymentMethod: AnalysisRow['paymentMethod'] = null,
+): AnalysisRow => ({
+  period,
+  type,
+  categoryId,
+  merchantId,
+  paymentMethod,
+  plannedCents,
+  settledCents,
+});
 
 // August had nothing at all; in October, part of it is still to be paid.
 const analysis: Analysis = {
@@ -223,5 +233,43 @@ describe('merchantRanking', () => {
       [mercadoB, mercadoA, null],
     );
     expect(merchantRanking(byMerchant, fuel, 'PLANNED')).toEqual([]);
+  });
+});
+
+describe('paymentMethodRanking (ADR 0054)', () => {
+  const withMethods: Analysis = {
+    from: '2026-09',
+    to: '2026-10',
+    rows: [
+      row('2026-09', 'DEBIT', market, 60_000, 60_000, null, 'MEAL_VOUCHER'),
+      row('2026-10', 'DEBIT', market, 40_000, 40_000, null, 'MEAL_VOUCHER'),
+      row('2026-10', 'DEBIT', rent, 180_000, 180_000, null, 'PIX'),
+      row('2026-10', 'DEBIT', fuel, 10_000),
+      row('2026-10', 'CREDIT', salary, 500_000, 500_000, null, 'TRANSFER'),
+    ],
+  };
+
+  it('adds up the expenses by method, largest first, and what had none last', () => {
+    expect(paymentMethodRanking(withMethods, defaultAnalysisFilters)).toEqual([
+      { paymentMethod: 'PIX', totalCents: 180_000, averageCents: 90_000, shareBp: 6_207 },
+      { paymentMethod: 'MEAL_VOUCHER', totalCents: 100_000, averageCents: 50_000, shareBp: 3_448 },
+      { paymentMethod: null, totalCents: 10_000, averageCents: 5_000, shareBp: 345 },
+    ]);
+  });
+
+  it('follows the type and category filters, and leaves applications out', () => {
+    expect(
+      paymentMethodRanking(withMethods, { ...defaultAnalysisFilters, type: 'CREDIT' }),
+    ).toEqual([
+      { paymentMethod: 'TRANSFER', totalCents: 500_000, averageCents: 250_000, shareBp: 10_000 },
+    ]);
+    expect(
+      paymentMethodRanking(withMethods, { ...defaultAnalysisFilters, categoryIds: [market] }),
+    ).toEqual([expect.objectContaining({ paymentMethod: 'MEAL_VOUCHER', totalCents: 100_000 })]);
+    expect(
+      paymentMethodRanking(withMethods, defaultAnalysisFilters, new Set([rent])).map(
+        (share) => share.paymentMethod,
+      ),
+    ).toEqual(['MEAL_VOUCHER', null]);
   });
 });
