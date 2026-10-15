@@ -226,6 +226,19 @@ export function RecurrenceForm({
           )}
         />
       </div>
+      <Controller
+        control={control}
+        name="paymentMethod"
+        render={({ field, fieldState }) => (
+          <FormField
+            id={id('payment-method')}
+            label={`${paymentMethodFieldLabels[recurrence.type]} (opcional)`}
+            error={fieldState.error?.message}
+          >
+            <PaymentMethodSelect value={field.value} onChange={field.onChange} />
+          </FormField>
+        )}
+      />
       <p className="text-muted-foreground text-sm">
         {variable
           ? 'Um valor novo substitui as estimativas pendentes; os meses cujo valor já foi informado ficam como estão. Os meses seguintes começam pela média dos 3 últimos pagos.'
@@ -261,19 +274,6 @@ export function RecurrenceForm({
           )}
         />
       )}
-      <Controller
-        control={control}
-        name="paymentMethod"
-        render={({ field, fieldState }) => (
-          <FormField
-            id={id('payment-method')}
-            label={`${paymentMethodFieldLabels[recurrence.type]} (opcional)`}
-            error={fieldState.error?.message}
-          >
-            <PaymentMethodSelect value={field.value} onChange={field.onChange} />
-          </FormField>
-        )}
-      />
       <FormField
         id={id('notes')}
         label="Observações (opcional)"

@@ -190,6 +190,46 @@ describe('categories', () => {
         { description: 'jantar', type: 'DEBIT', categoryId: lazer.id },
       ]);
     });
+
+    it('says the payment method most used with each merchant and description (ADR 0054)', async () => {
+      const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+      const mercado = (await list(browser, id)).find((category) => category.name === 'Mercado')!;
+      const now = currentPeriod();
+      const merchant = (
+        (
+          await browser
+            .post(`/api/workspaces/${id}/merchants`)
+            .send({ name: 'Bom Preço' })
+            .expect(201)
+        ).body as { id: string }
+      ).id;
+      const add = (fields: object) =>
+        browser
+          .post(`/api/workspaces/${id}/transactions`)
+          .send({
+            type: 'DEBIT',
+            amountCents: 1000,
+            period: now,
+            categoryId: mercado.id,
+            ...fields,
+          })
+          .expect(201);
+
+      await add({ description: 'Compras', merchantId: merchant, paymentMethod: 'CREDIT_CARD' });
+      await add({ description: 'compras', merchantId: merchant, paymentMethod: 'CREDIT_CARD' });
+      await add({ description: 'Compras', merchantId: merchant, paymentMethod: 'PIX' });
+      // Without a method: says nothing.
+      await add({ description: 'Feira' });
+
+      const hints = categoryHintsSchema.parse(
+        (await browser.get(`/api/workspaces/${id}/categories/hints`).expect(200)).body,
+      );
+
+      expect(hints.paymentMethods).toEqual({
+        merchants: [{ merchantId: merchant, type: 'DEBIT', paymentMethod: 'CREDIT_CARD' }],
+        descriptions: [{ description: 'compras', type: 'DEBIT', paymentMethod: 'CREDIT_CARD' }],
+      });
+    });
   });
 
   describe('creating', () => {

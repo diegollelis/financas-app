@@ -1376,9 +1376,7 @@ describe('TransactionsPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Novo lançamento' }));
     let form = await screen.findByRole('dialog', { name: 'Novo lançamento' });
     const more = () => within(form).getByText(/^Mais opções/);
-    expect(more()).toHaveTextContent(
-      'Mais opções (observações, estabelecimento, meio de pagamento, pessoa, dividir)',
-    );
+    expect(more()).toHaveTextContent('Mais opções (observações, estabelecimento, pessoa, dividir)');
     expect(more().closest('details')).not.toHaveAttribute('open');
     await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
 
@@ -1390,6 +1388,40 @@ describe('TransactionsPage', () => {
     expect(
       within(form).getByRole('combobox', { name: 'A receber de (opcional)' }),
     ).toHaveTextContent('Ana');
+  });
+
+  it('fills an empty payment method from the history, never one the person picked (ADR 0054)', async () => {
+    mockTransactions({
+      [`GET /api/workspaces/${houseId}/categories/hints`]: {
+        body: {
+          merchants: [],
+          descriptions: [],
+          paymentMethods: {
+            merchants: [],
+            descriptions: [
+              { description: 'conta de luz', type: 'DEBIT', paymentMethod: 'AUTO_DEBIT' },
+            ],
+          },
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    const method = () =>
+      within(form).getByRole('combobox', { name: 'Meio de pagamento (opcional)' });
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Conta de Luz');
+    expect(method()).toHaveTextContent('Débito automático');
+    expect(within(form).getByText('Sugerido pelo histórico.')).toBeInTheDocument();
+
+    // Picked by hand: it stays, and the note goes.
+    await userEvent.click(method());
+    await userEvent.click(await screen.findByRole('option', { name: 'Pix' }));
+    expect(method()).toHaveTextContent('Pix');
+    expect(within(form).queryByText('Sugerido pelo histórico.')).not.toBeInTheDocument();
+    await userEvent.type(within(form).getByLabelText('Descrição'), ' ');
+    expect(method()).toHaveTextContent('Pix');
   });
 
   it('fills an empty category from the history, never one the person picked (ADR 0053)', async () => {
