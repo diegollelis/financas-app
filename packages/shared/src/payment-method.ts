@@ -5,7 +5,7 @@ import type { TransactionType } from './category.ts';
 // account nor a card with a balance and a bill: that, if it comes, has an ADR of its own.
 
 export const paymentMethodSchema = z.enum(
-  ['PIX', 'DEBIT_CARD', 'CREDIT_CARD', 'CASH', 'BOLETO', 'TRANSFER', 'AUTO_DEBIT'],
+  ['PIX', 'DEBIT_CARD', 'CREDIT_CARD', 'MEAL_VOUCHER', 'CASH', 'BOLETO', 'TRANSFER', 'AUTO_DEBIT'],
   'Escolha um meio da lista.',
 );
 
@@ -16,6 +16,8 @@ export const paymentMethodLabels = {
   PIX: 'Pix',
   DEBIT_CARD: 'Débito',
   CREDIT_CARD: 'Crédito',
+  /** A meal or food voucher, from the employer (VA, VR), even one usable at a single store. */
+  MEAL_VOUCHER: 'Vale-alimentação/refeição',
   CASH: 'Dinheiro',
   BOLETO: 'Boleto',
   TRANSFER: 'Transferência',

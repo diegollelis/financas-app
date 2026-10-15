@@ -189,6 +189,7 @@ enum PaymentMethod {
   PIX
   DEBIT_CARD
   CREDIT_CARD
+  MEAL_VOUCHER
   CASH
   BOLETO
   TRANSFER

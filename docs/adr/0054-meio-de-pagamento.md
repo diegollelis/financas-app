@@ -77,3 +77,9 @@ Escolhidos com o dono do projeto: **lista fixa (opção 1)**, **sete meios (opç
 
 - **Sai de "Mais opções" e vem logo após o vencimento,** no formulário do lançamento e na edição da recorrência (depois de "Vence no"). Com a sugestão pelo histórico, o meio era preenchido dentro de uma seção fechada, sem que a pessoa visse; à vista, a sugestão ("Sugerido pelo histórico") é confirmada ou trocada na hora. O ADR 0053 já previa subir um campo de "Mais opções" que fosse preenchido quase sempre.
 - **Continua opcional.** Muitas vezes o meio só se sabe ao pagar (a conta lançada antes do vencimento), as recorrências e os parcelamentos antigos geram meses sem meio, as partes de uma divisão ficam sem meio de propósito, e a planilha modelo não o exige. O vazio quer dizer "ainda não sei", e a Análise poderá mostrar quanto está sem meio. Pedir o meio ao tocar em "Pagar" só será considerado depois de algumas semanas de uso, se houver muitos lançamentos sem ele.
+
+## Nota (Vale-alimentação/refeição, 2026-10-15)
+
+- **Um oitavo meio, "Vale-alimentação/refeição"** (`MEAL_VOUCHER`), logo depois de "Crédito": o vale do empregador (VA, VR), também o que só é aceito nos estabelecimentos da própria empresa. O dono do projeto pensou em "Crédito próprio", mas o nome não dizia de quem era o crédito; o termo do mercado diz.
+- **Para o mês fechar certo,** o crédito mensal do vale entra como uma entrada, e as compras como saídas com esse meio; a Análise por meio mostrará quanto foi gasto no vale. Quanto ainda resta no cartão é saldo de conta, que fica com Contas e Cartões, se vierem.
+- **Um valor a mais no enum** (`ALTER TYPE … ADD VALUE … AFTER 'CREDIT_CARD'`); o formulário, a sugestão, a busca e a tabela já usam a lista compartilhada.
