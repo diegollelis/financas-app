@@ -133,3 +133,50 @@ export function splitInstallments(totalCents: number, installments: number): num
 export function installmentPlanTotal(input: CreateInstallmentPlanInput): number {
   return input.amountIs === 'TOTAL' ? input.amountCents : input.amountCents * input.installments;
 }
+
+/**
+ * What can change in a running plan (ADR 0038 note). The fields that say what it is, copied to
+ * the pending installments, change at any time. The amounts (`amountCents` with `amountIs`, how
+ * many and from when) only while no installment is settled and it is not split: the installments
+ * are then made again, as if it had just been created.
+ */
+export const updateInstallmentPlanInputSchema = z
+  .object({
+    description: transactionDescriptionSchema,
+    notes: transactionNotesSchema.nullable(),
+    categoryId: z.uuid('Escolha uma categoria.'),
+    dueDay: dueDaySchema.nullable(),
+    dueMonthOffset: dueMonthOffsetSchema,
+    personId: z.uuid().nullable(),
+    merchantId: z.uuid().nullable(),
+    paymentMethod: paymentMethodSchema.nullable(),
+    installments: installmentCountSchema,
+    amountCents: amountCentsSchema,
+    amountIs: installmentAmountIsSchema,
+    firstPeriod: periodSchema,
+  })
+  .partial()
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: 'Nada para alterar.',
+  })
+  .refine((input) => (input.amountCents === undefined) === (input.amountIs === undefined), {
+    message: 'Informe o valor e se ele é o total ou o da parcela.',
+    path: ['amountCents'],
+  })
+  .refine(
+    (input) =>
+      input.amountCents === undefined ||
+      input.amountIs === 'INSTALLMENT' ||
+      input.amountCents >= (input.installments ?? MIN_INSTALLMENTS),
+    { message: 'O total precisa dar ao menos um centavo por parcela.', path: ['amountCents'] },
+  );
+
+export type UpdateInstallmentPlanInput = z.infer<typeof updateInstallmentPlanInputSchema>;
+
+/** The fields of an update that remake the installments (they change the amounts). */
+export const INSTALLMENT_AMOUNT_FIELDS = [
+  'amountCents',
+  'amountIs',
+  'installments',
+  'firstPeriod',
+] as const satisfies readonly (keyof UpdateInstallmentPlanInput)[];

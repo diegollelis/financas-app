@@ -5,11 +5,18 @@ import {
   shareDescription,
   shiftPeriod,
   splitInstallments,
+  INSTALLMENT_AMOUNT_FIELDS,
   type CreateInstallmentPlanInput,
   type InstallmentPlan,
   type SplitShareInput,
+  type UpdateInstallmentPlanInput,
 } from '@financas/shared';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
@@ -200,15 +207,175 @@ export class InstallmentsService {
   }
 
   /**
+   * Changes a running plan (ADR 0038 note). What it is (description, notes, category, person,
+   * merchant, payment method, due day) reaches the plan and its pending installments; settled
+   * ones are history. The amounts remake every installment, as if it had just been created, and
+   * so only while none is settled and it is not split.
+   */
+  async update(
+    workspaceId: string,
+    planId: string,
+    input: UpdateInstallmentPlanInput,
+  ): Promise<InstallmentPlan> {
+    const plan = await this.find(workspaceId, planId);
+    const db = this.prisma.forWorkspace(workspaceId);
+    if (plan.endedAt) {
+      throw new ConflictException({
+        code: 'PLAN_ENDED',
+        message: 'Um parcelamento encerrado não muda mais.',
+      });
+    }
+    if (input.categoryId && input.categoryId !== plan.categoryId) {
+      await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, plan.type);
+    }
+    if (input.personId && input.personId !== plan.personId) {
+      await ensureUsablePerson(this.prisma, workspaceId, input.personId);
+    }
+    if (input.merchantId && input.merchantId !== plan.merchantId) {
+      await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
+    }
+    const [settledCount, sharesCount] = await Promise.all([
+      db.transaction.count({
+        where: { workspaceId, installmentPlanId: planId, settledAt: { not: null } },
+      }),
+      db.transaction.count({
+        where: { workspaceId, splitOf: { is: { installmentPlanId: planId } } },
+      }),
+    ]);
+    if (input.personId && sharesCount > 0) {
+      throw new BadRequestException({
+        code: 'INVALID_INPUT',
+        message: 'Um lançamento dividido não fica ligado a uma só pessoa.',
+      });
+    }
+    const merged = {
+      description: input.description ?? plan.description,
+      notes: input.notes === undefined ? plan.notes : input.notes,
+      categoryId: input.categoryId ?? plan.categoryId,
+      dueDay: input.dueDay === undefined ? plan.dueDay : input.dueDay,
+      dueMonthOffset: input.dueMonthOffset ?? plan.dueMonthOffset,
+      personId: input.personId === undefined ? plan.personId : input.personId,
+      merchantId: input.merchantId === undefined ? plan.merchantId : input.merchantId,
+      paymentMethod: input.paymentMethod === undefined ? plan.paymentMethod : input.paymentMethod,
+    };
+    const dueDateIn = (period: string) =>
+      merged.dueDay === null
+        ? null
+        : toDate(dueDateFor(period, merged.dueDay, merged.dueMonthOffset));
+
+    if (INSTALLMENT_AMOUNT_FIELDS.some((field) => input[field] !== undefined)) {
+      if (settledCount > 0) {
+        throw new ConflictException({
+          code: 'PLAN_HAS_PAYMENTS',
+          message: 'Com parcelas pagas, o valor não muda: encerre e crie outro parcelamento.',
+        });
+      }
+      if (sharesCount > 0) {
+        throw new ConflictException({
+          code: 'PLAN_IS_SPLIT',
+          message: 'O valor de um parcelamento dividido não muda: exclua e crie outro.',
+        });
+      }
+      const installments = input.installments ?? plan.installments;
+      const firstPeriod = input.firstPeriod ?? plan.firstPeriod;
+      const totalCents =
+        input.amountCents === undefined
+          ? plan.totalCents
+          : input.amountIs === 'TOTAL'
+            ? input.amountCents
+            : input.amountCents * installments;
+      if (totalCents < installments) {
+        throw new BadRequestException({
+          code: 'INVALID_INPUT',
+          message: 'O total precisa dar ao menos um centavo por parcela.',
+        });
+      }
+      // Nothing is settled: the installments are made again from scratch.
+      await db.transaction.deleteMany({ where: { workspaceId, installmentPlanId: planId } });
+      const amounts = splitInstallments(totalCents, installments);
+      const updated = await db.installmentPlan.update({
+        where: { id: planId, workspaceId },
+        data: {
+          ...merged,
+          totalCents,
+          installments,
+          firstPeriod,
+          transactions: {
+            create: amounts.map((amountCents, index) => {
+              const period = shiftPeriod(firstPeriod, index);
+              return {
+                workspaceId,
+                type: plan.type,
+                description: merged.description,
+                notes: merged.notes,
+                categoryId: merged.categoryId,
+                personId: merged.personId,
+                merchantId: merged.merchantId,
+                paymentMethod: merged.paymentMethod,
+                amountCents,
+                period,
+                dueDate: dueDateIn(period),
+                installmentNumber: index + 1,
+              };
+            }),
+          },
+        },
+      });
+      return toResponse(updated, 0, {
+        count: amounts.length,
+        cents: totalCents,
+        lastPeriod: shiftPeriod(firstPeriod, amounts.length - 1),
+      });
+    }
+
+    const updated = await db.installmentPlan.update({
+      where: { id: planId, workspaceId },
+      data: merged,
+    });
+    const dueChanged = input.dueDay !== undefined || input.dueMonthOffset !== undefined;
+    const pending = await db.transaction.findMany({
+      where: { workspaceId, installmentPlanId: planId, settledAt: null },
+      select: { id: true, period: true },
+    });
+    for (const installment of pending) {
+      await db.transaction.update({
+        where: { id: installment.id, workspaceId },
+        data: {
+          description: input.description,
+          notes: input.notes,
+          categoryId: input.categoryId,
+          personId: input.personId,
+          merchantId: input.merchantId,
+          paymentMethod: input.paymentMethod,
+          dueDate: dueChanged ? dueDateIn(installment.period) : undefined,
+        },
+      });
+    }
+    const list = await this.list(workspaceId);
+    return list.find((item) => item.id === planId) ?? toResponse(updated, settledCount);
+  }
+
+  /**
    * Ends it (paid off early, or a mistake): the pending installments from this month on are
    * removed, with their shares still pending (ADR 0052); settled ones and past months stay as
-   * history (ADR 0038). Ending twice changes nothing.
+   * history (ADR 0038). Ending twice changes nothing. With no installment settled there is no
+   * history to keep: the plan goes with every installment, also the past months' (ADR 0038 note).
    */
   async end(workspaceId: string, planId: string): Promise<void> {
-    if (!z.uuid().safeParse(planId).success) throw new NotFoundException();
+    const plan = await this.find(workspaceId, planId);
     const db = this.prisma.forWorkspace(workspaceId);
-    const plan = await db.installmentPlan.findFirst({ where: { id: planId, workspaceId } });
-    if (!plan) throw new NotFoundException();
+    const settled = await db.transaction.count({
+      where: { workspaceId, installmentPlanId: planId, settledAt: { not: null } },
+    });
+    if (settled === 0) {
+      // The pending shares first (a settled one, money already received, stays unlinked); the
+      // installments go with the plan, by cascade.
+      await db.transaction.deleteMany({
+        where: { workspaceId, settledAt: null, splitOf: { is: { installmentPlanId: planId } } },
+      });
+      await db.installmentPlan.delete({ where: { id: planId, workspaceId } });
+      return;
+    }
     if (plan.endedAt) return;
     const removed = {
       workspaceId,
@@ -225,5 +392,14 @@ export class InstallmentsService {
       where: { id: planId, workspaceId },
       data: { endedAt: new Date() },
     });
+  }
+
+  private async find(workspaceId: string, planId: string): Promise<PlanRow> {
+    if (!z.uuid().safeParse(planId).success) throw new NotFoundException();
+    const plan = await this.prisma
+      .forWorkspace(workspaceId)
+      .installmentPlan.findFirst({ where: { id: planId, workspaceId } });
+    if (!plan) throw new NotFoundException();
+    return plan;
   }
 }
