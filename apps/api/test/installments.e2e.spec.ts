@@ -27,6 +27,11 @@ const installmentRoutes: WorkspaceRoute[] = [
   { method: 'get', path: (id) => `/api/workspaces/${id}/installments` },
   { method: 'post', path: (id) => `/api/workspaces/${id}/installments`, body: {} },
   {
+    method: 'patch',
+    path: (id) => `/api/workspaces/${id}/installments/01920000-0000-7000-8000-000000000999`,
+    body: { description: 'Intruso' },
+  },
+  {
     method: 'delete',
     path: (id) => `/api/workspaces/${id}/installments/01920000-0000-7000-8000-000000000999`,
   },
@@ -226,6 +231,125 @@ describe('installments', () => {
     expect(refused.body).toMatchObject({ code: 'INVALID_PERSON' });
   });
 
+  describe('editing and deleting (ADR 0038 note)', () => {
+    it('changes what it is in the pending installments, never in the settled ones', async () => {
+      const { create, fridge, transactionsOf, base, browser, categoryId } = await setUp();
+      const plan = await create(fridge());
+      const [first] = await transactionsOf(thisMonth);
+      await browser
+        .patch(`${base}/transactions/${first?.id}`)
+        .send({ settledAt: `${thisMonth}-15` })
+        .expect(200);
+
+      const response = await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({
+          description: 'Geladeira nova',
+          categoryId: categoryId('Compras', 'DEBIT'),
+          paymentMethod: 'CREDIT_CARD',
+          dueDay: 20,
+        })
+        .expect(200);
+
+      expect(installmentPlanSchema.parse(response.body)).toMatchObject({
+        description: 'Geladeira nova',
+        paymentMethod: 'CREDIT_CARD',
+        dueDay: 20,
+        settledCount: 1,
+      });
+      expect((await transactionsOf(thisMonth))[0]).toMatchObject({
+        description: 'Geladeira',
+        paymentMethod: null,
+      });
+      expect((await transactionsOf(month(1)))[0]).toMatchObject({
+        description: 'Geladeira nova',
+        categoryId: categoryId('Compras', 'DEBIT'),
+        paymentMethod: 'CREDIT_CARD',
+        dueDate: `${month(1)}-20`,
+      });
+    });
+
+    it('remakes the installments when the amounts change and none is settled', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const plan = await create(fridge());
+
+      const response = await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({ amountCents: 120_000, amountIs: 'TOTAL', installments: 4 })
+        .expect(200);
+
+      expect(installmentPlanSchema.parse(response.body)).toMatchObject({
+        totalCents: 120_000,
+        installments: 4,
+        pendingCount: 4,
+      });
+      expect((await transactionsOf(month(3)))[0]).toMatchObject({
+        amountCents: 30_000,
+        installment: { planId: plan.id, number: 4, count: 4 },
+      });
+    });
+
+    it('refuses new amounts once an installment is settled, or when it is split', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const paid = await create(fridge());
+      const [first] = await transactionsOf(thisMonth);
+      await browser
+        .patch(`${base}/transactions/${first?.id}`)
+        .send({ settledAt: `${thisMonth}-15` })
+        .expect(200);
+      const split = await create(
+        fridge({ description: 'TV', split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }),
+      );
+      const newAmount = { amountCents: 90_000, amountIs: 'TOTAL' };
+
+      const refusedPaid = await browser
+        .patch(`${base}/installments/${paid.id}`)
+        .send(newAmount)
+        .expect(409);
+      const refusedSplit = await browser
+        .patch(`${base}/installments/${split.id}`)
+        .send(newAmount)
+        .expect(409);
+
+      expect(refusedPaid.body).toMatchObject({ code: 'PLAN_HAS_PAYMENTS' });
+      expect(refusedSplit.body).toMatchObject({ code: 'PLAN_IS_SPLIT' });
+    });
+
+    it('deletes one with no installment settled, also its past months and shares', async () => {
+      const { create, fridge, transactionsOf, base, browser, plans } = await setUp();
+      const plan = await create(
+        fridge({ firstPeriod: month(-1), split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }),
+      );
+
+      await browser.delete(`${base}/installments/${plan.id}`).expect(204);
+
+      expect(await plans()).toEqual([]);
+      for (const offset of [-1, 0, 1]) expect(await transactionsOf(month(offset))).toEqual([]);
+    });
+
+    it('does not change an ended plan, and deletes an ended one with nothing settled', async () => {
+      const { create, fridge, transactionsOf, base, browser, plans } = await setUp();
+      const plan = await create(fridge({ firstPeriod: month(-1) }));
+      const [last] = await transactionsOf(month(-1));
+      await browser
+        .patch(`${base}/transactions/${last?.id}`)
+        .send({ settledAt: `${month(-1)}-15` })
+        .expect(200);
+      await browser.delete(`${base}/installments/${plan.id}`).expect(204);
+
+      const refused = await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({ description: 'Outra' })
+        .expect(409);
+      expect(refused.body).toMatchObject({ code: 'PLAN_ENDED' });
+
+      // Its paid installment taken back: nothing settled left, so it can now be deleted.
+      await browser.patch(`${base}/transactions/${last?.id}`).send({ settledAt: null }).expect(200);
+      await browser.delete(`${base}/installments/${plan.id}`).expect(204);
+      expect(await plans()).toEqual([]);
+    });
+  });
+
   describe('split (ADR 0052)', () => {
     it('gives every installment one pending share per person, each total adding up', async () => {
       const { create, fridge, transactionsOf, base, browser, categoryId, plans } = await setUp();
@@ -305,7 +429,13 @@ describe('installments', () => {
       const plan = await create(
         fridge({ firstPeriod: month(-1), split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }),
       );
+      // Last month's installment is paid (so it ends, and is not deleted, ADR 0038 note), and
       // Ana already paid her part of this month's installment.
+      const lastMonth = (await transactionsOf(month(-1))).find((t) => t.installment)!;
+      await browser
+        .patch(`${base}/transactions/${lastMonth.id}`)
+        .send({ settledAt: `${month(-1)}-20` })
+        .expect(200);
       const now = await transactionsOf(thisMonth);
       const paidShare = now.find((t) => t.splitOfId !== null)!;
       await browser

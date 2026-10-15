@@ -124,3 +124,13 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
 - **Os registros antigos ficam com 0,** como eram. Para corrigir uma recorrência criada antes, edita-se a distância, e a API recalcula o vencimento dos pendentes deste mês em diante, como já fazia com o dia. Os pagos e os meses passados ficam como estão.
 - **"Tornar recorrente"** tira a distância da data do próprio lançamento, e um lançamento que vence longe demais do seu mês é recusado (`NOT_REPEATABLE`).
 - **Na tela,** o formulário calcula o dia e a distância da data digitada em "Todo mês" e "Parcelado". O lançamento avulso continua aceitando qualquer data.
+
+## Nota (editar e excluir um parcelamento, 2026-10-15)
+
+- **O problema:** um parcelamento não se editava, nem para trocar a categoria ou corrigir a descrição; e encerrar um sem nenhuma parcela paga deixava um item em "Encerrados e pagos" que nada tinha de pago.
+- **Editar (`PATCH …/installments/:planId`):**
+  - descrição, observações, categoria, pessoa, estabelecimento, meio de pagamento, dia do vencimento e "Vence no" mudam a qualquer momento, no parcelamento e nas parcelas **pendentes**; as pagas são histórico e ficam como estão;
+  - os valores (total ou valor da parcela, número de parcelas, mês da primeira) só mudam **enquanto nenhuma parcela estiver paga e o parcelamento não estiver dividido**: as parcelas são refeitas do zero, como se tivesse acabado de ser criado. Com parcela paga, `PLAN_HAS_PAYMENTS`; dividido, `PLAN_IS_SPLIT` (refazer as partes de cada pessoa em cada parcela fica para outra vez, como na recorrência dividida);
+  - um parcelamento encerrado não muda mais (`PLAN_ENDED`).
+- **Excluir em vez de encerrar:** sem nenhuma parcela paga não há histórico a guardar, então `DELETE …/installments/:planId` apaga o parcelamento com **todas** as parcelas, também as de meses anteriores, e as partes pendentes de uma divisão (uma parte já recebida fica, solta). Com alguma parcela paga, continua encerrando como antes. Um parcelamento já encerrado sem nada pago também pode ser excluído assim.
+- **O histórico com algo pago fica:** a recorrência ou o parcelamento encerrado com lançamentos pagos continua em Recorrências, porque esses vínculos são o histórico.

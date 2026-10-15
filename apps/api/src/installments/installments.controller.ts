@@ -2,13 +2,16 @@ import {
   createInstallmentPlanInputSchema,
   installmentPlanListResponseSchema,
   installmentPlanSchema,
+  updateInstallmentPlanInputSchema,
   type CreateInstallmentPlanInput,
   type InstallmentPlan,
+  type UpdateInstallmentPlanInput,
 } from '@financas/shared';
-import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
@@ -60,11 +63,31 @@ export class InstallmentsController {
     return this.installments.create(membership.workspaceId, input);
   }
 
+  @Patch(':planId')
+  @RequireRole('EDITOR')
+  @ApiBody({ schema: openApi(updateInstallmentPlanInputSchema) })
+  @ApiOkResponse({
+    description:
+      'Changed, with its pending installments; the amounts remake every installment (ADR 0038 note).',
+    schema: openApi(installmentPlanSchema),
+  })
+  @ApiBadRequestResponse({ description: 'INVALID_INPUT, INVALID_CATEGORY, INVALID_MERCHANT.' })
+  @ApiConflictResponse({ description: 'PLAN_ENDED, PLAN_HAS_PAYMENTS or PLAN_IS_SPLIT.' })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  update(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('planId') planId: string,
+    @Body({ schema: updateInstallmentPlanInputSchema }) input: UpdateInstallmentPlanInput,
+  ): Promise<InstallmentPlan> {
+    return this.installments.update(membership.workspaceId, planId, input);
+  }
+
   @Delete(':planId')
   @RequireRole('EDITOR')
   @HttpCode(204)
   @ApiNoContentResponse({
-    description: 'Ended: its pending installments from this month on removed.',
+    description:
+      'Ended: its pending installments from this month on removed. With none settled, deleted with every installment.',
   })
   @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
   end(
