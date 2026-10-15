@@ -49,3 +49,8 @@ O Better Auth oferece um _hook_ "depois de criar usuário", mas ele roda **depoi
 ## Nota (padrões genéricos, 2026-10-10)
 
 As categorias padrão de um espaço novo vinham da planilha pessoal de origem: 14 de crédito e 26 de débito, como PLR, Lote, Inglês e IPVA. Antes da 1.0.0 ([ADR 0050](0050-versionamento.md)), elas foram trocadas por uma lista genérica, porque o app é para outras pessoas também. São 5 de crédito e 13 de débito, listadas em `DEFAULT_CATEGORIES` e em [modelo.md](../dominio/modelo.md#categorias-padrão). Cada pessoa cria as categorias da sua vida. Os espaços criados antes continuam com as categorias que receberam, e não houve migração.
+
+## Nota ("Bônus" entre os padrões, 2026-10-15)
+
+- **Os espaços novos recebem "Bônus"** entre as categorias de entrada, logo depois de "Salário": o que o empregador paga além do salário (PLR, gratificação, prêmio). "Renda extra" fica para o que vem de fora (freela, venda).
+- **Os espaços existentes ficam como estão**, como na saída de "Cartão de crédito" ([ADR 0054](0054-meio-de-pagamento.md)). Criar "Bônus" neles impediria renomear uma categoria antiga (como "PLR", da lista de origem) para esse nome, que é o caminho para o histórico inteiro passar a se chamar Bônus.

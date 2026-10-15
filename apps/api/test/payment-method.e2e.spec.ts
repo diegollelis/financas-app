@@ -171,9 +171,22 @@ describe('payment method', () => {
     expect(transactions.map((item) => item.paymentMethod)).toContain('CASH');
   });
 
-  it('no longer gives a new workspace a credit card category', async () => {
+  it('no longer gives a new workspace a credit card category, and gives it Bônus', async () => {
     const { categories } = await setup();
+    const names = categories.map((category) => `${category.name} (${category.type})`);
 
-    expect(categories.map((category) => category.name)).not.toContain('Cartão de crédito');
+    expect(names).not.toContain('Cartão de crédito (DEBIT)');
+    expect(names).toContain('Bônus (CREDIT)');
+  });
+
+  it('takes a meal or food voucher', async () => {
+    const { browser, base, fields } = await setup();
+
+    const created = await browser
+      .post(`${base}/transactions`)
+      .send({ ...fields({ paymentMethod: 'MEAL_VOUCHER' }), period })
+      .expect(201);
+
+    expect(transactionSchema.parse(created.body).paymentMethod).toBe('MEAL_VOUCHER');
   });
 });

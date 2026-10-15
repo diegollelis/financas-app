@@ -69,7 +69,7 @@ Onde se comprou ou quem pagou: um cadastro do espaço, só o nome (único no esp
 
 ### PaymentMethod (Meio de pagamento) — fase 5 ([ADR 0054](../adr/0054-meio-de-pagamento.md))
 
-Como se pagou ou recebeu, numa lista fixa: Pix, Débito, Crédito, Dinheiro, Boleto, Transferência e Débito automático. Lançamentos, recorrências e parcelamentos têm um `payment_method` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Na tela, "Meio de pagamento" numa saída e "Meio de recebimento" numa entrada. Não é uma conta nem um cartão com saldo e fatura: isso, se vier, terá um ADR próprio.
+Como se pagou ou recebeu, numa lista fixa: Pix, Débito, Crédito, Vale-alimentação/refeição, Dinheiro, Boleto, Transferência e Débito automático. Lançamentos, recorrências e parcelamentos têm um `payment_method` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Na tela, "Meio de pagamento" numa saída e "Meio de recebimento" numa entrada. Não é uma conta nem um cartão com saldo e fatura: isso, se vier, terá um ADR próprio.
 
 ## Indicadores do painel (por espaço e competência)
 
@@ -79,7 +79,7 @@ Calculados na API a partir dos lançamentos, nunca armazenados, nas visões prev
 
 Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras. A lista é genérica de propósito: cada pessoa cria as categorias da sua vida.
 
-**Créditos:** Salário, Renda extra, Rendimentos, Reembolso, Outros
+**Créditos:** Salário, Bônus, Renda extra, Rendimentos, Reembolso, Outros
 
 **Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Educação, Lazer, Compras, Assinaturas, Impostos e taxas, Repasse, Outros
 
