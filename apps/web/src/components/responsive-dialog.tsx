@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useKeyboardInset } from '@/lib/use-keyboard-inset';
+import { cn } from '@/lib/utils';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 
 /**
@@ -26,6 +27,7 @@ export function ResponsiveDialog({
   title,
   description,
   returnFocusTo,
+  wide = false,
   children,
 }: {
   open: boolean;
@@ -37,6 +39,8 @@ export function ResponsiveDialog({
    * or a button outside it has none, and focus would fall to the page.
    */
   returnFocusTo?: HTMLElement | null | RefObject<HTMLElement | null>;
+  /** A longer form that lays its fields in columns from lg: a wider dialog there. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const desktop = useMediaQuery(DESKTOP_QUERY);
@@ -64,7 +68,7 @@ export function ResponsiveDialog({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
+          className={cn('max-h-[90svh] overflow-y-auto sm:max-w-lg', wide && 'lg:max-w-2xl')}
           onCloseAutoFocus={onCloseAutoFocus}
         >
           <DialogHeader>

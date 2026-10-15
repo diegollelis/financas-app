@@ -178,3 +178,10 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **O nome acessível começa pelo texto visível** ("Pagar: Conta de luz"), para quem usa comando de voz (WCAG 2.5.3). O axe apontou o nome anterior.
 - **No celular,** os dois botões ficam empilhados embaixo do valor, para a descrição manter a largura; do md em diante, lado a lado.
 - **Na mesma rodada,** o link ativo da barra lateral passou a ter o texto na cor normal (o azul sobre o fundo azul claro dava 3,89:1), com o ícone e a barrinha azuis marcando a seção; e o script de capturas passou a rodar o axe também em 1280 px, onde a barra lateral existe.
+
+## Nota (diálogo do lançamento mais largo, 2026-10-15)
+
+- **A partir de lg (1024 px), o diálogo de "Novo lançamento" e "Editar lançamento" passa de cerca de 512 para 672 px** (`ResponsiveDialog wide`), e os campos curtos que andam juntos dividem a linha: Descrição | Categoria; Valor | Vencimento | Meio de pagamento (a terceira coluna um pouco mais larga, para o rótulo maior caber numa linha); em "Mais opções", Estabelecimento | Pessoa. Repetir, Observações e a divisão continuam na largura toda.
+- **Por quê:** num desktop de 800 px de altura, com "Mais opções" aberto ou uma divisão, o formulário passava da altura e pedia rolagem dentro do diálogo, com espaço sobrando dos lados. Só alargar não resolveria: o ganho vem de pôr lado a lado o que é curto e relacionado.
+- **A ordem é a mesma do celular** (o quê, quanto, quando, como), lida e percorrida com Tab da esquerda para a direita. No celular e no tablet nada muda: a folha de baixo, um campo por linha.
+- **Só este diálogo:** os outros continuam com a largura de antes. Uma gaveta lateral foi descartada, porque mudaria o padrão de todos os diálogos sem ganho claro para um formulário deste tamanho.
