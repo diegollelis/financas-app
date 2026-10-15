@@ -1723,6 +1723,9 @@ describe('TransactionsPage', () => {
 
       const debits = await section('Saídas');
       expect(within(debits).getByRole('columnheader', { name: 'Situação' })).toBeInTheDocument();
+      expect(
+        within(debits).getByRole('columnheader', { name: /^Estabelecimento . Meio/ }),
+      ).toBeInTheDocument();
       // By due date at first, one without a date last.
       expect(tableRows(debits)).toEqual(['Conta de luz', 'Compras da semana']);
       const amount = within(debits).getByRole('columnheader', { name: /Valor/ });
