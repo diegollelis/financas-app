@@ -144,7 +144,8 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] ADR: lista fixa (e não cadastro ou texto livre), sete meios, saídas e entradas, "Meio de pagamento" / "Meio de recebimento" na tela e `PaymentMethod` no código, no glossário
   - [x] API: enum e `payment_method` opcional em lançamentos, recorrências e parcelamentos (herdado por cada mês e parcela, nunca pelas partes), exportação; "Cartão de crédito" fora das categorias padrão dos espaços novos
   - [x] Tela: o campo em "Mais opções" e na edição da recorrência, o meio na linha, na tabela e na busca
-  - [ ] Sugestão pelo histórico (como a da categoria), Análise "Por meio de pagamento" e a coluna opcional na planilha modelo
+  - [x] Sugestão pelo histórico (como a da categoria): o meio vazio vem do estabelecimento ou da descrição, com "Sugerido pelo histórico", sem trocar uma escolha feita à mão
+  - [ ] Análise "Por meio de pagamento" e a coluna opcional na planilha modelo
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês

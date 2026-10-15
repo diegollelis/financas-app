@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { suggestCategory, type CategoryHints } from './category-hints.ts';
+import { suggestCategory, suggestPaymentMethod, type CategoryHints } from './category-hints.ts';
 
 // Fictitious ids (ADR 0019).
 const mercado = '01920000-0000-7000-8000-000000000101';
@@ -15,6 +15,13 @@ const hints: CategoryHints = {
     { description: 'remedios', type: 'DEBIT', categoryId: farmacia },
     { description: 'remedios', type: 'CREDIT', categoryId: reembolso },
   ],
+  paymentMethods: {
+    merchants: [{ merchantId: bomPreco, type: 'DEBIT', paymentMethod: 'CREDIT_CARD' }],
+    descriptions: [
+      { description: 'conta de luz', type: 'DEBIT', paymentMethod: 'AUTO_DEBIT' },
+      { description: 'remedios', type: 'DEBIT', paymentMethod: 'PIX' },
+    ],
+  },
 };
 
 describe('suggestCategory', () => {
@@ -41,6 +48,20 @@ describe('suggestCategory', () => {
     ).toBeNull();
     expect(
       suggestCategory(hints, { type: 'CREDIT', merchantId: bomPreco, description: 'Cinema' }),
+    ).toBeNull();
+  });
+});
+
+describe('suggestPaymentMethod (ADR 0054)', () => {
+  it("takes the merchant's method first, then the description's, of the same type", () => {
+    expect(
+      suggestPaymentMethod(hints, { type: 'DEBIT', merchantId: bomPreco, description: 'Remédios' }),
+    ).toBe('CREDIT_CARD');
+    expect(
+      suggestPaymentMethod(hints, { type: 'DEBIT', merchantId: null, description: 'Conta de Luz' }),
+    ).toBe('AUTO_DEBIT');
+    expect(
+      suggestPaymentMethod(hints, { type: 'CREDIT', merchantId: null, description: 'Remédios' }),
     ).toBeNull();
   });
 });

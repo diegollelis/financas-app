@@ -72,3 +72,8 @@ Escolhidos com o dono do projeto: **lista fixa (opção 1)**, **sete meios (opç
   2. API: o enum, as colunas, os schemas, os serviços (herança nas recorrências e parcelamentos), a exportação; e "Cartão de crédito" fora das categorias padrão.
   3. Tela: o campo no formulário e na edição da recorrência, o meio na linha e na tabela, a busca.
   4. A sugestão pelo histórico, a Análise por meio e a coluna da planilha.
+
+## Nota (o campo à vista e sugerido, 2026-10-15)
+
+- **Sai de "Mais opções" e vem logo após o vencimento,** no formulário do lançamento e na edição da recorrência (depois de "Vence no"). Com a sugestão pelo histórico, o meio era preenchido dentro de uma seção fechada, sem que a pessoa visse; à vista, a sugestão ("Sugerido pelo histórico") é confirmada ou trocada na hora. O ADR 0053 já previa subir um campo de "Mais opções" que fosse preenchido quase sempre.
+- **Continua opcional.** Muitas vezes o meio só se sabe ao pagar (a conta lançada antes do vencimento), as recorrências e os parcelamentos antigos geram meses sem meio, as partes de uma divisão ficam sem meio de propósito, e a planilha modelo não o exige. O vazio quer dizer "ainda não sei", e a Análise poderá mostrar quanto está sem meio. Pedir o meio ao tocar em "Pagar" só será considerado depois de algumas semanas de uso, se houver muitos lançamentos sem ele.

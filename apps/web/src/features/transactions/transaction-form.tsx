@@ -12,6 +12,7 @@ import {
   paymentMethodFieldLabels,
   paymentMethodSchema,
   suggestCategory,
+  suggestPaymentMethod,
   type Category,
   type CategoryHints,
   type Merchant,
@@ -75,6 +76,8 @@ const transactionFormSchema = plainTransactionInputSchema
       .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
     /** How it was paid or received (ADR 0054); '' for none. */
     paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
+    /** The method the history filled in (ADR 0054); '' when none. Never sent. */
+    suggestedPaymentMethod: z.string(),
     /** A receber de / a pagar para (ADR 0042): a name; a new one becomes a person on save. */
     person: z
       .string()
@@ -287,6 +290,7 @@ export function TransactionForm({
       amountIs: 'TOTAL',
       merchant: merchants.find((merchant) => merchant.id === initial?.merchantId)?.name ?? '',
       paymentMethod: initial?.paymentMethod ?? '',
+      suggestedPaymentMethod: '',
       person: people.find((person) => person.id === initial?.personId)?.name ?? '',
       splitOn: false,
       shareMode: 'REAIS',
@@ -365,16 +369,34 @@ export function TransactionForm({
       setValue('suggestedCategoryId', usable);
     }
   }, [usable, categoryId, suggested, setValue]);
+  // The payment method the same way (ADR 0054): fills an empty one, or replaces one it filled
+  // itself; a method the person picked is never changed.
+  const paymentMethod = useWatch({ control, name: 'paymentMethod' });
+  const suggestedMethod = useWatch({ control, name: 'suggestedPaymentMethod' });
+  const methodSuggestion =
+    hints && !initial && !preset
+      ? suggestPaymentMethod(hints, {
+          type,
+          description: description ?? '',
+          merchantId: findMerchant(merchants, merchantName ?? '')?.id ?? null,
+        })
+      : null;
+  useEffect(() => {
+    if (!methodSuggestion || methodSuggestion === paymentMethod) return;
+    if (paymentMethod === '' || paymentMethod === suggestedMethod) {
+      setValue('paymentMethod', methodSuggestion);
+      setValue('suggestedPaymentMethod', methodSuggestion);
+    }
+  }, [methodSuggestion, paymentMethod, suggestedMethod, setValue]);
   // Opened from the start when the transaction being edited uses one of them.
   const [moreOpen, setMoreOpen] = useState(
-    Boolean(initial?.notes || initial?.personId || initial?.merchantId || initial?.paymentMethod),
+    Boolean(initial?.notes || initial?.personId || initial?.merchantId),
   );
   const application = initial ? undefined : preset?.applicationTo;
   // What "Mais opções" holds, named on it so nothing is hidden by surprise.
   const moreContents = [
     'observações',
     !application && 'estabelecimento',
-    paymentMethodFieldLabels[type].toLowerCase(),
     showPerson && !application && 'pessoa',
     canSplit && !application && 'dividir',
   ]
@@ -467,6 +489,25 @@ export function TransactionForm({
           <Input type="date" {...register('dueDate')} />
         </FormField>
       </div>
+      {/* Right after the due date, not in "Mais opções": the history's suggestion is seen (ADR 0054). */}
+      <Controller
+        control={control}
+        name="paymentMethod"
+        render={({ field, fieldState }) => (
+          <div className="grid gap-1">
+            <FormField
+              id={id('payment-method')}
+              label={`${paymentMethodFieldLabels[type]} (opcional)`}
+              error={fieldState.error?.message}
+            >
+              <PaymentMethodSelect value={field.value} onChange={field.onChange} />
+            </FormField>
+            {field.value !== '' && field.value === suggestedMethod && (
+              <p className="text-muted-foreground text-sm">Sugerido pelo histórico.</p>
+            )}
+          </div>
+        )}
+      />
       {allowRepeat && (
         <div className="grid gap-2">
           <p aria-hidden className="text-sm font-medium">
@@ -596,19 +637,6 @@ export function TransactionForm({
               )}
             />
           )}
-          <Controller
-            control={control}
-            name="paymentMethod"
-            render={({ field, fieldState }) => (
-              <FormField
-                id={id('payment-method')}
-                label={`${paymentMethodFieldLabels[type]} (opcional)`}
-                error={fieldState.error?.message}
-              >
-                <PaymentMethodSelect value={field.value} onChange={field.onChange} />
-              </FormField>
-            )}
-          />
           {showPerson && !application && (
             <Controller
               control={control}
