@@ -200,6 +200,8 @@ export function TransactionDialog({
       open={open}
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
+      // The form lays its short fields in columns from lg (ADR 0036 note).
+      wide
       title={
         editing
           ? 'Editar lançamento'

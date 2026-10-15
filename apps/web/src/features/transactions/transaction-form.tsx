@@ -37,6 +37,7 @@ import { findMerchant } from '@/features/merchants/use-merchants';
 import { PersonSelect } from '@/features/people/person-picker';
 import { dueDayLabel, dueOf } from '@/features/recurrences/due';
 import { apiErrorMessage } from '@/lib/error-message';
+import { cn } from '@/lib/utils';
 import { shareCents } from './split';
 import { PaymentMethodSelect } from './payment-method-select';
 import { SplitFields, type SplitFormFields } from './split-fields';
@@ -441,37 +442,41 @@ export function TransactionForm({
           )}
         />
       )}
-      <FormField
-        id={id('description')}
-        label="Descrição"
-        error={formState.errors.description?.message}
-      >
-        <Input autoComplete="off" {...register('description')} />
-      </FormField>
-      {fixedCategory === null && (
-        <Controller
-          control={control}
-          name="categoryId"
-          render={({ field, fieldState }) => (
-            <div className="grid gap-1">
-              <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
-                <CategorySelect
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={options}
-                  allowAdd
-                />
-              </FormField>
-              {/* Says why it is filled in; gone once the person picks one (ADR 0053). */}
-              {field.value !== '' && field.value === suggested && (
-                <p className="text-muted-foreground text-sm">Sugerida pelo histórico.</p>
-              )}
-            </div>
-          )}
-        />
-      )}
-      {/* One column on the phone, two from sm. */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* From lg, in the wider dialog, the short fields that go together share a row: what it is
+          and its category; how much, when and how. The order stays the one of the phone. */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <FormField
+          id={id('description')}
+          label="Descrição"
+          error={formState.errors.description?.message}
+        >
+          <Input autoComplete="off" {...register('description')} />
+        </FormField>
+        {fixedCategory === null && (
+          <Controller
+            control={control}
+            name="categoryId"
+            render={({ field, fieldState }) => (
+              <div className="grid gap-1">
+                <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
+                  <CategorySelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={options}
+                    allowAdd
+                  />
+                </FormField>
+                {/* Says why it is filled in; gone once the person picks one (ADR 0053). */}
+                {field.value !== '' && field.value === suggested && (
+                  <p className="text-muted-foreground text-sm">Sugerida pelo histórico.</p>
+                )}
+              </div>
+            )}
+          />
+        )}
+      </div>
+      {/* One column on the phone, two from sm, three from lg (the method, with the longest label, a little wider). */}
+      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr]">
         <FormField id={id('amount')} label={amountLabel} error={formState.errors.amount?.message}>
           <Input
             inputMode="decimal"
@@ -488,26 +493,26 @@ export function TransactionForm({
         >
           <Input type="date" {...register('dueDate')} />
         </FormField>
+        {/* Right after the due date, not in "Mais opções": the history's suggestion is seen (ADR 0054). */}
+        <Controller
+          control={control}
+          name="paymentMethod"
+          render={({ field, fieldState }) => (
+            <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
+              <FormField
+                id={id('payment-method')}
+                label={`${paymentMethodFieldLabels[type]} (opcional)`}
+                error={fieldState.error?.message}
+              >
+                <PaymentMethodSelect value={field.value} onChange={field.onChange} />
+              </FormField>
+              {field.value !== '' && field.value === suggestedMethod && (
+                <p className="text-muted-foreground text-sm">Sugerido pelo histórico.</p>
+              )}
+            </div>
+          )}
+        />
       </div>
-      {/* Right after the due date, not in "Mais opções": the history's suggestion is seen (ADR 0054). */}
-      <Controller
-        control={control}
-        name="paymentMethod"
-        render={({ field, fieldState }) => (
-          <div className="grid gap-1">
-            <FormField
-              id={id('payment-method')}
-              label={`${paymentMethodFieldLabels[type]} (opcional)`}
-              error={fieldState.error?.message}
-            >
-              <PaymentMethodSelect value={field.value} onChange={field.onChange} />
-            </FormField>
-            {field.value !== '' && field.value === suggestedMethod && (
-              <p className="text-muted-foreground text-sm">Sugerido pelo histórico.</p>
-            )}
-          </div>
-        )}
-      />
       {allowRepeat && (
         <div className="grid gap-2">
           <p aria-hidden className="text-sm font-medium">
@@ -618,46 +623,53 @@ export function TransactionForm({
           >
             <Input autoComplete="off" {...register('notes')} />
           </FormField>
+          {/* Side by side from lg; the merchant takes the row when there is no person (a split). */}
           {!application && (
-            <Controller
-              control={control}
-              name="merchant"
-              render={({ field, fieldState }) => (
-                <FormField
-                  id={id('merchant')}
-                  label="Estabelecimento (opcional)"
-                  error={fieldState.error?.message}
-                >
-                  <MerchantSelect
-                    value={field.value}
-                    onChange={field.onChange}
-                    merchants={merchants}
-                  />
-                </FormField>
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              <div className={cn(!showPerson && 'lg:col-span-2')}>
+                <Controller
+                  control={control}
+                  name="merchant"
+                  render={({ field, fieldState }) => (
+                    <FormField
+                      id={id('merchant')}
+                      label="Estabelecimento (opcional)"
+                      error={fieldState.error?.message}
+                    >
+                      <MerchantSelect
+                        value={field.value}
+                        onChange={field.onChange}
+                        merchants={merchants}
+                      />
+                    </FormField>
+                  )}
+                />
+              </div>
+              {showPerson && (
+                <Controller
+                  control={control}
+                  name="person"
+                  render={({ field, fieldState }) => (
+                    <FormField
+                      id={id('person')}
+                      label={
+                        type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'
+                      }
+                      error={fieldState.error?.message}
+                    >
+                      <PersonSelect
+                        value={field.value}
+                        onChange={field.onChange}
+                        people={people}
+                        userId={user.id}
+                        optional
+                        title={type === 'CREDIT' ? 'A receber de' : 'A pagar para'}
+                      />
+                    </FormField>
+                  )}
+                />
               )}
-            />
-          )}
-          {showPerson && !application && (
-            <Controller
-              control={control}
-              name="person"
-              render={({ field, fieldState }) => (
-                <FormField
-                  id={id('person')}
-                  label={type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'}
-                  error={fieldState.error?.message}
-                >
-                  <PersonSelect
-                    value={field.value}
-                    onChange={field.onChange}
-                    people={people}
-                    userId={user.id}
-                    optional
-                    title={type === 'CREDIT' ? 'A receber de' : 'A pagar para'}
-                  />
-                </FormField>
-              )}
-            />
+            </div>
           )}
           {canSplit && !application && (
             <div className="grid gap-3">
