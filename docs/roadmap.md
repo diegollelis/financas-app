@@ -113,9 +113,9 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Vencimento no mês seguinte numa recorrência ou num parcelamento (visto em 2026-10-13 com a conta de luz: lançada em outubro, vence em 10/11; nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
     - [x] API: `dueMonthOffset` (0 ou 1) na recorrência e no parcelamento, usado em cada mês gerado e em cada parcela; mudá-lo recalcula os pendentes deste mês em diante; "Tornar recorrente" tira a distância da data do lançamento
     - [x] Tela: o formulário manda a distância da data digitada, Recorrências mostra "Vence dia 10 do mês seguinte" e a edição oferece "Mesmo mês / Mês seguinte"
-  - [ ] Editar e excluir um parcelamento (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
+  - [x] Editar e excluir um parcelamento (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
     - [x] API: `PATCH …/installments/:planId` (o que ele é, sempre, nas parcelas pendentes; os valores só sem parcela paga e sem divisão, refazendo as parcelas) e excluir de vez o que não tem parcela paga
-    - [ ] Tela: "Editar" no menu do parcelamento, "Excluir parcelamento" quando nada foi pago e "Encerrados e quitados"
+    - [x] Tela: "Editar" no menu do parcelamento, "Excluir parcelamento" quando nada foi pago e "Encerrados e quitados"
 - [x] Ver Lançamentos e Recorrências como tabela, a partir de 1280 px ("Ver como: Lista | Tabela", lembrado no navegador; nota no [ADR 0045](adr/0045-largura-por-pagina-e-grade-do-painel.md))
   - [x] Lançamentos: Entradas e Saídas em tabelas alinhadas, ordenadas pela coluna clicada; o botão da linha vira "○ Pagar" / "○ Receber" (com contorno, também na lista) e o menu ganha "Marcar como pago / recebido" (nota no [ADR 0036](adr/0036-design-mobile-first.md)); o link ativo da barra lateral com contraste de texto e o axe também em 1280 px no script de capturas
   - [x] Recorrências: "Todo mês" e "Parcelamentos" em tabela (Descrição, Tipo, Categoria, Pessoa, Vence, Período e Valor; Descrição, Tipo, Categoria, Pessoa, Pagas, Falta e Total), as encerradas à parte e sem coluna de ações

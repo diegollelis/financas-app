@@ -34,6 +34,7 @@ function toResponse(
   plan: PlanRow,
   settledCount: number,
   pending: Pending = NOTHING_PENDING,
+  isSplit = false,
 ): InstallmentPlan {
   return {
     id: plan.id,
@@ -49,6 +50,7 @@ function toResponse(
     personId: plan.personId,
     merchantId: plan.merchantId,
     paymentMethod: plan.paymentMethod,
+    isSplit,
     endedAt: plan.endedAt?.toISOString() ?? null,
     settledCount,
     pendingCount: pending.count,
@@ -69,7 +71,7 @@ export class InstallmentsService {
   /** Running ones first, then by description; each with what was settled and what is left. */
   async list(workspaceId: string): Promise<InstallmentPlan[]> {
     const db = this.prisma.forWorkspace(workspaceId);
-    const [plans, settled, pending] = await Promise.all([
+    const [plans, settled, pending, shares] = await Promise.all([
       db.installmentPlan.findMany({
         where: { workspaceId },
         orderBy: [{ endedAt: { sort: 'desc', nulls: 'first' } }, { description: 'asc' }],
@@ -86,7 +88,13 @@ export class InstallmentsService {
         _sum: { amountCents: true },
         _max: { period: true },
       }),
+      // One share per split plan is enough to know it is split.
+      db.transaction.findMany({
+        where: { workspaceId, splitOf: { is: { installmentPlanId: { not: null } } } },
+        select: { splitOf: { select: { installmentPlanId: true } } },
+      }),
     ]);
+    const splitPlans = new Set(shares.map((share) => share.splitOf?.installmentPlanId));
     const settledByPlan = new Map(
       settled.map((row) => [row.installmentPlanId, row._count._all] as const),
     );
@@ -104,7 +112,12 @@ export class InstallmentsService {
       ),
     );
     return plans.map((plan) =>
-      toResponse(plan, settledByPlan.get(plan.id) ?? 0, pendingByPlan.get(plan.id)),
+      toResponse(
+        plan,
+        settledByPlan.get(plan.id) ?? 0,
+        pendingByPlan.get(plan.id),
+        splitPlans.has(plan.id),
+      ),
     );
   }
 
@@ -163,11 +176,16 @@ export class InstallmentsService {
       },
     });
     // Just created: every installment is still to pay.
-    return toResponse(plan, 0, {
-      count: amounts.length,
-      cents: totalCents,
-      lastPeriod: shiftPeriod(input.firstPeriod, amounts.length - 1),
-    });
+    return toResponse(
+      plan,
+      0,
+      {
+        count: amounts.length,
+        cents: totalCents,
+        lastPeriod: shiftPeriod(input.firstPeriod, amounts.length - 1),
+      },
+      Boolean(input.split),
+    );
   }
 
   /**

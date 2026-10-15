@@ -2,9 +2,10 @@ import {
   installmentPlanListResponseSchema,
   installmentPlanSchema,
   type CreateInstallmentPlanInput,
+  type UpdateInstallmentPlanInput,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiDelete, apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { useInvalidateTransactions } from '@/features/transactions/use-transactions';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
@@ -41,7 +42,23 @@ export function useCreateInstallmentPlan(workspaceId: string) {
   });
 }
 
-/** Ends it: its pending installments from this month on are removed. */
+/**
+ * Changes it (ADR 0038 note): what it is reaches the pending installments; the amounts remake
+ * every installment, only while none is settled and it is not split.
+ */
+export function useUpdateInstallmentPlan(workspaceId: string) {
+  const onSuccess = useInvalidateInstallments(workspaceId);
+  return useMutation({
+    mutationFn: ({ id, ...input }: UpdateInstallmentPlanInput & { id: string }) =>
+      apiPatch(`/api/workspaces/${workspaceId}/installments/${id}`, input, installmentPlanSchema),
+    onSuccess,
+  });
+}
+
+/**
+ * Ends it: its pending installments from this month on are removed. With none settled, it is
+ * deleted with every installment instead (ADR 0038 note).
+ */
 export function useEndInstallmentPlan(workspaceId: string) {
   const onSuccess = useInvalidateInstallments(workspaceId);
   return useMutation({

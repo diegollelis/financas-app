@@ -11,6 +11,7 @@ import {
   transactionTypeLabels,
   type Category,
   type InstallmentPlan,
+  type UpdateInstallmentPlanInput,
   type PaymentMethod,
   type Person,
   type Recurrence,
@@ -52,9 +53,11 @@ import {
 import { useCurrentUser } from '@/features/auth/use-me';
 import { useResolveCategory } from '@/features/categories/new-category';
 import { useCategories } from '@/features/categories/use-categories';
+import { PlanForm } from '@/features/installments/plan-form';
 import {
   useEndInstallmentPlan,
   useInstallmentPlans,
+  useUpdateInstallmentPlan,
 } from '@/features/installments/use-installments';
 import { usePeople, useResolvePerson } from '@/features/people/use-people';
 import { dueDayLabel } from '@/features/recurrences/due';
@@ -345,6 +348,65 @@ function EditRecurrence({
   );
 }
 
+/** Inside the plan's edit dialog: mounted on each opening, so no error is left from the last one. */
+function EditPlan({
+  workspaceId,
+  plan,
+  categories,
+  people,
+  onDone,
+}: {
+  workspaceId: string;
+  plan: InstallmentPlan;
+  categories: Category[];
+  people: Person[];
+  onDone: () => void;
+}) {
+  const user = useCurrentUser();
+  const update = useUpdateInstallmentPlan(workspaceId);
+  const person = useResolvePerson(workspaceId, people);
+  const category = useResolveCategory(workspaceId, categories);
+  const save = async (changes: UpdateInstallmentPlanInput, personName: string | undefined) => {
+    if (changes.categoryId !== undefined) {
+      try {
+        changes.categoryId = await category.resolve(changes.categoryId, plan.type);
+      } catch {
+        return; // Shown by the form, from category.error.
+      }
+    }
+    if (personName !== undefined) {
+      try {
+        changes.personId = await person.resolve(personName);
+      } catch {
+        return; // Shown by the form, from person.error.
+      }
+    }
+    if (Object.keys(changes).length === 0) return onDone();
+    update.mutate(
+      { id: plan.id, ...changes },
+      {
+        onSuccess: () => {
+          toast.success('Parcelamento alterado');
+          onDone();
+        },
+      },
+    );
+  };
+
+  return (
+    <PlanForm
+      plan={plan}
+      categories={categories}
+      people={people}
+      userId={user.id}
+      pending={update.isPending || person.isPending || category.isPending}
+      error={category.error ?? person.error ?? update.error}
+      onSubmit={(changes, personName) => void save(changes, personName)}
+      onCancel={onDone}
+    />
+  );
+}
+
 /** "A receber de Ana" / "A pagar para Ana" (ADR 0052); null without a person. */
 function personLine(type: TransactionType, personId: string | null, people: Person[]) {
   const name = people.find((person) => person.id === personId)?.name;
@@ -504,16 +566,19 @@ function PlanItem({
   asTable: boolean;
 }) {
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [editing, setEditing] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const end = useEndInstallmentPlan(workspaceId);
   const { description } = plan;
   const over = planIsOver(plan);
+  // Nothing paid: no history to keep, so it is deleted rather than ended (ADR 0038 note).
+  const nothingPaid = plan.settledCount === 0;
   const category = categories.find((item) => item.id === plan.categoryId);
   const parts = splitInstallments(plan.totalCents, plan.installments);
   const first = parts[0] ?? 0;
   const confirmEnd = () =>
     void end.mutateAsync(plan.id).then(() => {
-      toast.success('Parcelamento encerrado');
+      toast.success(nothingPaid ? 'Parcelamento excluído' : 'Parcelamento encerrado');
       document.getElementById(PLANS_TITLE_ID)?.focus();
     }, showError);
 
@@ -529,23 +594,52 @@ function PlanItem({
     parts.at(-1) === first
       ? `total em ${plan.installments} de ${formatCents(first)}`
       : `total em ${plan.installments} parcelas`;
-  const menu = canEdit && !over && (
+  const pendingText =
+    plan.pendingCount === 1 ? '1 parcela pendente' : `${plan.pendingCount} parcelas pendentes`;
+  // A running one, or an ended one with nothing paid (still to delete).
+  const menu = canEdit && (!over || nothingPaid) && (
     <>
       <DropdownMenu>
         <ActionsButton name={description} ref={actionsRef} />
         <DropdownMenuContent align="end">
+          {!over && <DropdownMenuItem onSelect={() => setEditing(true)}>Editar</DropdownMenuItem>}
           <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
-            Encerrar parcelamento
+            {nothingPaid ? 'Excluir parcelamento' : 'Encerrar parcelamento'}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {!over && (
+        <ResponsiveDialog
+          open={editing}
+          onOpenChange={setEditing}
+          returnFocusTo={actionsRef}
+          title={`Editar ${description}`}
+          description="As mudanças valem para as parcelas pendentes. As já pagas ficam como estão."
+        >
+          <EditPlan
+            workspaceId={workspaceId}
+            plan={plan}
+            categories={categories}
+            people={people}
+            onDone={() => setEditing(false)}
+          />
+        </ResponsiveDialog>
+      )}
       <EndDialog
         open={confirmingEnd}
         onOpenChange={setConfirmingEnd}
         returnFocusTo={actionsRef}
-        title={`Encerrar o parcelamento ${description}?`}
-        description="As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada."
-        action="Encerrar parcelamento"
+        title={
+          nothingPaid
+            ? `Excluir o parcelamento ${description}?`
+            : `Encerrar o parcelamento ${description}?`
+        }
+        description={
+          nothingPaid
+            ? `Nenhuma parcela foi paga: o parcelamento sai com ${pendingText}, também as de meses anteriores. Não é possível desfazer.`
+            : 'As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada.'
+        }
+        action={nothingPaid ? 'Excluir parcelamento' : 'Encerrar parcelamento'}
         onConfirm={confirmEnd}
       />
     </>
@@ -569,7 +663,7 @@ function PlanItem({
         <TableCell>
           <SeriesAmount amount={formatCents(plan.totalCents)} note={amountNote} />
         </TableCell>
-        {menu && (
+        {canEdit && (
           <TableCell>
             <div className="flex justify-end">{menu}</div>
           </TableCell>
@@ -790,8 +884,9 @@ export function RecurrencesPage() {
                 planItem,
                 canEdit,
               )}
-              pastTitle="Encerrados e pagos"
-              past={show(plans.data.filter(planIsOver), planColumns, planItem, false)}
+              pastTitle="Encerrados e quitados"
+              // An ended one with nothing paid can still be deleted: the actions column stays.
+              past={show(plans.data.filter(planIsOver), planColumns, planItem, canEdit)}
             />
           </>
         ))}

@@ -410,6 +410,95 @@ describe('RecurrencesPage', () => {
     );
   });
 
+  describe('editing and deleting a plan (ADR 0038 note)', () => {
+    // Nothing paid yet: its amounts can change, and it is deleted rather than ended.
+    const tv = plan(3, {
+      description: 'TV',
+      totalCents: 90_000,
+      installments: 3,
+      settledCount: 0,
+      pendingCount: 3,
+      pendingCents: 90_000,
+      lastPendingPeriod: '2026-11',
+    });
+
+    it('edits a plan with nothing paid, amounts too, sending only what changed', async () => {
+      const fetchMock = mockRecurrences({
+        [`GET ${base}/installments`]: { body: [tv] },
+        [`PATCH ${base}/installments/${tv.id}`]: { body: { ...tv, installments: 4 } },
+      });
+      renderApp(page);
+
+      await choose('TV', 'Editar');
+      const dialog = await screen.findByRole('dialog', { name: 'Editar TV' });
+      expect(dialog).toHaveTextContent('refaz todas as parcelas');
+      const installments = within(dialog).getByLabelText('Parcelas');
+      await userEvent.clear(installments);
+      await userEvent.type(installments, '4');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+      await expectCall(fetchMock, `${base}/installments/${tv.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ amountCents: 90_000, amountIs: 'TOTAL', installments: 4 }),
+      });
+      expect(await screen.findByText('Parcelamento alterado')).toBeInTheDocument();
+    });
+
+    it('keeps the amounts of a plan with a paid installment, and changes the rest', async () => {
+      const fetchMock = mockRecurrences({
+        [`PATCH ${base}/installments/${geladeira.id}`]: {
+          body: { ...geladeira, description: 'Geladeira nova' },
+        },
+      });
+      renderApp(page);
+
+      await choose('Geladeira', 'Editar');
+      const dialog = await screen.findByRole('dialog', { name: 'Editar Geladeira' });
+      expect(within(dialog).getByLabelText('Valor total (R$)')).toHaveAttribute('readonly');
+      expect(dialog).toHaveTextContent('Com parcelas pagas, o valor e as parcelas não mudam');
+      const description = within(dialog).getByLabelText('Descrição');
+      await userEvent.clear(description);
+      await userEvent.type(description, 'Geladeira nova');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+      await expectCall(fetchMock, `${base}/installments/${geladeira.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ description: 'Geladeira nova' }),
+      });
+    });
+
+    it('deletes a plan with nothing paid, saying how many installments go', async () => {
+      const fetchMock = mockRecurrences({
+        [`GET ${base}/installments`]: { body: [tv] },
+        [`DELETE ${base}/installments/${tv.id}`]: { status: 204, body: null },
+      });
+      renderApp(page);
+
+      await choose('TV', 'Excluir parcelamento');
+      const dialog = await screen.findByRole('alertdialog', { name: 'Excluir o parcelamento TV?' });
+      expect(dialog).toHaveTextContent('sai com 3 parcelas pendentes');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Excluir parcelamento' }));
+
+      await expectCall(fetchMock, `${base}/installments/${tv.id}`, { method: 'DELETE' });
+      expect(await screen.findByText('Parcelamento excluído')).toBeInTheDocument();
+    });
+
+    it('offers to delete an ended plan with nothing paid, from the history', async () => {
+      const ended = { ...tv, endedAt: '2026-10-01T12:00:00.000Z', pendingCount: 1 };
+      mockRecurrences({ [`GET ${base}/installments`]: { body: [ended, sofa] } });
+      renderApp(page);
+
+      const plans = await section('Parcelamentos');
+      expect(
+        within(plans).getByRole('heading', { name: 'Encerrados e quitados' }),
+      ).toBeInTheDocument();
+      await choose('TV', 'Excluir parcelamento');
+      expect(await screen.findByRole('alertdialog')).toHaveTextContent('1 parcela pendente');
+      // Paid off: history, nothing to act on.
+      expect(screen.queryByRole('button', { name: 'Ações de Sofá' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('as a table (from xl)', () => {
     /** The first cell of each body row of a table: the descriptions, top to bottom. */
     const descriptions = (table: HTMLElement) =>
