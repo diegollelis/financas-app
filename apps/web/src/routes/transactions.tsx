@@ -198,7 +198,8 @@ function EndSeriesDialog({
     ? {
         title: `Encerrar o parcelamento ${transaction.description}?`,
         description:
-          'As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada.',
+          // From here the page does not know whether any installment is paid (ADR 0038 note).
+          'As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada. Se nenhuma parcela foi paga, o parcelamento sai com todas elas.',
         action: 'Encerrar parcelamento',
         done: 'Parcelamento encerrado',
       }

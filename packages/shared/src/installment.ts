@@ -98,6 +98,8 @@ export const installmentPlanSchema = z.object({
   personId: z.uuid().nullable().default(null),
   merchantId: z.uuid().nullable().default(null),
   paymentMethod: paymentMethodSchema.nullable().default(null),
+  /** Split with other people (ADR 0052): its amounts do not change (ADR 0038 note). */
+  isSplit: z.boolean().default(false),
   /** When it was ended; null while it runs. */
   endedAt: z.iso.datetime().nullable(),
   /** How many installments were already settled. */

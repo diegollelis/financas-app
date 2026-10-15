@@ -23,6 +23,9 @@ const ptBrCodes = new Set([
   'MERCHANT_IN_USE',
   'INVALID_MERCHANT',
   'NOT_REPEATABLE',
+  'PLAN_ENDED',
+  'PLAN_HAS_PAYMENTS',
+  'PLAN_IS_SPLIT',
 ]);
 
 /** Turns an error from our own API routes (not /api/auth) into a message for the user. */
