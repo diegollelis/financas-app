@@ -24,13 +24,14 @@ export function SortableHead({
   return (
     <TableHead
       aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : undefined}
-      className={cn(align === 'right' && 'text-right')}
+      // A long title ("Estabelecimento / Meio") breaks into lines instead of running into the next.
+      className={cn('whitespace-normal', align === 'right' && 'text-right')}
     >
       <button
         type="button"
         onClick={onSort}
         className={cn(
-          'hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-1 rounded-sm outline-none focus-visible:ring-3',
+          'hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-1 rounded-sm text-left outline-none focus-visible:ring-3',
           active ? 'text-foreground' : 'text-muted-foreground',
           align === 'right' && 'flex-row-reverse',
         )}

@@ -573,8 +573,8 @@ function TransactionRow(props: RowProps) {
       <TableCell className="whitespace-normal">
         {/* Where and how (ADR 0054): the method under the merchant, in the same column. */}
         <span className="grid">
-          {/* The dash only when there is neither. */}
-          {(merchantName || !transaction.paymentMethod) && <span>{merchantName ?? '—'}</span>}
+          {/* Always the merchant first, a dash without one, so the method is never read as one. */}
+          <span>{merchantName ?? '—'}</span>
           {transaction.paymentMethod && (
             <span className="text-muted-foreground">
               {paymentMethodLabels[transaction.paymentMethod]}
@@ -651,7 +651,7 @@ function TransactionTable({
             {head('dueDate', 'Vencimento')}
             {head('description', 'Descrição')}
             {head('category', 'Categoria')}
-            {head('merchant', 'Estabelecimento')}
+            {head('merchant', 'Estabelecimento / Meio')}
             <TableHead>Situação</TableHead>
             {head('amount', 'Valor', 'right')}
             {canEdit && (

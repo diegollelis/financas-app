@@ -58,7 +58,7 @@ Escolhidos com o dono do projeto: **lista fixa (opção 1)**, **sete meios (opç
 **Tela**
 
 - **No formulário:** "Meio de pagamento (opcional)" numa saída, "Meio de recebimento (opcional)" numa entrada, em "Mais opções", escolhido num `Select` com os sete meios e "Nenhum".
-- **Na linha do lançamento:** o meio aparece nos detalhes; na tabela, embaixo do estabelecimento, na mesma coluna. A busca também procura por ele.
+- **Na linha do lançamento:** o meio aparece nos detalhes; na tabela, embaixo do estabelecimento, na mesma coluna, que se chama "Estabelecimento / Meio" e mostra "—" sem estabelecimento (sem isso, um "Pix" sozinho parecia ser o estabelecimento). A busca também procura por ele.
 - **Na edição de uma recorrência:** o mesmo campo.
 - **Na Análise:** "Por meio de pagamento", quanto foi em cada meio no período.
 - **Na planilha modelo:** a coluna opcional "Meio de pagamento", lida pelo rótulo, ignorando maiúsculas e acentos; um valor desconhecido vira um aviso na linha e o lançamento entra sem meio.
