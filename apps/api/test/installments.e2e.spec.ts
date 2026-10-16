@@ -371,29 +371,34 @@ describe('installments', () => {
       const months = await Promise.all([0, 1, 2].map((offset) => transactionsOf(month(offset))));
       const sharesOf = (transactions: (typeof months)[number]) => {
         const installment = transactions.find((t) => t.installment !== null)!;
-        return transactions
-          .filter((t) => t.splitOfId === installment.id)
-          .map(({ type, description, amountCents, categoryId: category, settledAt }) => ({
-            type,
-            description,
-            amountCents,
-            category,
-            settledAt,
-          }))
-          .sort((a, b) => a.description.localeCompare(b.description));
+        return (
+          transactions
+            .filter((t) => t.splitOfId === installment.id)
+            .map(({ type, description, amountCents, categoryId: category, settledAt }) => ({
+              type,
+              description,
+              amountCents,
+              category,
+              settledAt,
+            }))
+            // The same description for both: the larger share (Ana's) first.
+            .sort(
+              (a, b) => a.description.localeCompare(b.description) || b.amountCents - a.amountCents,
+            )
+        );
       };
       const reembolso = categoryId('Reembolso', 'CREDIT');
       expect(sharesOf(months[0]!)).toEqual([
         {
           type: 'CREDIT',
-          description: 'Ana: parte de Geladeira (1/3)',
+          description: 'Geladeira (1/3)',
           amountCents: 11_111,
           category: reembolso,
           settledAt: null,
         },
         {
           type: 'CREDIT',
-          description: 'Bruno: parte de Geladeira (1/3)',
+          description: 'Geladeira (1/3)',
           amountCents: 3_333,
           category: reembolso,
           settledAt: null,
@@ -419,9 +424,31 @@ describe('installments', () => {
 
       const last = await transactionsOf(month(9));
       expect(last.find((t) => t.splitOfId !== null)).toMatchObject({
-        description: 'Ana: parte de Geladeira (10/10)',
+        description: 'Geladeira (10/10)',
         amountCents: 4_995,
       });
+    });
+
+    it('renames the pending shares with the plan, each with its installment (ADR 0052 note)', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const plan = await create(fridge({ split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }));
+      // This month's share is already paid back: history, it keeps its name.
+      const [paid] = (await transactionsOf(thisMonth)).filter((t) => t.splitOfId !== null);
+      await browser
+        .patch(`${base}/transactions/${paid?.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({ description: 'Geladeira nova' })
+        .expect(200);
+
+      const shareOf = async (offset: number) =>
+        (await transactionsOf(month(offset))).find((t) => t.splitOfId !== null)?.description;
+      expect(await shareOf(0)).toBe('Geladeira (1/3)');
+      expect(await shareOf(1)).toBe('Geladeira nova (2/3)');
+      expect(await shareOf(2)).toBe('Geladeira nova (3/3)');
     });
 
     it('ends it with the shares still pending of the installments removed', async () => {

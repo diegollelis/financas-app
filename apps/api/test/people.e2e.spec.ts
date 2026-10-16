@@ -467,13 +467,13 @@ describe('people and splits', () => {
       ).toEqual(
         expect.arrayContaining([
           {
-            description: 'Ana: parte de Hospedagem',
+            description: 'Hospedagem',
             amountCents: 33_333,
             personId: ana.id,
             settledAt: null,
           },
           {
-            description: 'Bruno: parte de Hospedagem',
+            description: 'Hospedagem',
             amountCents: 33_333,
             personId: bruno.id,
             settledAt: null,
@@ -484,6 +484,48 @@ describe('people and splits', () => {
         new Set([category('Reembolso', 'CREDIT').id]),
       );
       expect(bruno.receivableCents).toBe(33_333);
+    });
+
+    it('renames the pending shares with the transaction, never a settled one (ADR 0052 note)', async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const bruno = await addPerson(browser, base, 'Bruno');
+      const debit = transactionSchema.parse(
+        (
+          await browser
+            .post(`${base}/transactions`)
+            .send({
+              type: 'DEBIT',
+              description: 'Jantar',
+              categoryId: category('Lazer', 'DEBIT').id,
+              amountCents: 30_000,
+              period,
+              split: [
+                { personId: ana.id, amountCents: 10_000 },
+                { personId: bruno.id, amountCents: 10_000 },
+              ],
+            })
+            .expect(201)
+        ).body,
+      );
+      const sharesOf = async () =>
+        (await transactions(browser, base)).filter((t) => t.splitOfId === debit.id);
+      const anaShare = (await sharesOf()).find((share) => share.personId === ana.id)!;
+      await browser
+        .patch(`${base}/transactions/${anaShare.id}`)
+        .send({ settledAt: `${period}-02` })
+        .expect(200);
+
+      await browser
+        .patch(`${base}/transactions/${debit.id}`)
+        .send({ description: 'Jantar de aniversário' })
+        .expect(200);
+
+      const shares = await sharesOf();
+      expect(shares.find((share) => share.personId === ana.id)?.description).toBe('Jantar');
+      expect(shares.find((share) => share.personId === bruno.id)?.description).toBe(
+        'Jantar de aniversário',
+      );
     });
 
     it('refuses a split bigger than the debit, or the same person twice', async () => {
@@ -604,7 +646,7 @@ describe('people and splits', () => {
       expect(shares).toEqual([
         expect.objectContaining({
           type: 'DEBIT',
-          description: 'Irmão: parte de Aluguel recebido',
+          description: 'Aluguel recebido',
           categoryId: category('Repasse', 'DEBIT').id,
           amountCents: 50_000,
           personId: irmao.id,

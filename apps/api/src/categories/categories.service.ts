@@ -104,8 +104,8 @@ export class CategoriesService {
   /**
    * Which category, and which payment method, usually go with each merchant and each
    * description, per type (ADRs 0053, 0054), from the last 12 months: what the form fills an
-   * empty field with. Shares of a split are left out ("Ana: parte de …" says nothing about the
-   * purchase). Only names and ids, no amount.
+   * empty field with. Shares of a split are left out: they repeat the description of
+   * what was split, in Reembolso or Repasse, and would suggest those (ADR 0052 note). Only names and ids, no amount.
    */
   async hints(workspaceId: string): Promise<CategoryHints> {
     const db = this.prisma.forWorkspace(workspaceId);

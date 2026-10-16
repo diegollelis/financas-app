@@ -15,6 +15,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
 import { optionalDate, toIsoDate } from './dates.js';
+import { followDescription } from './share-description.js';
 
 /** Every read brings what generated the transaction, if anything: a recurrence or a plan (ADR 0038). */
 export const withOrigin = {
@@ -127,7 +128,7 @@ export class TransactionsService {
     return split.map((share, index) => ({
       workspaceId,
       type,
-      description: shareDescription(people[index]!.name, input.description),
+      description: shareDescription(input.description),
       categoryId,
       amountCents: share.amountCents,
       period: input.period,
@@ -181,6 +182,22 @@ export class TransactionsService {
       // (ADR 0052).
       if (input.amountCents !== undefined && input.amountCents !== current.amountCents) {
         await this.recurrences.followAmount(workspaceId, transactionId, input.amountCents);
+      }
+      // Its pending shares take the new name; an installment's keep their number (ADR 0052 note).
+      if (input.description !== undefined && input.description !== current.description) {
+        const installment =
+          transaction.installmentNumber && transaction.installmentPlan
+            ? {
+                number: transaction.installmentNumber,
+                count: transaction.installmentPlan.installments,
+              }
+            : undefined;
+        await followDescription(
+          this.prisma,
+          workspaceId,
+          transactionId,
+          shareDescription(input.description, installment),
+        );
       }
       return toTransactionResponse(transaction);
     } catch (error) {

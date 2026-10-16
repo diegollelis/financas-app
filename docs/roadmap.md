@@ -117,6 +117,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
     - [x] API: `dueMonthOffset` (0 ou 1) na recorrência e no parcelamento, usado em cada mês gerado e em cada parcela; mudá-lo recalcula os pendentes deste mês em diante; "Tornar recorrente" tira a distância da data do lançamento
     - [x] Tela: o formulário manda a distância da data digitada, Recorrências mostra "Vence dia 10 do mês seguinte" e a edição oferece "Mesmo mês / Mês seguinte"
   - [x] Editar e excluir um parcelamento (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
+  - [x] A parte de uma divisão repete a descrição do que foi dividido, sem o nome da pessoa ("Conta de luz", "Geladeira (3/10)"), e acompanha a edição da descrição nas partes pendentes (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
   - [x] Recorrência anual (IPVA, IPTU, anuidade; nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
     - [x] API: `intervalMonths` (1 ou 12) na recorrência, só o mês do ciclo gerado, "Tornar recorrente" anual, a frequência no lançamento e na exportação
     - [x] Tela: "Todo ano" no "Repetir" (2×2 no celular) e no "Tornar recorrente", o selo, a seção "Recorrentes" com a frequência e o próximo mês de uma anual, a coluna "Repete" na tabela e o total "Por ano" à parte
