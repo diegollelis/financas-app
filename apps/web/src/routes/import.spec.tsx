@@ -49,12 +49,24 @@ const salaryRow = [
   'Salário',
   'Salário',
   null,
+  null,
   5200,
   day('2026-08-05'),
   day('2026-08-05'),
   null,
 ];
-const groceryRow = ['2026-08', 'Débito', 'Supermercado', 'mercado', null, 640.35, null, null, null];
+const groceryRow = [
+  '2026-08',
+  'Débito',
+  'Supermercado',
+  'mercado',
+  null,
+  null,
+  640.35,
+  null,
+  null,
+  null,
+];
 
 function mockImport(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
@@ -147,7 +159,17 @@ describe('ImportPage', () => {
 
     await choose(
       await spreadsheet([
-        ['2026-08', 'Saída', 'Supermercado', 'mercado', 'Mercado Bom Preço', 640.35, null, null],
+        [
+          '2026-08',
+          'Saída',
+          'Supermercado',
+          'mercado',
+          'Mercado Bom Preço',
+          null,
+          640.35,
+          null,
+          null,
+        ],
       ]),
     );
 
@@ -158,6 +180,26 @@ describe('ImportPage', () => {
     await expectCall(fetchMock, `${base}/imports`, {
       method: 'POST',
       body: expect.stringContaining('"merchantName":"Mercado Bom Preço"') as unknown,
+    });
+  });
+
+  it('shows the payment method of a row and sends it (ADR 0054)', async () => {
+    const fetchMock = mockImport();
+    renderApp(page);
+
+    await choose(
+      await spreadsheet([
+        ['2026-08', 'Saída', 'Supermercado', 'mercado', null, 'crédito', 640.35, null, null],
+      ]),
+    );
+
+    const august = await screen.findByRole('region', { name: 'agosto de 2026' });
+    expect(within(august).getByRole('listitem')).toHaveTextContent('Crédito');
+    await userEvent.click(screen.getByRole('button', { name: 'Importar 1 lançamento' }));
+
+    await expectCall(fetchMock, `${base}/imports`, {
+      method: 'POST',
+      body: expect.stringContaining('"paymentMethod":"CREDIT_CARD"') as unknown,
     });
   });
 
@@ -180,7 +222,7 @@ describe('ImportPage', () => {
     await choose(
       await spreadsheet([
         salaryRow,
-        ['2026-08', 'Débito', 'Feira do sábado', 'Feira', null, 85, null, null, null],
+        ['2026-08', 'Débito', 'Feira do sábado', 'Feira', null, null, 85, null, null, null],
       ]),
     );
 
@@ -203,7 +245,7 @@ describe('ImportPage', () => {
     await choose(
       await spreadsheet([
         salaryRow,
-        ['2026-08', 'Débito', 'Conta de luz', 'Moradia', null, 0, null, null, null],
+        ['2026-08', 'Débito', 'Conta de luz', 'Moradia', null, null, 0, null, null, null],
       ]),
     );
 

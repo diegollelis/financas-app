@@ -83,3 +83,10 @@ Escolhidos com o dono do projeto: **lista fixa (opção 1)**, **sete meios (opç
 - **Um oitavo meio, "Vale-alimentação/refeição"** (`MEAL_VOUCHER`), logo depois de "Crédito": o vale do empregador (VA, VR), também o que só é aceito nos estabelecimentos da própria empresa. O dono do projeto pensou em "Crédito próprio", mas o nome não dizia de quem era o crédito; o termo do mercado diz.
 - **Para o mês fechar certo,** o crédito mensal do vale entra como uma entrada, e as compras como saídas com esse meio; a Análise por meio mostrará quanto foi gasto no vale. Quanto ainda resta no cartão é saldo de conta, que fica com Contas e Cartões, se vierem.
 - **Um valor a mais no enum** (`ALTER TYPE … ADD VALUE … AFTER 'CREDIT_CARD'`); o formulário, a sugestão, a busca e a tabela já usam a lista compartilhada.
+
+## Nota (a coluna na planilha modelo, 2026-10-16)
+
+- **Uma coluna só, "Meio de pagamento",** logo depois de "Estabelecimento", para saídas e entradas. Uma planilha com o título "Meio de recebimento" também é lida, e uma sem a coluna é lida como antes.
+- **Lida pelo rótulo da tela,** ignorando maiúsculas e acentos ("credito", "PIX"), e por alguns sinônimos comuns: "Cartão de crédito", "Cartão de débito", "VA", "VR", "Vale-alimentação", "Vale-refeição", "TED" e "DOC". Um valor fora da lista vira um aviso na linha, e o lançamento entra sem meio, como previsto na Decisão.
+- **A planilha baixada ganha a aba "Meios de pagamento",** com os rótulos aceitos, como a aba "Categorias" faz com as categorias. A linha de exemplo usa "Boleto".
+- **Na revisão,** o meio aparece nos detalhes da linha, e "Editar" ou "Corrigir" tem o mesmo campo do formulário do lançamento. Um lançamento importado leva o meio só quando há um.

@@ -32,6 +32,7 @@ const parsedRow = (line: number, overrides: Partial<TemplateRow> = {}): Template
   notes: null,
   categoryName: 'mercado',
   merchantName: '',
+  paymentMethod: null,
   amountCents: 64_035,
   period: '2026-09',
   dueDate: '2026-09-10',
@@ -139,6 +140,13 @@ describe('toTransaction', () => {
 
     expect(result.ok && result.transaction.merchantName).toBe('Feira');
     expect(toTransaction(reviewRow(), mercado.id)).not.toHaveProperty('transaction.merchantName');
+  });
+
+  it('sends the payment method only when the row has one (ADR 0054)', () => {
+    const result = toTransaction(reviewRow({ paymentMethod: 'PIX' }), mercado.id);
+
+    expect(result.ok && result.transaction.paymentMethod).toBe('PIX');
+    expect(toTransaction(reviewRow(), mercado.id)).not.toHaveProperty('transaction.paymentMethod');
   });
 
   it('says what is still wrong, with the shared messages', () => {

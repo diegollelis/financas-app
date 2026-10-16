@@ -1,5 +1,7 @@
 import {
   parseTemplateRows,
+  paymentMethodLabels,
+  TEMPLATE_PAYMENT_METHODS_SHEET,
   TEMPLATE_CATEGORIES_SHEET,
   TEMPLATE_EXAMPLE,
   TEMPLATE_FILE_NAME,
@@ -39,8 +41,8 @@ export async function readTemplate(file: Blob) {
 const typeLabel = { CREDIT: 'Entrada', DEBIT: 'Saída' } as const;
 
 /**
- * The template: the header, one example row and, on a second sheet, the workspace's active
- * categories to pick names from.
+ * The template: the header, one example row and, on other sheets, the workspace's active
+ * categories and the payment methods (ADR 0054) to pick names from.
  */
 async function templateFile(categories: Category[]) {
   const { default: writeXlsxFile } = await import('write-excel-file/browser');
@@ -53,7 +55,7 @@ async function templateFile(categories: Category[]) {
     {
       sheet: TEMPLATE_SHEET,
       data: [TEMPLATE_HEADERS.map(bold), [...TEMPLATE_EXAMPLE]],
-      columns: [12, 10, 36, 22, 22, 14, 14, 14, 40].map((width) => ({ width })),
+      columns: [12, 10, 36, 22, 22, 18, 14, 14, 14, 40].map((width) => ({ width })),
       stickyRowsCount: 1,
     },
     {
@@ -63,6 +65,15 @@ async function templateFile(categories: Category[]) {
         ...active.map((category) => [typeLabel[category.type], category.name]),
       ],
       columns: [{ width: 10 }, { width: 30 }],
+      stickyRowsCount: 1,
+    },
+    {
+      sheet: TEMPLATE_PAYMENT_METHODS_SHEET,
+      data: [
+        [bold('Meio de pagamento')],
+        ...Object.values(paymentMethodLabels).map((label) => [label]),
+      ],
+      columns: [{ width: 28 }],
       stickyRowsCount: 1,
     },
   ]);

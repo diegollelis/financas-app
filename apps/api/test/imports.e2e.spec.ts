@@ -157,6 +157,20 @@ describe('imports', () => {
     expect(september.find((item) => item.type === 'DEBIT')?.merchantId).toBe(archived.id);
   });
 
+  it('keeps the payment method of each transaction (ADR 0054)', async () => {
+    const { browser, base, rows, transactionsOf } = await setUp();
+    const [salary, grocery] = rows;
+
+    await browser
+      .post(`${base}/imports`)
+      .send({ transactions: [{ ...salary, paymentMethod: 'TRANSFER' }, grocery] })
+      .expect(201);
+
+    const august = await transactionsOf('2026-08');
+    expect(august.find((item) => item.type === 'CREDIT')?.paymentMethod).toBe('TRANSFER');
+    expect(august.find((item) => item.type === 'DEBIT')?.paymentMethod).toBeNull();
+  });
+
   it('refuses the whole batch when one category is of the wrong type, saving nothing', async () => {
     const { browser, base, rows, categoryId, transactionsOf } = await setUp();
     const wrong = { ...rows[1]!, categoryId: categoryId('Salário', 'CREDIT') };
