@@ -185,3 +185,12 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **Por quê:** num desktop de 800 px de altura, com "Mais opções" aberto ou uma divisão, o formulário passava da altura e pedia rolagem dentro do diálogo, com espaço sobrando dos lados. Só alargar não resolveria: o ganho vem de pôr lado a lado o que é curto e relacionado.
 - **A ordem é a mesma do celular** (o quê, quanto, quando, como), lida e percorrida com Tab da esquerda para a direita. No celular e no tablet nada muda: a folha de baixo, um campo por linha.
 - **Só este diálogo:** os outros continuam com a largura de antes. Uma gaveta lateral foi descartada, porque mudaria o padrão de todos os diálogos sem ganho claro para um formulário deste tamanho.
+
+## Nota (leitura de Lançamentos, 2026-10-16)
+
+O dono achava a leitura de Lançamentos confusa às vezes. O valor de uma entrada e o de uma saída eram idênticos ("R$ 45,00"), só o título da seção os separava (e no celular ele sai da tela ao rolar), o selo "Pendente" aparecia em quase toda linha e não havia um resumo do mês.
+
+- **O valor tem sinal:** "+ R$ 45,00" numa entrada, "− R$ 69,90" (o sinal de menos tipográfico) numa saída, também nos totais das seções. O sinal é a pista principal; a cor só reforça.
+- **Verde só nas entradas** (`text-credit-foreground`, ADR 0043). As saídas ficam na cor do texto: gastar é o normal, e pintá-las de vermelho faria a lista de saídas inteira competir com o "Vencido", que continua vermelho.
+- **"Pendente" só para quem não pode agir:** para um EDITOR, o botão "○ Pagar / Receber" já diz que está pendente, e o selo em quase toda linha apagava o "Vencido". Um VIEWER, que não vê o botão, continua vendo "Pendente". "Vencido" e "Pago em / Recebido em" aparecem sempre.
+- **Resumo do mês no topo:** "Entradas", "Saídas" e "Saldo previsto" (o mesmo termo e a mesma conta do Painel), somados dos lançamentos já carregados, do mês inteiro, sem seguir a busca nem o filtro. No celular, uma linha por número, com o rótulo ao lado (três colunas quebravam o sinal); a partir de sm, três colunas. O saldo fica vermelho só quando é negativo.

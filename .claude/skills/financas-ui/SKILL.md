@@ -28,7 +28,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 - **Two themes:** the person picks Sistema, Claro or Escuro in the account menu (`useTheme` from `lib/theme.ts`; `.dark` on `<html>`). Every color comes from a token that has a `.dark` value; never `bg-white`, `text-black` or other fixed colors. Check every change in both themes.
 - Charts use the validated `--chart-1..3` palette (ADR 0032); never add series colors ad hoc.
 - **Avoid template tells** (see `frontend-design`): no `→` appended to links or buttons, no `A · B · C` middle-dot strings, no all-caps eyebrow labels, no identical-card-everything layouts, no decorative gradients, no motion that is not a response to the user.
-- **Amounts:** `tabular-nums`, right-aligned in lists, the largest text in their block. Debits and credits are told apart by sign and label, never by color alone.
+- **Amounts:** `tabular-nums`, right-aligned in lists, the largest text in their block. Debits and credits are told apart by sign and label, never by color alone: a credit is "+ R$ …" in `text-credit-foreground`, a debit "− R$ …" (a real minus sign) in the normal text color. Red is for overdue and a negative balance only, never for every expense.
 
 ## Mobile first layout
 
