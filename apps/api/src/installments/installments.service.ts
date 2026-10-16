@@ -25,6 +25,7 @@ import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
+import { followDescription } from '../transactions/share-description.js';
 
 type Pending = { count: number; cents: number; lastPeriod: string | null };
 
@@ -215,8 +216,8 @@ export class InstallmentsService {
       people.map((person, k) => ({
         workspaceId,
         type,
-        // "Ana: parte de Geladeira (3/10)": which installment it is a share of.
-        description: shareDescription(person.name, `${input.description} (${index + 1}/${count})`),
+        // "Geladeira (3/10)": which installment it is a share of (ADR 0052 note).
+        description: shareDescription(input.description, { number: index + 1, count }),
         categoryId,
         amountCents: perInstallment[k]![index]!,
         period,
@@ -353,7 +354,7 @@ export class InstallmentsService {
     const dueChanged = input.dueDay !== undefined || input.dueMonthOffset !== undefined;
     const pending = await db.transaction.findMany({
       where: { workspaceId, installmentPlanId: planId, settledAt: null },
-      select: { id: true, period: true },
+      select: { id: true, period: true, installmentNumber: true },
     });
     for (const installment of pending) {
       await db.transaction.update({
@@ -368,6 +369,18 @@ export class InstallmentsService {
           dueDate: dueChanged ? dueDateIn(installment.period) : undefined,
         },
       });
+      // Its pending shares take the new name, with their installment (ADR 0052 note).
+      if (input.description !== undefined && installment.installmentNumber !== null) {
+        await followDescription(
+          this.prisma,
+          workspaceId,
+          installment.id,
+          shareDescription(input.description, {
+            number: installment.installmentNumber,
+            count: plan.installments,
+          }),
+        );
+      }
     }
     const list = await this.list(workspaceId);
     return list.find((item) => item.id === planId) ?? toResponse(updated, settledCount);

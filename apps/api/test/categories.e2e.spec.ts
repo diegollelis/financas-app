@@ -171,7 +171,7 @@ describe('categories', () => {
         categoryId: lazer.id,
         period: shiftPeriod(now, -CATEGORY_HINT_MONTHS),
       });
-      // A split's share ("Ana: parte de …") says nothing about the purchase.
+      // A split's share repeats the description, in Reembolso: it must not suggest Reembolso.
       await add({
         description: 'Jantar',
         categoryId: lazer.id,

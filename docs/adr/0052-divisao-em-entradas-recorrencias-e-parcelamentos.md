@@ -102,3 +102,12 @@ Escolhidos com o dono do projeto: **"Repasse" (opção 1)**, **tabela `recurrenc
 - **As partes nascem iguais,** você incluído, e acompanham o valor e as pessoas escolhidas até alguém digitar uma parte à mão. "Dividir igualmente" volta às partes iguais.
 - **Uma lista fixa com caixas de marcar foi descartada:** com muitos contatos, vira uma parede no celular e esconde a busca e o "Adicionar 'Nome'".
 - **Só a tela muda:** a API recebe o mesmo `split`. A mesma forma vale para a divisão no parcelamento e na recorrência, quando chegarem à tela.
+
+## Nota (a descrição das partes, 2026-10-16)
+
+Com o uso, apareceram dois problemas no formato "Ana: parte de {descrição}": mudar a descrição de uma recorrência dividida não chegava às partes (o reembolso continuava com o nome antigo), e o nome da pessoa gravado no texto envelhecia quando a pessoa era renomeada (ou o membro trocava o nome da conta).
+
+- **A parte repete a descrição do que foi dividido,** sem o nome da pessoa: "Conta de luz", e numa parcela "Geladeira (3/10)", que diz qual parcela ela reembolsa. Quem é a pessoa a linha já mostra, em "A receber de Ana" ou "A pagar para Ana", pelo `personId`, sempre com o nome atual; a categoria (Reembolso ou Repasse) separa a parte do lançamento original. `shareDescription` (em `packages/shared`) monta o texto nos três lugares que criam partes.
+- **A parte acompanha a edição:** mudar a descrição de um lançamento dividido, de uma recorrência (nos meses pendentes deste mês em diante) ou de um parcelamento (nas parcelas pendentes) muda também as **partes pendentes** ligadas a eles. Uma parte já paga ou recebida é histórico e fica como está, a mesma regra das parcelas pagas.
+- **As partes antigas** ("Ana: parte de …") ficam como estão até a próxima edição da origem, que corrige as pendentes. Não há migração que reescreva descrições, porque ela mexeria também no que já foi pago.
+- **A sugestão pelo histórico** continua deixando as partes de fora: com a mesma descrição da origem, elas sugeririam Reembolso ou Repasse.

@@ -598,13 +598,13 @@ describe('recurrences', () => {
         expect(await sharesIn(transactionsOf, period)).toEqual(
           expect.arrayContaining([
             {
-              description: 'Ana: parte de Conta de luz',
+              description: 'Conta de luz',
               amountCents: 6_000,
               type: 'CREDIT',
               settledAt: null,
             },
             {
-              description: 'Bruno: parte de Conta de luz',
+              description: 'Conta de luz',
               amountCents: 4_000,
               type: 'CREDIT',
               settledAt: null,
@@ -686,6 +686,24 @@ describe('recurrences', () => {
         .send(energy({ variableAmount: true, split: [{ newPersonName: 'Bia', amountCents: 100 }] }))
         .expect(400);
       expect(invalid.body).toMatchObject({ message: 'Num valor que varia, divida em percentual.' });
+    });
+
+    it('renames the pending shares from this month on with it (ADR 0052 note)', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const recurrence = await create(
+        energy({ startPeriod: month(-1), split: [{ newPersonName: 'Ana', basisPoints: 5_000 }] }),
+      );
+      await transactionsOf(month(1));
+
+      await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ description: 'Conta de energia' })
+        .expect(200);
+
+      // Last month is history; this month and the next follow.
+      expect((await sharesIn(transactionsOf, month(-1)))[0]?.description).toBe('Conta de luz');
+      expect((await sharesIn(transactionsOf, thisMonth))[0]?.description).toBe('Conta de energia');
+      expect((await sharesIn(transactionsOf, month(1)))[0]?.description).toBe('Conta de energia');
     });
 
     it('ends it with the shares still pending of the months removed', async () => {

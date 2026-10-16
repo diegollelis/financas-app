@@ -31,6 +31,7 @@ import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate, toIsoDate } from '../transactions/dates.js';
+import { followDescription } from '../transactions/share-description.js';
 
 type RecurrenceWithShares = RecurrenceRow & { shares: RecurrenceShareRow[] };
 
@@ -281,6 +282,15 @@ export class RecurrencesService {
             : undefined,
         },
       });
+      // Its pending shares take the new name (ADR 0052 note).
+      if (input.description !== undefined) {
+        await followDescription(
+          this.prisma,
+          workspaceId,
+          transaction.id,
+          shareDescription(input.description),
+        );
+      }
       // Its pending shares in percentages follow the new amount (ADR 0052).
       if (!keepsAmount && input.amountCents !== undefined) {
         await this.followAmount(workspaceId, transaction.id, input.amountCents, recurrence.shares);
@@ -428,7 +438,7 @@ export class RecurrencesService {
                   create: recurrence.shares.map((share) => ({
                     workspaceId,
                     type: shareType,
-                    description: shareDescription(share.person.name, recurrence.description),
+                    description: shareDescription(recurrence.description),
                     categoryId: shareCategory,
                     amountCents: shareCents(amountCents, share),
                     period,
