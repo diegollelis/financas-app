@@ -588,7 +588,7 @@ function TransactionItem(props: RowProps) {
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
-    <li className="flex items-start gap-3 py-3">
+    <li className="bg-card flex items-start gap-3 rounded-xl border px-4 py-3.5">
       <div className="grid min-w-0 flex-1 justify-items-start gap-1">
         <p className="font-medium break-words">{transaction.description}</p>
         <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
@@ -904,7 +904,9 @@ export function TransactionsPage() {
                     renderRow={(transaction) => row(transaction, TransactionRow)}
                   />
                 ) : (
-                  <ul className="divide-y rounded-xl border px-4">
+                  // One card per transaction, 8px apart: where one ends and the next begins
+                  // shows at a glance (ADR 0036 note). Still one column, read top to bottom.
+                  <ul className="grid gap-2">
                     {items.map((transaction) => row(transaction, TransactionItem))}
                   </ul>
                 )}
