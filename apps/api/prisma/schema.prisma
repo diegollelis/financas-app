@@ -450,6 +450,8 @@ model Recurrence {
   dueDay         Int?                   @map("due_day") @db.SmallInt
   // Due in the same month (0) or in the next one (1): energy of October due on November 10th.
   dueMonthOffset Int                    @default(0) @map("due_month_offset") @db.SmallInt
+  // Every 1 month or every 12 (ADR 0038 note): only the months of its cycle are generated.
+  intervalMonths Int                    @default(1) @map("interval_months") @db.SmallInt
   // "A receber de" / "a pagar para" (ADR 0052), copied to every month it generates.
   personId       String?                @map("person_id") @db.Uuid
   person         Person?                @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)

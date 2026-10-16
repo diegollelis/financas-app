@@ -5,7 +5,8 @@ import { paymentMethodSchema } from './payment-method.ts';
 import { MAX_SPLIT_PEOPLE, personNameSchema } from './person.ts';
 import { transactionDescriptionSchema, transactionNotesSchema } from './transaction.ts';
 
-// Recorrências (ADR 0038): a transaction that repeats every month. Opening a competência creates
+// Recorrências (ADR 0038): a transaction that repeats every month, or every year (ADR 0038 note).
+// Opening a competência creates
 // its pending transaction there, with the estimated amount; changes reach only the pending ones
 // from this month on, and settled ones and past months stay as history.
 
@@ -30,6 +31,17 @@ export const dueMonthOffsetSchema = z
   .max(MAX_DUE_MONTH_OFFSET, 'Use 0 (mesmo mês) ou 1 (mês seguinte).');
 
 /**
+ * How many months apart its transactions are (ADR 0038 note): 1, every month, or 12, every year
+ * (IPVA, IPTU, an annual fee), in the month of its start.
+ */
+export const recurrenceIntervalSchema = z.union(
+  [z.literal(1), z.literal(12)],
+  'Use 1 (todo mês) ou 12 (todo ano).',
+);
+
+export type RecurrenceInterval = z.infer<typeof recurrenceIntervalSchema>;
+
+/**
  * The fields of a recurrence, without the split: what an update and the web form `.omit()` or
  * `.pick()` from, since Zod refuses both on the refined create schema.
  */
@@ -47,6 +59,8 @@ export const recurrenceFieldsSchema = z.object({
    * last 3 settled, and stays an estimate until the real one is given. Otherwise it is fixed.
    */
   variableAmount: z.boolean().optional(),
+  /** Every month (1, the default) or every year (12); it never changes afterwards. */
+  intervalMonths: recurrenceIntervalSchema.optional(),
   /** "A receber de" / "a pagar para" (ADR 0052): copied to every month it generates. */
   personId: z.uuid().nullable().optional(),
   /** Where it is bought or who pays it (ADR 0053): copied to every month it generates. */
@@ -125,13 +139,15 @@ export const repeatTransactionInputSchema = z.object({
   transactionId: z.uuid('Escolha um lançamento.'),
   /** The amount changes every month (energy, water): the next months start from an estimate. */
   variableAmount: z.boolean().optional(),
+  /** Every month (1, the default) or every year (12), from the transaction's month. */
+  intervalMonths: recurrenceIntervalSchema.optional(),
 });
 
 export type RepeatTransactionInput = z.infer<typeof repeatTransactionInputSchema>;
 
-/** The type and the start do not change: end it and create another instead. */
+/** The type, the start and the interval do not change: end it and create another instead. */
 export const updateRecurrenceInputSchema = recurrenceFieldsSchema
-  .omit({ type: true, startPeriod: true })
+  .omit({ type: true, startPeriod: true, intervalMonths: true })
   .partial()
   .refine((input) => Object.values(input).some((value) => value !== undefined), {
     message: 'Nada para alterar.',
@@ -149,6 +165,7 @@ export const recurrenceSchema = z.object({
   variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
   dueMonthOffset: z.number().int().default(0),
+  intervalMonths: recurrenceIntervalSchema.default(1),
   personId: z.uuid().nullable().default(null),
   merchantId: z.uuid().nullable().default(null),
   paymentMethod: paymentMethodSchema.nullable().default(null),
@@ -215,6 +232,33 @@ export function dueDateIn(period: string, dueDay: number): string {
  */
 export function dueDateFor(period: string, dueDay: number, dueMonthOffset: number): string {
   return dueDateIn(shiftPeriod(period, dueMonthOffset), dueDay);
+}
+
+/**
+ * Whether a recurrence has a transaction in a competência: from its start on, every
+ * `intervalMonths` months. `isRecurrenceMonth('2026-03', 12, '2027-03')` → true.
+ */
+export function isRecurrenceMonth(
+  startPeriod: string,
+  intervalMonths: number,
+  period: string,
+): boolean {
+  const months = dueMonthOffsetOf(startPeriod, `${period}-01`);
+  return months >= 0 && months % intervalMonths === 0;
+}
+
+/**
+ * The first competência of a recurrence at or after `fromPeriod`:
+ * `nextRecurrencePeriod('2026-03', 12, '2026-10')` → '2027-03'.
+ */
+export function nextRecurrencePeriod(
+  startPeriod: string,
+  intervalMonths: number,
+  fromPeriod: string,
+): string {
+  const months = dueMonthOffsetOf(startPeriod, `${fromPeriod}-01`);
+  if (months <= 0) return startPeriod;
+  return shiftPeriod(startPeriod, Math.ceil(months / intervalMonths) * intervalMonths);
 }
 
 /**

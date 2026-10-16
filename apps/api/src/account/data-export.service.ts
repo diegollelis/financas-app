@@ -235,6 +235,7 @@ export class DataExportService {
         variableAmount: recurrence.variableAmount,
         dueDay: recurrence.dueDay,
         dueMonthOffset: recurrence.dueMonthOffset,
+        intervalMonths: recurrence.intervalMonths,
         personId: recurrence.personId,
         merchantId: recurrence.merchantId,
         paymentMethod: recurrence.paymentMethod,

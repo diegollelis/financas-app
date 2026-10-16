@@ -4,6 +4,7 @@ import {
   dueMonthOffsetOf,
   MAX_DUE_MONTH_OFFSET,
   estimateAmount,
+  isRecurrenceMonth,
   shareDescription,
   shareOfAmount,
   shiftPeriod,
@@ -44,6 +45,7 @@ function toResponse(recurrence: RecurrenceWithShares): Recurrence {
     variableAmount: recurrence.variableAmount,
     dueDay: recurrence.dueDay,
     dueMonthOffset: recurrence.dueMonthOffset,
+    intervalMonths: recurrence.intervalMonths === 12 ? 12 : 1,
     personId: recurrence.personId,
     merchantId: recurrence.merchantId,
     paymentMethod: recurrence.paymentMethod,
@@ -114,6 +116,7 @@ export class RecurrencesService {
         variableAmount: input.variableAmount ?? false,
         dueDay: input.dueDay ?? null,
         dueMonthOffset: input.dueMonthOffset ?? 0,
+        intervalMonths: input.intervalMonths ?? 1,
         personId: input.personId ?? null,
         merchantId: input.merchantId ?? null,
         paymentMethod: input.paymentMethod ?? null,
@@ -184,6 +187,7 @@ export class RecurrencesService {
           variableAmount: input.variableAmount ?? false,
           dueDay: dueDate ? Number(dueDate.slice(8)) : null,
           dueMonthOffset,
+          intervalMonths: input.intervalMonths ?? 1,
           personId: transaction.personId,
           merchantId: transaction.merchantId,
           paymentMethod: transaction.paymentMethod,
@@ -372,7 +376,8 @@ export class RecurrencesService {
       const missing = sorted.filter(
         (period) =>
           !done.has(period) &&
-          period >= recurrence.startPeriod &&
+          // Only the months of its cycle: a yearly one, the month of its start (ADR 0038 note).
+          isRecurrenceMonth(recurrence.startPeriod, recurrence.intervalMonths, period) &&
           (recurrence.endPeriod === null || period <= recurrence.endPeriod),
       );
       if (missing.length === 0) continue;

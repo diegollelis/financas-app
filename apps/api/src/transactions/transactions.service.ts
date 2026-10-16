@@ -18,7 +18,7 @@ import { optionalDate, toIsoDate } from './dates.js';
 
 /** Every read brings what generated the transaction, if anything: a recurrence or a plan (ADR 0038). */
 export const withOrigin = {
-  occurrence: { select: { recurrenceId: true } },
+  occurrence: { select: { recurrenceId: true, recurrence: { select: { intervalMonths: true } } } },
   // The plan's count, for "3/10".
   installmentPlan: { select: { installments: true } },
 } as const;
@@ -37,6 +37,7 @@ export function toTransactionResponse(transaction: TransactionRow): Transaction 
     dueDate: transaction.dueDate && toIsoDate(transaction.dueDate),
     settledAt: transaction.settledAt && toIsoDate(transaction.settledAt),
     recurrenceId: transaction.occurrence?.recurrenceId ?? null,
+    recurrenceIntervalMonths: transaction.occurrence?.recurrence.intervalMonths ?? null,
     amountEstimated: transaction.amountEstimated,
     installment:
       transaction.installmentPlanId && transaction.installmentNumber && transaction.installmentPlan

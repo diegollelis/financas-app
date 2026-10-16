@@ -95,6 +95,7 @@ const exportRecurrenceSchema = z.object({
   variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
   dueMonthOffset: z.number().int(),
+  intervalMonths: z.number().int(),
   personId: z.uuid().nullable(),
   merchantId: z.uuid().nullable(),
   paymentMethod: paymentMethodSchema.nullable(),
