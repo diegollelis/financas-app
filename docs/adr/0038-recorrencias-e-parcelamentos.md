@@ -134,3 +134,14 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
   - um parcelamento encerrado não muda mais (`PLAN_ENDED`).
 - **Excluir em vez de encerrar:** sem nenhuma parcela paga não há histórico a guardar, então `DELETE …/installments/:planId` apaga o parcelamento com **todas** as parcelas, também as de meses anteriores, e as partes pendentes de uma divisão (uma parte já recebida fica, solta). Com alguma parcela paga, continua encerrando como antes. Um parcelamento já encerrado sem nada pago também pode ser excluído assim.
 - **O histórico com algo pago fica:** a recorrência ou o parcelamento encerrado com lançamentos pagos continua em Recorrências, porque esses vínculos são o histórico.
+
+## Nota (recorrência anual, 2026-10-16)
+
+O dono precisou lançar o que se repete uma vez por ano (IPVA, IPTU, anuidade, seguro). A Decisão já previa revisar o desenho para outra frequência.
+
+- **`interval_months` na recorrência,** 1 (todo mês, o padrão) ou 12 (todo ano), com CHECK. As recorrências existentes ficam mensais. Guardar o intervalo em meses deixa espaço para trimestral ou semestral, se aparecerem, liberando só um valor.
+- **Só o mês do ciclo é gerado:** uma anual tem lançamento no mês do início e a cada 12 meses (`isRecurrenceMonth`, em `packages/shared`). O resto do motor não muda: o lançamento nasce ao abrir o mês, o vencimento usa o dia e "Vence no", o valor variável é a média dos 3 últimos pagos (numa anual, os 3 últimos anos), e mudar ou encerrar toca só os pendentes deste mês em diante.
+- **A frequência não se altera,** como o tipo e o início: para mudar, encerre e crie outra. "Tornar recorrente" também aceita `intervalMonths`.
+- **O lançamento diz a frequência** (`recurrenceIntervalMonths`), para o selo "Todo mês" ou "Todo ano".
+- **No orçamento, a anual entra só no mês em que cai,** como qualquer lançamento. Reservar 1/12 por mês (provisão) fica para um ADR próprio, se a necessidade aparecer.
+- **Na tela,** "Todo ano" entra em "Repetir" no "Novo lançamento" e em "Tornar recorrente"; Recorrências diz a frequência e o próximo mês de uma anual, e o total "por mês" soma só as mensais.

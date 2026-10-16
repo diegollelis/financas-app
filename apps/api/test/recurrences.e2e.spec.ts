@@ -802,6 +802,99 @@ describe('recurrences', () => {
     });
   });
 
+  describe('yearly (ADR 0038 note)', () => {
+    it('generates only the month of its start, every year, with the same due day', async () => {
+      const { create, energy, transactionsOf } = await setUp();
+      const recurrence = await create(
+        energy({ description: 'IPVA', amountCents: 120_000, intervalMonths: 12 }),
+      );
+
+      expect(recurrence.intervalMonths).toBe(12);
+      for (const offset of [1, 6, 11]) expect(await transactionsOf(month(offset))).toEqual([]);
+      expect(await transactionsOf(month(12))).toEqual([
+        expect.objectContaining({
+          description: 'IPVA',
+          dueDate: `${month(12)}-10`,
+          recurrenceId: recurrence.id,
+          recurrenceIntervalMonths: 12,
+        }),
+      ]);
+      expect(await transactionsOf(month(13))).toEqual([]);
+    });
+
+    it('tells a monthly transaction apart from a yearly one', async () => {
+      const { create, energy, transactionsOf } = await setUp();
+      await create(energy());
+
+      expect(await transactionsOf(thisMonth)).toEqual([
+        expect.objectContaining({ recurrenceIntervalMonths: 1 }),
+      ]);
+    });
+
+    it('estimates a variable one from the years settled', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      await create(energy({ variableAmount: true, intervalMonths: 12, startPeriod: month(-24) }));
+      for (const [offset, amountCents] of [
+        [-24, 100_000],
+        [-12, 110_000],
+      ] as const) {
+        const [transaction] = await transactionsOf(month(offset));
+        await browser
+          .patch(`${base}/transactions/${transaction?.id}`)
+          .send({ amountCents, settledAt: `${month(offset)}-05` })
+          .expect(200);
+      }
+
+      expect((await transactionsOf(thisMonth))[0]).toMatchObject({
+        amountCents: 105_000,
+        amountEstimated: true,
+      });
+    });
+
+    it('makes a transaction recurrent every year', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const transaction = (
+        await browser
+          .post(`${base}/transactions`)
+          .send({
+            type: 'DEBIT',
+            description: 'Anuidade',
+            categoryId: categoryId('Contas da casa', 'DEBIT'),
+            amountCents: 40_000,
+            period: thisMonth,
+          })
+          .expect(201)
+      ).body as { id: string };
+
+      const response = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: transaction.id, intervalMonths: 12 })
+        .expect(201);
+
+      expect(recurrenceSchema.parse(response.body).intervalMonths).toBe(12);
+      expect(await transactionsOf(month(1))).toEqual([]);
+      expect(await transactionsOf(month(12))).toHaveLength(1);
+    });
+
+    it('never changes its interval, and refuses one other than 1 or 12', async () => {
+      const { create, energy, base, browser } = await setUp();
+      const recurrence = await create(energy({ intervalMonths: 12 }));
+
+      await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ intervalMonths: 1, amountCents: 19_000 })
+        .expect(200);
+      const list = recurrenceListResponseSchema.parse(
+        (await browser.get(`${base}/recurrences`).expect(200)).body,
+      );
+      expect(list[0]).toMatchObject({ intervalMonths: 12, amountCents: 19_000 });
+      await browser
+        .post(`${base}/recurrences`)
+        .send({ ...energy(), intervalMonths: 6 })
+        .expect(400);
+    });
+  });
+
   describe('isolation', () => {
     it('hides the routes from non-members', async () => {
       const { personalWorkspaceId } = await t.signUp(maria);

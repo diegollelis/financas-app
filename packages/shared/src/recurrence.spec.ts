@@ -5,6 +5,8 @@ import {
   dueDateIn,
   dueMonthOffsetOf,
   estimateAmount,
+  isRecurrenceMonth,
+  nextRecurrencePeriod,
   shareOfAmount,
   updateRecurrenceInputSchema,
 } from './recurrence.ts';
@@ -142,5 +144,44 @@ describe('split recurrences (ADR 0052)', () => {
   it('computes a share of a month: a fixed amount as it is, a percentage to the cent', () => {
     expect(shareOfAmount(24_000, { amountCents: 5_000, basisPoints: null })).toBe(5_000);
     expect(shareOfAmount(24_001, { amountCents: null, basisPoints: 5_000 })).toBe(12_001);
+  });
+});
+
+describe('yearly recurrences (ADR 0038 note)', () => {
+  it('has a month every month, or only in the month of its start every year', () => {
+    expect(isRecurrenceMonth('2026-03', 1, '2026-04')).toBe(true);
+    expect(isRecurrenceMonth('2026-03', 12, '2026-03')).toBe(true);
+    expect(isRecurrenceMonth('2026-03', 12, '2026-04')).toBe(false);
+    expect(isRecurrenceMonth('2026-03', 12, '2027-02')).toBe(false);
+    expect(isRecurrenceMonth('2026-03', 12, '2028-03')).toBe(true);
+  });
+
+  it('has no month before its start', () => {
+    expect(isRecurrenceMonth('2026-03', 1, '2026-02')).toBe(false);
+    expect(isRecurrenceMonth('2026-03', 12, '2025-03')).toBe(false);
+  });
+
+  it('finds the next month of its cycle', () => {
+    expect(nextRecurrencePeriod('2026-03', 12, '2026-01')).toBe('2026-03');
+    expect(nextRecurrencePeriod('2026-03', 12, '2026-03')).toBe('2026-03');
+    expect(nextRecurrencePeriod('2026-03', 12, '2026-10')).toBe('2027-03');
+    expect(nextRecurrencePeriod('2026-03', 1, '2026-10')).toBe('2026-10');
+  });
+
+  it('takes 1 or 12 months on create, and no interval on update', () => {
+    const base = {
+      type: 'DEBIT',
+      description: 'IPVA',
+      categoryId: '01920000-0000-7000-8000-000000000101',
+      amountCents: 120_000,
+      startPeriod: '2026-03',
+    };
+    expect(createRecurrenceInputSchema.safeParse({ ...base, intervalMonths: 12 }).success).toBe(
+      true,
+    );
+    expect(createRecurrenceInputSchema.safeParse({ ...base, intervalMonths: 6 }).success).toBe(
+      false,
+    );
+    expect(updateRecurrenceInputSchema.safeParse({ intervalMonths: 12 }).success).toBe(false);
   });
 });
