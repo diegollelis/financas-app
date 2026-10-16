@@ -144,4 +144,4 @@ O dono precisou lançar o que se repete uma vez por ano (IPVA, IPTU, anuidade, s
 - **A frequência não se altera,** como o tipo e o início: para mudar, encerre e crie outra. "Tornar recorrente" também aceita `intervalMonths`.
 - **O lançamento diz a frequência** (`recurrenceIntervalMonths`), para o selo "Todo mês" ou "Todo ano".
 - **No orçamento, a anual entra só no mês em que cai,** como qualquer lançamento. Reservar 1/12 por mês (provisão) fica para um ADR próprio, se a necessidade aparecer.
-- **Na tela,** "Todo ano" entra em "Repetir" no "Novo lançamento" e em "Tornar recorrente"; Recorrências diz a frequência e o próximo mês de uma anual, e o total "por mês" soma só as mensais.
+- **Na tela,** "Todo ano" entra em "Repetir" no "Novo lançamento" (quatro opções, em duas linhas no celular) e em "Tornar recorrente". Em Recorrências, a seção "Todo mês" passa a se chamar "Recorrentes"; cada linha diz a frequência ("Todo ano em março") e uma anual mostra "Próximo: março de 2027"; na tabela, a frequência e o vencimento dividem a coluna "Repete" (uma coluna a mais apertava a descrição); e o total "Por mês" soma só as mensais, com "Por ano" à parte.

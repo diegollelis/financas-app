@@ -76,7 +76,8 @@ export function SplitFields({
    * A recurrence (ADR 0052): every month gets the shares. A variable amount takes percentages
    * only, which follow the real amount of each month.
    */
-  monthly?: { variable: boolean };
+  /** Every month, or every year (ADR 0038 note). */
+  monthly?: { variable: boolean; yearly?: boolean };
 }) {
   const { fields, replace, remove } = useFieldArray({ control, name: 'shares' });
   const mode = useWatch({ control, name: 'shareMode' });
@@ -116,7 +117,9 @@ export function SplitFields({
     const meaning = monthly
       ? monthly.variable
         ? ' do valor estimado'
-        : ' por mês'
+        : monthly.yearly
+          ? ' por ano'
+          : ' por mês'
       : !installments
         ? ''
         : installments.amountIs === 'TOTAL'
@@ -134,13 +137,21 @@ export function SplitFields({
         `Por parcela: ${each.join('; ')}${uneven ? ', a última com os centavos que sobram' : ''}.`,
       );
     }
-    const where = monthly ? ' em cada mês' : installments ? ' em cada parcela' : '';
+    const where = monthly
+      ? monthly.yearly
+        ? ' em cada ano'
+        : ' em cada mês'
+      : installments
+        ? ' em cada parcela'
+        : '';
     parts.push(
       type === 'CREDIT'
         ? `Cada pessoa vira um valor a pagar${where}, na categoria Repasse.`
         : `Cada pessoa vira um valor a receber${where}, na categoria Reembolso.`,
     );
-    if (monthly?.variable) parts.push('As partes acompanham o valor real de cada mês.');
+    if (monthly?.variable) {
+      parts.push(`As partes acompanham o valor real de cada ${monthly.yearly ? 'ano' : 'mês'}.`);
+    }
     return parts.join(' ');
   };
 

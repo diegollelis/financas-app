@@ -35,7 +35,7 @@ import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { findMerchant } from '@/features/merchants/use-merchants';
 import { PersonSelect } from '@/features/people/person-picker';
-import { dueDayLabel, dueOf } from '@/features/recurrences/due';
+import { amountKindHint, dueDayLabel, dueOf, monthNameOf } from '@/features/recurrences/due';
 import { apiErrorMessage } from '@/lib/error-message';
 import { cn } from '@/lib/utils';
 import { shareCents } from './split';
@@ -63,7 +63,7 @@ const transactionFormSchema = plainTransactionInputSchema
      * Only when creating: once, every month from this competência on, or in installments
      * (ADR 0038).
      */
-    repeat: z.enum(['NONE', 'MONTHLY', 'INSTALLMENTS']),
+    repeat: z.enum(['NONE', 'MONTHLY', 'YEARLY', 'INSTALLMENTS']),
     /** Of a monthly one: the same every month, or changing (energy, water), ADR 0038. */
     amountKind: z.enum(['FIXED', 'VARIABLE']),
     /** Of installments: how many, as typed. */
@@ -183,6 +183,7 @@ const amountKindOptions = [
 const repeatOptions = [
   { value: 'NONE', label: 'Não repetir' },
   { value: 'MONTHLY', label: 'Todo mês' },
+  { value: 'YEARLY', label: 'Todo ano' },
   { value: 'INSTALLMENTS', label: 'Parcelado' },
 ] as const;
 
@@ -317,7 +318,10 @@ export function TransactionForm({
     const cents = parseReais(typedAmount ?? '');
     return cents !== null && cents > 0 ? cents : null;
   })();
-  const variable = repeat === 'MONTHLY' && amountKind === 'VARIABLE';
+  // Every month or every year (ADR 0038 note): the same fields, only the cycle differs.
+  const recurring = repeat === 'MONTHLY' || repeat === 'YEARLY';
+  const yearly = repeat === 'YEARLY';
+  const variable = recurring && amountKind === 'VARIABLE';
   const installments = repeat === 'INSTALLMENTS';
   const amountLabel = variable
     ? 'Valor estimado (R$)'
@@ -334,7 +338,7 @@ export function TransactionForm({
     due.dueDay !== null &&
     due.dueMonthOffset >= 0 &&
     due.dueMonthOffset <= MAX_DUE_MONTH_OFFSET
-      ? `${installments ? 'Cada parcela' : 'Cada mês'} vence no ${dueDayLabel(due.dueDay, due.dueMonthOffset)}.`
+      ? `${installments ? 'Cada parcela' : yearly ? 'Cada ano' : 'Cada mês'} vence no ${dueDayLabel(due.dueDay, due.dueMonthOffset)}.`
       : null;
   const preview = installments
     ? installmentsPreview(typedAmount ?? '', typedInstallments ?? '', amountIs ?? 'TOTAL')
@@ -524,7 +528,7 @@ export function TransactionForm({
             render={({ field }) => (
               <SegmentedControl
                 label="Repetir"
-                // An application repeats every month at most: installments make no sense here.
+                // An application repeats every month or every year: installments make no sense here.
                 options={
                   application
                     ? repeatOptions.filter((option) => option.value !== 'INSTALLMENTS')
@@ -532,19 +536,27 @@ export function TransactionForm({
                 }
                 value={field.value}
                 onChange={field.onChange}
+                // Four options do not fit in 360px: two rows on the phone.
+                className={
+                  application
+                    ? undefined
+                    : 'grid-flow-row grid-cols-2 sm:grid-flow-col sm:grid-cols-none'
+                }
               />
             )}
           />
-          {repeat === 'MONTHLY' && (
+          {recurring && (
             <p className="text-muted-foreground text-sm">
-              Um lançamento pendente em cada mês, a partir deste. Para parar, use "Encerrar
-              recorrência" no menu do lançamento.
+              {yearly
+                ? `Um lançamento pendente todo ano em ${monthNameOf(period ?? '')}, a partir deste.`
+                : 'Um lançamento pendente em cada mês, a partir deste.'}{' '}
+              Para parar, use "Encerrar recorrência" no menu do lançamento.
             </p>
           )}
           {dueNote && <p className="text-muted-foreground text-sm">{dueNote}</p>}
         </div>
       )}
-      {allowRepeat && repeat === 'MONTHLY' && (
+      {allowRepeat && recurring && (
         <div className="grid gap-2">
           <p aria-hidden className="text-sm font-medium">
             Valor
@@ -561,11 +573,7 @@ export function TransactionForm({
               />
             )}
           />
-          <p className="text-muted-foreground text-sm">
-            {variable
-              ? 'Para contas que mudam todo mês, como energia e água. Cada mês começa com a média dos 3 últimos pagos; ao marcar como pago, você informa o valor da fatura.'
-              : 'O mesmo valor todo mês, como internet e aluguel.'}
-          </p>
+          <p className="text-muted-foreground text-sm">{amountKindHint(variable, yearly)}</p>
         </div>
       )}
       {allowRepeat && installments && (
@@ -712,7 +720,7 @@ export function TransactionForm({
                       ? { count: Number(typedInstallments), amountIs: amountIs ?? 'TOTAL' }
                       : undefined
                   }
-                  monthly={repeat === 'MONTHLY' ? { variable } : undefined}
+                  monthly={recurring ? { variable, yearly } : undefined}
                 />
               )}
             </div>

@@ -311,6 +311,102 @@ describe('TransactionsPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('repeats a transaction every year, in the month it is launched (ADR 0038 note)', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/recurrences`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000307',
+          type: 'DEBIT',
+          description: 'IPVA',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 120_000,
+          variableAmount: false,
+          dueDay: 20,
+          dueMonthOffset: 0,
+          intervalMonths: 12,
+          startPeriod: '2026-10',
+          endPeriod: null,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'IPVA');
+    await chooseCategory(form, 'Energia');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '1.200,00');
+    await userEvent.type(within(form).getByLabelText('Vencimento (opcional)'), '2026-10-20');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo ano' }));
+    expect(
+      within(form).getByText(/Um lançamento pendente todo ano em outubro, a partir deste/),
+    ).toBeInTheDocument();
+    expect(within(form).getByText('Cada ano vence no dia 20.')).toBeInTheDocument();
+    expect(
+      within(form).getByText('O mesmo valor todo ano, como uma anuidade.'),
+    ).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'IPVA',
+        notes: null,
+        categoryId: energyCategory.id,
+        amountCents: 120_000,
+        dueDay: 20,
+        dueMonthOffset: 0,
+        startPeriod: '2026-10',
+        intervalMonths: 12,
+        variableAmount: false,
+        personId: null,
+      }),
+    });
+    expect(
+      await screen.findByText('Lançamento adicionado, repetindo todo ano'),
+    ).toBeInTheDocument();
+  });
+
+  it('makes a transaction recurrent every year, from its menu', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/recurrences/from-transaction`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000308',
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 15_990,
+          variableAmount: false,
+          dueDay: 10,
+          dueMonthOffset: 0,
+          intervalMonths: 12,
+          startPeriod: '2026-10',
+          endPeriod: null,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Tornar recorrente' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Tornar Conta de luz recorrente' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Todo ano' }));
+    expect(dialog).toHaveTextContent(
+      'Todo ano em outubro, a partir de outubro de 2026, vencendo no dia 10. Este lançamento vira o primeiro ano',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tornar recorrente' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences/from-transaction`, {
+      method: 'POST',
+      body: JSON.stringify({ transactionId: light.id, variableAmount: false, intervalMonths: 12 }),
+    });
+    expect(await screen.findByText('Agora se repete todo ano')).toBeInTheDocument();
+  });
+
   it('repeats a bill due in the next month, and refuses a due date further away', async () => {
     const fetchMock = mockTransactions({
       [`POST /api/workspaces/${houseId}/recurrences`]: {
@@ -448,6 +544,20 @@ describe('TransactionsPage', () => {
       ).not.toBeInTheDocument();
       await userEvent.keyboard('{Escape}');
     }
+  });
+
+  it('marks a transaction of a yearly recurrence as "Todo ano"', async () => {
+    const recurrenceId = '01920000-0000-7000-8000-000000000309';
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [salary, { ...light, recurrenceId, recurrenceIntervalMonths: 12 }, shopping],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Saídas');
+    expect(row(debits, 'Conta de luz')).toHaveTextContent('Todo ano');
+    expect(row(debits, 'Conta de luz')).not.toHaveTextContent('Todo mês');
   });
 
   it('marks a generated transaction and ends its recurrence from the menu', async () => {
