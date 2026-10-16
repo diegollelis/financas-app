@@ -1,5 +1,6 @@
 import type { Category } from '@financas/shared';
 import { describe, expect, it } from 'vitest';
+import { readSheet } from 'read-excel-file/browser';
 import writeXlsxFile from 'write-excel-file/browser';
 import { buildTemplate, readTemplate, TemplateReadError } from './workbook';
 
@@ -31,11 +32,30 @@ describe('planilha modelo', () => {
         notes: null,
         categoryName: 'Moradia',
         merchantName: 'Imobiliária Exemplo',
+        paymentMethod: 'BOLETO',
         amountCents: 150_000,
         period: '2026-09',
         dueDate: '2026-09-10',
         settledAt: '2026-09-10',
       },
+    ]);
+  });
+
+  it('lists the payment methods on a sheet of their own (ADR 0054)', async () => {
+    const file = await buildTemplate([]);
+
+    const methods = await readSheet(file, 'Meios de pagamento');
+
+    expect(methods.flat()).toEqual([
+      'Meio de pagamento',
+      'Pix',
+      'Débito',
+      'Crédito',
+      'Vale-alimentação/refeição',
+      'Dinheiro',
+      'Boleto',
+      'Transferência',
+      'Débito automático',
     ]);
   });
 

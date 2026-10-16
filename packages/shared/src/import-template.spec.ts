@@ -41,6 +41,7 @@ describe('parseTemplateRows', () => {
         notes: null,
         categoryName: 'Mercado',
         merchantName: '',
+        paymentMethod: null,
         amountCents: 64_035,
         period: '2026-09',
         dueDate: '2026-09-10',
@@ -97,6 +98,7 @@ describe('parseTemplateRows', () => {
       description: 'Aluguel',
       categoryName: 'Moradia',
       merchantName: 'Imobiliária Exemplo',
+      paymentMethod: 'BOLETO',
       amountCents: 150_000,
       period: '2026-09',
       dueDate: '2026-09-10',
@@ -184,6 +186,7 @@ describe('parseTemplateRows', () => {
         notes: 'Conferir na fatura',
         categoryName: 'Mercado',
         merchantName: '',
+        paymentMethod: null,
         // The zero stays, to be corrected; the unreadable date comes empty.
         amountCents: 0,
         period: '2026-09',
@@ -290,6 +293,58 @@ describe('the merchant column (ADR 0053)', () => {
     expect(issues).toEqual([
       { line: 2, severity: 'error', message: 'Estabelecimento: Use no máximo 100 caracteres.' },
     ]);
+  });
+});
+
+describe('the payment method column (ADR 0054)', () => {
+  it('reads the label in any case or accents, and the usual synonyms', () => {
+    const typed = ['Crédito', 'pix', 'DEBITO', 'Vale-alimentação/refeição', 'VR', 'TED', ''];
+
+    const { rows, issues } = parseTemplateRows([
+      header,
+      ...typed.map((method) => row({ 'Meio de pagamento': method })),
+    ]);
+
+    expect(issues).toEqual([]);
+    expect(rows.map((parsed) => parsed.paymentMethod)).toEqual([
+      'CREDIT_CARD',
+      'PIX',
+      'DEBIT_CARD',
+      'MEAL_VOUCHER',
+      'MEAL_VOUCHER',
+      'TRANSFER',
+      null,
+    ]);
+  });
+
+  it('brings a method not in the list in without one, with a warning', () => {
+    const { rows, issues } = parseTemplateRows([header, row({ 'Meio de pagamento': 'Cheque' })]);
+
+    expect(rows[0]?.paymentMethod).toBeNull();
+    expect(issues).toEqual([
+      {
+        line: 2,
+        severity: 'warning',
+        message: 'Meio de pagamento "Cheque" não está na lista: o lançamento entra sem meio.',
+      },
+    ]);
+  });
+
+  it('reads "Meio de recebimento" as the column, and a spreadsheet without it as before', () => {
+    const inflow = header.map((title) =>
+      title === 'Meio de pagamento' ? 'Meio de recebimento' : title,
+    );
+    const before = header.filter((title) => title !== 'Meio de pagamento');
+
+    const named = parseTemplateRows([inflow, row({ 'Meio de pagamento': 'Transferência' })]);
+    const without = parseTemplateRows([
+      before,
+      before.map((title) => (title === 'Valor' ? 640.35 : (row()[header.indexOf(title)] ?? null))),
+    ]);
+
+    expect(named.rows[0]?.paymentMethod).toBe('TRANSFER');
+    expect(without.issues).toEqual([]);
+    expect(without.rows[0]?.paymentMethod).toBeNull();
   });
 });
 

@@ -2,6 +2,7 @@ import {
   formatCents,
   formatIsoDate,
   formatPeriod,
+  paymentMethodLabels,
   PENDING_LABEL,
   settledLabels,
   type Category,
@@ -77,6 +78,7 @@ function RowItem({
             {categoryName ?? `${row.categoryName || 'Sem categoria'} (sem correspondência)`}
           </span>
           {row.merchantName && <span>{row.merchantName}</span>}
+          {row.paymentMethod && <span>{paymentMethodLabels[row.paymentMethod]}</span>}
           {row.dueDate && <span>Vence em {formatIsoDate(row.dueDate)}</span>}
           <span>
             {row.settledAt

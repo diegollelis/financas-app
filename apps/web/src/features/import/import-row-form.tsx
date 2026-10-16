@@ -1,6 +1,8 @@
 import {
   isoDateSchema,
   MERCHANT_NAME_MAX_LENGTH,
+  paymentMethodFieldLabels,
+  paymentMethodSchema,
   periodSchema,
   reaisInputSchema,
   transactionDescriptionSchema,
@@ -16,6 +18,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CategorySelect } from '@/features/categories/category-picker';
+import { PaymentMethodSelect } from '@/features/transactions/payment-method-select';
 import type { ReviewRow } from './review';
 
 /** Empty means none; anything else must be a real date. */
@@ -42,6 +45,8 @@ const rowFormSchema = z.object({
     .string()
     .trim()
     .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
+  /** '' = none (ADR 0054). */
+  paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
 });
 
 type FormInput = z.input<typeof rowFormSchema>;
@@ -86,6 +91,7 @@ export function ImportRowForm({
       settledAt: row.settledAt ?? '',
       notes: row.notes ?? '',
       merchant: row.merchantName,
+      paymentMethod: row.paymentMethod ?? '',
     },
   });
   const type = useWatch({ control, name: 'type' });
@@ -99,6 +105,7 @@ export function ImportRowForm({
       description: values.description,
       notes: values.notes,
       merchantName: values.merchant,
+      paymentMethod: values.paymentMethod || null,
       categoryId: values.categoryId,
       amountCents: values.amount,
       period: values.period,
@@ -147,6 +154,19 @@ export function ImportRowForm({
       >
         <Input autoComplete="off" {...register('merchant')} />
       </FormField>
+      <Controller
+        control={control}
+        name="paymentMethod"
+        render={({ field, fieldState }) => (
+          <FormField
+            id={id('payment-method')}
+            label={`${paymentMethodFieldLabels[type]} (opcional)`}
+            error={fieldState.error?.message}
+          >
+            <PaymentMethodSelect value={field.value} onChange={field.onChange} />
+          </FormField>
+        )}
+      />
       {/* One column on the phone, two from sm. */}
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField id={id('amount')} label="Valor (R$)" error={formState.errors.amount?.message}>

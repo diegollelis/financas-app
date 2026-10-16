@@ -3,6 +3,7 @@ import {
   normalizeName,
   type Category,
   type ImportTransactionInput,
+  type PaymentMethod,
   type TemplateDraft,
   type TemplateRow,
   type TransactionType,
@@ -22,6 +23,8 @@ export type ReviewRow = {
   categoryName: string;
   /** Where it was bought or who paid it (ADR 0053); '' when none. A new name is created. */
   merchantName: string;
+  /** How it was paid or received (ADR 0054); null when none. */
+  paymentMethod: PaymentMethod | null;
   /** Chosen in the form; otherwise the category comes from the name. */
   categoryId: string | null;
   amountCents: number | null;
@@ -112,6 +115,8 @@ export function toTransaction(
     period: row.period,
     dueDate: row.dueDate,
     settledAt: row.settledAt,
+    // Only when there is one, as a new transaction in the form (ADR 0054).
+    ...(row.paymentMethod && { paymentMethod: row.paymentMethod }),
   });
   if (result.success) {
     const merchantName = row.merchantName.trim();

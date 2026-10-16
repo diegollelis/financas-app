@@ -146,14 +146,14 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Análise por estabelecimento dentro de uma categoria (ex.: quanto foi para cada mercado)
   - [x] Coluna opcional "Estabelecimento" na planilha modelo (um nome novo vira estabelecimento ao importar; um arquivado volta; desfazer a importação não os apaga)
   - [x] Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição (o estabelecimento vale mais; 12 meses de histórico; nunca troca uma categoria escolhida)
-- [ ] **Meio de pagamento** ([ADR 0054](adr/0054-meio-de-pagamento.md)): como se pagou ou recebeu, numa lista fixa (Pix, Débito, Crédito, Dinheiro, Boleto, Transferência e Débito automático), em saídas e entradas. Contas e cartões com saldo e fatura ficam para um ADR próprio, se a necessidade aparecer.
+- [x] **Meio de pagamento** ([ADR 0054](adr/0054-meio-de-pagamento.md)): como se pagou ou recebeu, numa lista fixa (Pix, Débito, Crédito, Dinheiro, Boleto, Transferência e Débito automático), em saídas e entradas. Contas e cartões com saldo e fatura ficam para um ADR próprio, se a necessidade aparecer.
   - [x] ADR: lista fixa (e não cadastro ou texto livre), sete meios, saídas e entradas, "Meio de pagamento" / "Meio de recebimento" na tela e `PaymentMethod` no código, no glossário
   - [x] API: enum e `payment_method` opcional em lançamentos, recorrências e parcelamentos (herdado por cada mês e parcela, nunca pelas partes), exportação; "Cartão de crédito" fora das categorias padrão dos espaços novos
   - [x] Tela: o campo em "Mais opções" e na edição da recorrência, o meio na linha, na tabela e na busca
   - [x] Sugestão pelo histórico (como a da categoria): o meio vazio vem do estabelecimento ou da descrição, com "Sugerido pelo histórico", sem trocar uma escolha feita à mão
   - [x] Meio "Vale-alimentação/refeição" (o vale do empregador, também o de um só estabelecimento) e "Bônus" entre as categorias padrão de entrada dos espaços novos (nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
   - [x] Análise "Despesas por meio de pagamento" (ou "Entradas por meio de recebimento"), com os mesmos filtros das categorias e "Sem meio" por último
-  - [ ] Coluna opcional "Meio de pagamento" na planilha modelo
+  - [x] Coluna opcional "Meio de pagamento" na planilha modelo (lida pelo rótulo ou por sinônimos comuns, um valor fora da lista vira aviso; a aba "Meios de pagamento" na planilha baixada)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês

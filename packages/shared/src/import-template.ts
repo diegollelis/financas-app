@@ -2,6 +2,7 @@ import type { TransactionType } from './category.ts';
 import { MAX_IMPORT_TRANSACTIONS } from './import.ts';
 import { merchantNameSchema } from './merchant.ts';
 import { amountCentsSchema, isoDateSchema, parseReais, periodSchema } from './money-and-dates.ts';
+import { paymentMethodLabels, paymentMethodSchema, type PaymentMethod } from './payment-method.ts';
 import { transactionDescriptionSchema, transactionNotesSchema } from './transaction.ts';
 
 // Planilha modelo (ADR 0040): the one format the import reads. One row per transaction on the
@@ -11,13 +12,14 @@ import { transactionDescriptionSchema, transactionNotesSchema } from './transact
 
 export const TEMPLATE_SHEET = 'Lançamentos';
 export const TEMPLATE_CATEGORIES_SHEET = 'Categorias';
+export const TEMPLATE_PAYMENT_METHODS_SHEET = 'Meios de pagamento';
 export const TEMPLATE_FILE_NAME = 'financas-modelo.xlsx';
 
 /** What a cell holds once read: dates already as Date (midnight UTC), numbers as numbers. */
 export type TemplateCell = string | number | boolean | Date | null;
 
-// `formerTitles`: the titles of the template before ADR 0051, still read, since spreadsheets
-// filled in with it exist.
+// `formerTitles`: other titles still read: the template's before ADR 0051, since spreadsheets
+// filled in with it exist, and the inflow's name of the payment method.
 const columns = [
   {
     key: 'period',
@@ -30,6 +32,13 @@ const columns = [
   { key: 'category', title: 'Categoria', formerTitles: [], required: true },
   // Optional (ADR 0053): a template without it is read as before.
   { key: 'merchant', title: 'Estabelecimento', formerTitles: [], required: false },
+  // Optional too (ADR 0054): one column for both sides, by the label the form shows.
+  {
+    key: 'paymentMethod',
+    title: 'Meio de pagamento',
+    formerTitles: ['Meio de recebimento'],
+    required: false,
+  },
   { key: 'amount', title: 'Valor', formerTitles: [], required: true },
   { key: 'dueDate', title: 'Vencimento', formerTitles: [], required: false },
   {
@@ -53,6 +62,7 @@ export const TEMPLATE_EXAMPLE: readonly string[] = [
   'Aluguel',
   'Moradia',
   'Imobiliária Exemplo',
+  'Boleto',
   '1.500,00',
   '10/09/2026',
   '10/09/2026',
@@ -69,6 +79,8 @@ export type TemplateRow = {
   categoryName: string;
   /** Where it was bought or who paid it (ADR 0053), as a name; '' when none. */
   merchantName: string;
+  /** How it was paid or received (ADR 0054); null when empty or not in the list. */
+  paymentMethod: PaymentMethod | null;
   amountCents: number;
   period: string;
   dueDate: string | null;
@@ -86,6 +98,7 @@ export type TemplateDraft = {
   notes: string | null;
   categoryName: string;
   merchantName: string;
+  paymentMethod: PaymentMethod | null;
   /** Null when missing or unreadable; a zero or negative amount stays, to be corrected. */
   amountCents: number | null;
   period: string | null;
@@ -154,6 +167,33 @@ function readAmount(cell: TemplateCell | undefined): number | null {
   return parseReais(text(cell));
 }
 
+/** Words people type for each method besides its label, already normalized. */
+const PAYMENT_METHOD_ALIASES: Record<string, PaymentMethod> = {
+  'cartao de debito': 'DEBIT_CARD',
+  'cartao de credito': 'CREDIT_CARD',
+  'vale-alimentacao': 'MEAL_VOUCHER',
+  'vale alimentacao': 'MEAL_VOUCHER',
+  'vale-refeicao': 'MEAL_VOUCHER',
+  'vale refeicao': 'MEAL_VOUCHER',
+  va: 'MEAL_VOUCHER',
+  vr: 'MEAL_VOUCHER',
+  ted: 'TRANSFER',
+  doc: 'TRANSFER',
+};
+
+/**
+ * The method of a label ("Crédito", "pix"), ignoring case and accents, or a usual synonym.
+ * Null when empty, undefined when not in the list.
+ */
+function readPaymentMethod(cell: TemplateCell | undefined): PaymentMethod | null | undefined {
+  const value = normalizeName(text(cell));
+  if (!value) return null;
+  const byLabel = paymentMethodSchema.options.find(
+    (method) => normalizeName(paymentMethodLabels[method]) === value,
+  );
+  return byLabel ?? PAYMENT_METHOD_ALIASES[value];
+}
+
 // Warnings only: the spreadsheet stored these in free text (docs/dominio/planilha-origem.md).
 const INSTALLMENT_TEXT = /parcela\s*\d+\s*(?:de|\/)\s*\d+/i;
 const SENSITIVE_TEXT = [
@@ -217,6 +257,9 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
     if (merchantName && !merchant.success) {
       errors.push(`Estabelecimento: ${merchant.error.issues[0]?.message ?? 'nome inválido.'}`);
     }
+    // Not in the list: a warning, and the transaction comes in without one (ADR 0054).
+    const paymentMethod = readPaymentMethod(cell('paymentMethod')) ?? null;
+    const unknownMethod = paymentMethod === null && !isEmpty(cell('paymentMethod'));
     const amountCents = readAmount(cell('amount'));
     const amount = amountCentsSchema.safeParse(amountCents);
     if (amountCents === null) errors.push('Valor inválido: use números, como 1.500,00.');
@@ -245,6 +288,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
         notes: text(cell('notes')) || null,
         categoryName,
         merchantName,
+        paymentMethod,
         amountCents,
         period,
         dueDate: dueDate ?? null,
@@ -253,6 +297,13 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
       return;
     }
 
+    if (unknownMethod) {
+      issues.push({
+        line,
+        severity: 'warning',
+        message: `Meio de pagamento "${text(cell('paymentMethod'))}" não está na lista: o lançamento entra sem meio.`,
+      });
+    }
     const freeText = `${description.data} ${notes.success ? (notes.data ?? '') : ''}`;
     if (INSTALLMENT_TEXT.test(freeText)) {
       issues.push({
@@ -285,6 +336,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
       notes: notes.success ? notes.data : null,
       categoryName,
       merchantName: merchant.success ? merchant.data : '',
+      paymentMethod,
       amountCents: amount.data,
       period,
       dueDate: dueDate ?? null,
