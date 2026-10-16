@@ -174,16 +174,29 @@ describe('TransactionsPage', () => {
     expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
     await expectCall(fetchMock, `${base}?period=2026-10`, {});
     const credits = await section('Entradas');
-    expect(credits).toHaveTextContent('Total: R$ 5.000,00');
+    expect(credits).toHaveTextContent('Total: + R$ 5.000,00');
     expect(within(credits).getByText('Recebido em 05/10')).toBeInTheDocument();
     const debits = await section('Saídas');
-    expect(debits).toHaveTextContent('Total: R$ 509,90');
+    expect(debits).toHaveTextContent('Total: − R$ 509,90');
     const lightItem = row(debits, 'Conta de luz');
     expect(within(lightItem).getByText('Energia')).toBeInTheDocument();
     expect(within(lightItem).getByText('Vence em 10/10/2026')).toBeInTheDocument();
-    expect(lightItem).toHaveTextContent('R$ 159,90');
+    // The sign says money in or out; the green is only on top of it (ADR 0036 note).
+    expect(lightItem).toHaveTextContent('− R$ 159,90');
     expect(lightItem).toHaveTextContent('Vencido');
-    expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
+    expect(within(credits).getByText('+ R$ 5.000,00')).toHaveClass('text-credit-foreground');
+    // Pending is what "○ Pagar" already says: no badge for whoever can pay it.
+    expect(row(debits, 'Compras da semana')).not.toHaveTextContent('Pendente');
+  });
+
+  it('sums up the month at the top, whatever the filter (ADR 0036 note)', async () => {
+    mockTransactions();
+    renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-10&situacao=vencidos`);
+
+    const totals = await screen.findByLabelText('Resumo do mês');
+    expect(totals).toHaveTextContent('Entradas+ R$ 5.000,00');
+    expect(totals).toHaveTextContent('Saídas− R$ 509,90');
+    expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
   });
 
   it('finds a transaction by status or by what is typed; the status stays in the address', async () => {
@@ -199,7 +212,7 @@ describe('TransactionsPage', () => {
     expect(within(debits).queryByText('Compras da semana')).not.toBeInTheDocument();
     // How many are shown, and the total of those.
     expect(debits).toHaveTextContent('1 de 2');
-    expect(debits).toHaveTextContent('Total: R$ 159,90');
+    expect(debits).toHaveTextContent('Total: − R$ 159,90');
     expect(await section('Entradas')).toHaveTextContent('Nenhuma entrada com esse filtro.');
 
     await userEvent.click(screen.getByRole('radio', { name: 'Todos' }));
@@ -1098,7 +1111,9 @@ describe('TransactionsPage', () => {
         .getAllByRole('listitem')
         .find((li) => li.textContent?.startsWith('Aporte em Investimentos'))!;
     await within(debits).findByText('Aporte em Investimentos');
-    expect(item()).toHaveTextContent('Pendente');
+    expect(
+      within(item()).getByRole('button', { name: 'Pagar: Aporte em Investimentos' }),
+    ).toBeInTheDocument();
 
     await userEvent.click(
       within(debits).getByRole('button', { name: 'Pagar: Aporte em Investimentos' }),
@@ -1778,7 +1793,10 @@ describe('TransactionsPage', () => {
 
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    expect(await section('Saídas')).toHaveTextContent('Conta de luz');
+    const debits = await section('Saídas');
+    expect(debits).toHaveTextContent('Conta de luz');
+    // No "○ Pagar" to say it: pending is written out.
+    expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
     // Only the competência picker, which navigates; nothing that edits.
     expect(
       within(screen.getByRole('main'))

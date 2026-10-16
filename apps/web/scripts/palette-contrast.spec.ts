@@ -62,6 +62,10 @@ const textPairs: [string, string][] = [
   ['success', 'background'],
   ['success', 'card'],
   ['success', 'success-muted'],
+  // The "Vencido" badge.
+  ['destructive', 'debit-muted'],
+  ['credit-foreground', 'background'],
+  ['credit-foreground', 'card'],
   ['warning', 'card'],
   ['warning', 'warning-muted'],
   ['sidebar-foreground', 'sidebar'],

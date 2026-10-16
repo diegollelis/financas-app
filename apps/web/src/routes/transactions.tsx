@@ -88,7 +88,27 @@ const sectionTitleId = (type: TransactionType) => `transactions-${type}`;
 const showError = (error: unknown) => toast.error(apiErrorMessage(error));
 
 /** Colors as in the spreadsheet: red while pending past the due date, green once settled. */
-function StatusBadge({ transaction, today }: { transaction: Transaction; today: string }) {
+/**
+ * "+ R$ 45,00" for money in, "− R$ 69,90" (a real minus sign) for money out: the sign always,
+ * the color only on top of it (ADR 0036 note).
+ */
+function signedCents(type: Transaction['type'], cents: number) {
+  return `${type === 'CREDIT' ? '+' : '−'} ${formatCents(cents)}`;
+}
+
+/**
+ * Settled and overdue always show; pending only to whoever cannot act on it, since the
+ * "○ Pagar / Receber" button already says it to an EDITOR (ADR 0036 note).
+ */
+function StatusBadge({
+  transaction,
+  today,
+  canEdit,
+}: {
+  transaction: Transaction;
+  today: string;
+  canEdit: boolean;
+}) {
   const status = transactionStatus(transaction, today);
   if (status === 'SETTLED') {
     // What happened, in its own word; the year only when it is not the competência's.
@@ -101,7 +121,51 @@ function StatusBadge({ transaction, today }: { transaction: Transaction; today: 
     );
   }
   if (status === 'OVERDUE') return <Badge variant="destructive">{OVERDUE_LABEL}</Badge>;
-  return <Badge variant="outline">{PENDING_LABEL}</Badge>;
+  return canEdit ? null : <Badge variant="outline">{PENDING_LABEL}</Badge>;
+}
+
+/**
+ * What the month adds up to, whatever the search or the filter: what comes in, what goes out
+ * and how it ends if everything is paid and received, the Painel's "Saldo previsto" (ADR 0036
+ * note).
+ */
+function MonthTotals({ transactions }: { transactions: Transaction[] }) {
+  const sum = (type: Transaction['type']) =>
+    transactions
+      .filter((transaction) => transaction.type === type)
+      .reduce((total, transaction) => total + transaction.amountCents, 0);
+  const credits = sum('CREDIT');
+  const debits = sum('DEBIT');
+  const balance = credits - debits;
+  const items = [
+    { label: 'Entradas', value: signedCents('CREDIT', credits), tone: 'text-credit-foreground' },
+    { label: 'Saídas', value: signedCents('DEBIT', debits), tone: '' },
+    {
+      label: 'Saldo previsto',
+      value: formatCents(balance),
+      tone: balance < 0 ? 'text-destructive' : '',
+    },
+  ];
+  return (
+    // On the phone one line each, the label beside the amount, so a large amount never wraps;
+    // three columns from sm.
+    <dl
+      aria-label="Resumo do mês"
+      className="bg-card grid gap-1.5 rounded-xl border p-3 sm:grid-cols-3 sm:gap-3"
+    >
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex items-baseline justify-between gap-3 sm:grid sm:justify-start sm:gap-0.5"
+        >
+          <dt className="text-muted-foreground text-sm">{item.label}</dt>
+          <dd className={`font-semibold whitespace-nowrap tabular-nums ${item.tone}`}>
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 /** Asks before deleting, naming the transaction (ADR 0036). */
@@ -493,12 +557,21 @@ function SettleButton({
   );
 }
 
-/** The amount, and "Estimado" under it while a variable bill's month is an estimate. */
+/**
+ * The amount with its sign, money in in green (ADR 0036 note), and "Estimado" under it while a
+ * variable bill's month is an estimate.
+ */
 function Amount({ transaction, estimated }: { transaction: Transaction; estimated: boolean }) {
   return (
     <span className="grid justify-items-end">
-      <span className="text-base font-semibold tabular-nums">
-        {formatCents(transaction.amountCents)}
+      <span
+        className={
+          transaction.type === 'CREDIT'
+            ? 'text-credit-foreground text-base font-semibold whitespace-nowrap tabular-nums'
+            : 'text-base font-semibold whitespace-nowrap tabular-nums'
+        }
+      >
+        {signedCents(transaction.type, transaction.amountCents)}
       </span>
       {/* In words, in text colors: an estimate is not a status of its own (ADR 0038). */}
       {estimated && <span className="text-muted-foreground text-xs">Estimado</span>}
@@ -515,7 +588,7 @@ function TransactionItem(props: RowProps) {
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
-    <li className="flex items-start gap-3 py-3">
+    <li className="bg-card flex items-start gap-3 rounded-xl border px-4 py-3.5">
       <div className="grid min-w-0 flex-1 justify-items-start gap-1">
         <p className="font-medium break-words">{transaction.description}</p>
         <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
@@ -530,7 +603,7 @@ function TransactionItem(props: RowProps) {
           <p className="text-muted-foreground text-sm break-words">{transaction.notes}</p>
         )}
         <span className="flex flex-wrap gap-1.5">
-          <StatusBadge transaction={transaction} today={today} />
+          <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
           <LinkBadges transaction={transaction} personName={personName} sharedWith={sharedWith} />
         </span>
       </div>
@@ -584,7 +657,7 @@ function TransactionRow(props: RowProps) {
         </span>
       </TableCell>
       <TableCell>
-        <StatusBadge transaction={transaction} today={today} />
+        <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
       </TableCell>
       <TableCell className="text-right">
         <Amount transaction={transaction} estimated={estimated} />
@@ -643,8 +716,9 @@ function TransactionTable({
           <col />
           <col className="w-32" />
           <col className="w-36" />
-          <col className="w-32" />
-          <col className="w-28" />
+          <col className="w-36" />
+          {/* Room for the sign: "+ R$ 5.200,00" (ADR 0036 note). */}
+          <col className="w-36" />
           {canEdit && <col className="w-32" />}
         </colgroup>
         <TableHeader>
@@ -755,6 +829,7 @@ export function TransactionsPage() {
       >
         <PeriodNav period={period} />
         <ViewModeToggle page="lancamentos" />
+        {ready && transactions.data.length > 0 && <MonthTotals transactions={transactions.data} />}
         {ready && transactions.data.length > 0 && (
           // The search on a row of its own at every width: beside the filter it was squeezed to a
           // sliver once the filter read "Pagos e recebidos" (ADR 0051).
@@ -811,7 +886,7 @@ export function TransactionsPage() {
                         {items.length} de {all.length}
                       </span>
                     )}
-                    <span>Total: {formatCents(total)}</span>
+                    <span>Total: {signedCents(type, total)}</span>
                   </span>
                 </div>
                 {items.length === 0 ? (
@@ -829,7 +904,9 @@ export function TransactionsPage() {
                     renderRow={(transaction) => row(transaction, TransactionRow)}
                   />
                 ) : (
-                  <ul className="divide-y rounded-xl border px-4">
+                  // One card per transaction, 8px apart: where one ends and the next begins
+                  // shows at a glance (ADR 0036 note). Still one column, read top to bottom.
+                  <ul className="grid gap-2">
                     {items.map((transaction) => row(transaction, TransactionItem))}
                   </ul>
                 )}
