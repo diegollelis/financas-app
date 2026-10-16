@@ -5,8 +5,13 @@ import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { apiErrorMessage } from '@/lib/error-message';
-import { dueDayLabel, dueOf } from './due';
+import { amountKindHint, dueDayLabel, dueOf, monthNameOf } from './due';
 import { useRepeatTransaction } from './use-recurrences';
+
+const frequencyOptions = [
+  { value: 'MONTHLY', label: 'Todo mês' },
+  { value: 'YEARLY', label: 'Todo ano' },
+] as const;
 
 const amountKindOptions = [
   { value: 'FIXED', label: 'Fixo' },
@@ -28,14 +33,20 @@ function RepeatForm({
   onDone: () => void;
 }) {
   const repeat = useRepeatTransaction(workspaceId);
+  const [frequency, setFrequency] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
   const [amountKind, setAmountKind] = useState<'FIXED' | 'VARIABLE'>('FIXED');
+  const yearly = frequency === 'YEARLY';
   const { dueDay, dueMonthOffset } = dueOf(transaction.period, transaction.dueDate);
   const submit = () =>
     repeat.mutate(
-      { transactionId: transaction.id, variableAmount: amountKind === 'VARIABLE' },
+      {
+        transactionId: transaction.id,
+        variableAmount: amountKind === 'VARIABLE',
+        ...(yearly && { intervalMonths: 12 as const }),
+      },
       {
         onSuccess: () => {
-          toast.success('Agora se repete todo mês');
+          toast.success(`Agora se repete ${yearly ? 'todo ano' : 'todo mês'}`);
           onDone();
         },
       },
@@ -43,12 +54,27 @@ function RepeatForm({
 
   return (
     <div className="grid gap-4">
+      <div className="grid gap-2">
+        <p aria-hidden className="text-sm font-medium">
+          Repetir
+        </p>
+        <SegmentedControl
+          label="Repetir"
+          options={frequencyOptions}
+          value={frequency}
+          onChange={setFrequency}
+        />
+      </div>
       <p>
-        Todo mês a partir de {formatPeriod(transaction.period)}
+        {yearly
+          ? `Todo ano em ${monthNameOf(transaction.period)}, a partir de ${formatPeriod(transaction.period)}`
+          : `Todo mês a partir de ${formatPeriod(transaction.period)}`}
         {dueDay === null
           ? ', sem vencimento.'
           : `, vencendo no ${dueDayLabel(dueDay, dueMonthOffset)}.`}{' '}
-        Este lançamento vira o primeiro mês; os próximos aparecem pendentes ao abrir cada mês.
+        {yearly
+          ? 'Este lançamento vira o primeiro ano; os próximos aparecem pendentes ao abrir o mês de cada ano.'
+          : 'Este lançamento vira o primeiro mês; os próximos aparecem pendentes ao abrir cada mês.'}
       </p>
       <div className="grid gap-2">
         <p aria-hidden className="text-sm font-medium">
@@ -61,9 +87,7 @@ function RepeatForm({
           onChange={setAmountKind}
         />
         <p className="text-muted-foreground text-sm">
-          {amountKind === 'VARIABLE'
-            ? 'Para contas que mudam todo mês, como energia e água. Cada mês começa com a média dos 3 últimos pagos; ao marcar como pago, você informa o valor da fatura.'
-            : 'O mesmo valor todo mês, como internet e aluguel.'}
+          {amountKindHint(amountKind === 'VARIABLE', yearly)}
         </p>
       </div>
       {repeat.isError && (
@@ -102,7 +126,7 @@ export function RepeatDialog({
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
       title={`Tornar ${transaction.description} recorrente`}
-      description="Repete este lançamento todo mês, com a mesma categoria, valor e vencimento."
+      description="Repete este lançamento todo mês ou todo ano, com a mesma categoria, valor e vencimento."
     >
       <RepeatForm
         workspaceId={workspaceId}

@@ -264,7 +264,7 @@ function LinkBadges({
       {transaction.recurrenceId && (
         <Badge variant="secondary">
           <Repeat aria-hidden />
-          Todo mês
+          {transaction.recurrenceIntervalMonths === 12 ? 'Todo ano' : 'Todo mês'}
         </Badge>
       )}
       {transaction.installment && (

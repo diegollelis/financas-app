@@ -4,6 +4,7 @@ import {
   formatCents,
   formatPeriod,
   hasRole,
+  nextRecurrencePeriod,
   paymentMethodLabels,
   settledLabels,
   shiftPeriod,
@@ -60,7 +61,7 @@ import {
   useUpdateInstallmentPlan,
 } from '@/features/installments/use-installments';
 import { usePeople, useResolvePerson } from '@/features/people/use-people';
-import { dueDayLabel } from '@/features/recurrences/due';
+import { dueDayLabel, frequencyLabel } from '@/features/recurrences/due';
 import { RecurrenceForm } from '@/features/recurrences/recurrence-form';
 import {
   useEndRecurrence,
@@ -85,6 +86,17 @@ const showError = (error: unknown) => toast.error(apiErrorMessage(error));
 /** "Desde outubro de 2026", or "A partir de" for one that has not started yet. */
 function since(period: string) {
   return `${period > currentPeriod() ? 'A partir de' : 'Desde'} ${formatPeriod(period)}`;
+}
+
+/** "Próximo: março de 2027": when a yearly one comes again (ADR 0038 note); null otherwise. */
+function nextLine(recurrence: Recurrence) {
+  if (recurrence.intervalMonths !== 12 || recurrence.endPeriod !== null) return null;
+  const next = nextRecurrencePeriod(
+    recurrence.startPeriod,
+    recurrence.intervalMonths,
+    currentPeriod(),
+  );
+  return `Próximo: ${formatPeriod(next)}`;
 }
 
 /** The competência of a plan's last installment. */
@@ -464,7 +476,13 @@ function RecurrenceItem({
     ? `Até ${formatPeriod(recurrence.endPeriod ?? '')}`
     : since(recurrence.startPeriod);
   // A variable one: the amount typed is only the starting estimate (ADR 0038).
-  const amountNote = recurrence.variableAmount ? 'Varia todo mês' : null;
+  const frequency = frequencyLabel(recurrence.intervalMonths, recurrence.startPeriod);
+  const next = nextLine(recurrence);
+  const amountNote = recurrence.variableAmount
+    ? recurrence.intervalMonths === 12
+      ? 'Varia todo ano'
+      : 'Varia todo mês'
+    : null;
   const menu = canEdit && !ended && (
     <>
       <DropdownMenu>
@@ -513,9 +531,22 @@ function RecurrenceItem({
         </TableCell>
         <TableCell className="whitespace-normal">{who ?? '—'}</TableCell>
         <TableCell className="whitespace-normal">
-          {dueCell(recurrence.dueDay, recurrence.dueMonthOffset)}
+          {/* How often, with the due day under it (ADR 0038 note). */}
+          <span className="grid">
+            <span>{frequency}</span>
+            {recurrence.dueDay !== null && (
+              <span className="text-muted-foreground">
+                {dueCell(recurrence.dueDay, recurrence.dueMonthOffset)}
+              </span>
+            )}
+          </span>
         </TableCell>
-        <TableCell className="whitespace-normal">{period}</TableCell>
+        <TableCell className="whitespace-normal">
+          <span className="grid">
+            <span>{period}</span>
+            {next && <span className="text-muted-foreground">{next}</span>}
+          </span>
+        </TableCell>
         <TableCell>
           <SeriesAmount amount={formatCents(recurrence.amountCents)} note={amountNote} />
         </TableCell>
@@ -533,6 +564,7 @@ function RecurrenceItem({
       title={description}
       meta={[
         typeLabel[recurrence.type],
+        frequency,
         category?.name ?? 'Categoria',
         recurrence.paymentMethod && paymentMethodLabels[recurrence.paymentMethod],
         personLine(recurrence.type, recurrence.personId, people),
@@ -541,6 +573,7 @@ function RecurrenceItem({
           ? null
           : `Vence ${dueDayLabel(recurrence.dueDay, recurrence.dueMonthOffset)}`,
         period,
+        next,
       ]}
       amount={formatCents(recurrence.amountCents)}
       amountNote={amountNote}
@@ -701,10 +734,25 @@ function remaining(plan: InstallmentPlan) {
 }
 
 /**
- * What the active recurrences add up to each month, by type: "Por mês: R$ 224,90 em saídas, dos
- * quais R$ 180,00 estimados." The variable ones are only an estimate, and it says so.
+ * What the active recurrences add up to, by type: "Por mês: R$ 224,90 em saídas, dos quais
+ * R$ 180,00 estimados." The variable ones are only an estimate, and it says so. The yearly ones
+ * come apart, "Por ano: …", since they fall in one month only (ADR 0038 note).
  */
-function monthlyTotal(recurrences: Recurrence[]) {
+function recurrenceTotals(recurrences: Recurrence[]) {
+  const lines = [
+    total(
+      recurrences.filter((item) => item.intervalMonths !== 12),
+      'Por mês',
+    ),
+    total(
+      recurrences.filter((item) => item.intervalMonths === 12),
+      'Por ano',
+    ),
+  ].filter(Boolean);
+  return lines.length === 0 ? null : lines.join(' ');
+}
+
+function total(recurrences: Recurrence[], label: string) {
   const sides = (['DEBIT', 'CREDIT'] as const).flatMap((type) => {
     const items = recurrences.filter((item) => item.type === type);
     if (items.length === 0) return [];
@@ -721,7 +769,7 @@ function monthlyTotal(recurrences: Recurrence[]) {
           : `, dos quais ${formatCents(estimated)} estimados`;
     return [`${formatCents(total)} em ${noun}${part}`];
   });
-  return sides.length === 0 ? null : `Por mês: ${sides.join('; ')}.`;
+  return sides.length === 0 ? null : `${label}: ${sides.join('; ')}.`;
 }
 
 function Section({
@@ -805,12 +853,14 @@ export function RecurrencesPage() {
     { label: 'Descrição', sort: (item) => item.description },
     { label: 'Tipo', width: 'w-20' },
     { label: 'Categoria', width: 'w-32', sort: (item) => categoryName(item.categoryId) },
-    { label: 'Pessoa', width: 'w-44' },
+    { label: 'Pessoa', width: 'w-40' },
     {
-      label: 'Vence',
-      width: 'w-32',
-      // The next month's day 1 comes after this month's 31.
-      sort: (item) => (item.dueDay === null ? null : item.dueMonthOffset * 31 + item.dueDay),
+      label: 'Repete',
+      width: 'w-40',
+      // Monthly ones first, then by due day: the next month's day 1 comes after this month's 31.
+      sort: (item) =>
+        item.intervalMonths * 100 +
+        (item.dueDay === null ? 99 : item.dueMonthOffset * 31 + item.dueDay),
     },
     { label: 'Período', width: 'w-36', sort: (item) => item.endPeriod ?? item.startPeriod },
     { label: 'Valor', width: 'w-32', align: 'right', sort: (item) => item.amountCents },
@@ -841,7 +891,7 @@ export function RecurrencesPage() {
     <>
       <PageHeader
         title="Recorrências"
-        description="O que se repete todo mês e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi pago ou recebido não muda."
+        description="O que se repete todo mês ou todo ano e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi pago ou recebido não muda."
       >
         <ViewModeToggle page="recorrencias" />
       </PageHeader>
@@ -856,9 +906,9 @@ export function RecurrencesPage() {
           <>
             <Section
               titleId={MONTHLY_TITLE_ID}
-              title="Todo mês"
+              title="Recorrentes"
               empty="Nenhuma recorrência ativa."
-              summary={monthlyTotal(recurrences.data.filter((item) => item.endPeriod === null))}
+              summary={recurrenceTotals(recurrences.data.filter((item) => item.endPeriod === null))}
               active={show(
                 recurrences.data.filter((item) => item.endPeriod === null),
                 recurrenceColumns,

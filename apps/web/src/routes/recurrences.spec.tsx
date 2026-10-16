@@ -129,11 +129,36 @@ async function choose(name: string, action: string) {
 }
 
 describe('RecurrencesPage', () => {
+  it('shows a yearly one with its month and when it comes again (ADR 0038 note)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-15T12:00:00-03:00'));
+    const ipva = recurrence(4, {
+      description: 'IPVA',
+      amountCents: 120_000,
+      startPeriod: '2026-03',
+      intervalMonths: 12,
+    });
+    mockRecurrences({ [`GET ${base}/recurrences`]: { body: [aluguel, ipva] } });
+    renderApp(page);
+
+    const recurring = await section('Recorrentes');
+    // A yearly one falls in one month only: its own total, not in the monthly one.
+    expect(nbsp(recurring.textContent)).toContain(
+      'Por mês: R$ 1.500,00 em saídas. Por ano: R$ 1.200,00 em saídas.',
+    );
+    const [active] = within(recurring).getAllByRole('list');
+    expect(rowsOf(active!)).toEqual([
+      expect.stringMatching(/Aluguel.*Todo mês/),
+      expect.stringMatching(/IPVA.*Todo ano em março.*Desde março de 2026.*Próximo: março de 2027/),
+    ]);
+    vi.useRealTimers();
+  });
+
   it('lists active recurrences and running plans, with the past ones apart', async () => {
     mockRecurrences();
     renderApp(page);
 
-    const monthly = await section('Todo mês');
+    const monthly = await section('Recorrentes');
     // What the active ones add up to; the variable one is an estimate. Academia ended.
     expect(nbsp(monthly.textContent)).toContain(
       'Por mês: R$ 1.689,90 em saídas, dos quais R$ 189,90 estimados.',
@@ -173,7 +198,7 @@ describe('RecurrencesPage', () => {
     mockRecurrences({ [`GET ${base}/recurrences`]: { body: [aluguel, split] } });
     renderApp(page);
 
-    const monthly = await section('Todo mês');
+    const monthly = await section('Recorrentes');
     expect(nbsp(monthly.textContent)).toContain('Dividido com Ana (50%) e Bruno (R$ 30,00)');
 
     await choose('Conta de luz', 'Editar');
@@ -253,7 +278,7 @@ describe('RecurrencesPage', () => {
     });
     renderApp(page);
 
-    const monthly = await section('Todo mês');
+    const monthly = await section('Recorrentes');
     expect(monthly).toHaveTextContent('Vence dia 10 do mês seguinte');
     await choose('Aluguel', 'Editar');
     const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
@@ -512,7 +537,7 @@ describe('RecurrencesPage', () => {
       mockRecurrences();
       renderApp(page);
 
-      const monthly = await section('Todo mês');
+      const monthly = await section('Recorrentes');
       expect(screen.queryByRole('radiogroup', { name: 'Ver como' })).not.toBeInTheDocument();
       expect(within(monthly).queryByRole('table')).not.toBeInTheDocument();
     });
@@ -524,7 +549,7 @@ describe('RecurrencesPage', () => {
 
       await userEvent.click(await screen.findByRole('radio', { name: 'Tabela' }));
 
-      const monthly = await section('Todo mês');
+      const monthly = await section('Recorrentes');
       const [active, ended] = within(monthly).getAllByRole('table');
       expect(within(active!).getByRole('row', { name: /Aluguel/ })).toHaveTextContent(
         /Aluguel.*Saída.*Moradia.*A pagar para Ana.*Dia 10.*Desde janeiro de 2026.*R\$.1\.500,00/,
