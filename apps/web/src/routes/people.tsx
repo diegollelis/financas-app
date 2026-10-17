@@ -47,7 +47,7 @@ import {
 } from '@/features/people/use-people';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { useUpdateTransaction } from '@/features/transactions/use-transactions';
-import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
+import { CARD_LIST, CARD_ROW } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -339,7 +339,7 @@ function PersonRow({
   return (
     // As a transaction row: who on the left, the amounts on the right; the menu below them on the
     // phone, where the width is short, and beside them, on the line of the name, from md.
-    <li className="flex items-start gap-3 py-3">
+    <li className={`${CARD_ROW} flex items-start gap-3`}>
       <span className="grid min-w-0 flex-1 justify-items-start">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-medium break-words">{person.name}</span>
@@ -347,7 +347,7 @@ function PersonRow({
         </span>
         <button
           type="button"
-          className="text-primary focus-visible:ring-ring/50 min-h-11 rounded-sm text-left text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3 md:min-h-0"
+          className="text-primary focus-visible:ring-ring/50 min-h-11 rounded-sm text-left text-sm whitespace-nowrap underline-offset-4 outline-none hover:underline focus-visible:ring-3 md:min-h-0"
           aria-label={`Ver lançamentos com ${person.name}`}
           onClick={(event) => onOpenHistory(person, event.currentTarget)}
         >
@@ -505,7 +505,7 @@ export function PeoplePage() {
               ao lançar.
             </p>
           ) : (
-            <ul className={DIVIDED_LIST}>{active.map(row)}</ul>
+            <ul className={CARD_LIST}>{active.map(row)}</ul>
           )}
         </section>
       )}
@@ -514,7 +514,7 @@ export function PeoplePage() {
           <h2 id="people-archived" className="text-muted-foreground font-medium">
             Arquivadas
           </h2>
-          <ul className={DIVIDED_LIST}>{archived.map(row)}</ul>
+          <ul className={CARD_LIST}>{archived.map(row)}</ul>
         </section>
       )}
       <PersonHistory

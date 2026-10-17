@@ -24,3 +24,13 @@ export const STRIPED_ROW =
  * card background like the cards of money, so the pages look alike.
  */
 export const DIVIDED_LIST = 'bg-card divide-y rounded-xl border px-4';
+
+/**
+ * A catalog of names (categories, merchants): compact cards, one column on the phone, two from lg,
+ * in alphabetical order. No amounts to compare, so a grid reads well here (ADR 0036 note).
+ */
+export const TILE_LIST = 'grid gap-2 lg:grid-cols-2';
+
+/** One name of such a catalog, with its badge and menu. */
+export const TILE_ROW =
+  'bg-card flex min-h-14 items-center justify-between gap-3 rounded-xl border py-1.5 pr-2 pl-4 md:min-h-12';
