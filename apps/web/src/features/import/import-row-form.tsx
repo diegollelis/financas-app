@@ -1,5 +1,6 @@
 import {
   isoDateSchema,
+  occurredOnLabels,
   MERCHANT_NAME_MAX_LENGTH,
   paymentMethodFieldLabels,
   paymentMethodSchema,
@@ -37,6 +38,8 @@ const rowFormSchema = z.object({
   categoryId: z.string().min(1, 'Escolha uma categoria.'),
   amount: reaisInputSchema,
   period: periodSchema,
+  /** The day it happened (ADR 0055). */
+  occurredOn: optionalDate,
   dueDate: optionalDate,
   settledAt: optionalDate,
   notes: transactionNotesSchema,
@@ -87,6 +90,7 @@ export function ImportRowForm({
       amount:
         row.amountCents && row.amountCents > 0 ? amountText.format(row.amountCents / 100) : '',
       period: row.period ?? '',
+      occurredOn: row.occurredOn ?? '',
       dueDate: row.dueDate ?? '',
       settledAt: row.settledAt ?? '',
       notes: row.notes ?? '',
@@ -109,6 +113,7 @@ export function ImportRowForm({
       categoryId: values.categoryId,
       amountCents: values.amount,
       period: values.period,
+      occurredOn: values.occurredOn,
       dueDate: values.dueDate,
       settledAt: values.settledAt,
     });
@@ -184,6 +189,13 @@ export function ImportRowForm({
           error={formState.errors.period?.message}
         >
           <Input type="month" {...register('period')} />
+        </FormField>
+        <FormField
+          id={id('occurred-on')}
+          label={`${occurredOnLabels[type]} (opcional)`}
+          error={formState.errors.occurredOn?.message}
+        >
+          <Input type="date" {...register('occurredOn')} />
         </FormField>
         <FormField
           id={id('due-date')}

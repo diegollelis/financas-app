@@ -3,6 +3,7 @@ import {
   formatIsoDate,
   formatPeriod,
   hasRole,
+  occurredOnRowLabels,
   OVERDUE_LABEL,
   paymentMethodLabels,
   PENDING_LABEL,
@@ -101,6 +102,12 @@ function signedCents(type: Transaction['type'], cents: number) {
  * Settled and overdue always show; pending only to whoever cannot act on it, since the
  * "○ Pagar / Receber" button already says it to an EDITOR (ADR 0036 note).
  */
+/** "28/09": a day of the competência's year needs no year; another one keeps it. */
+function dayInPeriod(iso: string, period: string) {
+  const date = formatIsoDate(iso);
+  return iso.slice(0, 4) === period.slice(0, 4) ? date.slice(0, 5) : date;
+}
+
 function StatusBadge({
   transaction,
   today,
@@ -112,12 +119,11 @@ function StatusBadge({
 }) {
   const status = transactionStatus(transaction, today);
   if (status === 'SETTLED') {
-    // What happened, in its own word; the year only when it is not the competência's.
-    const date = formatIsoDate(transaction.settledAt ?? '');
-    const sameYear = transaction.settledAt?.slice(0, 4) === transaction.period.slice(0, 4);
+    // What happened, in its own word.
     return (
       <Badge variant="success">
-        {settledLabels[transaction.type]} em {sameYear ? date.slice(0, 5) : date}
+        {settledLabels[transaction.type]} em{' '}
+        {dayInPeriod(transaction.settledAt ?? '', transaction.period)}
       </Badge>
     );
   }
@@ -598,6 +604,13 @@ function TransactionItem(props: RowProps) {
           {transaction.paymentMethod && (
             <span>{paymentMethodLabels[transaction.paymentMethod]}</span>
           )}
+          {/* The day it happened (ADR 0055), before when it is due. */}
+          {transaction.occurredOn && (
+            <span>
+              {occurredOnRowLabels[transaction.type]}{' '}
+              {dayInPeriod(transaction.occurredOn, transaction.period)}
+            </span>
+          )}
           {transaction.dueDate && <span>Vence em {formatIsoDate(transaction.dueDate)}</span>}
         </p>
         {transaction.notes && (
@@ -631,6 +644,10 @@ function TransactionRow(props: RowProps) {
   return (
     // Stripes instead of lines, and a stronger fill under the pointer (ADR 0036 note).
     <TableRow className={STRIPED_ROW}>
+      {/* The day it happened (ADR 0055): a column of its own, to sort a card statement by. */}
+      <TableCell className="tabular-nums">
+        {transaction.occurredOn ? dayInPeriod(transaction.occurredOn, transaction.period) : '—'}
+      </TableCell>
       <TableCell>
         {/* The status under the date: "Vencido" or "Pago em" only, so it has no column of its own. */}
         <div className="grid justify-items-start gap-1">
@@ -680,7 +697,7 @@ function TransactionRow(props: RowProps) {
   );
 }
 
-type SortKey = 'dueDate' | 'description' | 'category' | 'merchant' | 'amount';
+type SortKey = 'occurredOn' | 'dueDate' | 'description' | 'category' | 'merchant' | 'amount';
 
 /** A section's transactions as a table, sorted by the column clicked (by due date at first). */
 function TransactionTable({
@@ -698,6 +715,7 @@ function TransactionTable({
 }) {
   const sort = useSort<SortKey>('dueDate');
   const values: Record<SortKey, (transaction: Transaction) => SortValue> = {
+    occurredOn: (transaction) => transaction.occurredOn,
     dueDate: (transaction) => transaction.dueDate,
     description: (transaction) => transaction.description,
     category: categoryName,
@@ -718,7 +736,9 @@ function TransactionTable({
       {/* Fixed widths: the tables of both sections line up, and the description takes the rest. */}
       <Table className="table-fixed">
         <colgroup>
-          {/* The date, with "Recebido em 05/10" under it. */}
+          {/* The day it happened: "28/09". */}
+          <col className="w-24" />
+          {/* The due date, with "Recebido em 05/10" under it. */}
           <col className="w-36" />
           <col />
           <col className="w-32" />
@@ -729,6 +749,7 @@ function TransactionTable({
         </colgroup>
         <TableHeader>
           <TableRow>
+            {head('occurredOn', 'Data')}
             {head('dueDate', 'Vencimento')}
             {head('description', 'Descrição')}
             {head('category', 'Categoria')}

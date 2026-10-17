@@ -1,11 +1,13 @@
 import {
   plainTransactionInputSchema,
+  currentPeriod,
   formatCents,
   installmentCountSchema,
   MAX_DUE_MONTH_OFFSET,
   parseReais,
   splitInstallments,
   isoDateSchema,
+  occurredOnLabels,
   PERSON_NAME_MAX_LENGTH,
   reaisInputSchema,
   MERCHANT_NAME_MAX_LENGTH,
@@ -13,6 +15,7 @@ import {
   paymentMethodSchema,
   suggestCategory,
   suggestPaymentMethod,
+  todayIso,
   type Category,
   type CategoryHints,
   type Merchant,
@@ -54,6 +57,11 @@ const transactionFormSchema = plainTransactionInputSchema
     suggestedCategoryId: z.string(),
     amount: reaisInputSchema,
     dueDate: z
+      .string()
+      .transform((date) => date || null)
+      .pipe(isoDateSchema.nullable()),
+    /** The day it happened (ADR 0055); '' for none. Only when launched once. */
+    occurredOn: z
       .string()
       .transform((date) => date || null)
       .pipe(isoDateSchema.nullable()),
@@ -285,6 +293,12 @@ export function TransactionForm({
           ? amountText.format(preset.amountCents / 100)
           : '',
       dueDate: initial?.dueDate ?? '',
+      // Today in this month; blank in another, so no wrong day is saved unseen (ADR 0055).
+      occurredOn: initial
+        ? (initial.occurredOn ?? '')
+        : period && period === currentPeriod()
+          ? todayIso()
+          : '',
       period: initial?.period ?? period ?? '',
       repeat: 'NONE',
       amountKind: 'FIXED',
@@ -323,6 +337,8 @@ export function TransactionForm({
   const yearly = repeat === 'YEARLY';
   const variable = recurring && amountKind === 'VARIABLE';
   const installments = repeat === 'INSTALLMENTS';
+  // Each generated month and installment comes without a day: the due date says it (ADR 0055).
+  const withDay = repeat === 'NONE';
   const amountLabel = variable
     ? 'Valor estimado (R$)'
     : installments
@@ -479,8 +495,14 @@ export function TransactionForm({
           />
         )}
       </div>
-      {/* One column on the phone, two from sm, three from lg (the method, with the longest label, a little wider). */}
-      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr]">
+      {/* One column on the phone, two from sm: the amount and its day, then when it is due and how.
+          Without the day, three from lg (the method, with the longest label, a little wider). */}
+      <div
+        className={cn(
+          'grid items-start gap-4 sm:grid-cols-2',
+          !withDay && 'lg:grid-cols-[1fr_1fr_1.4fr]',
+        )}
+      >
         <FormField id={id('amount')} label={amountLabel} error={formState.errors.amount?.message}>
           <Input
             inputMode="decimal"
@@ -490,6 +512,15 @@ export function TransactionForm({
             {...register('amount')}
           />
         </FormField>
+        {withDay && (
+          <FormField
+            id={id('occurred-on')}
+            label={`${occurredOnLabels[type]} (opcional)`}
+            error={formState.errors.occurredOn?.message}
+          >
+            <Input type="date" {...register('occurredOn')} />
+          </FormField>
+        )}
         <FormField
           id={id('due-date')}
           label="Vencimento (opcional)"
@@ -502,7 +533,7 @@ export function TransactionForm({
           control={control}
           name="paymentMethod"
           render={({ field, fieldState }) => (
-            <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
+            <div className={cn('grid gap-1', !withDay && 'sm:col-span-2 lg:col-span-1')}>
               <FormField
                 id={id('payment-method')}
                 label={`${paymentMethodFieldLabels[type]} (opcional)`}

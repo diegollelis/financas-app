@@ -1002,6 +1002,7 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 15_990,
         dueDate: '2026-10-10',
+        occurredOn: '2026-10-15',
         period: '2026-10',
         personId: null,
       }),
@@ -1203,6 +1204,7 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 17_250,
         dueDate: '2026-10-10',
+        occurredOn: null,
         personId: null,
         merchantId: null,
         paymentMethod: null,
@@ -1271,6 +1273,7 @@ describe('TransactionsPage', () => {
         categoryId: marketCategory.id,
         amountCents: 30_000,
         dueDate: null,
+        occurredOn: '2026-10-15',
         period: '2026-10',
         split: [
           { personId: ana.id, amountCents: 10_000 },
@@ -1360,6 +1363,7 @@ describe('TransactionsPage', () => {
         categoryId: salaryCategory.id,
         amountCents: 100_000,
         dueDate: null,
+        occurredOn: '2026-10-15',
         period: '2026-10',
         split: [{ personId: ana.id, amountCents: 50_000 }],
       }),
@@ -1741,6 +1745,7 @@ describe('TransactionsPage', () => {
         categoryId: marketCategory.id,
         amountCents: 5_000,
         dueDate: null,
+        occurredOn: '2026-10-15',
         period: '2026-10',
         personId: null,
         merchantId: mercado.id,
@@ -1848,11 +1853,46 @@ describe('TransactionsPage', () => {
         categoryId: marketCategory.id,
         amountCents: 2_500,
         dueDate: null,
+        occurredOn: '2026-10-15',
         period: '2026-10',
         personId: null,
         paymentMethod: 'CREDIT_CARD',
       }),
     });
+  });
+
+  it('shows the day it happened, and starts a new one of this month on today (ADR 0055)', async () => {
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [
+          { ...salary, occurredOn: '2026-10-05' },
+          light,
+          { ...shopping, occurredOn: '2025-12-28' },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    // Of another year, the day keeps its year.
+    expect(row(await section('Saídas'), 'Compras da semana')).toHaveTextContent(
+      'Compra em 28/12/2025',
+    );
+    expect(row(await section('Entradas'), 'Salário de outubro')).toHaveTextContent('Em 05/10');
+    const form = await openNewTransaction();
+    expect(within(form).getByLabelText('Data da compra (opcional)')).toHaveValue('2026-10-15');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Entrada' }));
+    expect(within(form).getByLabelText('Data (opcional)')).toHaveValue('2026-10-15');
+    // Each generated month comes without a day.
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo mês' }));
+    expect(within(form).queryByLabelText('Data (opcional)')).not.toBeInTheDocument();
+  });
+
+  it('starts a new one of another month without a day (ADR 0055)', async () => {
+    mockTransactions();
+    renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-11`);
+
+    const form = await openNewTransaction();
+    expect(within(form).getByLabelText('Data da compra (opcional)')).toHaveValue('');
   });
 
   describe('as a table (from xl)', () => {
@@ -1861,7 +1901,7 @@ describe('TransactionsPage', () => {
       within(within(container).getByRole('table'))
         .getAllByRole('row')
         .slice(1)
-        .map((tableRow) => within(tableRow).getAllByRole('cell')[1]?.textContent);
+        .map((tableRow) => within(tableRow).getAllByRole('cell')[2]?.textContent);
 
     it('offers "Ver como" only where a table fits, and keeps the list on the phone', async () => {
       window.localStorage.setItem('financas:visao:lancamentos', 'TABLE');
