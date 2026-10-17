@@ -561,6 +561,51 @@ describe('people and splits', () => {
       expect(await transactions(browser, base)).toEqual([]);
     });
 
+    it('makes the shares due with the transaction, and moves the pending ones with it (ADR 0052 note)', async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const bruno = await addPerson(browser, base, 'Bruno');
+      const debit = transactionSchema.parse(
+        (
+          await browser
+            .post(`${base}/transactions`)
+            .send({
+              type: 'DEBIT',
+              description: 'Aluguel da casa de praia',
+              categoryId: category('Lazer', 'DEBIT').id,
+              amountCents: 90_000,
+              period,
+              dueDate: `${period}-10`,
+              split: [
+                { personId: ana.id, amountCents: 30_000 },
+                { personId: bruno.id, amountCents: 30_000 },
+              ],
+            })
+            .expect(201)
+        ).body,
+      );
+      const sharesOf = async () =>
+        (await transactions(browser, base)).filter((t) => t.splitOfId === debit.id);
+      expect((await sharesOf()).map((share) => share.dueDate)).toEqual([
+        `${period}-10`,
+        `${period}-10`,
+      ]);
+      const anaShare = (await sharesOf()).find((share) => share.personId === ana.id)!;
+      await browser
+        .patch(`${base}/transactions/${anaShare.id}`)
+        .send({ settledAt: `${period}-02` })
+        .expect(200);
+
+      await browser
+        .patch(`${base}/transactions/${debit.id}`)
+        .send({ dueDate: `${period}-20` })
+        .expect(200);
+
+      const shares = await sharesOf();
+      expect(shares.find((share) => share.personId === ana.id)?.dueDate).toBe(`${period}-10`);
+      expect(shares.find((share) => share.personId === bruno.id)?.dueDate).toBe(`${period}-20`);
+    });
+
     it('keeps Reembolso: it is never archived, and the shares go to it (ADR 0052 note)', async () => {
       const { browser, base, category } = await setup();
       const reembolso = category('Reembolso', 'CREDIT');

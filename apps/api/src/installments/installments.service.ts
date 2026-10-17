@@ -25,7 +25,7 @@ import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
-import { followDescription } from '../transactions/share-description.js';
+import { followDescription, followDueDate } from '../transactions/share-description.js';
 
 type Pending = { count: number; cents: number; lastPeriod: string | null };
 
@@ -157,6 +157,8 @@ export class InstallmentsService {
         transactions: {
           create: amounts.map((amountCents, index) => {
             const period = shiftPeriod(input.firstPeriod, index);
+            const dueDate =
+              dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset));
             return {
               workspaceId,
               type: input.type,
@@ -168,9 +170,9 @@ export class InstallmentsService {
               paymentMethod,
               amountCents,
               period,
-              dueDate: dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset)),
+              dueDate,
               installmentNumber: index + 1,
-              ...(input.split && { shares: { create: sharesOf(index, period) } }),
+              ...(input.split && { shares: { create: sharesOf(index, period, dueDate) } }),
             };
           }),
         },
@@ -212,7 +214,7 @@ export class InstallmentsService {
         count,
       ),
     );
-    return (index: number, period: string) =>
+    return (index: number, period: string, dueDate: Date | null) =>
       people.map((person, k) => ({
         workspaceId,
         type,
@@ -221,6 +223,8 @@ export class InstallmentsService {
         categoryId,
         amountCents: perInstallment[k]![index]!,
         period,
+        // Due with its installment (ADR 0052 note).
+        dueDate,
         personId: person.id,
       }));
   }
@@ -357,6 +361,7 @@ export class InstallmentsService {
       select: { id: true, period: true, installmentNumber: true },
     });
     for (const installment of pending) {
+      const dueDate = dueChanged ? dueDateIn(installment.period) : undefined;
       await db.transaction.update({
         where: { id: installment.id, workspaceId },
         data: {
@@ -366,9 +371,13 @@ export class InstallmentsService {
           personId: input.personId,
           merchantId: input.merchantId,
           paymentMethod: input.paymentMethod,
-          dueDate: dueChanged ? dueDateIn(installment.period) : undefined,
+          dueDate,
         },
       });
+      // Its pending shares fall due with it (ADR 0052 note).
+      if (dueDate !== undefined) {
+        await followDueDate(this.prisma, workspaceId, installment.id, dueDate);
+      }
       // Its pending shares take the new name, with their installment (ADR 0052 note).
       if (input.description !== undefined && installment.installmentNumber !== null) {
         await followDescription(
