@@ -216,8 +216,10 @@ function CategoryItem({
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 break-words">
         {name}
         {category.destinationId && <Badge variant="secondary">Meta</Badge>}
+        {/* Reembolso and Repasse receive the shares of a split and never change (ADR 0052 note). */}
+        {category.splitRole && <Badge variant="secondary">Divisão</Badge>}
       </span>
-      {canEdit && !category.destinationId && (
+      {canEdit && !category.destinationId && !category.splitRole && (
         <>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -402,7 +404,7 @@ export function CategoriesPage() {
     <>
       <PageHeader
         title="Categorias"
-        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada. As das metas mudam junto com a meta, no orçamento do Painel."
+        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada. As das metas mudam junto com a meta, no orçamento do Painel. Reembolso e Repasse recebem as partes das divisões entre pessoas e não mudam."
       >
         {/* At the top, so adding never needs scrolling past a long list. */}
         {canEdit && categories.isSuccess && (
