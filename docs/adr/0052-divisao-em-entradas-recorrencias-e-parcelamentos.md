@@ -111,3 +111,12 @@ Com o uso, apareceram dois problemas no formato "Ana: parte de {descrição}": m
 - **A parte acompanha a edição:** mudar a descrição de um lançamento dividido, de uma recorrência (nos meses pendentes deste mês em diante) ou de um parcelamento (nas parcelas pendentes) muda também as **partes pendentes** ligadas a eles. Uma parte já paga ou recebida é histórico e fica como está, a mesma regra das parcelas pagas.
 - **As partes antigas** ("Ana: parte de …") ficam como estão até a próxima edição da origem, que corrige as pendentes. Não há migração que reescreva descrições, porque ela mexeria também no que já foi pago.
 - **A sugestão pelo histórico** continua deixando as partes de fora: com a mesma descrição da origem, elas sugeririam Reembolso ou Repasse.
+
+## Nota (Reembolso e Repasse fixos, 2026-10-17)
+
+A divisão encontrava Reembolso e Repasse **pelo nome**: arquivada, a categoria voltava sozinha na próxima divisão; excluída, era criada de novo; mas **renomeada** ("Reembolsos"), a divisão não a achava e criava outra "Reembolso", e os reembolsos ficavam em duas categorias.
+
+- **Uma marca no banco:** `categories.split_role` (`REIMBURSEMENT` ou `PASS_THROUGH`), única por espaço e com um CHECK que liga a marca ao tipo (Reembolso é entrada, Repasse é saída). Os espaços novos já nascem com as duas marcadas.
+- **A migração marca as que existem,** achadas pelo nome como a divisão fazia (a mais antiga de cada espaço, ignorando maiúsculas), e as reativa, se estavam arquivadas.
+- **A divisão acha a categoria pela marca.** Num espaço sem ela (que excluiu ou renomeou a sua antes da marca), a de nome "Reembolso" (ou "Repasse") é marcada; sem nenhuma, uma nova é criada, marcada. Uma renomeada antes da marca continua como categoria comum.
+- **As rotas de categorias recusam renomear, arquivar e excluir** as duas (409 `CATEGORY_OF_SPLIT`), e a cópia entre espaços ([ADR 0048](0048-copiar-categorias-entre-espacos.md)) não as copia: cada espaço tem as suas. A lista devolve `splitRole`, e a tela mostra o selo "Divisão" no lugar do menu, como o "Meta" das categorias de metas.

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { transactionTypeSchema } from './category.ts';
+import { splitRoleSchema, transactionTypeSchema } from './category.ts';
 import { paymentMethodSchema } from './payment-method.ts';
 import { workspaceRoleSchema } from './workspace.ts';
 
@@ -21,6 +21,8 @@ const exportCategorySchema = z.object({
   name: z.string(),
   type: transactionTypeSchema,
   archivedAt: instant.nullable(),
+  /** Reembolso or Repasse (ADR 0052 note); null for the others. */
+  splitRole: splitRoleSchema.nullable(),
   createdAt: instant,
 });
 

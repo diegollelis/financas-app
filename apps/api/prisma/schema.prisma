@@ -221,13 +221,25 @@ model Category {
   installmentPlans InstallmentPlan[]
   // Set when the category is a saving destination's own (ADR 0047).
   destination      BudgetDestination?
+  // Reembolso or Repasse, the categories of the shares of a split (ADR 0052 note): found by
+  // this mark, never by the name, and never renamed, archived or deleted.
+  splitRole        SplitRole?         @map("split_role")
 
   @@unique([workspaceId, type, name])
+  // One Reembolso and one Repasse per workspace.
+  @@unique([workspaceId, splitRole])
   // Target of the composite foreign key of transactions (ADR 0029).
   @@unique([id, workspaceId, type])
   // Target of the composite foreign key of budget destinations (ADR 0047).
   @@unique([id, workspaceId])
   @@map("categories")
+}
+
+enum SplitRole {
+  REIMBURSEMENT
+  PASS_THROUGH
+
+  @@map("split_role")
 }
 
 enum BudgetDestinationKind {
