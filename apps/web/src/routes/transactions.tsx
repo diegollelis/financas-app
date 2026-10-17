@@ -73,6 +73,7 @@ import {
 import { sortRows, useSort, type SortValue } from '@/features/view-mode/sort';
 import { SortableHead } from '@/features/view-mode/sortable-head';
 import { useShowsTable } from '@/features/view-mode/view-mode';
+import { CARD_LIST, CARD_ROW, STRIPED_ROW, TABLE_BOX } from '@/features/view-mode/row-styles';
 import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -588,7 +589,7 @@ function TransactionItem(props: RowProps) {
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
-    <li className="bg-card flex items-start gap-3 rounded-xl border px-4 py-3.5">
+    <li className={`${CARD_ROW} flex items-start gap-3`}>
       <div className="grid min-w-0 flex-1 justify-items-start gap-1">
         <p className="font-medium break-words">{transaction.description}</p>
         <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
@@ -628,9 +629,8 @@ function TransactionRow(props: RowProps) {
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
-    // Stripes instead of lines, and a stronger fill under the pointer, to follow a wide row to
-    // its "Pagar" (ADR 0036 note).
-    <TableRow className="border-0 odd:bg-muted/70 hover:bg-border/70 dark:odd:bg-secondary/40 dark:hover:bg-secondary">
+    // Stripes instead of lines, and a stronger fill under the pointer (ADR 0036 note).
+    <TableRow className={STRIPED_ROW}>
       <TableCell>
         {/* The status under the date: "Vencido" or "Pago em" only, so it has no column of its own. */}
         <div className="grid justify-items-start gap-1">
@@ -714,7 +714,7 @@ function TransactionTable({
     />
   );
   return (
-    <div className="bg-card rounded-xl border px-2 py-1">
+    <div className={TABLE_BOX}>
       {/* Fixed widths: the tables of both sections line up, and the description takes the rest. */}
       <Table className="table-fixed">
         <colgroup>
@@ -911,7 +911,7 @@ export function TransactionsPage() {
                 ) : (
                   // One card per transaction, 8px apart: where one ends and the next begins
                   // shows at a glance (ADR 0036 note). Still one column, read top to bottom.
-                  <ul className="grid gap-2">
+                  <ul className={CARD_LIST}>
                     {items.map((transaction) => row(transaction, TransactionItem))}
                   </ul>
                 )}

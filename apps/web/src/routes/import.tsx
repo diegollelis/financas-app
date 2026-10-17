@@ -21,6 +21,7 @@ import { ImportReview } from '@/features/import/import-review';
 import { startReview, type ReviewRow } from '@/features/import/review';
 import { useImports, useUndoImport } from '@/features/import/use-imports';
 import { downloadTemplate, readTemplate, TemplateReadError } from '@/features/import/workbook';
+import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 import { cn } from '@/lib/utils';
@@ -253,7 +254,7 @@ export function ImportPage() {
           <h2 id={PREVIOUS_TITLE_ID} tabIndex={-1} className="font-medium outline-none">
             Importações anteriores
           </h2>
-          <ul className="divide-y rounded-xl border px-4">
+          <ul className={DIVIDED_LIST}>
             {imports.data.map((item) => (
               <PreviousImport
                 key={item.id}

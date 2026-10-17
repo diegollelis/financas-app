@@ -71,6 +71,7 @@ import {
 import { sortRows, useSort, type SortValue } from '@/features/view-mode/sort';
 import { SortableHead } from '@/features/view-mode/sortable-head';
 import { useShowsTable } from '@/features/view-mode/view-mode';
+import { CARD_LIST, CARD_ROW, STRIPED_ROW, TABLE_BOX } from '@/features/view-mode/row-styles';
 import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -177,7 +178,7 @@ function SeriesRow({
   menu: ReactNode;
 }) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 py-3">
+    <li className={`${CARD_ROW} grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1`}>
       <p className="font-medium break-words">{title}</p>
       <div className="flex items-start gap-2 md:row-span-2 md:gap-1">
         <SeriesAmount amount={amount} note={amountNote} />
@@ -223,7 +224,7 @@ function SeriesTable<T>({
   const sortBy = columns[Number(sort.key)]?.sort;
   const sorted = sortBy ? sortRows(rows, sortBy, sort.direction) : rows;
   return (
-    <div className="rounded-xl border px-2">
+    <div className={TABLE_BOX}>
       <Table className="table-fixed">
         <colgroup>
           {columns.map((column) => (
@@ -523,7 +524,7 @@ function RecurrenceItem({
 
   if (asTable) {
     return (
-      <TableRow>
+      <TableRow className={STRIPED_ROW}>
         <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
         <TableCell>{typeLabel[recurrence.type]}</TableCell>
         <TableCell className="whitespace-normal">
@@ -680,7 +681,7 @@ function PlanItem({
 
   if (asTable) {
     return (
-      <TableRow>
+      <TableRow className={STRIPED_ROW}>
         <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
         <TableCell>{typeLabel[plan.type]}</TableCell>
         <TableCell className="whitespace-normal">
@@ -884,7 +885,8 @@ export function RecurrencesPage() {
     rows.length === 0 ? null : asTable ? (
       <SeriesTable rows={rows} columns={columns} actions={actions} renderRow={item} />
     ) : (
-      <ul className="divide-y rounded-xl border px-4">{rows.map(item)}</ul>
+      // One card per item, like Lançamentos (ADR 0036 note).
+      <ul className={CARD_LIST}>{rows.map(item)}</ul>
     );
 
   return (

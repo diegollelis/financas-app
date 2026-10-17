@@ -43,6 +43,7 @@ import {
   useDeleteCategory,
   useUpdateCategory,
 } from '@/features/categories/use-categories';
+import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { useWorkspaces } from '@/features/workspaces/use-workspaces';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -312,7 +313,7 @@ function CategoryList({
   canEdit: boolean;
 }) {
   return (
-    <ul className="divide-y rounded-xl border px-4">
+    <ul className={DIVIDED_LIST}>
       {categories.map((category) => (
         <CategoryItem
           key={category.id}

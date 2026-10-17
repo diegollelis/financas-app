@@ -8,6 +8,7 @@ import {
   type Category,
   type Import,
 } from '@financas/shared';
+import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CategorySelect } from '@/features/categories/category-picker';
+import { CARD_LIST, CARD_ROW } from '@/features/view-mode/row-styles';
 import { apiErrorMessage } from '@/lib/error-message';
 import { ImportRowForm } from './import-row-form';
 import {
@@ -57,7 +59,8 @@ function RowItem({
   const label = row.description || `Linha ${row.line}`;
   const blocked = problems.length > 0;
   return (
-    <li className="flex items-start gap-3 py-3">
+    // The box beside the checkbox has its own 44px target: 8px of side room on the phone.
+    <li className={cn(CARD_ROW, 'flex items-start gap-3 px-2 md:px-4')}>
       {/* A 44px target on the phone (ADR 0036): the label around the box toggles it too. */}
       <label
         htmlFor={`import-row-${row.line}`}
@@ -282,7 +285,8 @@ export function ImportReview({
                 Entradas {formatCents(totals.credits)}, saídas {formatCents(totals.debits)}
               </span>
             </div>
-            <ul className="divide-y rounded-xl border px-2 md:px-4">
+            {/* One card per row, like Lançamentos (ADR 0036 note). */}
+            <ul className={CARD_LIST}>
               {grouped.map((row) => {
                 const { categoryId, problems } = check(row);
                 return (
