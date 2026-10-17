@@ -121,9 +121,9 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
     - [x] Tela: o formulário manda a distância da data digitada, Recorrências mostra "Vence dia 10 do mês seguinte" e a edição oferece "Mesmo mês / Mês seguinte"
   - [x] Editar e excluir um parcelamento (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
   - [x] A parte de uma divisão repete a descrição do que foi dividido, sem o nome da pessoa ("Conta de luz", "Geladeira (3/10)"), e acompanha a edição da descrição nas partes pendentes (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
-  - [ ] Reembolso e Repasse fixos: marcados no banco (`split_role`), achados pela marca, sem renomear, arquivar ou excluir, e com o selo "Divisão" em Categorias (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
+  - [x] Reembolso e Repasse fixos: marcados no banco (`split_role`), achados pela marca, sem renomear, arquivar ou excluir, e com o selo "Divisão" em Categorias (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
     - [x] API: a marca, a migração, a divisão pela marca, as rotas e a cópia recusando, a exportação
-    - [ ] Tela: o selo "Divisão" sem menu em Categorias
+    - [x] Tela: o selo "Divisão" sem menu em Categorias
   - [x] Recorrência anual (IPVA, IPTU, anuidade; nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
     - [x] API: `intervalMonths` (1 ou 12) na recorrência, só o mês do ciclo gerado, "Tornar recorrente" anual, a frequência no lançamento e na exportação
     - [x] Tela: "Todo ano" no "Repetir" (2×2 no celular) e no "Tornar recorrente", o selo, a seção "Recorrentes" com a frequência e o próximo mês de uma anual, a coluna "Repete" na tabela e o total "Por ano" à parte
