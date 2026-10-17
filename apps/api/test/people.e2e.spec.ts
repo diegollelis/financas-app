@@ -576,6 +576,7 @@ describe('people and splits', () => {
               amountCents: 90_000,
               period,
               dueDate: `${period}-10`,
+              occurredOn: `${period}-01`,
               split: [
                 { personId: ana.id, amountCents: 30_000 },
                 { personId: bruno.id, amountCents: 30_000 },
@@ -586,9 +587,9 @@ describe('people and splits', () => {
       );
       const sharesOf = async () =>
         (await transactions(browser, base)).filter((t) => t.splitOfId === debit.id);
-      expect((await sharesOf()).map((share) => share.dueDate)).toEqual([
-        `${period}-10`,
-        `${period}-10`,
+      expect((await sharesOf()).map((share) => [share.dueDate, share.occurredOn])).toEqual([
+        [`${period}-10`, `${period}-01`],
+        [`${period}-10`, `${period}-01`],
       ]);
       const anaShare = (await sharesOf()).find((share) => share.personId === ana.id)!;
       await browser
@@ -598,12 +599,19 @@ describe('people and splits', () => {
 
       await browser
         .patch(`${base}/transactions/${debit.id}`)
-        .send({ dueDate: `${period}-20` })
+        .send({ dueDate: `${period}-20`, occurredOn: `${period}-02` })
         .expect(200);
 
       const shares = await sharesOf();
-      expect(shares.find((share) => share.personId === ana.id)?.dueDate).toBe(`${period}-10`);
-      expect(shares.find((share) => share.personId === bruno.id)?.dueDate).toBe(`${period}-20`);
+      expect(shares.find((share) => share.personId === ana.id)).toMatchObject({
+        dueDate: `${period}-10`,
+        occurredOn: `${period}-01`,
+      });
+      // The day it happened goes with it too (ADR 0055).
+      expect(shares.find((share) => share.personId === bruno.id)).toMatchObject({
+        dueDate: `${period}-20`,
+        occurredOn: `${period}-02`,
+      });
     });
 
     it('keeps Reembolso: it is never archived, and the shares go to it (ADR 0052 note)', async () => {

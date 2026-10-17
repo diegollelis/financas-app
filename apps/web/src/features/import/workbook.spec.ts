@@ -35,6 +35,7 @@ describe('planilha modelo', () => {
         paymentMethod: 'BOLETO',
         amountCents: 150_000,
         period: '2026-09',
+        occurredOn: '2026-09-05',
         dueDate: '2026-09-10',
         settledAt: '2026-09-10',
       },

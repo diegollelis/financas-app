@@ -37,6 +37,8 @@ const exportTransactionSchema = z.object({
   period,
   dueDate: day.nullable(),
   settledAt: day.nullable(),
+  /** The day it happened (ADR 0055). */
+  occurredOn: day.nullable(),
   recurrenceId: z.uuid().nullable(),
   installmentPlanId: z.uuid().nullable(),
   installmentNumber: z.number().int().nullable(),

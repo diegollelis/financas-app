@@ -70,6 +70,7 @@ describe('imports', () => {
         categoryId: categoryId('Mercado', 'DEBIT'),
         amountCents: 64_035,
         period,
+        occurredOn: `${period}-03`,
         dueDate: null,
         settledAt: null,
       },
@@ -107,6 +108,8 @@ describe('imports', () => {
     expect(august.find((transaction) => transaction.type === 'DEBIT')).toMatchObject({
       notes: 'Importado da planilha',
       settledAt: null,
+      // The "Data" column of the template (ADR 0055).
+      occurredOn: '2026-08-03',
     });
 
     const list = importListResponseSchema.parse(

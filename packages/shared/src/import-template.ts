@@ -40,6 +40,8 @@ const columns = [
     required: false,
   },
   { key: 'amount', title: 'Valor', formerTitles: [], required: true },
+  // Optional (ADR 0055): the day of the purchase, which never changes the month.
+  { key: 'occurredOn', title: 'Data', formerTitles: [], required: false },
   { key: 'dueDate', title: 'Vencimento', formerTitles: [], required: false },
   {
     key: 'settledAt',
@@ -64,6 +66,7 @@ export const TEMPLATE_EXAMPLE: readonly string[] = [
   'Imobiliária Exemplo',
   'Boleto',
   '1.500,00',
+  '05/09/2026',
   '10/09/2026',
   '10/09/2026',
   '',
@@ -83,6 +86,8 @@ export type TemplateRow = {
   paymentMethod: PaymentMethod | null;
   amountCents: number;
   period: string;
+  /** The day it happened (ADR 0055); null when empty. */
+  occurredOn: string | null;
   dueDate: string | null;
   settledAt: string | null;
 };
@@ -102,6 +107,7 @@ export type TemplateDraft = {
   /** Null when missing or unreadable; a zero or negative amount stays, to be corrected. */
   amountCents: number | null;
   period: string | null;
+  occurredOn: string | null;
   dueDate: string | null;
   settledAt: string | null;
 };
@@ -270,6 +276,8 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
           : (amount.error.issues[0]?.message ?? 'Valor inválido.'),
       );
     }
+    const occurredOn = readDate(cell('occurredOn'));
+    if (occurredOn === undefined) errors.push('Data inválida: use dd/mm/aaaa.');
     const dueDate = readDate(cell('dueDate'));
     if (dueDate === undefined) errors.push('Vencimento inválido: use dd/mm/aaaa.');
     const settledAt = readDate(cell('settledAt'));
@@ -291,6 +299,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
         paymentMethod,
         amountCents,
         period,
+        occurredOn: occurredOn ?? null,
         dueDate: dueDate ?? null,
         settledAt: settledAt ?? null,
       });
@@ -339,6 +348,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
       paymentMethod,
       amountCents: amount.data,
       period,
+      occurredOn: occurredOn ?? null,
       dueDate: dueDate ?? null,
       settledAt: settledAt ?? null,
     });

@@ -32,7 +32,7 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 ### Transaction (Lançamento)
 
 - `workspace_id`, `type` (`CREDIT` | `DEBIT`), `description`, `notes`, `category_id`
-- `amount_cents` (> 0), `period` (competência `YYYY-MM`), `due_date` (opcional), `settled_at`
+- `amount_cents` (> 0), `period` (competência `YYYY-MM`), `due_date` (opcional), `settled_at`, `occurred_on` (opcional: o dia da compra, que não muda a competência, [ADR 0055](../adr/0055-importacao-da-fatura-do-cartao.md))
 - `installment_plan_id?`, `installment_number?`, `recurrence_id?`
 - Regras:
   - a categoria pertence ao mesmo espaço e tem o mesmo `type` (garantido pelo banco, [ADR 0029](../adr/0029-lancamentos-e-integridade-no-banco.md)); categoria arquivada não pode ser escolhida;
