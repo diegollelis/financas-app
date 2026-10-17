@@ -2,6 +2,7 @@ import {
   formatCents,
   formatIsoDate,
   formatPeriod,
+  occurredOnRowLabels,
   paymentMethodLabels,
   PENDING_LABEL,
   settledLabels,
@@ -82,6 +83,11 @@ function RowItem({
           </span>
           {row.merchantName && <span>{row.merchantName}</span>}
           {row.paymentMethod && <span>{paymentMethodLabels[row.paymentMethod]}</span>}
+          {row.occurredOn && (
+            <span>
+              {row.type ? occurredOnRowLabels[row.type] : 'Em'} {formatIsoDate(row.occurredOn)}
+            </span>
+          )}
           {row.dueDate && <span>Vence em {formatIsoDate(row.dueDate)}</span>}
           <span>
             {row.settledAt

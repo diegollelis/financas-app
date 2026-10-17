@@ -100,3 +100,10 @@ O arquivo de exemplo é uma fatura real do dono. Como o repositório é público
 - **`transactions.occurred_on`** (só o dia, opcional) entra nas rotas de lançamentos, na importação e na exportação de dados. Lançamentos antigos, meses de recorrência e parcelas ficam sem data.
 - **A planilha modelo ganha a coluna "Data",** entre "Valor" e "Vencimento", lida como o vencimento (dd/mm/aaaa ou uma célula de data). Uma planilha sem a coluna é lida como antes.
 - **As partes de uma divisão** ganham a mesma data do lançamento dividido e a acompanham numa mudança, como o vencimento ([ADR 0052](0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)).
+
+## Nota (a data da compra na tela, 2026-10-17)
+
+- **Formulário:** "Data da compra (opcional)" numa saída e "Data (opcional)" numa entrada, entre o valor e o vencimento, em duas colunas a partir de 640 px. Vem com hoje num lançamento novo do mês atual e em branco num mês passado ou futuro. Some com "Todo mês", "Todo ano" ou "Parcelado", porque os meses e as parcelas nascem sem data.
+- **Lista:** "Compra em 28/09" (ou "Em 03/10", numa entrada) antes do vencimento, com o ano só quando não é o do mês de referência.
+- **Tabela:** uma coluna "Data" própria antes do vencimento, que também ordena. Na prévia foram descartadas a data dentro da coluna do vencimento (a linha ficava mais alta) e embaixo da descrição (sem ordenar e menos à vista).
+- **Revisão da importação:** a data aparece na linha e pode ser corrigida em "Editar".

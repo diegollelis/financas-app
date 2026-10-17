@@ -138,9 +138,19 @@ export function TransactionDialog({
       ...(merchantId && { merchantId }),
       ...(paymentMethod && { paymentMethod }),
     };
+    // The day it happened (ADR 0055), on a new one only when there is one; never on a repeat.
+    const withDay = values.occurredOn ? { occurredOn: values.occurredOn } : {};
     if (editing) {
       update.mutate(
-        { id: editing.id, ...fields, dueDate: values.dueDate, personId, merchantId, paymentMethod },
+        {
+          id: editing.id,
+          ...fields,
+          dueDate: values.dueDate,
+          occurredOn: values.occurredOn,
+          personId,
+          merchantId,
+          paymentMethod,
+        },
         { onSuccess: done('Lançamento salvo') },
       );
     } else if (values.repeat === 'INSTALLMENTS') {
@@ -190,13 +200,13 @@ export function TransactionDialog({
       // The transaction and one share per person on the other side, at once (ADRs 0042, 0052).
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, period, ...withMerchant, split },
+        { ...fields, dueDate: values.dueDate, ...withDay, period, ...withMerchant, split },
         { onSuccess: done(withPeople('Lançamento adicionado')) },
       );
     } else {
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, period, personId, ...withMerchant },
+        { ...fields, dueDate: values.dueDate, ...withDay, period, personId, ...withMerchant },
         { onSuccess: done('Lançamento adicionado') },
       );
     }
