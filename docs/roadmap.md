@@ -156,6 +156,14 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Análise por estabelecimento dentro de uma categoria (ex.: quanto foi para cada mercado)
   - [x] Coluna opcional "Estabelecimento" na planilha modelo (um nome novo vira estabelecimento ao importar; um arquivado volta; desfazer a importação não os apaga)
   - [x] Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição (o estabelecimento vale mais; 12 meses de histórico; nunca troca uma categoria escolhida)
+- [ ] **Importação da fatura do cartão** ([ADR 0055](adr/0055-importacao-da-fatura-do-cartao.md)): o CSV da fatura do Nubank lido na tela Importar, com a data da compra, os apelidos de estabelecimento e as parcelas virando parcelamentos
+  - [x] ADR: mês de referência da fatura, parcelas (casar ou criar o parcelamento, com a parcela inicial), apelidos pelo começo do título, "Data da compra" / "Data", aviso de fatura lançada inteira
+  - [ ] API: a data da compra nos lançamentos, na planilha modelo (coluna "Data") e na exportação
+  - [ ] Tela: a data no formulário, na linha e na tabela
+  - [ ] API: apelidos de estabelecimento e parcela inicial no parcelamento
+  - [ ] Tela: apelidos em Estabelecimentos e no seletor; parcela inicial no "Parcelado"
+  - [ ] API: a importação aceita parcelamentos, apelidos e a data
+  - [ ] Tela: o leitor do CSV do Nubank e a revisão
 - [x] **Meio de pagamento** ([ADR 0054](adr/0054-meio-de-pagamento.md)): como se pagou ou recebeu, numa lista fixa (Pix, Débito, Crédito, Dinheiro, Boleto, Transferência e Débito automático), em saídas e entradas. Contas e cartões com saldo e fatura ficam para um ADR próprio, se a necessidade aparecer.
   - [x] ADR: lista fixa (e não cadastro ou texto livre), sete meios, saídas e entradas, "Meio de pagamento" / "Meio de recebimento" na tela e `PaymentMethod` no código, no glossário
   - [x] API: enum e `payment_method` opcional em lançamentos, recorrências e parcelamentos (herdado por cada mês e parcela, nunca pelas partes), exportação; "Cartão de crédito" fora das categorias padrão dos espaços novos
