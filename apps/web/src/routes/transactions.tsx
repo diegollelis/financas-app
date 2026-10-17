@@ -628,9 +628,17 @@ function TransactionRow(props: RowProps) {
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
-    <TableRow>
-      <TableCell className="tabular-nums">
-        {transaction.dueDate ? formatIsoDate(transaction.dueDate) : '—'}
+    // Stripes instead of lines, and a stronger fill under the pointer, to follow a wide row to
+    // its "Pagar" (ADR 0036 note).
+    <TableRow className="border-0 odd:bg-muted/70 hover:bg-border/70 dark:odd:bg-secondary/40 dark:hover:bg-secondary">
+      <TableCell>
+        {/* The status under the date: "Vencido" or "Pago em" only, so it has no column of its own. */}
+        <div className="grid justify-items-start gap-1">
+          <span className="tabular-nums">
+            {transaction.dueDate ? formatIsoDate(transaction.dueDate) : '—'}
+          </span>
+          <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
+        </div>
       </TableCell>
       <TableCell className="whitespace-normal">
         <div className="grid justify-items-start gap-1">
@@ -645,19 +653,17 @@ function TransactionRow(props: RowProps) {
       </TableCell>
       <TableCell className="whitespace-normal">{category?.name ?? 'Categoria'}</TableCell>
       <TableCell className="whitespace-normal">
-        {/* Where and how (ADR 0054): the method under the merchant, in the same column. */}
+        {/* Where and how (ADR 0054): the merchant, the method under it in muted text, which
+            "Onde / Meio" names; a dash only when there is neither. */}
         <span className="grid">
-          {/* Always the merchant first, a dash without one, so the method is never read as one. */}
-          <span>{merchantName ?? '—'}</span>
+          {merchantName && <span>{merchantName}</span>}
           {transaction.paymentMethod && (
             <span className="text-muted-foreground">
               {paymentMethodLabels[transaction.paymentMethod]}
             </span>
           )}
+          {!merchantName && !transaction.paymentMethod && <span>—</span>}
         </span>
-      </TableCell>
-      <TableCell>
-        <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
       </TableCell>
       <TableCell className="text-right">
         <Amount transaction={transaction} estimated={estimated} />
@@ -708,15 +714,15 @@ function TransactionTable({
     />
   );
   return (
-    <div className="rounded-xl border px-2">
+    <div className="bg-card rounded-xl border px-2 py-1">
       {/* Fixed widths: the tables of both sections line up, and the description takes the rest. */}
       <Table className="table-fixed">
         <colgroup>
-          <col className="w-28" />
+          {/* The date, with "Recebido em 05/10" under it. */}
+          <col className="w-36" />
           <col />
           <col className="w-32" />
-          <col className="w-36" />
-          <col className="w-36" />
+          <col className="w-44" />
           {/* Room for the sign: "+ R$ 5.200,00" (ADR 0036 note). */}
           <col className="w-36" />
           {canEdit && <col className="w-32" />}
@@ -726,8 +732,7 @@ function TransactionTable({
             {head('dueDate', 'Vencimento')}
             {head('description', 'Descrição')}
             {head('category', 'Categoria')}
-            {head('merchant', 'Estabelecimento / Meio')}
-            <TableHead>Situação</TableHead>
+            {head('merchant', 'Onde / Meio')}
             {head('amount', 'Valor', 'right')}
             {canEdit && (
               <TableHead>

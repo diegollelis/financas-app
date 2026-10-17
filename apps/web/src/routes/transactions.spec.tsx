@@ -1882,9 +1882,12 @@ describe('TransactionsPage', () => {
       await userEvent.click(await screen.findByRole('radio', { name: 'Tabela' }));
 
       const debits = await section('Saídas');
-      expect(within(debits).getByRole('columnheader', { name: 'Situação' })).toBeInTheDocument();
+      // The status sits under the due date, with no column of its own (ADR 0036 note).
       expect(
-        within(debits).getByRole('columnheader', { name: /^Estabelecimento . Meio/ }),
+        within(debits).queryByRole('columnheader', { name: 'Situação' }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(debits).getByRole('columnheader', { name: /^Onde . Meio/ }),
       ).toBeInTheDocument();
       // By due date at first, one without a date last.
       expect(tableRows(debits)).toEqual(['Conta de luz', 'Compras da semana']);
@@ -1894,7 +1897,7 @@ describe('TransactionsPage', () => {
       expect(amount).toHaveAttribute('aria-sort', 'descending');
       expect(tableRows(debits)).toEqual(['Compras da semana', 'Conta de luz']);
       expect(within(debits).getByRole('row', { name: /Conta de luz/ })).toHaveTextContent(
-        /10\/10\/2026.*Energia.*Vencido.*R\$.159,90/,
+        /10\/10\/2026.*Vencido.*Conta de luz.*Energia.*R\$.159,90/,
       );
       expect(window.localStorage.getItem('financas:visao:lancamentos')).toBe('TABLE');
     });
