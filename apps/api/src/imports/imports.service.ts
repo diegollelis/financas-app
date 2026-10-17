@@ -71,6 +71,7 @@ export class ImportsService {
               period: transaction.period,
               dueDate: transaction.dueDate ? toDate(transaction.dueDate) : null,
               settledAt: transaction.settledAt ? toDate(transaction.settledAt) : null,
+              occurredOn: transaction.occurredOn ? toDate(transaction.occurredOn) : null,
               paymentMethod: transaction.paymentMethod ?? null,
               merchantId: transaction.merchantName
                 ? (merchantIds.get(normalizeName(transaction.merchantName)) ?? null)

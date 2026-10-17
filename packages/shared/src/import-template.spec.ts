@@ -44,6 +44,7 @@ describe('parseTemplateRows', () => {
         paymentMethod: null,
         amountCents: 64_035,
         period: '2026-09',
+        occurredOn: null,
         dueDate: '2026-09-10',
         settledAt: '2026-09-10',
       },
@@ -101,6 +102,7 @@ describe('parseTemplateRows', () => {
       paymentMethod: 'BOLETO',
       amountCents: 150_000,
       period: '2026-09',
+      occurredOn: '2026-09-05',
       dueDate: '2026-09-10',
       settledAt: '2026-09-10',
     });
@@ -190,6 +192,7 @@ describe('parseTemplateRows', () => {
         // The zero stays, to be corrected; the unreadable date comes empty.
         amountCents: 0,
         period: '2026-09',
+        occurredOn: null,
         dueDate: null,
         settledAt: '2026-09-10',
       },
@@ -201,6 +204,7 @@ describe('parseTemplateRows', () => {
     [{ Categoria: null }, 'Informe a categoria.'],
     [{ Valor: 'quinze reais' }, 'Valor inválido: use números, como 1.500,00.'],
     [{ Vencimento: '31/02/2026' }, 'Vencimento inválido: use dd/mm/aaaa.'],
+    [{ Data: '2026/08/28' }, 'Data inválida: use dd/mm/aaaa.'],
     [
       { 'Pago ou recebido em': 'ontem' },
       'Data de pagamento ou recebimento inválida: use dd/mm/aaaa.',
@@ -280,6 +284,27 @@ describe('the merchant column (ADR 0053)', () => {
     expect(withMerchant.rows[0]?.merchantName).toBe('Mercado Bom Preço');
     expect(without.issues).toEqual([]);
     expect(without.rows[0]?.merchantName).toBe('');
+  });
+
+  it('reads the day of the purchase, which keeps the month, and a spreadsheet without it', () => {
+    const withDay = parseTemplateRows([
+      header,
+      row({ Data: day('2026-08-28') }),
+      row({ Data: '28/8/2026' }),
+    ]);
+    const before = header.filter((title) => title !== 'Data');
+    const without = parseTemplateRows([
+      before,
+      before.map((title) => row()[header.indexOf(title)] ?? null),
+    ]);
+
+    expect(withDay.issues).toEqual([]);
+    expect(withDay.rows.map(({ occurredOn, period }) => [occurredOn, period])).toEqual([
+      ['2026-08-28', '2026-09'],
+      ['2026-08-28', '2026-09'],
+    ]);
+    expect(without.issues).toEqual([]);
+    expect(without.rows[0]?.occurredOn).toBeNull();
   });
 
   it('leaves out a row whose merchant name is too long', () => {

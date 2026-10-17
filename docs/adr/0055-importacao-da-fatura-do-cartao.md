@@ -94,3 +94,9 @@ O arquivo de exemplo é uma fatura real do dono. Como o repositório é público
   5. Tela: os apelidos em Estabelecimentos e no seletor; a parcela inicial no "Parcelado".
   6. API: a importação aceita parcelamentos, apelidos e a data, na mesma escrita.
   7. Tela: o leitor do CSV do Nubank e a revisão, com as regras acima.
+
+## Nota (a data da compra na API, 2026-10-17)
+
+- **`transactions.occurred_on`** (só o dia, opcional) entra nas rotas de lançamentos, na importação e na exportação de dados. Lançamentos antigos, meses de recorrência e parcelas ficam sem data.
+- **A planilha modelo ganha a coluna "Data",** entre "Valor" e "Vencimento", lida como o vencimento (dd/mm/aaaa ou uma célula de data). Uma planilha sem a coluna é lida como antes.
+- **As partes de uma divisão** ganham a mesma data do lançamento dividido e a acompanham numa mudança, como o vencimento ([ADR 0052](0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)).

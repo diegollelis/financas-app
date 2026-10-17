@@ -41,6 +41,8 @@ export const transactionFieldsSchema = z.object({
   period: periodSchema,
   dueDate: isoDateSchema.nullable().optional(),
   settledAt: isoDateSchema.nullable().optional(),
+  /** The day it happened, the purchase's (ADR 0055); it never changes the period. */
+  occurredOn: isoDateSchema.nullable().optional(),
   personId: z.uuid().nullable().optional(),
   /** Where it was bought or who paid it (ADR 0053). */
   merchantId: z.uuid().nullable().optional(),
@@ -121,6 +123,8 @@ export const transactionSchema = z.object({
   period: periodSchema,
   dueDate: isoDateSchema.nullable(),
   settledAt: isoDateSchema.nullable(),
+  /** The day it happened (ADR 0055); null when not given. */
+  occurredOn: isoDateSchema.nullable().default(null),
   /** The recurrence that generated it (ADR 0038); null for one launched by hand. */
   recurrenceId: z.uuid().nullable().default(null),
   /** That recurrence's interval in months, 1 or 12 (ADR 0038 note); null like recurrenceId. */

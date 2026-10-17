@@ -15,7 +15,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
 import { optionalDate, toIsoDate } from './dates.js';
-import { followDescription, followDueDate } from './share-description.js';
+import { followDescription, followShares } from './share-description.js';
 
 /** Every read brings what generated the transaction, if anything: a recurrence or a plan (ADR 0038). */
 export const withOrigin = {
@@ -37,6 +37,7 @@ export function toTransactionResponse(transaction: TransactionRow): Transaction 
     period: transaction.period,
     dueDate: transaction.dueDate && toIsoDate(transaction.dueDate),
     settledAt: transaction.settledAt && toIsoDate(transaction.settledAt),
+    occurredOn: transaction.occurredOn && toIsoDate(transaction.occurredOn),
     recurrenceId: transaction.occurrence?.recurrenceId ?? null,
     recurrenceIntervalMonths: transaction.occurrence?.recurrence.intervalMonths ?? null,
     amountEstimated: transaction.amountEstimated,
@@ -104,6 +105,7 @@ export class TransactionsService {
         period: input.period,
         dueDate: optionalDate(input.dueDate) ?? null,
         settledAt: optionalDate(input.settledAt) ?? null,
+        occurredOn: optionalDate(input.occurredOn) ?? null,
         personId: input.personId ?? null,
         merchantId: input.merchantId ?? null,
         paymentMethod: input.paymentMethod ?? null,
@@ -132,8 +134,9 @@ export class TransactionsService {
       categoryId,
       amountCents: share.amountCents,
       period: input.period,
-      // Due with the transaction it shares (ADR 0052 note).
+      // Due with the transaction it shares (ADR 0052 note), and of the same day (ADR 0055).
       dueDate: optionalDate(input.dueDate) ?? null,
+      occurredOn: optionalDate(input.occurredOn) ?? null,
       personId: people[index]!.id,
     }));
   }
@@ -168,6 +171,7 @@ export class TransactionsService {
           period: input.period,
           dueDate: optionalDate(input.dueDate),
           settledAt: optionalDate(input.settledAt),
+          occurredOn: optionalDate(input.occurredOn),
           personId: input.personId,
           merchantId: input.merchantId,
           paymentMethod: input.paymentMethod,
@@ -201,12 +205,14 @@ export class TransactionsService {
           shareDescription(input.description, installment),
         );
       }
-      // And its due date (ADR 0052 note).
-      if (
-        input.dueDate !== undefined &&
-        transaction.dueDate?.getTime() !== current.dueDate?.getTime()
-      ) {
-        await followDueDate(this.prisma, workspaceId, transactionId, transaction.dueDate);
+      // And its due date (ADR 0052 note) and its day (ADR 0055).
+      const changed = (field: 'dueDate' | 'occurredOn') =>
+        input[field] !== undefined && transaction[field]?.getTime() !== current[field]?.getTime();
+      if (changed('dueDate') || changed('occurredOn')) {
+        await followShares(this.prisma, workspaceId, transactionId, {
+          dueDate: changed('dueDate') ? transaction.dueDate : undefined,
+          occurredOn: changed('occurredOn') ? transaction.occurredOn : undefined,
+        });
       }
       return toTransactionResponse(transaction);
     } catch (error) {

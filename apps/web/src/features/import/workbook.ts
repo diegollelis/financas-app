@@ -55,7 +55,7 @@ async function templateFile(categories: Category[]) {
     {
       sheet: TEMPLATE_SHEET,
       data: [TEMPLATE_HEADERS.map(bold), [...TEMPLATE_EXAMPLE]],
-      columns: [12, 10, 36, 22, 22, 18, 14, 14, 14, 40].map((width) => ({ width })),
+      columns: [12, 10, 36, 22, 22, 18, 14, 12, 14, 14, 40].map((width) => ({ width })),
       stickyRowsCount: 1,
     },
     {

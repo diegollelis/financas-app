@@ -29,6 +29,8 @@ export type ReviewRow = {
   categoryId: string | null;
   amountCents: number | null;
   period: string | null;
+  /** The day it happened (ADR 0055); null when none. */
+  occurredOn: string | null;
   dueDate: string | null;
   settledAt: string | null;
   /** Warnings of the report (installment in the text, personal data...). */
@@ -115,6 +117,7 @@ export function toTransaction(
     period: row.period,
     dueDate: row.dueDate,
     settledAt: row.settledAt,
+    occurredOn: row.occurredOn,
     // Only when there is one, as a new transaction in the form (ADR 0054).
     ...(row.paymentMethod && { paymentMethod: row.paymentMethod }),
   });

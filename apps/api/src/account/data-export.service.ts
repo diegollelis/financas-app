@@ -184,6 +184,7 @@ export class DataExportService {
         period: transaction.period,
         dueDate: dayOrNull(transaction.dueDate),
         settledAt: dayOrNull(transaction.settledAt),
+        occurredOn: dayOrNull(transaction.occurredOn),
         recurrenceId: transaction.occurrence?.recurrenceId ?? null,
         installmentPlanId: transaction.installmentPlanId,
         installmentNumber: transaction.installmentNumber,
