@@ -31,7 +31,7 @@ import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate, toIsoDate } from '../transactions/dates.js';
-import { followDescription } from '../transactions/share-description.js';
+import { followDescription, followDueDate } from '../transactions/share-description.js';
 
 type RecurrenceWithShares = RecurrenceRow & { shares: RecurrenceShareRow[] };
 
@@ -264,6 +264,9 @@ export class RecurrencesService {
     for (const transaction of pending) {
       // A variable one whose real amount was already given keeps it: only estimates follow.
       const keepsAmount = recurrence.variableAmount && !transaction.amountEstimated;
+      const dueDate = dueChanged
+        ? dueDateFor(transaction.period, recurrence.dueDay, recurrence.dueMonthOffset)
+        : undefined;
       await db.transaction.update({
         where: { id: transaction.id, workspaceId },
         data: {
@@ -277,11 +280,13 @@ export class RecurrencesService {
           // Turned fixed: what was an estimate becomes the amount.
           amountEstimated: input.variableAmount === false ? false : undefined,
           // Only when the day or its month changed: each month has its own date.
-          dueDate: dueChanged
-            ? dueDateFor(transaction.period, recurrence.dueDay, recurrence.dueMonthOffset)
-            : undefined,
+          dueDate,
         },
       });
+      // Its pending shares fall due with it (ADR 0052 note).
+      if (dueDate !== undefined) {
+        await followDueDate(this.prisma, workspaceId, transaction.id, dueDate);
+      }
       // Its pending shares take the new name (ADR 0052 note).
       if (input.description !== undefined) {
         await followDescription(
@@ -442,6 +447,8 @@ export class RecurrencesService {
                     categoryId: shareCategory,
                     amountCents: shareCents(amountCents, share),
                     period,
+                    // Due with the month it shares (ADR 0052 note).
+                    dueDate: dueDateFor(period, recurrence.dueDay, recurrence.dueMonthOffset),
                     personId: share.personId,
                   })),
                 },

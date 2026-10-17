@@ -706,6 +706,23 @@ describe('recurrences', () => {
       expect((await sharesIn(transactionsOf, month(1)))[0]?.description).toBe('Conta de energia');
     });
 
+    it('makes each month share due with it, and moves the pending ones from this month on (ADR 0052 note)', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const recurrence = await create(
+        energy({ startPeriod: month(-1), split: [{ newPersonName: 'Ana', basisPoints: 5_000 }] }),
+      );
+      const dueOfShare = async (period: string) =>
+        (await transactionsOf(period)).find((t) => t.splitOfId !== null)?.dueDate;
+      expect(await dueOfShare(month(1))).toBe(`${month(1)}-10`);
+
+      await browser.patch(`${base}/recurrences/${recurrence.id}`).send({ dueDay: 25 }).expect(200);
+
+      // Last month is history; this month and the next follow.
+      expect(await dueOfShare(month(-1))).toBe(`${month(-1)}-10`);
+      expect(await dueOfShare(thisMonth)).toBe(`${thisMonth}-25`);
+      expect(await dueOfShare(month(1))).toBe(`${month(1)}-25`);
+    });
+
     it('ends it with the shares still pending of the months removed', async () => {
       const { create, energy, transactionsOf, base, browser } = await setUp();
       const recurrence = await create(

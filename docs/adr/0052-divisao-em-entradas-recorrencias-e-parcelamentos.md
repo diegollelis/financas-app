@@ -120,3 +120,12 @@ A divisão encontrava Reembolso e Repasse **pelo nome**: arquivada, a categoria 
 - **A migração marca as que existem,** achadas pelo nome como a divisão fazia (a mais antiga de cada espaço, ignorando maiúsculas), e as reativa, se estavam arquivadas.
 - **A divisão acha a categoria pela marca.** Num espaço sem ela (que excluiu ou renomeou a sua antes da marca), a de nome "Reembolso" (ou "Repasse") é marcada; sem nenhuma, uma nova é criada, marcada. Uma renomeada antes da marca continua como categoria comum.
 - **As rotas de categorias recusam renomear, arquivar e excluir** as duas (409 `CATEGORY_OF_SPLIT`), e a cópia entre espaços ([ADR 0048](0048-copiar-categorias-entre-espacos.md)) não as copia: cada espaço tem as suas. A lista devolve `splitRole`, e a tela mostra o selo "Divisão" no lugar do menu, como o "Meta" das categorias de metas.
+
+## Nota (o vencimento das partes, 2026-10-17)
+
+As partes nasciam **sem vencimento**: copiavam a descrição, o valor e a competência, mas não a data. O reembolso aparecia sem data e nunca ficava "Vencido", mesmo com a conta já vencida.
+
+- **A parte vence com o que foi dividido:** o lançamento, o mês da recorrência ou a parcela. Os três lugares que criam partes copiam o vencimento.
+- **E acompanha a mudança, como a descrição:** mudar o vencimento de um lançamento dividido, o "Vence dia" (ou "Vence no") de uma recorrência (nos meses pendentes deste mês em diante) ou o de um parcelamento (nas parcelas pendentes) move também as **partes pendentes**. Uma parte já paga ou recebida fica como está (`followDueDate`, ao lado de `followDescription`).
+- **As partes pendentes já gravadas** ganham, pela migração, o vencimento da origem quando estão sem data. As pagas ou recebidas não mudam.
+- **O vencimento da própria parte** ainda pode ser editado à mão, como o de qualquer lançamento; a próxima mudança da origem o substitui.

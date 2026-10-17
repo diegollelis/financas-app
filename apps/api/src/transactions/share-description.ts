@@ -16,3 +16,19 @@ export async function followDescription(
     data: { description },
   });
 }
+
+/**
+ * The pending shares take its new due date too (ADR 0052 note), from the same changes: what
+ * the others owe falls due with the transaction they share.
+ */
+export async function followDueDate(
+  prisma: PrismaService,
+  workspaceId: string,
+  splitOfId: string,
+  dueDate: Date | null,
+): Promise<void> {
+  await prisma.forWorkspace(workspaceId).transaction.updateMany({
+    where: { workspaceId, splitOfId, settledAt: null },
+    data: { dueDate },
+  });
+}

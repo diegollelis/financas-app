@@ -451,6 +451,25 @@ describe('installments', () => {
       expect(await shareOf(2)).toBe('Geladeira nova (3/3)');
     });
 
+    it('makes each share due with its installment, and moves the pending ones (ADR 0052 note)', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const plan = await create(fridge({ split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }));
+      const shareOf = async (offset: number) =>
+        (await transactionsOf(month(offset))).find((t) => t.splitOfId !== null)!;
+      expect((await shareOf(1)).dueDate).toBe(`${month(1)}-15`);
+      const paid = await shareOf(0);
+      await browser
+        .patch(`${base}/transactions/${paid.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      await browser.patch(`${base}/installments/${plan.id}`).send({ dueDay: 20 }).expect(200);
+
+      expect((await shareOf(0)).dueDate).toBe(`${thisMonth}-15`);
+      expect((await shareOf(1)).dueDate).toBe(`${month(1)}-20`);
+      expect((await shareOf(2)).dueDate).toBe(`${month(2)}-20`);
+    });
+
     it('ends it with the shares still pending of the installments removed', async () => {
       const { create, fridge, transactionsOf, base, browser } = await setUp();
       const plan = await create(

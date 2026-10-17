@@ -15,7 +15,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
 import { optionalDate, toIsoDate } from './dates.js';
-import { followDescription } from './share-description.js';
+import { followDescription, followDueDate } from './share-description.js';
 
 /** Every read brings what generated the transaction, if anything: a recurrence or a plan (ADR 0038). */
 export const withOrigin = {
@@ -132,6 +132,8 @@ export class TransactionsService {
       categoryId,
       amountCents: share.amountCents,
       period: input.period,
+      // Due with the transaction it shares (ADR 0052 note).
+      dueDate: optionalDate(input.dueDate) ?? null,
       personId: people[index]!.id,
     }));
   }
@@ -198,6 +200,13 @@ export class TransactionsService {
           transactionId,
           shareDescription(input.description, installment),
         );
+      }
+      // And its due date (ADR 0052 note).
+      if (
+        input.dueDate !== undefined &&
+        transaction.dueDate?.getTime() !== current.dueDate?.getTime()
+      ) {
+        await followDueDate(this.prisma, workspaceId, transactionId, transaction.dueDate);
       }
       return toTransactionResponse(transaction);
     } catch (error) {
