@@ -38,7 +38,7 @@ import {
   useMerchants,
   useUpdateMerchant,
 } from '@/features/merchants/use-merchants';
-import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
+import { TILE_LIST, TILE_ROW } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -201,7 +201,7 @@ function MerchantItem({
     );
 
   return (
-    <li className="flex min-h-14 items-center justify-between gap-3 py-1.5">
+    <li className={TILE_ROW}>
       <span className="min-w-0 break-words">{name}</span>
       {canEdit && (
         <>
@@ -291,7 +291,7 @@ function MerchantList({
   canEdit: boolean;
 }) {
   return (
-    <ul className={DIVIDED_LIST}>
+    <ul className={TILE_LIST}>
       {merchants.map((merchant) => (
         <MerchantItem
           key={merchant.id}

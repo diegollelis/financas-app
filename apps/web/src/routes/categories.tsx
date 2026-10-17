@@ -43,7 +43,7 @@ import {
   useDeleteCategory,
   useUpdateCategory,
 } from '@/features/categories/use-categories';
-import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
+import { TILE_LIST, TILE_ROW } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { useWorkspaces } from '@/features/workspaces/use-workspaces';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -212,7 +212,7 @@ function CategoryItem({
     );
 
   return (
-    <li className="flex min-h-14 items-center justify-between gap-3 py-1.5">
+    <li className={TILE_ROW}>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 break-words">
         {name}
         {category.destinationId && <Badge variant="secondary">Meta</Badge>}
@@ -313,7 +313,7 @@ function CategoryList({
   canEdit: boolean;
 }) {
   return (
-    <ul className={DIVIDED_LIST}>
+    <ul className={TILE_LIST}>
       {categories.map((category) => (
         <CategoryItem
           key={category.id}
