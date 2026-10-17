@@ -561,13 +561,13 @@ describe('people and splits', () => {
       expect(await transactions(browser, base)).toEqual([]);
     });
 
-    it('brings Reembolso back when it was archived or deleted', async () => {
+    it('keeps Reembolso: it is never archived, and the shares go to it (ADR 0052 note)', async () => {
       const { browser, base, category } = await setup();
       const reembolso = category('Reembolso', 'CREDIT');
       await browser
         .patch(`${base}/categories/${reembolso.id}`)
         .send({ archived: true })
-        .expect(200);
+        .expect(409);
       const split = (description: string) =>
         browser
           .post(`${base}/transactions`)
@@ -582,10 +582,8 @@ describe('people and splits', () => {
           .expect(201);
 
       await split('Cinema');
-      const reactivated = categoryListResponseSchema
-        .parse((await browser.get(`${base}/categories`).expect(200)).body)
-        .find((c) => c.id === reembolso.id)!;
-      expect(reactivated.archived).toBe(false);
+      const shares = (await transactions(browser, base)).filter((t) => t.splitOfId !== null);
+      expect(shares.map((share) => share.categoryId)).toEqual([reembolso.id]);
     });
 
     it('deletes the debit alone, or with its shares when asked', async () => {
@@ -656,11 +654,17 @@ describe('people and splits', () => {
       expect((await people(browser, base))[0]).toMatchObject({ payableCents: 50_000 });
     });
 
-    it('creates Repasse again when it was deleted', async () => {
+    it('creates Repasse again, marked, in a workspace that deleted it before the mark', async () => {
       const { browser, base, category } = await setup();
       const repasse = category('Repasse', 'DEBIT');
-      await browser.patch(`${base}/categories/${repasse.id}`).send({ archived: true }).expect(200);
-      await browser.delete(`${base}/categories/${repasse.id}`).expect(204);
+      // The routes refuse it now; a workspace from before could have done it.
+      await browser.delete(`${base}/categories/${repasse.id}`).expect(409);
+      const owner = ownerClient();
+      try {
+        await owner.category.delete({ where: { id: repasse.id } });
+      } finally {
+        await owner.$disconnect();
+      }
 
       await browser
         .post(`${base}/transactions`)
@@ -678,7 +682,7 @@ describe('people and splits', () => {
         .parse((await browser.get(`${base}/categories`).expect(200)).body)
         .filter((c) => c.name === 'Repasse' && c.type === 'DEBIT');
       expect(recreated).toHaveLength(1);
-      expect(recreated[0]).toMatchObject({ archived: false });
+      expect(recreated[0]).toMatchObject({ archived: false, splitRole: 'PASS_THROUGH' });
     });
   });
 });

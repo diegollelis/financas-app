@@ -32,6 +32,7 @@ function toResponse(
     archived: category.archivedAt !== null,
     recentUses,
     destinationId,
+    splitRole: category.splitRole,
     ...(inUse !== undefined && { inUse }),
   };
 }
@@ -44,6 +45,13 @@ const ownedByDestination = () =>
   new ConflictException({
     code: 'CATEGORY_OF_DESTINATION',
     message: 'Esta categoria é de uma meta: renomeie, arquive ou exclua pela meta, no orçamento.',
+  });
+
+const ofSplit = () =>
+  new ConflictException({
+    code: 'CATEGORY_OF_SPLIT',
+    message:
+      'Esta categoria recebe as partes das divisões entre pessoas: ela não é renomeada, arquivada nem excluída.',
   });
 
 const categoryExists = () =>
@@ -247,6 +255,8 @@ export class CategoriesService {
           id: { in: [...requested] },
           archivedAt: null,
           destination: { is: null },
+          // Every workspace has its own Reembolso and Repasse (ADR 0052 note).
+          splitRole: null,
         },
         select: { name: true, type: true },
       }),
@@ -277,6 +287,7 @@ export class CategoriesService {
     input: UpdateCategoryInput,
   ): Promise<Category> {
     const current = await this.find(workspaceId, categoryId);
+    if (current.splitRole) throw ofSplit();
     await this.ensureNotOwnedByDestination(workspaceId, categoryId);
     if (input.name !== undefined) {
       await this.ensureNameIsFree(workspaceId, current.type, input.name, categoryId);
@@ -305,7 +316,8 @@ export class CategoriesService {
    * (ADR 0029) refuses the delete, which becomes a 409.
    */
   async remove(workspaceId: string, categoryId: string): Promise<void> {
-    if (!z.uuid().safeParse(categoryId).success) throw new NotFoundException();
+    const current = await this.find(workspaceId, categoryId);
+    if (current.splitRole) throw ofSplit();
     await this.ensureNotOwnedByDestination(workspaceId, categoryId);
     try {
       const { count } = await this.prisma

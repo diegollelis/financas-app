@@ -170,6 +170,7 @@ export class DataExportService {
         name: category.name,
         type: category.type,
         archivedAt: isoOrNull(category.archivedAt),
+        splitRole: category.splitRole,
         createdAt: iso(category.createdAt),
       })),
       transactions: transactions.map((transaction) => ({

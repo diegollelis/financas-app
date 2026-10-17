@@ -6,6 +6,15 @@ export const CATEGORY_NAME_MAX_LENGTH = 50;
 /** Money in (CREDIT) or out (DEBIT). Categories and, later, transactions have one (ADR 0010). */
 export const transactionTypeSchema = z.enum(['CREDIT', 'DEBIT']);
 
+/**
+ * The two categories of the shares of a split (ADR 0052 note): Reembolso (credits, the shares of
+ * a debit) and Repasse (debits, the shares of a credit). Found by this mark, never by the name,
+ * and never renamed, archived or deleted.
+ */
+export const splitRoleSchema = z.enum(['REIMBURSEMENT', 'PASS_THROUGH']);
+
+export type SplitRole = z.infer<typeof splitRoleSchema>;
+
 export type TransactionType = z.infer<typeof transactionTypeSchema>;
 
 const categoryNameSchema = z
@@ -52,6 +61,8 @@ export const categorySchema = z.object({
    * deleted with the destination, and a transaction in it is an application.
    */
   destinationId: z.uuid().nullable().optional(),
+  /** Reembolso or Repasse, the categories of the shares of a split (ADR 0052 note); fixed. */
+  splitRole: splitRoleSchema.nullable().optional(),
   /**
    * Whether anything uses it, in any competência: transactions, recurrences or installment plans.
    * Only one never used can be deleted. Sent by the list only.
