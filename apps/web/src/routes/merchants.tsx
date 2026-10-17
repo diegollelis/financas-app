@@ -38,6 +38,7 @@ import {
   useMerchants,
   useUpdateMerchant,
 } from '@/features/merchants/use-merchants';
+import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -290,7 +291,7 @@ function MerchantList({
   canEdit: boolean;
 }) {
   return (
-    <ul className="divide-y rounded-xl border px-4">
+    <ul className={DIVIDED_LIST}>
       {merchants.map((merchant) => (
         <MerchantItem
           key={merchant.id}

@@ -47,6 +47,7 @@ import {
 } from '@/features/people/use-people';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { useUpdateTransaction } from '@/features/transactions/use-transactions';
+import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 
@@ -504,7 +505,7 @@ export function PeoplePage() {
               ao lançar.
             </p>
           ) : (
-            <ul className="divide-y rounded-xl border px-4">{active.map(row)}</ul>
+            <ul className={DIVIDED_LIST}>{active.map(row)}</ul>
           )}
         </section>
       )}
@@ -513,7 +514,7 @@ export function PeoplePage() {
           <h2 id="people-archived" className="text-muted-foreground font-medium">
             Arquivadas
           </h2>
-          <ul className="divide-y rounded-xl border px-4">{archived.map(row)}</ul>
+          <ul className={DIVIDED_LIST}>{archived.map(row)}</ul>
         </section>
       )}
       <PersonHistory

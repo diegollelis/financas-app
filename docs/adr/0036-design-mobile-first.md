@@ -204,3 +204,9 @@ Comparadas numa prévia com divisórias (como antes) e com linhas separadas em b
 - **Faixas no lugar das divisórias:** uma linha com fundo suave e a seguinte sem, e um fundo mais forte ao passar o mouse, para seguir uma linha larga até o "Pagar". Os fundos vêm de tokens que já existem com opacidade (`muted` no claro, `secondary` no escuro, onde `muted` é igual ao cartão), sem cor nova. A tabela fica sobre o fundo do cartão.
 - **Sem a coluna "Situação":** desde a nota anterior ela ficava quase sempre vazia; o "Vencido" ou o "Pago em / Recebido em" vai embaixo da data, na coluna Vencimento. Os ~140 px liberados vão para a descrição e para a coluna do estabelecimento.
 - **"Onde / Meio"** no lugar de "Estabelecimento / Meio", que quebrava em duas linhas. Sem estabelecimento, a coluna mostra só o meio, em texto suave (o título já diz o que ele é); o "—" fica para quando não há nenhum dos dois. Isso substitui o traço sempre presente da nota de 2026-10-15 no ADR 0054.
+
+## Nota (o mesmo padrão nas outras listas, 2026-10-17)
+
+- **Recorrências e a revisão da importação** passam a usar um cartão por item, como Lançamentos: são linhas com várias informações, um valor e ações. As tabelas de Recorrências ganham as faixas. Na revisão da importação, o cartão tem 8 px de margem lateral no celular, porque a caixa de marcação já tem a sua área de toque de 44 px.
+- **As listas de nomes curtos** (Pessoas, Estabelecimentos, Categorias, Membros e convites, Importações anteriores, Aparelhos conectados) continuam com divisórias, num cartão só, agora sobre o fundo do cartão, como as demais. Um cartão por item deixaria Categorias, com mais de 30 itens, bem mais longa sem ganho de leitura.
+- As classes ficam num módulo só (`features/view-mode/row-styles.ts`: `CARD_LIST`, `CARD_ROW`, `TABLE_BOX`, `STRIPED_ROW`, `DIVIDED_LIST`), para as telas não divergirem.
