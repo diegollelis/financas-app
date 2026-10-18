@@ -1803,6 +1803,37 @@ describe('TransactionsPage', () => {
     ).toBe(false);
   });
 
+  it('finds a merchant by its alias in the picker, saying which (ADR 0055)', async () => {
+    mockTransactions({
+      [`GET /api/workspaces/${houseId}/merchants`]: {
+        body: [
+          {
+            id: '01920000-0000-7000-8000-000000000603',
+            name: 'Pizzaria Exemplo',
+            archived: false,
+            inUse: false,
+            aliases: [{ id: '01920000-0000-7000-8000-000000000701', alias: 'Ifd*Pizzaria' }],
+          },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    await userEvent.click(
+      within(form).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+    );
+    await userEvent.type(
+      await screen.findByPlaceholderText('Buscar ou adicionar estabelecimento'),
+      'ifd',
+    );
+
+    expect(await screen.findByRole('option', { name: /Pizzaria Exemplo/ })).toHaveTextContent(
+      'Pizzaria ExemploIfd*Pizzaria',
+    );
+  });
+
   it('names a new merchant on a new transaction, creating it first', async () => {
     const mercado = {
       id: '01920000-0000-7000-8000-000000000601',

@@ -42,7 +42,18 @@ export function MerchantSelect({
       aria={aria}
       list={(autoFocus) => (
         <NameList
-          groups={[{ items: merchants.filter((merchant) => !merchant.archived) }]}
+          // Found by its aliases too (ADR 0055).
+          groups={[
+            {
+              items: merchants
+                .filter((merchant) => !merchant.archived)
+                .map(({ id, name, aliases }) => ({
+                  id,
+                  name,
+                  aliases: aliases.map((item) => item.alias),
+                })),
+            },
+          ]}
           knownNames={merchants.map((merchant) => merchant.name)}
           isPicked={(name) => sameName(name, value)}
           onPick={pick}

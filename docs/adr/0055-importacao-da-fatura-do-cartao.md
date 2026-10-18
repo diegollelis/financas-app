@@ -135,3 +135,9 @@ A decisão de criar as parcelas sem data foi revista: uma compra parcelada acont
 
 - **Editar um mês de recorrência** (Todo mês ou Todo ano) não oferece a "Data da compra" / "Data": cada mês é uma cobrança nova, e quem diz o dia é o vencimento.
 - **A exceção é o mês que já tem uma data,** como o primeiro mês que veio de "Tornar recorrente", que mantém a do lançamento avulso. Ele mostra o campo enquanto tiver a data, para corrigi-la ou apagá-la; apagada, o campo some.
+
+## Nota (os apelidos na tela, 2026-10-18)
+
+- **Na lista de Estabelecimentos, só a contagem:** "2 apelidos" ao lado do nome. Na prévia, mostrar "Também aparece como: …" embaixo do nome foi descartado, porque deixava os cartões com alturas diferentes; a contagem mantém os cartões iguais.
+- **"Apelidos", no menu ⋯** de um estabelecimento ativo (entre "Renomear" e "Arquivar"), abre um diálogo que lista os apelidos, cada um com "Remover", e tem o campo "Novo apelido". Um apelido de outro estabelecimento mostra o nome dele na recusa.
+- **A busca da página e o seletor do lançamento** encontram também pelo apelido. No seletor, quando foi o apelido que bateu, ele aparece embaixo do nome.

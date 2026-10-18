@@ -48,6 +48,29 @@ export function useDeleteMerchant(workspaceId: string) {
   });
 }
 
+/** Adds an alias, a text the merchant appears as in a card statement (ADR 0055). */
+export function useAddMerchantAlias(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ merchantId, alias }: { merchantId: string; alias: string }) =>
+      apiPost(
+        `/api/workspaces/${workspaceId}/merchants/${merchantId}/aliases`,
+        { alias },
+        merchantSchema,
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: merchantsKey(workspaceId) }),
+  });
+}
+
+export function useRemoveMerchantAlias(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ merchantId, aliasId }: { merchantId: string; aliasId: string }) =>
+      apiDelete(`/api/workspaces/${workspaceId}/merchants/${merchantId}/aliases/${aliasId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: merchantsKey(workspaceId) }),
+  });
+}
+
 /** The merchant of that name, ignoring case and accents, as the API does; undefined if none. */
 export function findMerchant(merchants: Merchant[], name: string): Merchant | undefined {
   const wanted = normalizeName(name);
