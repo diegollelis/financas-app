@@ -115,3 +115,11 @@ O arquivo de exemplo é uma fatura real do dono. Como o repositório é público
 - **Parcela inicial:** `installment_plans.first_number` (1 por padrão, com CHECK de 1 até o número de parcelas). Com 3 de 10, o parcelamento cria só as parcelas 3 a 10, cada lançamento com o seu número de verdade, e as partes de uma divisão dizem "(3/10)".
 - **O valor de um parcelamento em andamento** é o das parcelas criadas: "da parcela" é cada uma delas, e "total" é a soma delas (o que falta pagar), não o da compra inteira. É o que a fatura mostra e o que a pessoa sabe; o total da compra inteira incluiria parcelas que o app não tem.
 - **Mudar a parcela inicial** refaz as parcelas, como mudar os valores, e só enquanto nenhuma foi paga e o parcelamento não é dividido.
+
+## Nota (a data da compra no parcelamento, 2026-10-18)
+
+A decisão de criar as parcelas sem data foi revista: uma compra parcelada aconteceu num dia de verdade, o mesmo para todas as parcelas, e é esse dia que a fatura mostra ao lado de "Parcela 3/10". A recorrência continua sem data, porque cada mês dela é uma cobrança nova.
+
+- **O parcelamento guarda a data da compra** (`installment_plans.occurred_on`, opcional), e cada parcela e cada parte de uma divisão a recebem ao serem criadas.
+- **Mudar a data** no parcelamento chega às parcelas pendentes e às partes pendentes delas; as pagas ficam como estão, como as outras mudanças do parcelamento.
+- **Na tela,** o "Parcelado" volta a mostrar a "Data da compra" (no PR da tela do parcelamento). A exportação de dados leva a data.

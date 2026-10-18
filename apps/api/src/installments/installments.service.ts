@@ -25,8 +25,12 @@ import type { Prisma, InstallmentPlan as PlanRow } from '../generated/prisma/cli
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { toDate } from '../transactions/dates.js';
-import { followDescription, followDueDate } from '../transactions/share-description.js';
+import { optionalDate, toDate, toIsoDate } from '../transactions/dates.js';
+import {
+  followDescription,
+  followDueDate,
+  followShares,
+} from '../transactions/share-description.js';
 
 type Pending = { count: number; cents: number; lastPeriod: string | null };
 
@@ -47,6 +51,7 @@ function toResponse(
     totalCents: plan.totalCents,
     installments: plan.installments,
     firstNumber: plan.firstNumber,
+    occurredOn: plan.occurredOn && toIsoDate(plan.occurredOn),
     firstPeriod: plan.firstPeriod,
     dueDay: plan.dueDay,
     dueMonthOffset: plan.dueMonthOffset,
@@ -142,6 +147,8 @@ export class InstallmentsService {
     const personId = input.personId ?? null;
     const merchantId = input.merchantId ?? null;
     const paymentMethod = input.paymentMethod ?? null;
+    // The day of the purchase, the same on every installment and share (ADR 0055 note).
+    const occurredOn = optionalDate(input.occurredOn) ?? null;
     const sharesOf = input.split ? await this.shares(workspaceId, input, input.split) : () => [];
     const plan = await this.prisma.forWorkspace(workspaceId).installmentPlan.create({
       data: {
@@ -153,6 +160,7 @@ export class InstallmentsService {
         totalCents,
         installments: input.installments,
         firstNumber,
+        occurredOn,
         firstPeriod: input.firstPeriod,
         dueDay,
         dueMonthOffset,
@@ -176,8 +184,11 @@ export class InstallmentsService {
               amountCents,
               period,
               dueDate,
+              occurredOn,
               installmentNumber: firstNumber + index,
-              ...(input.split && { shares: { create: sharesOf(index, period, dueDate) } }),
+              ...(input.split && {
+                shares: { create: sharesOf(index, period, dueDate, occurredOn) },
+              }),
             };
           }),
         },
@@ -221,7 +232,7 @@ export class InstallmentsService {
         created,
       ),
     );
-    return (index: number, period: string, dueDate: Date | null) =>
+    return (index: number, period: string, dueDate: Date | null, occurredOn: Date | null) =>
       people.map((person, k) => ({
         workspaceId,
         type,
@@ -230,15 +241,16 @@ export class InstallmentsService {
         categoryId,
         amountCents: perInstallment[k]![index]!,
         period,
-        // Due with its installment (ADR 0052 note).
+        // Due with its installment (ADR 0052 note), and of the same day (ADR 0055 note).
         dueDate,
+        occurredOn,
         personId: person.id,
       }));
   }
 
   /**
    * Changes a running plan (ADR 0038 note). What it is (description, notes, category, person,
-   * merchant, payment method, due day) reaches the plan and its pending installments; settled
+   * merchant, payment method, due day, day of the purchase) reaches the plan and its pending installments; settled
    * ones are history. The amounts remake every installment, as if it had just been created, and
    * so only while none is settled and it is not split.
    */
@@ -287,6 +299,7 @@ export class InstallmentsService {
       personId: input.personId === undefined ? plan.personId : input.personId,
       merchantId: input.merchantId === undefined ? plan.merchantId : input.merchantId,
       paymentMethod: input.paymentMethod === undefined ? plan.paymentMethod : input.paymentMethod,
+      occurredOn: input.occurredOn === undefined ? plan.occurredOn : optionalDate(input.occurredOn),
     };
     const dueDateIn = (period: string) =>
       merged.dueDay === null
@@ -354,6 +367,7 @@ export class InstallmentsService {
                 amountCents,
                 period,
                 dueDate: dueDateIn(period),
+                occurredOn: merged.occurredOn,
                 installmentNumber: firstNumber + index,
               };
             }),
@@ -388,11 +402,17 @@ export class InstallmentsService {
           merchantId: input.merchantId,
           paymentMethod: input.paymentMethod,
           dueDate,
+          occurredOn: optionalDate(input.occurredOn),
         },
       });
-      // Its pending shares fall due with it (ADR 0052 note).
+      // Its pending shares fall due with it (ADR 0052 note) and take its day (ADR 0055 note).
       if (dueDate !== undefined) {
         await followDueDate(this.prisma, workspaceId, installment.id, dueDate);
+      }
+      if (input.occurredOn !== undefined) {
+        await followShares(this.prisma, workspaceId, installment.id, {
+          occurredOn: optionalDate(input.occurredOn),
+        });
       }
       // Its pending shares take the new name, with their installment (ADR 0052 note).
       if (input.description !== undefined && installment.installmentNumber !== null) {

@@ -446,6 +446,8 @@ model InstallmentPlan {
   // The number of the first installment created (ADR 0055): 3 for a purchase already at 3/10,
   // which gets installments 3 to 10. CHECK (1 to installments) in the migration.
   firstNumber    Int             @default(1) @map("first_number") @db.SmallInt
+  // The day of the purchase (ADR 0055 note), copied to every installment and share.
+  occurredOn     DateTime?       @map("occurred_on") @db.Date
   firstPeriod    String          @map("first_period") @db.Char(7)
   dueDay         Int?            @map("due_day") @db.SmallInt
   // Each installment due in its own month (0) or in the next one (1), ADR 0038 note.

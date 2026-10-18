@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { transactionTypeSchema } from './category.ts';
-import { amountCentsSchema, MAX_AMOUNT_CENTS, periodSchema } from './money-and-dates.ts';
+import {
+  amountCentsSchema,
+  isoDateSchema,
+  MAX_AMOUNT_CENTS,
+  periodSchema,
+} from './money-and-dates.ts';
 import { MAX_SPLIT_PEOPLE } from './person.ts';
 import { paymentMethodSchema } from './payment-method.ts';
 import { dueDaySchema, dueMonthOffsetSchema } from './recurrence.ts';
@@ -42,6 +47,8 @@ export const createInstallmentPlanInputSchema = z
     amountIs: installmentAmountIsSchema,
     /** The competência of the first installment created. */
     firstPeriod: periodSchema,
+    /** The day of the purchase (ADR 0055 note): copied to every installment. */
+    occurredOn: isoDateSchema.nullable().optional(),
     dueDay: dueDaySchema.nullable().optional(),
     /** Each installment due in its own month (0, the default) or in the next one (1). */
     dueMonthOffset: dueMonthOffsetSchema.optional(),
@@ -111,6 +118,8 @@ export const installmentPlanSchema = z.object({
   /** The number of its first installment (ADR 0055): 1, or 3 for one created at 3/10. */
   firstNumber: z.number().int().default(1),
   firstPeriod: periodSchema,
+  /** The day of the purchase (ADR 0055 note); null when not given. */
+  occurredOn: isoDateSchema.nullable().default(null),
   dueDay: z.number().int().nullable(),
   dueMonthOffset: z.number().int().default(0),
   personId: z.uuid().nullable().default(null),
@@ -169,6 +178,7 @@ export const updateInstallmentPlanInputSchema = z
     categoryId: z.uuid('Escolha uma categoria.'),
     dueDay: dueDaySchema.nullable(),
     dueMonthOffset: dueMonthOffsetSchema,
+    occurredOn: isoDateSchema.nullable(),
     personId: z.uuid().nullable(),
     merchantId: z.uuid().nullable(),
     paymentMethod: paymentMethodSchema.nullable(),

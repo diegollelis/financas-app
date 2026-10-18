@@ -168,7 +168,9 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] API: a data da compra nos lançamentos, na planilha modelo (coluna "Data") e na exportação
   - [x] Tela: a data no formulário, na linha e na tabela (coluna "Data" própria, escolhida na prévia)
   - [x] API: apelidos de estabelecimento e parcela inicial no parcelamento
-  - [ ] Tela: apelidos em Estabelecimentos e no seletor; parcela inicial no "Parcelado"
+  - [x] API: a data da compra no parcelamento, copiada para cada parcela e parte (nota no ADR)
+  - [ ] Tela: a parcela inicial e a data da compra no "Parcelado"
+  - [ ] Tela: apelidos em Estabelecimentos e no seletor
   - [ ] API: a importação aceita parcelamentos, apelidos e a data
   - [ ] Tela: o leitor do CSV do Nubank e a revisão
 - [x] As partes de uma divisão vencem com o que foi dividido (lançamento, mês da recorrência ou parcela) e acompanham a mudança do vencimento; as pendentes já gravadas ganham o da origem pela migração (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))

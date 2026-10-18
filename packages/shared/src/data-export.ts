@@ -129,6 +129,7 @@ const exportInstallmentPlanSchema = z.object({
   totalCents: z.number().int(),
   installments: z.number().int(),
   firstNumber: z.number().int(),
+  occurredOn: day.nullable(),
   firstPeriod: period,
   dueDay: z.number().int().nullable(),
   dueMonthOffset: z.number().int(),
