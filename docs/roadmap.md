@@ -173,7 +173,8 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Tela: a parcela inicial e a data da compra no "Parcelado"
   - [x] Tela: apelidos em Estabelecimentos e no seletor
   - [x] API: a importação aceita parcelamentos, apelidos e a data
-  - [ ] Tela: o leitor do CSV do Nubank e a revisão
+  - [x] O leitor do CSV do Nubank, sem tela (`parseNubankCsv` em `packages/shared`)
+  - [ ] Tela: a origem "Fatura do cartão Nubank", o vencimento e a revisão com as regras da fatura
 - [x] As partes de uma divisão vencem com o que foi dividido (lançamento, mês da recorrência ou parcela) e acompanham a mudança do vencimento; as pendentes já gravadas ganham o da origem pela migração (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
 - [x] Recorrências: uma encerrada mostra do primeiro ao último mês ("Janeiro a maio de 2026"), e não só "Até maio de 2026" (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
 - [ ] "Beleza" entre as categorias padrão de saída dos espaços novos (pedido em 2026-10-17; os espaços existentes continuam com as suas, como no "Bônus", nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
