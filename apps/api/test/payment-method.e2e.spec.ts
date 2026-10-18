@@ -177,6 +177,8 @@ describe('payment method', () => {
 
     expect(names).not.toContain('Cartão de crédito (DEBIT)');
     expect(names).toContain('Bônus (CREDIT)');
+    // Beleza too (ADR 0024 note of 2026-10-18).
+    expect(names).toContain('Beleza (DEBIT)');
   });
 
   it('takes a meal or food voucher', async () => {
