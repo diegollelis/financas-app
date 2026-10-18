@@ -145,3 +145,9 @@ O dono precisou lançar o que se repete uma vez por ano (IPVA, IPTU, anuidade, s
 - **O lançamento diz a frequência** (`recurrenceIntervalMonths`), para o selo "Todo mês" ou "Todo ano".
 - **No orçamento, a anual entra só no mês em que cai,** como qualquer lançamento. Reservar 1/12 por mês (provisão) fica para um ADR próprio, se a necessidade aparecer.
 - **Na tela,** "Todo ano" entra em "Repetir" no "Novo lançamento" (quatro opções, em duas linhas no celular) e em "Tornar recorrente". Em Recorrências, a seção "Todo mês" passa a se chamar "Recorrentes"; cada linha diz a frequência ("Todo ano em março") e uma anual mostra "Próximo: março de 2027"; na tabela, a frequência e o vencimento dividem a coluna "Repete" (uma coluna a mais apertava a descrição); e o total "Por mês" soma só as mensais, com "Por ano" à parte.
+
+## Nota (o período de uma encerrada, 2026-10-18)
+
+- **Uma recorrência encerrada mostra do primeiro ao último mês:** "Janeiro a maio de 2026", "Outubro de 2025 a março de 2026" ou "Em maio de 2026", na lista e na coluna "Período" da tabela de Recorrências. Antes mostrava só "Até maio de 2026", e o início, que continua gravado (`startPeriod`), sumia da tela.
+- **Uma ativa continua com "Desde outubro de 2026"** (ou "A partir de…", quando começa num mês futuro).
+- **Não há data de início digitada:** o mês de início já decide a geração, e o dia de cada mês está no vencimento.

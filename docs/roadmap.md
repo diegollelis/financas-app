@@ -172,6 +172,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [ ] API: a importação aceita parcelamentos, apelidos e a data
   - [ ] Tela: o leitor do CSV do Nubank e a revisão
 - [x] As partes de uma divisão vencem com o que foi dividido (lançamento, mês da recorrência ou parcela) e acompanham a mudança do vencimento; as pendentes já gravadas ganham o da origem pela migração (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
+- [x] Recorrências: uma encerrada mostra do primeiro ao último mês ("Janeiro a maio de 2026"), e não só "Até maio de 2026" (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
 - [ ] "Beleza" entre as categorias padrão de saída dos espaços novos (pedido em 2026-10-17; os espaços existentes continuam com as suas, como no "Bônus", nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
 - [x] **Meio de pagamento** ([ADR 0054](adr/0054-meio-de-pagamento.md)): como se pagou ou recebeu, numa lista fixa (Pix, Débito, Crédito, Dinheiro, Boleto, Transferência e Débito automático), em saídas e entradas. Contas e cartões com saldo e fatura ficam para um ADR próprio, se a necessidade aparecer.
   - [x] ADR: lista fixa (e não cadastro ou texto livre), sete meios, saídas e entradas, "Meio de pagamento" / "Meio de recebimento" na tela e `PaymentMethod` no código, no glossário

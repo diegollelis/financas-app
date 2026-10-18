@@ -171,7 +171,8 @@ describe('RecurrencesPage', () => {
       expect.stringMatching(/Conta de luz.*Varia todo mês.*Contas da casa/),
     ]);
     expect(within(monthly).getByRole('heading', { name: 'Encerradas' })).toBeInTheDocument();
-    expect(rowsOf(ended!)).toEqual([expect.stringMatching(/Academia.*Até maio de 2026/)]);
+    // From its first month to its last: the start is not lost once it ends.
+    expect(rowsOf(ended!)).toEqual([expect.stringMatching(/Academia.*Janeiro a maio de 2026/)]);
     // History has nothing to act on.
     expect(screen.queryByRole('button', { name: 'Ações de Academia' })).not.toBeInTheDocument();
 
