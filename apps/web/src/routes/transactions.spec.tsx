@@ -851,12 +851,90 @@ describe('TransactionsPage', () => {
         amountCents: 100_000,
         amountIs: 'TOTAL',
         firstPeriod: '2026-10',
+        occurredOn: '2026-10-15',
         dueDay: null,
         dueMonthOffset: 0,
         personId: null,
       }),
     });
     expect(await screen.findByText('Parcelamento adicionado: 3 parcelas')).toBeInTheDocument();
+  });
+
+  it('starts a purchase already running at its installment, as the bill (ADR 0055)', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/installments`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000403',
+          type: 'DEBIT',
+          description: 'TV',
+          notes: null,
+          categoryId: marketCategory.id,
+          totalCents: 40_000,
+          installments: 10,
+          firstNumber: 3,
+          firstPeriod: '2026-10',
+          dueDay: null,
+          endedAt: null,
+          settledCount: 0,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'TV');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Parcelado' }));
+    // The day of the purchase stays: one day for every installment (ADR 0055 note).
+    await userEvent.clear(within(form).getByLabelText('Data da compra (opcional)'));
+    await userEvent.type(within(form).getByLabelText('Data da compra (opcional)'), '2026-08-28');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Da parcela' }));
+    await userEvent.type(within(form).getByLabelText('Valor da parcela (R$)'), '50');
+    await userEvent.type(within(form).getByLabelText('Parcelas'), '10');
+    await userEvent.type(within(form).getByLabelText('Começa na parcela (opcional)'), '3');
+    expect(nbsp(within(form).getByText(/^Da 3\/10/).textContent)).toBe(
+      'Da 3/10 à 10/10: 8 parcelas de R$ 50,00, total R$ 400,00.',
+    );
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/installments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'TV',
+        notes: null,
+        categoryId: marketCategory.id,
+        installments: 10,
+        firstNumber: 3,
+        amountCents: 5_000,
+        amountIs: 'INSTALLMENT',
+        firstPeriod: '2026-10',
+        occurredOn: '2026-08-28',
+        dueDay: null,
+        dueMonthOffset: 0,
+        personId: null,
+      }),
+    });
+    expect(await screen.findByText('Parcelamento adicionado: 8 parcelas')).toBeInTheDocument();
+  });
+
+  it('refuses a first installment past the installments', async () => {
+    mockTransactions();
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'TV');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Parcelado' }));
+    await userEvent.type(within(form).getByLabelText('Valor total (R$)'), '400');
+    await userEvent.type(within(form).getByLabelText('Parcelas'), '4');
+    await userEvent.type(within(form).getByLabelText('Começa na parcela (opcional)'), '5');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    expect(
+      await within(form).findByText('Use um número de 1 até o total de parcelas.'),
+    ).toBeInTheDocument();
   });
 
   it('splits an installment plan too, showing each share per installment', async () => {
@@ -908,6 +986,7 @@ describe('TransactionsPage', () => {
         amountCents: 100_000,
         amountIs: 'TOTAL',
         firstPeriod: '2026-10',
+        occurredOn: '2026-10-15',
         dueDay: null,
         dueMonthOffset: 0,
         personId: null,
