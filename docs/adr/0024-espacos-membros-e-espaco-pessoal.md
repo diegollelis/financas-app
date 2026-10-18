@@ -59,3 +59,14 @@ As categorias padrão de um espaço novo vinham da planilha pessoal de origem: 1
 
 - **Os espaços novos recebem "Beleza"** entre as categorias de saída, logo depois de "Saúde": salão, barbeiro, manicure, cosméticos, que antes acabavam em "Saúde" ou em "Compras".
 - **Os espaços existentes ficam como estão,** pelo mesmo motivo do "Bônus": criar a categoria neles impediria renomear uma antiga para esse nome. Quem quiser cria "Beleza" pela tela, ou pelo "Adicionar 'Beleza'" no formulário do lançamento.
+
+## Nota (a lista padrão comparada com o mercado, 2026-10-18)
+
+A lista de saídas foi comparada com três referências: os grupos de despesa da POF 2017-2018 do IBGE, a lista padrão do Mint (a taxonomia da MX, a mais copiada pelos apps de finanças) e o que apps e blogs brasileiros citam como categorias comuns (as listas do Mobills e do Organizze não estão publicadas).
+
+- **A base já batia:** moradia e contas da casa, mercado e restaurantes, transporte, saúde, educação, lazer, compras e impostos aparecem em todas as referências.
+- **"Beleza" vira "Cuidados pessoais",** o nome do mercado (Personal Care no Mint, "higiene e cuidados pessoais" na POF), que cobre também higiene e barbeiro. Um espaço criado entre os dois deploys fica com "Beleza", que pode ser renomeada.
+- **Entram "Presentes e doações" e "Pets":** aparecem em quase todas as listas e são gastos que hoje cairiam em "Lazer" ou "Outros".
+- **"Viagens" também aparece em quase todas, mas fica de fora como categoria:** viagem é algo para o qual se guarda, e cada meta de guardar do orçamento cria a sua categoria de mesmo nome ([ADR 0047](0047-orcamento-real-por-destino.md)). Com "Viagens" entre as padrão, criar a meta "Viagens" seria recusado ("Já existe uma categoria de saída com esse nome"), e ela é uma das metas mais comuns (a planilha de origem tinha um percentual para viagens). Quem não usa metas cria a categoria pelo "Adicionar 'Viagens'".
+- **Ficam de fora** "Vestuário" (os apps a põem em compras, e a fatia dela no gasto vem caindo), "Filhos" e "Seguros" (dependem da vida de cada um e se criam em segundos com "Adicionar 'Nome'"). As entradas não mudam.
+- **Os espaços existentes ficam como estão,** pelo motivo do "Bônus".
