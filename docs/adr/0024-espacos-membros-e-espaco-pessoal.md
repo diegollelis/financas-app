@@ -54,3 +54,8 @@ As categorias padrão de um espaço novo vinham da planilha pessoal de origem: 1
 
 - **Os espaços novos recebem "Bônus"** entre as categorias de entrada, logo depois de "Salário": o que o empregador paga além do salário (PLR, gratificação, prêmio). "Renda extra" fica para o que vem de fora (freela, venda).
 - **Os espaços existentes ficam como estão**, como na saída de "Cartão de crédito" ([ADR 0054](0054-meio-de-pagamento.md)). Criar "Bônus" neles impediria renomear uma categoria antiga (como "PLR", da lista de origem) para esse nome, que é o caminho para o histórico inteiro passar a se chamar Bônus.
+
+## Nota ("Beleza" entre os padrões, 2026-10-18)
+
+- **Os espaços novos recebem "Beleza"** entre as categorias de saída, logo depois de "Saúde": salão, barbeiro, manicure, cosméticos, que antes acabavam em "Saúde" ou em "Compras".
+- **Os espaços existentes ficam como estão,** pelo mesmo motivo do "Bônus": criar a categoria neles impediria renomear uma antiga para esse nome. Quem quiser cria "Beleza" pela tela, ou pelo "Adicionar 'Beleza'" no formulário do lançamento.

@@ -148,6 +148,8 @@ describe('ImportPage', () => {
             occurredOn: null,
           },
         ],
+        // The "Origem" it starts with (ADR 0055 note).
+        label: 'Planilha modelo',
       }),
     });
     expect(await screen.findByText('2 lançamentos importados')).toBeInTheDocument();
@@ -335,9 +337,149 @@ describe('ImportPage', () => {
     renderApp(page);
 
     expect(
-      await screen.findByText('Quem só visualiza o espaço não importa planilhas.'),
+      await screen.findByText('Quem só visualiza o espaço não importa arquivos.'),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Escolher planilha (.xlsx)')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Desfazer/ })).not.toBeInTheDocument();
+  });
+
+  describe('a Nubank card statement (ADR 0055)', () => {
+    const pizzaria = {
+      id: '01920000-0000-7000-8000-000000000601',
+      name: 'Pizzaria Exemplo',
+      archived: false,
+      inUse: true,
+      aliases: [{ id: '01920000-0000-7000-8000-000000000701', alias: 'Ifd*Pizzaria Exemplo' }],
+    };
+    // An invented statement in the bank's format.
+    const csv = [
+      'date,title,amount',
+      '2026-10-03,Ifd*Pizzaria Exemplo,"86,50"',
+      '2026-10-05,Spaceship.Com* Gypcbz,"32,40"',
+      '2026-10-10,Pagamento recebido,"- 2.345,10"',
+    ].join('\n');
+    const statementFile = (name = 'Nubank_2026-11-04.csv') =>
+      new File([csv], name, { type: 'text/csv' });
+    const mockStatement = (overrides: Record<string, { status?: number; body: unknown }> = {}) =>
+      mockImport({
+        [`GET ${base}/merchants`]: { body: [pizzaria] },
+        [`GET ${base}/installments`]: { body: [] },
+        [`GET ${base}/transactions`]: { body: [] },
+        [`GET ${base}/categories/hints`]: {
+          body: {
+            merchants: [{ merchantId: pizzaria.id, type: 'DEBIT', categoryId: mercado.id }],
+            descriptions: [],
+            paymentMethods: { merchants: [], descriptions: [] },
+          },
+        },
+        [`POST ${base}/imports`]: {
+          status: 201,
+          body: { ...previousImport, transactionCount: 2, firstPeriod: '2026-11' },
+        },
+        ...overrides,
+      });
+    const chooseStatement = async (file = statementFile()) => {
+      await userEvent.click(await screen.findByRole('radio', { name: 'Fatura Nubank' }));
+      await userEvent.upload(screen.getByLabelText('Escolher fatura (.csv)'), file);
+    };
+
+    it('reviews the statement, learns an alias and imports with its origin and due date', async () => {
+      const fetchMock = mockStatement();
+      renderApp(page);
+
+      await chooseStatement();
+
+      const november = await screen.findByRole('region', { name: 'novembro de 2026' });
+      const [pizza, unknown, payment] = within(november).getAllByRole('listitem');
+      // By the alias, named by the merchant, with the bank's text to check.
+      expect(pizza).toHaveTextContent('Pizzaria Exemplo');
+      expect(pizza).toHaveTextContent('No extrato: Ifd*Pizzaria Exemplo');
+      expect(payment).toHaveTextContent('Pagamento da fatura anterior: não é uma entrada.');
+      expect(within(payment!).getByRole('checkbox')).not.toBeChecked();
+      expect(screen.getByLabelText('Origem (opcional)')).toHaveValue('Fatura Nubank');
+
+      // A line without a category picks it on its card.
+      await userEvent.click(
+        within(unknown!).getByRole('combobox', { name: 'Categoria de Spaceship.Com* Gypcbz' }),
+      );
+      await userEvent.click(await screen.findByRole('option', { name: 'Moradia' }));
+      await userEvent.click(within(unknown!).getByRole('button', { name: /^(Editar|Corrigir)/ }));
+      const dialog = await screen.findByRole('dialog', { name: 'Linha 3 da fatura' });
+      await userEvent.click(
+        within(dialog).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+      );
+      await userEvent.type(
+        await screen.findByPlaceholderText('Buscar ou adicionar estabelecimento'),
+        'Spaceship',
+      );
+      await userEvent.click(await screen.findByRole('option', { name: 'Adicionar “Spaceship”' }));
+      expect(within(dialog).getByLabelText('Lembrar como apelido')).toBeChecked();
+      const alias = within(dialog).getByLabelText('Apelido');
+      expect(alias).toHaveValue('Spaceship.Com* Gypcbz');
+      await userEvent.clear(alias);
+      await userEvent.type(alias, 'Spaceship.Com');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar na prévia' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Importar 2 lançamentos' }));
+
+      await expectCall(fetchMock, `${base}/imports`, {
+        method: 'POST',
+        body: expect.stringContaining(
+          '"aliases":[{"merchantName":"Spaceship","alias":"Spaceship.Com"}],"label":"Fatura Nubank","statementDueDate":"2026-11-04"',
+        ) as unknown,
+      });
+      await expectCall(fetchMock, `${base}/imports`, {
+        method: 'POST',
+        body: expect.stringContaining(
+          '"description":"Spaceship","notes":null,"categoryId":"' + moradia.id + '"',
+        ) as unknown,
+      });
+    });
+
+    it('asks for the due date when the file name does not carry it', async () => {
+      mockStatement();
+      renderApp(page);
+
+      await chooseStatement(statementFile('fatura.csv'));
+      await userEvent.click(await screen.findByRole('button', { name: 'Revisar a fatura' }));
+      expect(await screen.findByText('Informe o vencimento da fatura.')).toBeInTheDocument();
+      await userEvent.type(screen.getByLabelText('Vencimento da fatura'), '2026-12-10');
+      await userEvent.click(screen.getByRole('button', { name: 'Revisar a fatura' }));
+
+      expect(await screen.findByRole('region', { name: 'dezembro de 2026' })).toBeInTheDocument();
+    });
+
+    it('refuses a file that is not a Nubank statement', async () => {
+      mockStatement();
+      renderApp(page);
+
+      await chooseStatement(
+        new File(['Data;Valor\n10/10/2026;10'], 'outra.csv', { type: 'text/csv' }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Este arquivo não parece a fatura do Nubank',
+      );
+    });
+
+    it('names a past import by its origin and due date', async () => {
+      mockImport({
+        [`GET ${base}/imports`]: {
+          body: [
+            {
+              ...previousImport,
+              label: 'Fatura Nubank',
+              statementDueDate: '2026-11-04',
+              planCount: 1,
+            },
+          ],
+        },
+      });
+      renderApp(page);
+
+      const previous = await screen.findByRole('region', { name: 'Importações anteriores' });
+      expect(within(previous).getByRole('listitem')).toHaveTextContent(
+        /^Fatura Nubank · vence 04\/11\/202612 lançamentos e 1 parcelamento, junho de 2026 a julho de 2026 · /,
+      );
+    });
   });
 });

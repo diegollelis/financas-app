@@ -8,6 +8,7 @@ import {
   settledLabels,
   type Category,
   type Import,
+  type Merchant,
 } from '@financas/shared';
 import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
@@ -18,6 +19,7 @@ import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { CARD_LIST, CARD_ROW } from '@/features/view-mode/row-styles';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -25,12 +27,13 @@ import { ImportRowForm } from './import-row-form';
 import {
   groupByPeriod,
   groupTotals,
-  readyTransactions,
+  readyImport,
   resolveCategory,
-  toTransaction,
+  rowProblems,
   unmatchedCategories,
   type ReviewRow,
 } from './review';
+import { applyToSameTitle, sameTitleCount } from './statement-review';
 import { useCreateImport } from './use-imports';
 
 const typeLabel = { CREDIT: 'entrada', DEBIT: 'saída' } as const;
@@ -46,19 +49,32 @@ function overlapsPrevious(imports: Import[], rows: ReviewRow[]) {
 function RowItem({
   row,
   categoryName,
+  categoryOptions,
   problems,
   onToggle,
+  onCategory,
   onEdit,
 }: {
   row: ReviewRow;
   /** The app's category the row goes to, or null while there is none. */
   categoryName: string | null;
+  /** The categories of its type, to pick one on the card. */
+  categoryOptions: Category[];
   problems: string[];
   onToggle: (included: boolean) => void;
+  onCategory: (categoryId: string) => void;
   onEdit: (trigger: HTMLButtonElement) => void;
 }) {
   const label = row.description || `Linha ${row.line}`;
-  const blocked = problems.length > 0;
+  // A statement's line without a category picks it right on the card, as most lines of a first
+  // statement have none yet (ADR 0055 note).
+  const picksCategory = Boolean(row.statementTitle) && !categoryName && row.type !== null;
+  // A statement's line unchecked by a rule says only why; checking it shows what it lacks.
+  const shown = row.statementTitle && !row.included ? [] : problems;
+  const visibleProblems = picksCategory
+    ? shown.filter((problem) => problem !== 'Escolha a categoria.')
+    : shown;
+  const blocked = problems.length > 0 && !row.statementTitle;
   return (
     // The box beside the checkbox has its own 44px target: 8px of side room on the phone.
     <li className={cn(CARD_ROW, 'flex items-start gap-3 px-2 md:px-4')}>
@@ -77,9 +93,18 @@ function RowItem({
       </label>
       <div className="grid min-w-0 flex-1 gap-1">
         <p className="font-medium break-words">{label}</p>
+        {/* The bank's text, to check against the statement (ADR 0055 note). */}
+        {row.statementTitle && row.statementTitle !== row.description && (
+          <p className="text-muted-foreground text-sm break-words">
+            No extrato: {row.statementTitle}
+          </p>
+        )}
         <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
           <span>
-            {categoryName ?? `${row.categoryName || 'Sem categoria'} (sem correspondência)`}
+            {categoryName ??
+              (row.statementTitle
+                ? 'Sem categoria'
+                : `${row.categoryName || 'Sem categoria'} (sem correspondência)`)}
           </span>
           {row.merchantName && <span>{row.merchantName}</span>}
           {row.paymentMethod && <span>{paymentMethodLabels[row.paymentMethod]}</span>}
@@ -96,11 +121,18 @@ function RowItem({
           </span>
           <span>Linha {row.line}</span>
         </p>
-        {[...problems, ...row.warnings].map((message) => (
+        {picksCategory && row.included && (
+          <div className="mt-1 grid max-w-xs gap-1">
+            <FormField id={`import-row-${row.line}-category`} label={`Categoria de ${label}`}>
+              <CategorySelect value="" onChange={onCategory} options={categoryOptions} />
+            </FormField>
+          </div>
+        )}
+        {[...visibleProblems, ...row.warnings].map((message) => (
           <p
             key={message}
             className={
-              problems.includes(message)
+              visibleProblems.includes(message)
                 ? 'text-destructive flex gap-1.5 text-sm'
                 : 'text-muted-foreground flex gap-1.5 text-sm'
             }
@@ -137,47 +169,60 @@ export function ImportReview({
   workspaceId,
   initialRows,
   categories,
+  merchants,
   previousImports,
+  statement,
+  defaultLabel,
   onChooseAnother,
   onImported,
 }: {
   workspaceId: string;
   initialRows: ReviewRow[];
   categories: Category[];
+  /** Offered when choosing a row's merchant (a card statement's review, ADR 0055). */
+  merchants?: Merchant[];
   previousImports: Import[];
+  /** A card statement (ADR 0055): its due date and what the review found before opening. */
+  statement?: { dueDate: string; notices: string[] };
+  /** The "Origem" it starts with ("Fatura Nubank", "Planilha modelo"). */
+  defaultLabel: string;
   onChooseAnother: () => void;
   onImported: (firstPeriod: string) => void;
 }) {
   const [rows, setRows] = useState(initialRows);
+  const [label, setLabel] = useState(defaultLabel);
   const [matches, setMatches] = useState<ReadonlyMap<string, string>>(new Map());
   // The line being edited; the button that opened it gets the focus back.
   const [editing, setEditing] = useState<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const create = useCreateImport(workspaceId);
 
-  const ready = readyTransactions(rows, categories, matches);
+  const ready = readyImport(rows, categories, matches);
+  const readyCount = ready.transactions.length + ready.plans.length;
   const unmatched = unmatchedCategories(rows, categories).filter(
     (entry) => !matches.has(entry.key),
   );
-  const overlapping = overlapsPrevious(previousImports, rows);
+  // A statement may be imported again on purpose: what is already in comes unchecked instead.
+  const overlapping = statement ? [] : overlapsPrevious(previousImports, rows);
   const nameOf = (id: string | null) =>
     categories.find((category) => category.id === id)?.name ?? null;
   const editingRow = rows.find((row) => row.line === editing);
-  /** What keeps a row out, if anything. "Escolha a categoria" is answered above, for every row
-   * of that name at once, so it is not repeated on each row. */
+  /** What keeps a row out, if anything. A spreadsheet category's "Escolha a categoria" is
+   * answered above, for every row of that name at once, so it is not repeated on each row. */
   const check = (row: ReviewRow) => {
     const categoryId = resolveCategory(row, categories, matches);
-    const result = toTransaction(row, categoryId);
-    const problems = result.ok
-      ? []
-      : result.problems.filter((problem) => !(problem === 'Escolha a categoria.' && row.type));
+    const problems = rowProblems(row, categoryId).filter(
+      (problem) => !(problem === 'Escolha a categoria.' && row.type && row.categoryName),
+    );
     return { categoryId, problems };
   };
   // The check before importing (avaliação externa): what goes in, adding up, and what does not.
-  const credits = ready
+  // A plan counts its first installment, the one of this statement.
+  const goingIn = [...ready.transactions, ...ready.plans];
+  const credits = goingIn
     .filter((transaction) => transaction.type === 'CREDIT')
     .reduce((sum, transaction) => sum + transaction.amountCents, 0);
-  const debits = ready
+  const debits = goingIn
     .filter((transaction) => transaction.type === 'DEBIT')
     .reduce((sum, transaction) => sum + transaction.amountCents, 0);
   const withProblems = rows.filter((row) => check(row).problems.length > 0);
@@ -192,7 +237,13 @@ export function ImportReview({
 
   const submit = () =>
     create.mutate(
-      { transactions: ready },
+      {
+        transactions: ready.transactions,
+        ...(ready.plans.length > 0 && { plans: ready.plans }),
+        ...(ready.aliases.length > 0 && { aliases: ready.aliases }),
+        label,
+        ...(statement && { statementDueDate: statement.dueDate }),
+      },
       {
         onSuccess: (created) => {
           toast.success(
@@ -207,8 +258,11 @@ export function ImportReview({
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p role="status" className="tabular-nums">
-          {ready.length} de {rows.length} {rows.length === 1 ? 'linha pronta' : 'linhas prontas'}{' '}
-          para importar: entradas {formatCents(credits)}, saídas {formatCents(debits)}.
+          {readyCount} de {rows.length} {rows.length === 1 ? 'linha pronta' : 'linhas prontas'} para
+          importar: entradas {formatCents(credits)}, saídas {formatCents(debits)}
+          {ready.plans.length > 0 &&
+            `, ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento novo' : 'parcelamentos novos'}`}
+          .
           {withProblems.length > 0 &&
             ` ${withProblems.length} ${withProblems.length === 1 ? 'linha com problema' : 'linhas com problema'}.`}
           {waitingForCategory > 0 &&
@@ -218,6 +272,37 @@ export function ImportReview({
           Escolher outro arquivo
         </Button>
       </div>
+
+      {/* What tells this import apart later, in "Importações anteriores" (ADR 0055 note). */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {statement && (
+          <div className="grid gap-1">
+            <p className="text-sm font-medium">Vencimento da fatura</p>
+            <p className="tabular-nums">{formatIsoDate(statement.dueDate)}</p>
+            <p className="text-muted-foreground text-sm first-letter:uppercase">
+              Mês de referência: {formatPeriod(statement.dueDate.slice(0, 7))}.
+            </p>
+          </div>
+        )}
+        <FormField
+          id="import-label"
+          label="Origem (opcional)"
+          hint="Como esta importação aparece depois. Ex.: Cartão Nubank do Diego."
+        >
+          <Input
+            autoComplete="off"
+            maxLength={100}
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+          />
+        </FormField>
+      </div>
+
+      {statement?.notices.map((notice) => (
+        <p key={notice} role="note" className="bg-muted rounded-lg p-3">
+          {notice}
+        </p>
+      ))}
 
       {overlapping.length > 0 && (
         <p role="note" className="bg-muted rounded-lg p-3">
@@ -300,9 +385,18 @@ export function ImportReview({
                     key={row.line}
                     row={row}
                     categoryName={nameOf(categoryId)}
+                    categoryOptions={categories.filter(
+                      (category) => category.type === row.type && !category.archived,
+                    )}
                     problems={problems}
                     onToggle={(included) =>
                       update(row.line, (current) => ({ ...current, included }))
+                    }
+                    // The same choice goes to the lines of the same title (ADR 0055 note).
+                    onCategory={(chosen) =>
+                      setRows((current) =>
+                        applyToSameTitle(current, { ...row, categoryId: chosen }),
+                      )
                     }
                     onEdit={(trigger) => {
                       triggerRef.current = trigger;
@@ -336,12 +430,16 @@ export function ImportReview({
           // The layout keeps room for it below the footer (data-fab).
           data-fab
           onClick={submit}
-          disabled={ready.length === 0 || create.isPending}
+          disabled={readyCount === 0 || create.isPending}
           className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-20 shadow-lg md:static md:shadow-none"
         >
           {create.isPending
             ? 'Importando…'
-            : `Importar ${ready.length} ${ready.length === 1 ? 'lançamento' : 'lançamentos'}`}
+            : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
+                ready.plans.length > 0
+                  ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`
+                  : ''
+              }`}
         </Button>
       </div>
 
@@ -349,16 +447,19 @@ export function ImportReview({
         open={Boolean(editingRow)}
         onOpenChange={(open) => !open && setEditing(null)}
         returnFocusTo={triggerRef}
-        title={`Linha ${editingRow?.line ?? ''} da planilha`}
-        description="A mudança vale só para esta importação; a planilha não muda."
+        title={`Linha ${editingRow?.line ?? ''} da ${statement ? 'fatura' : 'planilha'}`}
+        description="A mudança vale só para esta importação; o arquivo não muda."
       >
         {editingRow && (
           <ImportRowForm
             row={editingRow}
             categories={categories}
+            merchants={merchants}
+            sameTitle={sameTitleCount(rows, editingRow)}
             categoryId={resolveCategory(editingRow, categories, matches)}
             onSave={(fixed) => {
-              update(fixed.line, () => fixed);
+              // On a statement, the choices go to the other lines of the same title too.
+              setRows((current) => applyToSameTitle(current, fixed));
               setEditing(null);
             }}
             onCancel={() => setEditing(null)}

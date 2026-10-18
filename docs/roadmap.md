@@ -170,7 +170,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Análise por estabelecimento dentro de uma categoria (ex.: quanto foi para cada mercado)
   - [x] Coluna opcional "Estabelecimento" na planilha modelo (um nome novo vira estabelecimento ao importar; um arquivado volta; desfazer a importação não os apaga)
   - [x] Sugerir a categoria pelo estabelecimento, junto com a sugestão pela descrição (o estabelecimento vale mais; 12 meses de histórico; nunca troca uma categoria escolhida)
-- [ ] **Importação da fatura do cartão** ([ADR 0055](adr/0055-importacao-da-fatura-do-cartao.md)): o CSV da fatura do Nubank lido na tela Importar, com a data da compra, os apelidos de estabelecimento e as parcelas virando parcelamentos
+- [x] **Importação da fatura do cartão** ([ADR 0055](adr/0055-importacao-da-fatura-do-cartao.md)): o CSV da fatura do Nubank lido na tela Importar, com a data da compra, os apelidos de estabelecimento e as parcelas virando parcelamentos
   - [x] ADR: mês de referência da fatura, parcelas (casar ou criar o parcelamento, com a parcela inicial), apelidos pelo começo do título, "Data da compra" / "Data", aviso de fatura lançada inteira
   - [x] API: a data da compra nos lançamentos, na planilha modelo (coluna "Data") e na exportação
   - [x] Tela: a data no formulário, na linha e na tabela (coluna "Data" própria, escolhida na prévia)
@@ -181,10 +181,10 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] API: a importação aceita parcelamentos, apelidos e a data
   - [x] O leitor do CSV do Nubank, sem tela (`parseNubankCsv` em `packages/shared`)
   - [x] API: a "Origem" digitada e o vencimento da fatura em cada importação, e quantos parcelamentos ela criou
-  - [ ] Tela: a origem "Fatura do cartão Nubank", o vencimento e a revisão com as regras da fatura
+  - [x] Tela: a origem "Fatura do cartão Nubank", o vencimento e a revisão com as regras da fatura
 - [x] As partes de uma divisão vencem com o que foi dividido (lançamento, mês da recorrência ou parcela) e acompanham a mudança do vencimento; as pendentes já gravadas ganham o da origem pela migração (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
 - [x] Recorrências: uma encerrada mostra do primeiro ao último mês ("Janeiro a maio de 2026"), e não só "Até maio de 2026" (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
-- [ ] "Beleza" entre as categorias padrão de saída dos espaços novos (pedido em 2026-10-17; os espaços existentes continuam com as suas, como no "Bônus", nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
+- [x] "Beleza" entre as categorias padrão de saída dos espaços novos (pedido em 2026-10-17; os espaços existentes continuam com as suas, como no "Bônus", nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
 - [x] **Meio de pagamento** ([ADR 0054](adr/0054-meio-de-pagamento.md)): como se pagou ou recebeu, numa lista fixa (Pix, Débito, Crédito, Dinheiro, Boleto, Transferência e Débito automático), em saídas e entradas. Contas e cartões com saldo e fatura ficam para um ADR próprio, se a necessidade aparecer.
   - [x] ADR: lista fixa (e não cadastro ou texto livre), sete meios, saídas e entradas, "Meio de pagamento" / "Meio de recebimento" na tela e `PaymentMethod` no código, no glossário
   - [x] API: enum e `payment_method` opcional em lançamentos, recorrências e parcelamentos (herdado por cada mês e parcela, nunca pelas partes), exportação; "Cartão de crédito" fora das categorias padrão dos espaços novos
