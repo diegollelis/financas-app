@@ -1292,6 +1292,32 @@ describe('TransactionsPage', () => {
     expect(await screen.findByText('Lançamento salvo')).toBeInTheDocument();
   });
 
+  it('edits a month of a recurrence without a day, unless it has one (ADR 0055 note)', async () => {
+    const recurrenceId = '01920000-0000-7000-8000-000000000301';
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [
+          { ...light, recurrenceId },
+          // The first month, from "Tornar recorrente", keeps the day it had.
+          { ...shopping, recurrenceId, occurredOn: '2026-10-03' },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    let menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    let form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    expect(within(form).queryByLabelText('Data da compra (opcional)')).not.toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    menu = await openActions('Compras da semana');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    expect(within(form).getByLabelText('Data da compra (opcional)')).toHaveValue('2026-10-03');
+  });
+
   it('asks for confirmation, naming the transaction, before deleting', async () => {
     const fetchMock = mockTransactions({
       [`DELETE ${base}/${shopping.id}`]: { status: 204, body: null },

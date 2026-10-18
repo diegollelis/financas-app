@@ -364,7 +364,11 @@ export function TransactionForm({
   const installments = repeat === 'INSTALLMENTS';
   // A recurrence's months come without a day: the due date says it. An installment purchase
   // happened on one day, the same for every installment (ADR 0055 and its note).
-  const withDay = repeat === 'NONE' || repeat === 'INSTALLMENTS';
+  // A month of a recurrence offers it only when it already has one, so it can be fixed or cleared
+  // (the first month, from "Tornar recorrente", keeps the day it had).
+  const withDay =
+    (repeat === 'NONE' || repeat === 'INSTALLMENTS') &&
+    !(initial?.recurrenceId && !initial.occurredOn);
   const amountLabel = variable
     ? 'Valor estimado (R$)'
     : installments

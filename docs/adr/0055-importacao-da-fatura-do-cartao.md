@@ -130,3 +130,8 @@ A decisão de criar as parcelas sem data foi revista: uma compra parcelada acont
 - **A "Data da compra"** continua no "Parcelado", como num lançamento avulso, e vai para todas as parcelas. Com "Todo mês" ou "Todo ano" ela some.
 - **Na edição do parcelamento,** a data da compra muda a qualquer momento; a parcela inicial muda como o valor e as parcelas (só sem parcela paga e sem divisão).
 - **Em Recorrências,** um parcelamento criado em 3/10 conta as pagas com as anteriores ("3 de 10 pagas": a 1/10 e a 2/10 já tinham sido cobradas) e diz quais parcelas tem, ao lado das pagas: "Da 3/10 à 10/10". O valor continua "total em 8 de R$ 50,00".
+
+## Nota (a data num mês de recorrência, 2026-10-18)
+
+- **Editar um mês de recorrência** (Todo mês ou Todo ano) não oferece a "Data da compra" / "Data": cada mês é uma cobrança nova, e quem diz o dia é o vencimento.
+- **A exceção é o mês que já tem uma data,** como o primeiro mês que veio de "Tornar recorrente", que mantém a do lançamento avulso. Ele mostra o campo enquanto tiver a data, para corrigi-la ou apagá-la; apagada, o campo some.
