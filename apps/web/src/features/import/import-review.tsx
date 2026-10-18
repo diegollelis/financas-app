@@ -128,6 +128,17 @@ function RowItem({
             </FormField>
           </div>
         )}
+        {/* Optional: a hint, not a problem (ADR 0055 note), once what is required is there. */}
+        {row.statementTitle &&
+          row.included &&
+          categoryName &&
+          !row.merchantName &&
+          row.type === 'DEBIT' && (
+            <p className="text-muted-foreground text-sm">
+              Sem estabelecimento (opcional). Escolha um em "Editar" para a próxima fatura já vir
+              com ele.
+            </p>
+          )}
         {[...visibleProblems, ...row.warnings].map((message) => (
           <p
             key={message}
@@ -279,8 +290,8 @@ export function ImportReview({
           <div className="grid gap-1">
             <p className="text-sm font-medium">Vencimento da fatura</p>
             <p className="tabular-nums">{formatIsoDate(statement.dueDate)}</p>
-            <p className="text-muted-foreground text-sm first-letter:uppercase">
-              Mês de referência: {formatPeriod(statement.dueDate.slice(0, 7))}.
+            <p className="text-muted-foreground text-sm">
+              Cada compra entra no mês em que foi feita, e todas vencem nesse dia.
             </p>
           </div>
         )}

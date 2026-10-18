@@ -3,7 +3,9 @@ import {
   formatCents,
   formatPeriod,
   installmentsCreated,
+  MAX_DUE_MONTH_OFFSET,
   normalizeName,
+  shiftPeriod,
   statementTitleKey,
   suggestCategory,
   TRANSACTION_DESCRIPTION_MAX_LENGTH,
@@ -22,15 +24,34 @@ import type { ReviewRow } from './review';
 
 /** What the review needs to know about the workspace, read before it opens. */
 export type StatementContext = {
-  /** The bill's due date: its month is the competência of every line. */
+  /** The bill's due date, typed by the person: every line is due on it. */
   dueDate: string;
   merchants: Merchant[];
   categories: Category[];
   hints: CategoryHints | undefined;
   plans: InstallmentPlan[];
-  /** The transactions of that competência, the recurrences' pending months among them. */
+  /** The transactions of the competências the lines go to (`statementPeriods`). */
   transactions: Transaction[];
 };
+
+/** "2026-11" − "2026-10" = 1: how many months the first is after the second. */
+const monthsBetween = (later: string, earlier: string) =>
+  (Number(later.slice(0, 4)) - Number(earlier.slice(0, 4))) * 12 +
+  Number(later.slice(5, 7)) -
+  Number(earlier.slice(5, 7));
+
+/**
+ * The competência of a line (ADR 0055 note): the month of the purchase, and of an installment the
+ * purchase's month plus its number ("Parcela 3/10" of 28/08 is October's).
+ */
+export function linePeriod(line: StatementLine): string {
+  return shiftPeriod(line.occurredOn.slice(0, 7), (line.installment?.number ?? 1) - 1);
+}
+
+/** Every competência a statement's lines go to: what the review compares with. */
+export function statementPeriods(lines: StatementLine[]): string[] {
+  return [...new Set(lines.map(linePeriod))].sort();
+}
 
 /** A recurrence's month is "the same" when within 10% of the line (an energy bill varies). */
 const closeAmount = (a: number, b: number) => Math.abs(a - b) <= Math.max(a, b) * 0.1;
@@ -55,19 +76,20 @@ function existingPlan(
 }
 
 /**
- * Rows from a card statement's lines: each purchase a debit of the bill's month, due on its due
- * date, paid by credit card, with the merchant of its alias (its name as the description, ADR
- * 0055 note) and the category of the history. An installment starts a plan, unless it already
- * belongs to one; the last one is a plain transaction. The payment of the last bill, a purchase
- * already imported and a recurrence's month come unchecked, with the reason.
+ * Rows from a card statement's lines: each purchase a debit of the month it was made in, due on
+ * the bill's due date, paid by credit card, with the merchant of its alias (its name as the
+ * description, ADR 0055 note) and the category of the history. An installment starts a plan,
+ * unless it already belongs to one; the last one is a plain transaction. The payment of the last
+ * bill, a purchase already imported and a recurrence's month come unchecked, with the reason.
  */
 export function startStatementReview(
   lines: StatementLine[],
   context: StatementContext,
 ): ReviewRow[] {
-  const period = context.dueDate.slice(0, 7);
+  const dueMonth = context.dueDate.slice(0, 7);
   return lines.map((line) => {
     const type: TransactionType = line.kind === 'PURCHASE' ? 'DEBIT' : 'CREDIT';
+    const period = linePeriod(line);
     const merchantId = findMerchantByAlias(line.title, context.merchants);
     const merchant = context.merchants.find((item) => item.id === merchantId);
     const description = (merchant?.name ?? line.cleanTitle).slice(
@@ -125,12 +147,21 @@ export function startStatementReview(
           `Já lançada: é a parcela ${number}/${count} do parcelamento "${plan.description}".`,
         );
       }
+      // Each installment is due in the month after its own, like this one; a purchase made after
+      // the bill closed would be due two months later, more than a plan takes, so it starts a
+      // month later instead.
+      const firstPeriod =
+        monthsBetween(dueMonth, period) > MAX_DUE_MONTH_OFFSET
+          ? shiftPeriod(dueMonth, -MAX_DUE_MONTH_OFFSET)
+          : period;
+      const dueMonthOffset = Math.max(0, monthsBetween(dueMonth, firstPeriod));
       const created = count - number + 1;
       return {
         ...row,
-        plan: { installments: count, firstNumber: number },
+        period: firstPeriod,
+        plan: { installments: count, firstNumber: number, dueMonthOffset },
         warnings: [
-          `Vai criar um parcelamento: da ${number}/${count} à ${count}/${count}, ${created} parcelas de ${formatCents(line.amountCents)}, a primeira em ${formatPeriod(period)}.`,
+          `Vai criar um parcelamento: da ${number}/${count} à ${count}/${count}, ${created} parcelas de ${formatCents(line.amountCents)}, a primeira em ${formatPeriod(firstPeriod)}.`,
         ],
       };
     }
@@ -141,6 +172,7 @@ export function startStatementReview(
         : sameText(transaction.description, description);
     const imported = context.transactions.find(
       (transaction) =>
+        transaction.period === period &&
         transaction.type === type &&
         transaction.occurredOn === line.occurredOn &&
         transaction.amountCents === line.amountCents &&
@@ -155,6 +187,7 @@ export function startStatementReview(
       type === 'DEBIT'
         ? context.transactions.find(
             (transaction) =>
+              transaction.period === period &&
               transaction.recurrenceId !== null &&
               transaction.type === 'DEBIT' &&
               sameMerchant(transaction) &&
@@ -170,23 +203,21 @@ export function startStatementReview(
         `Já lançada pela recorrência "${recurring.description}"${difference}. Para o valor real, edite o lançamento da recorrência.`,
       );
     }
-
-    const warnings = [
-      ...(line.kind === 'REFUND'
-        ? ['Valor negativo na fatura: entra como entrada (um estorno). Desmarque se não quiser.']
-        : []),
-      ...(merchant
-        ? []
-        : ['Sem estabelecimento: escolha um em "Editar" para lembrar das próximas vezes.']),
-    ];
-    return { ...row, warnings };
+    return line.kind === 'REFUND'
+      ? {
+          ...row,
+          warnings: [
+            'Valor negativo na fatura: entra como entrada (um estorno). Desmarque se não quiser.',
+          ],
+        }
+      : row;
   });
 }
 
 /**
- * A debit of the bill's month paid by credit card whose amount is close to the whole statement
- * (within 5%): the bill seems already launched in full, and importing its purchases would count
- * them twice (ADR 0055). Null when there is none.
+ * A debit paid by credit card in a month of the statement whose amount is close to the whole
+ * statement (within 5%): the bill seems already launched in full, and importing its purchases
+ * would count them twice (ADR 0055). Null when there is none.
  */
 export function wholeBillAlreadyLaunched(lines: StatementLine[], context: StatementContext) {
   const total = lines.reduce(
@@ -227,9 +258,6 @@ export function applyToSameTitle(rows: ReviewRow[], fixed: ReviewRow): ReviewRow
       merchantName: takesMerchant ? fixed.merchantName : row.merchantName,
       description: takesMerchant ? fixed.merchantName : row.description,
       categoryId: row.categoryId ?? fixed.categoryId,
-      warnings: takesMerchant
-        ? row.warnings.filter((warning) => !warning.startsWith('Sem estabelecimento'))
-        : row.warnings,
     };
   });
 }

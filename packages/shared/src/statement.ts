@@ -149,12 +149,6 @@ export function parseNubankCsv(text: string): { lines: StatementLine[]; issues: 
   return { lines, issues };
 }
 
-/** "Nubank_2026-11-04.csv" → "2026-11-04", the bill's due date; null when the name lacks it. */
-export function statementDueDateFromFileName(fileName: string): string | null {
-  const match = /(\d{4}-\d{2}-\d{2})/.exec(fileName);
-  return match && isoDateSchema.safeParse(match[1]).success ? match[1]! : null;
-}
-
 /** The key that groups lines of the same merchant in a statement (ADR 0055 note). */
 export const statementTitleKey = (line: Pick<StatementLine, 'title'>) =>
   normalizeStatementTitle(line.title);

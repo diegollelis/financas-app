@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseNubankCsv, statementDueDateFromFileName, statementTitleKey } from './statement.ts';
+import { parseNubankCsv, statementTitleKey } from './statement.ts';
 
 // An invented statement in the Nubank format (ADR 0019: never a real one).
 const csv = [
@@ -106,14 +106,6 @@ describe('parseNubankCsv', () => {
     );
 
     expect(lines.map((line) => line.installment)).toEqual([{ number: 1, count: 2 }, null]);
-  });
-});
-
-describe('statementDueDateFromFileName', () => {
-  it('reads the due date the file name carries, or none', () => {
-    expect(statementDueDateFromFileName('Nubank_2026-11-04.csv')).toBe('2026-11-04');
-    expect(statementDueDateFromFileName('fatura.csv')).toBeNull();
-    expect(statementDueDateFromFileName('Nubank_2026-13-40.csv')).toBeNull();
   });
 });
 

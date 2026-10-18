@@ -175,3 +175,14 @@ A decisão de criar as parcelas sem data foi revista: uma compra parcelada acont
 - **Uma linha da fatura sem categoria escolhe a categoria no próprio cartão** (numa primeira fatura, quase nenhuma linha tem histórico), e a escolha vai para as linhas de mesmo texto. Uma linha desmarcada por uma regra mostra só o motivo; marcada, mostra o que falta, e a caixa nunca fica travada.
 - **O botão** conta os lançamentos e os parcelamentos ("Importar 7 lançamentos e 1 parcelamento"); o resumo soma, de um parcelamento, só a parcela desta fatura.
 - **Valor "próximo" de uma recorrência** é até 10% de diferença; **"perto do total"** da fatura é até 5%.
+
+## Nota (o mês da compra e o vencimento digitado, 2026-10-18)
+
+O primeiro teste com uma fatura real mostrou duas coisas, e a regra do mês foi revista antes do uso.
+
+- **As compras entram no mês da compra,** não no da fatura: a decisão inicial (opção 1, "no mês da fatura") é trocada pela opção 2. O que importa para quem acompanha o mês é quanto gastou nele; a data da compra é a do consumo, e o vencimento continua dizendo quando o dinheiro sai. A pizza de 03/10, numa fatura que vence em 04/11, entra em outubro, "Vence em 04/11".
+- **Uma parcela entra no mês da compra mais o número dela:** a "Parcela 3/10" de uma compra de 28/08 entra em outubro, vencendo no dia da fatura, e o parcelamento criado vence cada parcela no mês seguinte ao dela (`dueMonthOffset` 1). Uma compra feita depois do fechamento, que só vence dois meses depois, começa o parcelamento um mês depois, porque um parcelamento vence no máximo no mês seguinte.
+- **Consequência no Painel:** o "Saldo previsto" de outubro passa a ter as compras do cartão de outubro, pendentes até o pagamento em novembro.
+- **Uma fatura cobre vários meses,** então a revisão lê os lançamentos de cada mês envolvido para as comparações ("já importada", "já lançada pela recorrência"), e cada comparação olha só o mês da linha.
+- **O vencimento é sempre digitado,** com o campo vazio: o nome do arquivo não é uma fonte confiável (pode ter sido renomeado, e não se sabe se a data dele é sempre a do vencimento). `statementDueDateFromFileName` saiu.
+- **O estabelecimento é opcional e diz isso:** "Sem estabelecimento" deixou de ser um aviso com o ícone dos problemas, ao lado de "Escolha a categoria.", e virou uma dica em texto apagado, "Sem estabelecimento (opcional). Escolha um em 'Editar' para a próxima fatura já vir com ele.", só numa linha que já tem categoria.
