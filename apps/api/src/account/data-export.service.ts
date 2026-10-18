@@ -266,6 +266,7 @@ export class DataExportService {
         totalCents: plan.totalCents,
         installments: plan.installments,
         firstNumber: plan.firstNumber,
+        occurredOn: dayOrNull(plan.occurredOn),
         firstPeriod: plan.firstPeriod,
         dueDay: plan.dueDay,
         dueMonthOffset: plan.dueMonthOffset,

@@ -312,6 +312,37 @@ describe('installments', () => {
     });
   });
 
+  describe('the day of the purchase (ADR 0055 note)', () => {
+    it('gives it to every installment and share, and a change reaches the pending ones', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const day = (n: number) => `${month(-1)}-${n}`;
+      const plan = await create(
+        fridge({ occurredOn: day(28), split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }),
+      );
+      expect(plan.occurredOn).toBe(day(28));
+      const days = async (offset: number) =>
+        (await transactionsOf(month(offset))).map((t) => t.occurredOn);
+      expect(await days(2)).toEqual([day(28), day(28)]);
+      // This month's installment is already paid: history, it keeps its day.
+      const paid = (await transactionsOf(thisMonth)).find((t) => t.installment)!;
+      await browser
+        .patch(`${base}/transactions/${paid.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      const response = await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({ occurredOn: day(27) })
+        .expect(200);
+
+      expect(installmentPlanSchema.parse(response.body).occurredOn).toBe(day(27));
+      expect((await transactionsOf(thisMonth)).find((t) => t.installment)?.occurredOn).toBe(
+        day(28),
+      );
+      expect(await days(1)).toEqual([day(27), day(27)]);
+    });
+  });
+
   describe('editing and deleting (ADR 0038 note)', () => {
     it('changes what it is in the pending installments, never in the settled ones', async () => {
       const { create, fridge, transactionsOf, base, browser, categoryId } = await setUp();
