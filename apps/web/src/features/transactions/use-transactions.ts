@@ -4,7 +4,7 @@ import {
   type CreateTransactionInput,
   type UpdateTransactionInput,
 } from '@financas/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { analysisKey } from '@/features/analysis/use-analysis';
 import { peopleKey } from '@/features/people/use-people';
@@ -23,6 +23,33 @@ export function useTransactions(workspaceId: string, period: string) {
         `/api/workspaces/${workspaceId}/transactions?period=${period}`,
         transactionListResponseSchema,
       ),
+  });
+}
+
+/**
+ * The transactions of several competências at once (a card statement spans months, ADR 0055
+ * note): one query per month, the same as the list's, and all of them once every one is loaded.
+ */
+export function useTransactionsOf(workspaceId: string, periods: string[]) {
+  return useQueries({
+    queries: periods.map((period) => ({
+      queryKey: [...transactionsKey(workspaceId), period],
+      queryFn: () =>
+        apiGet(
+          `/api/workspaces/${workspaceId}/transactions?period=${period}`,
+          transactionListResponseSchema,
+        ),
+    })),
+    combine: (results) => ({
+      data: results.every((result) => result.isSuccess)
+        ? results.flatMap((result) => result.data ?? [])
+        : undefined,
+      isPending: results.some((result) => result.isPending),
+      isFetching: results.some((result) => result.isFetching),
+      isError: results.some((result) => result.isError),
+      error: results.find((result) => result.isError)?.error ?? null,
+      refetch: () => Promise.all(results.map((result) => result.refetch())),
+    }),
   });
 }
 

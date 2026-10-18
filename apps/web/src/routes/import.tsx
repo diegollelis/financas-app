@@ -5,7 +5,6 @@ import {
   hasRole,
   isoDateSchema,
   parseNubankCsv,
-  statementDueDateFromFileName,
   type Import,
   type StatementLine,
 } from '@financas/shared';
@@ -32,10 +31,14 @@ import { Input } from '@/components/ui/input';
 import { useCategories, useCategoryHints } from '@/features/categories/use-categories';
 import { ImportReview } from '@/features/import/import-review';
 import { startReview, type ReviewRow } from '@/features/import/review';
-import { startStatementReview, wholeBillAlreadyLaunched } from '@/features/import/statement-review';
+import {
+  startStatementReview,
+  statementPeriods,
+  wholeBillAlreadyLaunched,
+} from '@/features/import/statement-review';
 import { useInstallmentPlans } from '@/features/installments/use-installments';
 import { useMerchants } from '@/features/merchants/use-merchants';
-import { useTransactions } from '@/features/transactions/use-transactions';
+import { useTransactionsOf } from '@/features/transactions/use-transactions';
 import { useImports, useUndoImport } from '@/features/import/use-imports';
 import { downloadTemplate, readTemplate, TemplateReadError } from '@/features/import/workbook';
 import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
@@ -150,12 +153,12 @@ const originOptions = [
   { value: 'NUBANK', label: 'Fatura Nubank' },
 ] as const;
 
-/** A statement read, waiting for its due date when the file name does not carry it. */
-type StatementFile = { lines: StatementLine[]; unread: string[]; dueDate: string | null };
+/** A statement read, waiting for its due date. */
+type StatementFile = { lines: StatementLine[]; unread: string[] };
 
 /**
  * The review of a card statement (ADR 0055), opened once what it compares with is loaded: the
- * workspace's merchants, plans and history, and the transactions of the bill's month.
+ * workspace's merchants, plans and history, and the transactions of the months its lines go to.
  */
 function StatementReview({
   workspaceId,
@@ -176,11 +179,11 @@ function StatementReview({
   const merchants = useMerchants(workspaceId);
   const plans = useInstallmentPlans(workspaceId);
   const hints = useCategoryHints(workspaceId);
-  const transactions = useTransactions(workspaceId, dueDate.slice(0, 7));
-  const queries = [categories, merchants, plans, transactions];
+  const transactions = useTransactionsOf(workspaceId, statementPeriods(statement.lines));
+  const queries = [categories, merchants, plans];
   // The history only suggests: a failure there does not hold the review.
   if (!categories.data || !merchants.data || !plans.data || !transactions.data || hints.isPending) {
-    return <QueryState queries={queries} />;
+    return <QueryState queries={[...queries, transactions]} />;
   }
   const context = {
     dueDate,
@@ -194,7 +197,7 @@ function StatementReview({
   const notices = [
     ...(wholeBill
       ? [
-          `${formatPeriod(dueDate.slice(0, 7))} já tem a saída "${wholeBill.transaction.description}" de ${formatCents(wholeBill.transaction.amountCents)} no Crédito, perto do total desta fatura (${formatCents(wholeBill.totalCents)}). Se ela é esta fatura lançada inteira, importar as compras conta duas vezes: exclua aquela saída ou desmarque as compras.`,
+          `${formatPeriod(wholeBill.transaction.period)} já tem a saída "${wholeBill.transaction.description}" de ${formatCents(wholeBill.transaction.amountCents)} no Crédito, perto do total desta fatura (${formatCents(wholeBill.totalCents)}). Se ela é esta fatura lançada inteira, importar as compras conta duas vezes: exclua aquela saída ou desmarque as compras.`,
         ]
       : []),
     ...(statement.unread.length > 0
@@ -257,14 +260,13 @@ export function ImportPage() {
       const fatal = parsed.issues.find((issue) => issue.line === 1 || issue.line === null);
       if (fatal) setReadError(fatal.message);
       else {
-        const fromName = statementDueDateFromFileName(file.name);
+        // The due date is always typed: a file name is no reliable source (ADR 0055 note).
         setStatement({
           lines: parsed.lines,
           unread: parsed.issues.map((issue) => `linha ${issue.line} (${issue.message})`),
-          dueDate: fromName,
         });
-        setTypedDueDate(fromName ?? '');
-        setDueDate(fromName);
+        setTypedDueDate('');
+        setDueDate(null);
       }
     } catch {
       setReadError('Não foi possível ler o arquivo.');
@@ -346,7 +348,7 @@ export function ImportPage() {
             </h2>
             <p>
               No app ou no site do Nubank, abra a fatura do cartão e exporte em CSV. Cada compra
-              entra no mês da fatura, vencendo no dia dela, com a data da compra; as parcelas viram
+              entra no mês em que foi feita, vencendo no dia da fatura; as parcelas viram
               parcelamentos.
             </p>
           </section>
@@ -383,7 +385,7 @@ export function ImportPage() {
             )}
             {reading && <p role="status">Lendo a fatura…</p>}
           </section>
-          {/* The file name did not carry the due date: it is asked before the review. */}
+          {/* Asked before the review: every line is due on it. */}
           {statement && !dueDate && (
             <section aria-labelledby="import-step-due" className="grid gap-3 sm:max-w-sm">
               <h2 id="import-step-due" className="font-medium">
@@ -392,7 +394,7 @@ export function ImportPage() {
               <FormField
                 id="import-due-date"
                 label="Vencimento da fatura"
-                hint="As compras entram no mês dele, vencendo nesse dia."
+                hint="Cada compra entra no mês em que foi feita, e todas vencem nesse dia."
                 error={dueDateError ?? undefined}
               >
                 <Input

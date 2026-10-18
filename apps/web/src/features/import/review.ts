@@ -45,8 +45,11 @@ export type ReviewRow = {
   merchantByAlias?: boolean;
   /** The alias to remember for its merchant on import; null or absent: none. */
   rememberAlias?: string | null;
-  /** An installment of a statement that starts a plan: N installments, created from `firstNumber`. */
-  plan?: { installments: number; firstNumber: number };
+  /**
+   * An installment of a statement that starts a plan: N installments, created from
+   * `firstNumber`, each due `dueMonthOffset` months after its own (the bill's month).
+   */
+  plan?: { installments: number; firstNumber: number; dueMonthOffset: number };
 };
 
 /** "DEBIT|mercado": a spreadsheet category, per type, whatever the case or accents. */
@@ -145,7 +148,7 @@ export function toTransaction(
 
 /**
  * The installment plan a statement's row becomes (ADR 0055): the bill's line as its installment,
- * due on the bill's day in the competência of each installment; or what is still wrong.
+ * each due on the bill's day, in the month after its own (ADR 0055 note); or what is wrong.
  */
 export function toPlan(
   row: ReviewRow,
@@ -164,8 +167,7 @@ export function toPlan(
     firstPeriod: row.period,
     occurredOn: row.occurredOn,
     dueDay: row.dueDate ? Number(row.dueDate.slice(8)) : null,
-    // The bill's month is the competência, and it is due in it.
-    dueMonthOffset: 0,
+    dueMonthOffset: row.plan?.dueMonthOffset ?? 0,
     ...(row.paymentMethod && { paymentMethod: row.paymentMethod }),
     ...(merchantName && { merchantName }),
   });

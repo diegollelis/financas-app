@@ -382,15 +382,22 @@ describe('ImportPage', () => {
       await userEvent.click(await screen.findByRole('radio', { name: 'Fatura Nubank' }));
       await userEvent.upload(screen.getByLabelText('Escolher fatura (.csv)'), file);
     };
+    /** The due date is always typed (ADR 0055 note). */
+    const typeDueDate = async (date = '2026-11-04') => {
+      await userEvent.type(await screen.findByLabelText('Vencimento da fatura'), date);
+      await userEvent.click(screen.getByRole('button', { name: 'Revisar a fatura' }));
+    };
 
     it('reviews the statement, learns an alias and imports with its origin and due date', async () => {
       const fetchMock = mockStatement();
       renderApp(page);
 
       await chooseStatement();
+      await typeDueDate();
 
-      const november = await screen.findByRole('region', { name: 'novembro de 2026' });
-      const [pizza, unknown, payment] = within(november).getAllByRole('listitem');
+      // In the month of the purchase, not the bill's (ADR 0055 note).
+      const october = await screen.findByRole('region', { name: 'outubro de 2026' });
+      const [pizza, unknown, payment] = within(october).getAllByRole('listitem');
       // By the alias, named by the merchant, with the bank's text to check.
       expect(pizza).toHaveTextContent('Pizzaria Exemplo');
       expect(pizza).toHaveTextContent('No extrato: Ifd*Pizzaria Exemplo');
@@ -403,6 +410,9 @@ describe('ImportPage', () => {
         within(unknown!).getByRole('combobox', { name: 'Categoria de Spaceship.Com* Gypcbz' }),
       );
       await userEvent.click(await screen.findByRole('option', { name: 'Moradia' }));
+      // Ready without a merchant: only a hint says it is optional.
+      expect(screen.getByRole('button', { name: 'Importar 2 lançamentos' })).toBeEnabled();
+      expect(unknown).toHaveTextContent('Sem estabelecimento (opcional).');
       await userEvent.click(within(unknown!).getByRole('button', { name: /^(Editar|Corrigir)/ }));
       const dialog = await screen.findByRole('dialog', { name: 'Linha 3 da fatura' });
       await userEvent.click(
@@ -435,17 +445,19 @@ describe('ImportPage', () => {
       });
     });
 
-    it('asks for the due date when the file name does not carry it', async () => {
+    it('always asks for the due date, whatever the file name says', async () => {
       mockStatement();
       renderApp(page);
 
-      await chooseStatement(statementFile('fatura.csv'));
-      await userEvent.click(await screen.findByRole('button', { name: 'Revisar a fatura' }));
-      expect(await screen.findByText('Informe o vencimento da fatura.')).toBeInTheDocument();
-      await userEvent.type(screen.getByLabelText('Vencimento da fatura'), '2026-12-10');
+      await chooseStatement();
+      // The name carries a date, and the field still comes empty.
+      expect(await screen.findByLabelText('Vencimento da fatura')).toHaveValue('');
       await userEvent.click(screen.getByRole('button', { name: 'Revisar a fatura' }));
+      expect(await screen.findByText('Informe o vencimento da fatura.')).toBeInTheDocument();
+      await typeDueDate('2026-11-10');
 
-      expect(await screen.findByRole('region', { name: 'dezembro de 2026' })).toBeInTheDocument();
+      expect(await screen.findByRole('region', { name: 'outubro de 2026' })).toBeInTheDocument();
+      expect(screen.getByText('10/11/2026')).toBeInTheDocument();
     });
 
     it('refuses a file that is not a Nubank statement', async () => {

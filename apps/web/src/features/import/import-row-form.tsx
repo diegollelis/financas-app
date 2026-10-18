@@ -149,9 +149,6 @@ export function ImportRowForm({
       type: values.type,
       description: describedByMerchant(values) ? values.merchant : values.description,
       rememberAlias: offersAlias && values.remember && values.merchant ? values.alias : null,
-      warnings: values.merchant
-        ? row.warnings.filter((warning) => !warning.startsWith('Sem estabelecimento'))
-        : row.warnings,
       notes: values.notes,
       merchantName: values.merchant,
       paymentMethod: values.paymentMethod || null,
