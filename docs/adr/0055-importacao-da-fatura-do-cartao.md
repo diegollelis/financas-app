@@ -123,3 +123,10 @@ A decisão de criar as parcelas sem data foi revista: uma compra parcelada acont
 - **O parcelamento guarda a data da compra** (`installment_plans.occurred_on`, opcional), e cada parcela e cada parte de uma divisão a recebem ao serem criadas.
 - **Mudar a data** no parcelamento chega às parcelas pendentes e às partes pendentes delas; as pagas ficam como estão, como as outras mudanças do parcelamento.
 - **Na tela,** o "Parcelado" volta a mostrar a "Data da compra" (no PR da tela do parcelamento). A exportação de dados leva a data.
+
+## Nota (a parcela inicial e a data da compra no "Parcelado", 2026-10-18)
+
+- **No "Parcelado"** do novo lançamento, "Começa na parcela (opcional)" fica ao lado de "Parcelas" (em branco, é a primeira). A prévia diz quais serão criadas: "Da 3/10 à 10/10: 8 parcelas de R$ 50,00, total R$ 400,00." Um número acima do total de parcelas é recusado no próprio formulário.
+- **A "Data da compra"** continua no "Parcelado", como num lançamento avulso, e vai para todas as parcelas. Com "Todo mês" ou "Todo ano" ela some.
+- **Na edição do parcelamento,** a data da compra muda a qualquer momento; a parcela inicial muda como o valor e as parcelas (só sem parcela paga e sem divisão).
+- **Em Recorrências,** um parcelamento criado em 3/10 conta as pagas com as anteriores ("3 de 10 pagas": a 1/10 e a 2/10 já tinham sido cobradas) e diz quais parcelas tem, ao lado das pagas: "Da 3/10 à 10/10". O valor continua "total em 8 de R$ 50,00".

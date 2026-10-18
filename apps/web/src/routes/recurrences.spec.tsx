@@ -188,6 +188,27 @@ describe('RecurrencesPage', () => {
     expect(screen.queryByRole('button', { name: 'Ações de Sofá' })).not.toBeInTheDocument();
   });
 
+  it('shows a plan created at 3/10 as the bill does (ADR 0055)', async () => {
+    const tv = plan(3, {
+      description: 'TV',
+      totalCents: 40_000,
+      installments: 10,
+      firstNumber: 3,
+      settledCount: 1,
+      pendingCount: 7,
+      pendingCents: 35_000,
+      lastPendingPeriod: '2027-04',
+    });
+    mockRecurrences({ [`GET ${base}/installments`]: { body: [tv] } });
+    renderApp(page);
+
+    const plans = await section('Parcelamentos');
+    // 1/10 and 2/10 were charged before it, and one more is paid here.
+    expect(nbsp(rowsOf(within(plans).getByRole('list'))[0])).toMatch(
+      /TV.*total em 8 de R\$ 50,00.*3 de 10 pagas.*Da 3\/10 à 10\/10.*Faltam 7 parcelas/,
+    );
+  });
+
   it('shows who a recurrence is split with, and does not change the split when editing', async () => {
     const split = {
       ...energia,

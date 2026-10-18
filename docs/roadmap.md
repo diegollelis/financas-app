@@ -169,7 +169,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Tela: a data no formulário, na linha e na tabela (coluna "Data" própria, escolhida na prévia)
   - [x] API: apelidos de estabelecimento e parcela inicial no parcelamento
   - [x] API: a data da compra no parcelamento, copiada para cada parcela e parte (nota no ADR)
-  - [ ] Tela: a parcela inicial e a data da compra no "Parcelado"
+  - [x] Tela: a parcela inicial e a data da compra no "Parcelado"
   - [ ] Tela: apelidos em Estabelecimentos e no seletor
   - [ ] API: a importação aceita parcelamentos, apelidos e a data
   - [ ] Tela: o leitor do CSV do Nubank e a revisão

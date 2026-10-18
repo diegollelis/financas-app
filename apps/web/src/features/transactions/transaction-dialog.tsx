@@ -138,7 +138,8 @@ export function TransactionDialog({
       ...(merchantId && { merchantId }),
       ...(paymentMethod && { paymentMethod }),
     };
-    // The day it happened (ADR 0055), on a new one only when there is one; never on a repeat.
+    // The day it happened (ADR 0055), on a new one only when there is one; also on an
+    // installment purchase (ADR 0055 note), never on a recurrence.
     const withDay = values.occurredOn ? { occurredOn: values.occurredOn } : {};
     if (editing) {
       update.mutate(
@@ -157,6 +158,9 @@ export function TransactionDialog({
       // All installments at once, one per month from this one (ADR 0038).
       setRepeat('INSTALLMENTS');
       const installments = Number(values.installments);
+      // A purchase already running starts at its installment (ADR 0055): 3 of 10 creates 8.
+      const firstNumber = values.firstNumber.trim() === '' ? 1 : Number(values.firstNumber);
+      const created = installments - firstNumber + 1;
       createPlan.mutate(
         {
           type: fields.type,
@@ -164,15 +168,17 @@ export function TransactionDialog({
           notes: fields.notes,
           categoryId: fields.categoryId,
           installments,
+          ...(firstNumber > 1 && { firstNumber }),
           amountCents: fields.amountCents,
           amountIs: values.amountIs,
           firstPeriod: period,
+          ...withDay,
           ...dueOf(period, values.dueDate),
           personId,
           ...withMerchant,
           ...(splitting && { split }),
         },
-        { onSuccess: done(withPeople(`Parcelamento adicionado: ${installments} parcelas`)) },
+        { onSuccess: done(withPeople(`Parcelamento adicionado: ${created} parcelas`)) },
       );
     } else if (values.repeat === 'MONTHLY' || values.repeat === 'YEARLY') {
       // Every month (or every year) from this one, due on the same day, in its month or the

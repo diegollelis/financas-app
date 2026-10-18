@@ -76,6 +76,8 @@ const transactionFormSchema = plainTransactionInputSchema
     amountKind: z.enum(['FIXED', 'VARIABLE']),
     /** Of installments: how many, as typed. */
     installments: z.string(),
+    /** Of installments: the first one created, for a purchase already running (ADR 0055); '' = 1. */
+    firstNumber: z.string(),
     /** Of installments: whether the amount typed is the whole purchase or each installment. */
     amountIs: z.enum(['TOTAL', 'INSTALLMENT']),
     /** Where it was bought or who paid it (ADR 0053): a name; a new one is created on save. */
@@ -170,7 +172,20 @@ const transactionFormSchema = plainTransactionInputSchema
         message: count.error.issues[0]?.message ?? 'Informe o número de parcelas.',
       });
     }
+    const first = firstNumberOf(values.firstNumber);
+    if (!Number.isInteger(first) || first < 1 || (count.success && first > count.data)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['firstNumber'],
+        message: 'Use um número de 1 até o total de parcelas.',
+      });
+    }
   });
+
+/** "Começa na parcela", as typed: blank is the first one. */
+function firstNumberOf(text: string) {
+  return text.trim() === '' ? 1 : Number(text);
+}
 
 type FormInput = z.input<typeof transactionFormSchema>;
 export type TransactionFormValues = z.output<typeof transactionFormSchema>;
@@ -202,25 +217,33 @@ const amountIsOptions = [
 
 /**
  * "10 parcelas de R$ 35,00, total R$ 350,00", or, when cents are left over, "3 parcelas:
- * 2 de R$ 333,33 e a última de R$ 333,34": what will be created, before it is.
+ * 2 de R$ 333,33 e a última de R$ 333,34": what will be created, before it is. A purchase already
+ * running says which ones: "Da 3/10 à 10/10: 8 parcelas de R$ 50,00, total R$ 400,00."
  */
 function installmentsPreview(
   amountText: string,
   countText: string,
+  firstText: string,
   amountIs: 'TOTAL' | 'INSTALLMENT',
 ) {
   const cents = parseReais(amountText);
   const count = installmentCountSchema.safeParse(Number(countText));
+  const firstNumber = firstNumberOf(firstText);
   if (cents === null || cents <= 0 || !count.success) return null;
-  const total = amountIs === 'TOTAL' ? cents : cents * count.data;
-  if (amountIs === 'TOTAL' && total < count.data) return null;
-  const parts = splitInstallments(total, count.data);
+  if (!Number.isInteger(firstNumber) || firstNumber < 1 || firstNumber > count.data) return null;
+  const created = count.data - firstNumber + 1;
+  const total = amountIs === 'TOTAL' ? cents : cents * created;
+  if (amountIs === 'TOTAL' && total < created) return null;
+  const parts = splitInstallments(total, created);
   const first = parts[0] ?? 0;
   const last = parts.at(-1) ?? 0;
+  const which =
+    firstNumber > 1 ? `Da ${firstNumber}/${count.data} à ${count.data}/${count.data}: ` : '';
+  const many = created === 1 ? '1 parcela' : `${created} parcelas`;
   if (first === last) {
-    return `${count.data} parcelas de ${formatCents(first)}, total ${formatCents(total)}.`;
+    return `${which}${many} de ${formatCents(first)}, total ${formatCents(total)}.`;
   }
-  return `${count.data} parcelas: ${count.data - 1} de ${formatCents(first)} e a última de ${formatCents(last)}, total ${formatCents(total)}.`;
+  return `${which}${many}: ${created - 1} de ${formatCents(first)} e a última de ${formatCents(last)}, total ${formatCents(total)}.`;
 }
 
 /** Values a new transaction starts from, e.g. an application to a budget destination. */
@@ -303,6 +326,7 @@ export function TransactionForm({
       repeat: 'NONE',
       amountKind: 'FIXED',
       installments: '',
+      firstNumber: '',
       amountIs: 'TOTAL',
       merchant: merchants.find((merchant) => merchant.id === initial?.merchantId)?.name ?? '',
       paymentMethod: initial?.paymentMethod ?? '',
@@ -320,6 +344,7 @@ export function TransactionForm({
   const amountIs = useWatch({ control, name: 'amountIs' });
   const typedAmount = useWatch({ control, name: 'amount' });
   const typedInstallments = useWatch({ control, name: 'installments' });
+  const typedFirstNumber = useWatch({ control, name: 'firstNumber' });
   const splitOn = useWatch({ control, name: 'splitOn' });
   const typedDueDate = useWatch({ control, name: 'dueDate' });
   // A new transaction, a credit too, launched once, every month or in installments, may be
@@ -337,8 +362,9 @@ export function TransactionForm({
   const yearly = repeat === 'YEARLY';
   const variable = recurring && amountKind === 'VARIABLE';
   const installments = repeat === 'INSTALLMENTS';
-  // Each generated month and installment comes without a day: the due date says it (ADR 0055).
-  const withDay = repeat === 'NONE';
+  // A recurrence's months come without a day: the due date says it. An installment purchase
+  // happened on one day, the same for every installment (ADR 0055 and its note).
+  const withDay = repeat === 'NONE' || repeat === 'INSTALLMENTS';
   const amountLabel = variable
     ? 'Valor estimado (R$)'
     : installments
@@ -357,7 +383,12 @@ export function TransactionForm({
       ? `${installments ? 'Cada parcela' : yearly ? 'Cada ano' : 'Cada mês'} vence no ${dueDayLabel(due.dueDay, due.dueMonthOffset)}.`
       : null;
   const preview = installments
-    ? installmentsPreview(typedAmount ?? '', typedInstallments ?? '', amountIs ?? 'TOTAL')
+    ? installmentsPreview(
+        typedAmount ?? '',
+        typedInstallments ?? '',
+        typedFirstNumber ?? '',
+        amountIs ?? 'TOTAL',
+      )
     : null;
   // Only categories of the chosen type; an archived one only if it is already the current one.
   const options = categories.filter(
@@ -622,7 +653,21 @@ export function TransactionForm({
               {...register('installments')}
             />
           </FormField>
-          <div className="grid gap-2">
+          {/* A purchase already running, as the card bill shows it: 3 creates 3/10 to 10/10 (ADR 0055). */}
+          <FormField
+            id={id('first-number')}
+            label="Começa na parcela (opcional)"
+            error={formState.errors.firstNumber?.message}
+          >
+            <Input
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="1"
+              className="tabular-nums"
+              {...register('firstNumber')}
+            />
+          </FormField>
+          <div className="grid gap-2 sm:col-span-2">
             <p aria-hidden className="text-sm font-medium">
               O valor digitado é
             </p>
@@ -641,7 +686,7 @@ export function TransactionForm({
           </div>
           <p aria-live="polite" className="text-muted-foreground text-sm sm:col-span-2">
             {preview ??
-              'Uma parcela por mês, a partir deste, todas pendentes. Com o total, os centavos que sobram vão para a última.'}
+              'Uma parcela por mês, a partir deste, todas pendentes. Com o total, os centavos que sobram vão para a última. Numa compra já em andamento, informe em que parcela ela está.'}
           </p>
         </div>
       )}
@@ -748,7 +793,12 @@ export function TransactionForm({
                   userId={user.id}
                   installments={
                     repeat === 'INSTALLMENTS'
-                      ? { count: Number(typedInstallments), amountIs: amountIs ?? 'TOTAL' }
+                      ? {
+                          // The installments created: from the first number on (ADR 0055).
+                          count:
+                            Number(typedInstallments) - firstNumberOf(typedFirstNumber ?? '') + 1,
+                          amountIs: amountIs ?? 'TOTAL',
+                        }
                       : undefined
                   }
                   monthly={recurring ? { variable, yearly } : undefined}

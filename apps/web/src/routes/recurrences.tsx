@@ -7,6 +7,7 @@ import {
   nextRecurrencePeriod,
   paymentMethodLabels,
   settledLabels,
+  installmentsCreated,
   shiftPeriod,
   splitInstallments,
   transactionTypeLabels,
@@ -114,11 +115,17 @@ function nextLine(recurrence: Recurrence) {
 
 /** The competência of a plan's last installment. */
 const lastPeriodOf = (plan: InstallmentPlan) =>
-  shiftPeriod(plan.firstPeriod, plan.installments - 1);
+  shiftPeriod(plan.firstPeriod, installmentsCreated(plan) - 1);
 
 /** Ended, or every installment already paid: history, no longer something to act on. */
 const planIsOver = (plan: InstallmentPlan) =>
-  plan.endedAt !== null || plan.settledCount >= plan.installments;
+  plan.endedAt !== null || plan.settledCount >= installmentsCreated(plan);
+
+/**
+ * Installments paid, counting those before a plan created at 3/10 (ADR 0055): the bill had
+ * already charged 1/10 and 2/10, so "2 de 10" before the first one here is paid.
+ */
+const paidCount = (plan: InstallmentPlan) => plan.firstNumber - 1 + plan.settledCount;
 
 /** The confirmation before ending a series (ADR 0038): what goes and what stays. */
 function EndDialog({
@@ -620,7 +627,8 @@ function PlanItem({
   // Nothing paid: no history to keep, so it is deleted rather than ended (ADR 0038 note).
   const nothingPaid = plan.settledCount === 0;
   const category = categories.find((item) => item.id === plan.categoryId);
-  const parts = splitInstallments(plan.totalCents, plan.installments);
+  const created = installmentsCreated(plan);
+  const parts = splitInstallments(plan.totalCents, created);
   const first = parts[0] ?? 0;
   const confirmEnd = () =>
     void end.mutateAsync(plan.id).then(() => {
@@ -631,15 +639,20 @@ function PlanItem({
   const status =
     plan.endedAt !== null
       ? 'Encerrado'
-      : plan.settledCount >= plan.installments
+      : plan.settledCount >= created
         ? settledLabels[plan.type]
         : remaining(plan);
   // The amount is the purchase's total: "total em 10 de R$ 99,90", or just how many when the
   // leftover cents make the last one differ.
   const amountNote =
     parts.at(-1) === first
-      ? `total em ${plan.installments} de ${formatCents(first)}`
-      : `total em ${plan.installments} parcelas`;
+      ? `total em ${created} de ${formatCents(first)}`
+      : `total em ${created} parcelas`;
+  // A plan created at 3/10 (ADR 0055) says which ones it has, beside what was paid.
+  const which =
+    plan.firstNumber > 1
+      ? `Da ${plan.firstNumber}/${plan.installments} à ${plan.installments}/${plan.installments}`
+      : null;
   const pendingText =
     plan.pendingCount === 1 ? '1 parcela pendente' : `${plan.pendingCount} parcelas pendentes`;
   // A running one, or an ended one with nothing paid (still to delete).
@@ -702,8 +715,13 @@ function PlanItem({
         <TableCell className="whitespace-normal">
           {personLine(plan.type, plan.personId, people) ?? '—'}
         </TableCell>
-        <TableCell className="tabular-nums">
-          {plan.settledCount} de {plan.installments}
+        <TableCell className="whitespace-normal tabular-nums">
+          <span className="grid">
+            <span>
+              {paidCount(plan)} de {plan.installments}
+            </span>
+            {which && <span className="text-muted-foreground">{which}</span>}
+          </span>
         </TableCell>
         <TableCell className="whitespace-normal">{status}</TableCell>
         <TableCell>
@@ -726,7 +744,8 @@ function PlanItem({
         category?.name ?? 'Categoria',
         plan.paymentMethod && paymentMethodLabels[plan.paymentMethod],
         personLine(plan.type, plan.personId, people),
-        `${plan.settledCount} de ${plan.installments} pagas`,
+        `${paidCount(plan)} de ${plan.installments} pagas`,
+        which,
         status,
       ]}
       amount={formatCents(plan.totalCents)}
@@ -883,7 +902,7 @@ export function RecurrencesPage() {
     { label: 'Tipo', width: 'w-20' },
     { label: 'Categoria', width: 'w-32', sort: (item) => categoryName(item.categoryId) },
     { label: 'Pessoa', width: 'w-36', sort: (item) => personName(item.personId) },
-    { label: 'Pagas', width: 'w-24', sort: (item) => item.settledCount / item.installments },
+    { label: 'Pagas', width: 'w-32', sort: (item) => paidCount(item) / item.installments },
     { label: 'Falta', width: 'w-48', sort: (item) => item.pendingCents },
     { label: 'Total', width: 'w-36', align: 'right', sort: (item) => item.totalCents },
   ];
