@@ -159,3 +159,9 @@ A decisão de criar as parcelas sem data foi revista: uma compra parcelada acont
 - **Leitura tolerante:** as colunas são achadas pelo título, em qualquer ordem; o valor vem em texto brasileiro, com ou sem espaço depois do sinal; a data aceita `2026-10-16` e `16/10/2026`; o BOM e as quebras de linha do Windows não atrapalham. Uma linha ilegível fica de fora com o motivo, e um valor zero é ignorado.
 - **"Parcela n/N" só quando faz sentido:** n de 1 a N e N de 2 em diante; fora disso, a linha é uma compra comum.
 - **O vencimento** vem do nome do arquivo quando ele o traz (`Nubank_2026-11-04.csv`, `statementDueDateFromFileName`); sem ele, a tela pede.
+
+## Nota (a origem e a revisão da fatura, 2026-10-18)
+
+- **"Origem":** cada importação pode ter um nome digitado (`imports.label`, até 100 caracteres), sugerido como "Fatura Nubank" ou "Planilha modelo" e trocável ("Cartão Nubank do Diego"). O nome do arquivo não serve: ele não identifica a fatura para quem lê. A importação de uma fatura guarda também o vencimento (`imports.statement_due_date`), e a lista mostra "Fatura Nubank · vence 04/11/2026", com quantos lançamentos e parcelamentos ela criou.
+- **A mesma fatura pode ser importada de novo,** por exemplo cinco dias depois, numa fatura ainda aberta: o que já entrou vem desmarcado ("possivelmente já importada", "já lançada"), e só as compras novas entram. Cada importação fica separada, e desfazer a segunda tira só o que ela trouxe.
+- **A descrição de uma compra com estabelecimento é o nome dele** ("Pizzaria Exemplo"), não o texto do extrato ("Ifd*Pizzaria Exemplo"), escolhido na prévia: a lista de Lançamentos fica igual à de quem lança à mão, e o texto do extrato aparece na revisão, para conferir. Sem estabelecimento, a descrição é o texto do extrato sem a parcela. Em qualquer caso, ela pode ser trocada em "Editar".

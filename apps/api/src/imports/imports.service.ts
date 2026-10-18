@@ -14,14 +14,20 @@ import { z } from 'zod';
 import { ensureUsableCategories } from '../categories/ensure-category.js';
 import type { TransactionImport } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { toDate } from '../transactions/dates.js';
+import { toDate, toIsoDate } from '../transactions/dates.js';
 
-type ImportRow = TransactionImport & { createdBy: { name: string } | null };
+type ImportRow = TransactionImport & {
+  createdBy: { name: string } | null;
+  _count: { installmentPlans: number };
+};
 
 function toResponse(row: ImportRow): Import {
   return {
     id: row.id,
     transactionCount: row.transactionCount,
+    planCount: row._count.installmentPlans,
+    label: row.label,
+    statementDueDate: row.statementDueDate && toIsoDate(row.statementDueDate),
     firstPeriod: row.firstPeriod,
     lastPeriod: row.lastPeriod,
     createdAt: row.createdAt.toISOString(),
@@ -29,7 +35,10 @@ function toResponse(row: ImportRow): Import {
   };
 }
 
-const withCreator = { createdBy: { select: { name: true } } } as const;
+const withCreator = {
+  createdBy: { select: { name: true } },
+  _count: { select: { installmentPlans: true } },
+} as const;
 
 /**
  * Spreadsheet imports of one workspace (ADR 0040). Same rules as the other resources: the
@@ -89,6 +98,8 @@ export class ImportsService {
         workspaceId,
         createdById: userId,
         transactionCount: periods.length,
+        label: input.label ?? null,
+        statementDueDate: input.statementDueDate ? toDate(input.statementDueDate) : null,
         firstPeriod: periods[0] ?? '',
         lastPeriod: periods.at(-1) ?? '',
         installmentPlans: {

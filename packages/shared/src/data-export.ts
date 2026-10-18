@@ -144,6 +144,8 @@ const exportInstallmentPlanSchema = z.object({
 const exportImportSchema = z.object({
   id: z.uuid(),
   transactionCount: z.number().int(),
+  label: z.string().nullable(),
+  statementDueDate: day.nullable(),
   firstPeriod: period,
   lastPeriod: period,
   createdAt: instant,
