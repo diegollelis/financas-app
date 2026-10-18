@@ -61,7 +61,7 @@ import {
   useUpdateInstallmentPlan,
 } from '@/features/installments/use-installments';
 import { usePeople, useResolvePerson } from '@/features/people/use-people';
-import { dueDayLabel, frequencyLabel } from '@/features/recurrences/due';
+import { dueDayLabel, frequencyLabel, monthNameOf } from '@/features/recurrences/due';
 import { RecurrenceForm } from '@/features/recurrences/recurrence-form';
 import {
   useEndRecurrence,
@@ -87,6 +87,18 @@ const showError = (error: unknown) => toast.error(apiErrorMessage(error));
 /** "Desde outubro de 2026", or "A partir de" for one that has not started yet. */
 function since(period: string) {
   return `${period > currentPeriod() ? 'A partir de' : 'Desde'} ${formatPeriod(period)}`;
+}
+
+const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase('pt-BR') + text.slice(1);
+
+/**
+ * An ended one, from its first month to its last, so the start is not lost: "Janeiro a maio de
+ * 2026", "Outubro de 2025 a março de 2026", or "Em maio de 2026" for a single month.
+ */
+function periodRange(start: string, end: string) {
+  if (start === end) return `Em ${formatPeriod(end)}`;
+  const from = start.slice(0, 4) === end.slice(0, 4) ? monthNameOf(start) : formatPeriod(start);
+  return `${capitalized(from)} a ${formatPeriod(end)}`;
 }
 
 /** "Próximo: março de 2027": when a yearly one comes again (ADR 0038 note); null otherwise. */
@@ -474,7 +486,7 @@ function RecurrenceItem({
   const who =
     personLine(recurrence.type, recurrence.personId, people) ?? splitLine(recurrence.split, people);
   const period = ended
-    ? `Até ${formatPeriod(recurrence.endPeriod ?? '')}`
+    ? periodRange(recurrence.startPeriod, recurrence.endPeriod ?? recurrence.startPeriod)
     : since(recurrence.startPeriod);
   // A variable one: the amount typed is only the starting estimate (ADR 0038).
   const frequency = frequencyLabel(recurrence.intervalMonths, recurrence.startPeriod);
