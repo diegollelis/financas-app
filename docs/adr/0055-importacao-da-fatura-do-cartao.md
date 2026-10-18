@@ -151,3 +151,11 @@ A decisão de criar as parcelas sem data foi revista: uma compra parcelada acont
 - **Recorrências não são importadas:** uma fatura não diz se uma cobrança se repete. O caminho continua sendo "Tornar recorrente" depois de importar.
 - **Não contar duas vezes com uma recorrência:** se o mês da fatura já tem o lançamento pendente de uma recorrência com o mesmo estabelecimento (ou a mesma descrição) e valor próximo, a revisão traz a linha da fatura desmarcada, "já lançada pela recorrência", mostrando a diferença de valor. A importação não altera o lançamento da recorrência (assim "Desfazer" continua simples); ajustar o valor real é feito nele, em Lançamentos. A regra é da revisão, no passo 7: os meses de recorrência não têm data da compra, e a comparação por data não os pegaria.
 - **Uma escolha vale para as linhas iguais:** escolher (ou criar) o estabelecimento de uma linha sem correspondência aplica a mesma escolha às outras linhas da mesma fatura com o mesmo título limpo, como três pedidos na mesma pizzaria. Regra da revisão, no passo 7.
+
+## Nota (o leitor do CSV do Nubank, 2026-10-18)
+
+- **Um leitor por banco, sem tela:** `parseNubankCsv` (em `packages/shared/src/statement.ts`) recebe o texto do arquivo e devolve linhas num formato comum a todos os bancos (`StatementLine`): a data da compra, o título como veio, o título limpo (sem a parcela), o valor sempre positivo, a parcela n/N e o que a linha é. Um banco novo é outro leitor que devolve as mesmas linhas.
+- **O que a linha é:** valor positivo é compra; negativo com "Pagamento recebido" (ou "Pagamento em") é o pagamento da fatura anterior; outro negativo é estorno, que vira entrada na revisão.
+- **Leitura tolerante:** as colunas são achadas pelo título, em qualquer ordem; o valor vem em texto brasileiro, com ou sem espaço depois do sinal; a data aceita `2026-10-16` e `16/10/2026`; o BOM e as quebras de linha do Windows não atrapalham. Uma linha ilegível fica de fora com o motivo, e um valor zero é ignorado.
+- **"Parcela n/N" só quando faz sentido:** n de 1 a N e N de 2 em diante; fora disso, a linha é uma compra comum.
+- **O vencimento** vem do nome do arquivo quando ele o traz (`Nubank_2026-11-04.csv`, `statementDueDateFromFileName`); sem ele, a tela pede.

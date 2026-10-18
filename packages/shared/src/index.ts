@@ -18,6 +18,7 @@ export * from './invitation.ts';
 export * from './money-and-dates.ts';
 export * from './person.ts';
 export * from './recurrence.ts';
+export * from './statement.ts';
 export * from './summary.ts';
 export * from './transaction.ts';
 export * from './workspace.ts';
