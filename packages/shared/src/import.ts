@@ -19,6 +19,16 @@ import {
 /** A spreadsheet holds a few years of months; more than this in one go is a mistake. */
 export const MAX_IMPORT_TRANSACTIONS = 2000;
 
+/** Matches the `imports.label` column (varchar 100). */
+export const IMPORT_LABEL_MAX_LENGTH = 100;
+
+/** How the person names an import ("Fatura Nubank", ADR 0055 note); a blank one is none. */
+export const importLabelSchema = z
+  .string()
+  .trim()
+  .max(IMPORT_LABEL_MAX_LENGTH, `Use no máximo ${IMPORT_LABEL_MAX_LENGTH} caracteres.`)
+  .transform((label) => label || null);
+
 /**
  * One imported transaction: the plain fields, plus the merchant by name (ADR 0053). A name the
  * workspace does not have becomes a merchant in the import; an archived one comes back.
@@ -75,6 +85,10 @@ export const createImportInputSchema = z
       ),
     plans: z.array(importInstallmentPlanInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
     aliases: z.array(importMerchantAliasInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
+    /** "Origem" (ADR 0055 note). */
+    label: importLabelSchema.nullable().optional(),
+    /** The due date of the card statement imported, when it is one. */
+    statementDueDate: isoDateSchema.nullable().optional(),
   })
   .refine((input) => input.transactions.length + (input.plans?.length ?? 0) > 0, {
     message: 'Escolha ao menos um lançamento para importar.',
@@ -95,7 +109,14 @@ export type CreateImportInput = z.infer<typeof createImportInputSchema>;
 
 export const importSchema = z.object({
   id: z.uuid(),
+  /** The transactions it created, installments included. */
   transactionCount: z.number().int(),
+  /** The installment plans it created (ADR 0055). */
+  planCount: z.number().int().default(0),
+  /** "Origem", as typed; null for an import made before it, or without one. */
+  label: z.string().nullable().default(null),
+  /** The due date of the card statement, when it was one. */
+  statementDueDate: isoDateSchema.nullable().default(null),
   firstPeriod: periodSchema,
   lastPeriod: periodSchema,
   createdAt: z.iso.datetime(),

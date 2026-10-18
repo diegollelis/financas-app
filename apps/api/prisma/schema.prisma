@@ -418,6 +418,10 @@ model TransactionImport {
   createdById      String?       @map("created_by") @db.Uuid
   createdBy        User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
   transactionCount Int           @map("transaction_count")
+  // How the person names it ("Fatura Nubank"), and the bill's due date of a card statement
+  // (ADR 0055 note): what tells one import from another in the list.
+  label            String?       @db.VarChar(100)
+  statementDueDate DateTime?     @map("statement_due_date") @db.Date
   firstPeriod      String        @map("first_period") @db.Char(7)
   lastPeriod       String        @map("last_period") @db.Char(7)
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)

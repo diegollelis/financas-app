@@ -154,8 +154,14 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
     - [x] Dividir uma entrada: as partes viram saídas pendentes em Repasse
     - [x] Dividir um parcelamento: a parte de cada pessoa em cada parcela, criadas junto (API, depois tela)
     - [x] Dividir uma recorrência: a recorrência guarda a divisão e gera a parte de cada pessoa a cada mês; em % numa variável, acompanhando o valor real (API, depois tela)
-  - [ ] Enviar a parte para quem usa o app, com aceite no espaço dela (ADR próprio)
+  - [ ] Compartilhar um lançamento com quem usa o app, com aceite no espaço dela (ADR próprio; avaliado em 2026-10-18). Em vez de compartilhar um espaço para dividir um jantar, a parte da pessoa vira um pedido que ela aceita no Pessoal dela, escolhendo a categoria; o "pago" acompanha dos dois lados. A decidir no ADR:
+    - o vínculo entre dois espaços (hoje isolados por RLS), em tabela própria, a pessoa vendo só a parte dela;
+    - como ela fica sabendo (pedidos recebidos no app, e-mail ou os dois);
+    - a ligação da pessoa do cadastro com a conta dela (hoje só membros têm);
+    - o que sincroniza depois do aceite (sugestão: só o "pago" e o "excluído"; mudar valor ou descrição vira um pedido novo);
+    - recusa e exclusão de um dos lados.
   - [ ] Divisão das contas da casa por percentual entre os membros (ADR próprio)
+- [ ] **Visão geral dos espaços,** no Pessoal (avaliada em 2026-10-18; ADR curto ou nota): um cartão por espaço de que a pessoa participa, com o mês atual (entradas, saídas e saldo previsto), vencidos e pendências, o que ela tem a receber e a pagar ali e o link para o espaço; depois, também os pedidos de lançamento recebidos. Só junta o que ela já pode ver, lendo cada espaço no próprio contexto (como a cópia de categorias, [ADR 0048](adr/0048-copiar-categorias-entre-espacos.md)). Vem antes de compartilhar um lançamento.
 - [x] **Estabelecimento** ([ADR 0053](adr/0053-estabelecimentos.md)): onde se comprou ou quem pagou ("Mercado A", "Netflix", "Empresa X"), um cadastro do espaço e um campo opcional em saídas e entradas, separado da categoria e da pessoa. Pessoa responde "com quem"; estabelecimento responde "onde". Usar Pessoa para lojas foi descartado: os saldos de Pessoas contariam uma compra pendente como dívida com a loja, as lojas apareceriam em "Dividir com alguém" e um lançamento não teria como ter loja e pessoa ao mesmo tempo.
   - [x] ADR: cadastro próprio (e não texto livre, subcategorias ou etiquetas), saídas e entradas, "Estabelecimento" na tela e `Merchant` no código, no glossário
   - [x] API: tabela `merchants` com RLS (nome único no espaço, arquivar em vez de excluir), `merchant_id` opcional em lançamentos, recorrências e parcelamentos, exportação de dados
@@ -174,6 +180,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Tela: apelidos em Estabelecimentos e no seletor
   - [x] API: a importação aceita parcelamentos, apelidos e a data
   - [x] O leitor do CSV do Nubank, sem tela (`parseNubankCsv` em `packages/shared`)
+  - [x] API: a "Origem" digitada e o vencimento da fatura em cada importação, e quantos parcelamentos ela criou
   - [ ] Tela: a origem "Fatura do cartão Nubank", o vencimento e a revisão com as regras da fatura
 - [x] As partes de uma divisão vencem com o que foi dividido (lançamento, mês da recorrência ou parcela) e acompanham a mudança do vencimento; as pendentes já gravadas ganham o da origem pela migração (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
 - [x] Recorrências: uma encerrada mostra do primeiro ao último mês ("Janeiro a maio de 2026"), e não só "Até maio de 2026" (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))

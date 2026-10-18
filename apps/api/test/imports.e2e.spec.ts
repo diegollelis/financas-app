@@ -93,6 +93,10 @@ describe('imports', () => {
 
     expect(created).toMatchObject({
       transactionCount: 4,
+      planCount: 0,
+      // None given: as the imports made before the "Origem" (ADR 0055 note).
+      label: null,
+      statementDueDate: null,
       firstPeriod: '2026-08',
       lastPeriod: '2026-09',
       createdBy: { name: maria.name },
@@ -320,6 +324,8 @@ describe('imports', () => {
                 },
               ],
               plans: [tv({ categoryId: compras })],
+              label: ' Fatura Nubank ',
+              statementDueDate: '2026-11-04',
             })
             .expect(201)
         ).body,
@@ -328,6 +334,9 @@ describe('imports', () => {
       // The purchase and the eight installments, 3/10 to 10/10.
       expect(created).toMatchObject({
         transactionCount: 9,
+        planCount: 1,
+        label: 'Fatura Nubank',
+        statementDueDate: '2026-11-04',
         firstPeriod: statementPeriod,
         lastPeriod: '2027-06',
       });

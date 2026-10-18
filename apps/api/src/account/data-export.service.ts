@@ -280,6 +280,8 @@ export class DataExportService {
       imports: imports.map((item) => ({
         id: item.id,
         transactionCount: item.transactionCount,
+        label: item.label,
+        statementDueDate: dayOrNull(item.statementDueDate),
         firstPeriod: item.firstPeriod,
         lastPeriod: item.lastPeriod,
         createdAt: iso(item.createdAt),
