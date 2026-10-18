@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,6 +39,7 @@ import {
   useMerchants,
   useUpdateMerchant,
 } from '@/features/merchants/use-merchants';
+import { MerchantAliases } from '@/features/merchants/merchant-aliases';
 import { TILE_LIST, TILE_ROW } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -184,6 +186,7 @@ function MerchantItem({
   canEdit: boolean;
 }) {
   const [renaming, setRenaming] = useState(false);
+  const [editingAliases, setEditingAliases] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateMerchant(workspaceId);
@@ -202,7 +205,15 @@ function MerchantItem({
 
   return (
     <li className={TILE_ROW}>
-      <span className="min-w-0 break-words">{name}</span>
+      {/* Only how many aliases, so the cards stay alike; which ones, in "Apelidos" (ADR 0055). */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="min-w-0 break-words">{name}</span>
+        {merchant.aliases.length > 0 && (
+          <Badge variant="secondary">
+            {merchant.aliases.length === 1 ? '1 apelido' : `${merchant.aliases.length} apelidos`}
+          </Badge>
+        )}
+      </span>
       {canEdit && (
         <>
           <DropdownMenu>
@@ -234,6 +245,9 @@ function MerchantItem({
               ) : (
                 <>
                   <DropdownMenuItem onSelect={() => setRenaming(true)}>Renomear</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setEditingAliases(true)}>
+                    Apelidos
+                  </DropdownMenuItem>
                   <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(true)}>
                     Arquivar
                   </DropdownMenuItem>
@@ -252,6 +266,19 @@ function MerchantItem({
               workspaceId={workspaceId}
               merchant={merchant}
               onDone={() => setRenaming(false)}
+            />
+          </ResponsiveDialog>
+          <ResponsiveDialog
+            open={editingAliases}
+            onOpenChange={setEditingAliases}
+            returnFocusTo={actionsRef}
+            title={`Apelidos de ${name}`}
+            description="Como ele aparece no extrato do cartão. Um título do extrato que começa com o apelido é deste estabelecimento; você pode encurtar para a parte que não muda."
+          >
+            <MerchantAliases
+              workspaceId={workspaceId}
+              merchant={merchant}
+              onDone={() => setEditingAliases(false)}
             />
           </ResponsiveDialog>
           <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
@@ -305,8 +332,11 @@ function MerchantList({
 }
 
 /** A name matches when it contains what was typed, ignoring case and accents. */
+/** By its name or one of its aliases (ADR 0055), ignoring case and accents. */
 const matches = (merchant: Merchant, search: string) =>
-  normalizeName(merchant.name).includes(normalizeName(search));
+  [merchant.name, ...merchant.aliases.map((item) => item.alias)].some((text) =>
+    normalizeName(text).includes(normalizeName(search)),
+  );
 
 export function MerchantsPage() {
   const workspace = useCurrentWorkspace();
