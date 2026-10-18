@@ -267,6 +267,7 @@ export class DataExportService {
         installments: plan.installments,
         firstNumber: plan.firstNumber,
         occurredOn: dayOrNull(plan.occurredOn),
+        importId: plan.importId,
         firstPeriod: plan.firstPeriod,
         dueDay: plan.dueDay,
         dueMonthOffset: plan.dueMonthOffset,

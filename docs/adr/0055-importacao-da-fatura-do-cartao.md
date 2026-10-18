@@ -141,3 +141,13 @@ A decisão de criar as parcelas sem data foi revista: uma compra parcelada acont
 - **Na lista de Estabelecimentos, só a contagem:** "2 apelidos" ao lado do nome. Na prévia, mostrar "Também aparece como: …" embaixo do nome foi descartado, porque deixava os cartões com alturas diferentes; a contagem mantém os cartões iguais.
 - **"Apelidos", no menu ⋯** de um estabelecimento ativo (entre "Renomear" e "Arquivar"), abre um diálogo que lista os apelidos, cada um com "Remover", e tem o campo "Novo apelido". Um apelido de outro estabelecimento mostra o nome dele na recusa.
 - **A busca da página e o seletor do lançamento** encontram também pelo apelido. No seletor, quando foi o apelido que bateu, ele aparece embaixo do nome.
+
+## Nota (a importação com parcelamentos e apelidos, 2026-10-18)
+
+- **Numa só requisição:** a importação recebe, além dos lançamentos, os parcelamentos (`plans`, cada um como a linha da fatura: o valor da parcela, o total de parcelas, a parcela inicial e o mês da primeira) e os apelidos aprendidos na revisão (`aliases`, o texto com o nome do estabelecimento).
+- **Os parcelamentos entram na mesma escrita** dos lançamentos, ligados à importação (`installment_plans.import_id`): desfazer a importação apaga o parcelamento com as parcelas.
+- **Os apelidos são conferidos antes de gravar qualquer coisa:** um que já é de outro estabelecimento recusa a importação inteira, com o nome dele; um que o estabelecimento já tem, ou repetido no lote, é ignorado. Como os estabelecimentos, eles ficam quando a importação é desfeita.
+- **A contagem da importação** soma os lançamentos e as parcelas criadas, e os meses vão do primeiro ao último de todos eles.
+- **Recorrências não são importadas:** uma fatura não diz se uma cobrança se repete. O caminho continua sendo "Tornar recorrente" depois de importar.
+- **Não contar duas vezes com uma recorrência:** se o mês da fatura já tem o lançamento pendente de uma recorrência com o mesmo estabelecimento (ou a mesma descrição) e valor próximo, a revisão traz a linha da fatura desmarcada, "já lançada pela recorrência", mostrando a diferença de valor. A importação não altera o lançamento da recorrência (assim "Desfazer" continua simples); ajustar o valor real é feito nele, em Lançamentos. A regra é da revisão, no passo 7: os meses de recorrência não têm data da compra, e a comparação por data não os pegaria.
+- **Uma escolha vale para as linhas iguais:** escolher (ou criar) o estabelecimento de uma linha sem correspondência aplica a mesma escolha às outras linhas da mesma fatura com o mesmo título limpo, como três pedidos na mesma pizzaria. Regra da revisão, no passo 7.
