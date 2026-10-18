@@ -29,6 +29,15 @@ const merchantRoutes: WorkspaceRoute[] = [
     body: { archived: true },
   },
   { method: 'delete', path: (id) => `/api/workspaces/${id}/merchants/${SOME_ID}` },
+  {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/merchants/${SOME_ID}/aliases`,
+    body: { alias: 'Intrusa' },
+  },
+  {
+    method: 'delete',
+    path: (id) => `/api/workspaces/${id}/merchants/${SOME_ID}/aliases/${SOME_ID}`,
+  },
 ];
 
 describe('merchants', () => {
@@ -159,6 +168,100 @@ describe('merchants', () => {
 
       await viewer.browser.get(`${base}/merchants`).expect(200);
       await viewer.browser.post(`${base}/merchants`).send({ name: 'Padaria' }).expect(403);
+      await viewer.browser
+        .post(`${base}/merchants/${SOME_ID}/aliases`)
+        .send({ alias: 'Padaria' })
+        .expect(403);
+    });
+  });
+
+  describe('aliases (ADR 0055)', () => {
+    it('adds and lists the texts it appears as in a statement, by alias, and removes one', async () => {
+      const { browser, base, addMerchant } = await setup();
+      const pizzaria = await addMerchant('Pizzaria Exemplo');
+
+      await browser
+        .post(`${base}/merchants/${pizzaria.id}/aliases`)
+        .send({ alias: 'Ifd*Pizzaria Exemplo' })
+        .expect(201);
+      const response = await browser
+        .post(`${base}/merchants/${pizzaria.id}/aliases`)
+        .send({ alias: ' Pizzaria Ex ' })
+        .expect(201);
+
+      const withAliases = merchantSchema.parse(response.body);
+      expect(withAliases.aliases.map((item) => item.alias)).toEqual([
+        'Ifd*Pizzaria Exemplo',
+        'Pizzaria Ex',
+      ]);
+      expect((await merchants(browser, base))[0]?.aliases).toEqual(withAliases.aliases);
+      await browser
+        .delete(`${base}/merchants/${pizzaria.id}/aliases/${withAliases.aliases[0]!.id}`)
+        .expect(204);
+      expect((await merchants(browser, base))[0]?.aliases.map((item) => item.alias)).toEqual([
+        'Pizzaria Ex',
+      ]);
+    });
+
+    it('refuses an alias already used, ignoring case, accents and the installment at the end', async () => {
+      const { browser, base, addMerchant } = await setup();
+      const loja = await addMerchant('Loja Exemplo');
+      const outra = await addMerchant('Outra Loja');
+      await browser
+        .post(`${base}/merchants/${loja.id}/aliases`)
+        .send({ alias: 'Loja.Exemplo' })
+        .expect(201);
+
+      const taken = await browser
+        .post(`${base}/merchants/${outra.id}/aliases`)
+        .send({ alias: 'LOJA.EXEMPLO - Parcela 2/3' })
+        .expect(409);
+
+      expect(taken.body).toMatchObject({
+        code: 'MERCHANT_ALIAS_EXISTS',
+        message: 'Esse apelido já é de "Loja Exemplo".',
+      });
+      const onlyInstallment = await browser
+        .post(`${base}/merchants/${outra.id}/aliases`)
+        .send({ alias: 'Parcela 1/2' })
+        .expect(400);
+      expect(onlyInstallment.body).toMatchObject({ code: 'INVALID_INPUT' });
+    });
+
+    it('goes with its merchant, and frees the alias for another one', async () => {
+      const { browser, base, addMerchant } = await setup();
+      const loja = await addMerchant('Loja Exemplo');
+      await browser
+        .post(`${base}/merchants/${loja.id}/aliases`)
+        .send({ alias: 'Loja.Exemplo' })
+        .expect(201);
+
+      await browser.delete(`${base}/merchants/${loja.id}`).expect(204);
+
+      const outra = await addMerchant('Outra Loja');
+      await browser
+        .post(`${base}/merchants/${outra.id}/aliases`)
+        .send({ alias: 'Loja.Exemplo' })
+        .expect(201);
+    });
+
+    it("answers 404 for another merchant's alias or an unknown one", async () => {
+      const { browser, base, addMerchant } = await setup();
+      const loja = await addMerchant('Loja Exemplo');
+      const outra = await addMerchant('Outra Loja');
+      const added = merchantSchema.parse(
+        (
+          await browser
+            .post(`${base}/merchants/${loja.id}/aliases`)
+            .send({ alias: 'Loja.Exemplo' })
+            .expect(201)
+        ).body,
+      );
+
+      await browser
+        .delete(`${base}/merchants/${outra.id}/aliases/${added.aliases[0]!.id}`)
+        .expect(404);
+      await browser.delete(`${base}/merchants/${loja.id}/aliases/nada`).expect(404);
     });
   });
 

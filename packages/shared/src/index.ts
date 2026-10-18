@@ -12,6 +12,7 @@ export * from './import-template.ts';
 export * from './installment.ts';
 export * from './labels.ts';
 export * from './merchant.ts';
+export * from './merchant-alias.ts';
 export * from './payment-method.ts';
 export * from './invitation.ts';
 export * from './money-and-dates.ts';

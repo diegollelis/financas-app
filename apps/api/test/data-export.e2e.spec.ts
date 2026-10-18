@@ -137,7 +137,9 @@ describe('data export', () => {
     expect(personal!.recurrences).toMatchObject([
       { description: 'Internet de exemplo', generatedPeriods: [period] },
     ]);
-    expect(personal!.installmentPlans).toMatchObject([{ totalCents: 300_000, installments: 3 }]);
+    expect(personal!.installmentPlans).toMatchObject([
+      { totalCents: 300_000, installments: 3, firstNumber: 1 },
+    ]);
     expect(personal!.budgets).toMatchObject([
       {
         period,

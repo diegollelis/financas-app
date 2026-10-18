@@ -231,6 +231,87 @@ describe('installments', () => {
     expect(refused.body).toMatchObject({ code: 'INVALID_PERSON' });
   });
 
+  describe('a purchase already running (ADR 0055)', () => {
+    it('creates only the installments from the first number on, numbered as the bill', async () => {
+      const { create, fridge, transactionsOf } = await setUp();
+
+      const plan = await create(
+        fridge({ installments: 10, firstNumber: 3, amountCents: 5_000, amountIs: 'INSTALLMENT' }),
+      );
+
+      // Installments 3 to 10: eight of them, from this month on.
+      expect(plan).toMatchObject({
+        installments: 10,
+        firstNumber: 3,
+        totalCents: 40_000,
+        pendingCount: 8,
+        lastPendingPeriod: month(7),
+      });
+      expect((await transactionsOf(thisMonth))[0]?.installment).toEqual({
+        planId: plan.id,
+        number: 3,
+        count: 10,
+      });
+      expect((await transactionsOf(month(7)))[0]?.installment).toMatchObject({ number: 10 });
+      expect(await transactionsOf(month(8))).toEqual([]);
+    });
+
+    it('takes a total as the total of the installments created, and names the shares as the bill', async () => {
+      const { create, fridge, transactionsOf } = await setUp();
+
+      const plan = await create(
+        fridge({
+          installments: 4,
+          firstNumber: 3,
+          amountCents: 10_001,
+          split: [{ newPersonName: 'Ana', amountCents: 5_000 }],
+        }),
+      );
+
+      expect(plan).toMatchObject({ totalCents: 10_001, pendingCount: 2 });
+      const last = await transactionsOf(month(1));
+      expect(last.find((t) => t.installment)?.amountCents).toBe(5_001);
+      expect(last.find((t) => t.splitOfId !== null)).toMatchObject({
+        description: 'Geladeira (4/4)',
+        amountCents: 2_500,
+      });
+    });
+
+    it('refuses a first number past the installments, also when editing', async () => {
+      const { create, fridge, base, browser } = await setUp();
+
+      const refused = await browser
+        .post(`${base}/installments`)
+        .send(fridge({ firstNumber: 4 }))
+        .expect(400);
+      expect(refused.body).toMatchObject({
+        message: 'A parcela inicial passa do número de parcelas.',
+      });
+      const plan = await create(fridge());
+      await browser.patch(`${base}/installments/${plan.id}`).send({ firstNumber: 4 }).expect(400);
+    });
+
+    it('remakes the installments from a new first number while none is settled', async () => {
+      const { create, fridge, base, browser, transactionsOf } = await setUp();
+      const plan = await create(fridge({ installments: 5 }));
+
+      const response = await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({ firstNumber: 4 })
+        .expect(200);
+
+      expect(installmentPlanSchema.parse(response.body)).toMatchObject({
+        firstNumber: 4,
+        totalCents: 100_000,
+        pendingCount: 2,
+      });
+      expect((await transactionsOf(thisMonth))[0]?.installment).toMatchObject({
+        number: 4,
+        count: 5,
+      });
+    });
+  });
+
   describe('editing and deleting (ADR 0038 note)', () => {
     it('changes what it is in the pending installments, never in the settled ones', async () => {
       const { create, fridge, transactionsOf, base, browser, categoryId } = await setUp();
