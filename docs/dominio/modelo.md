@@ -85,7 +85,7 @@ Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras
 
 **Créditos:** Salário, Bônus, Renda extra, Rendimentos, Reembolso, Outros
 
-**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Beleza, Educação, Lazer, Compras, Assinaturas, Impostos e taxas, Repasse, Outros
+**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Cuidados pessoais, Educação, Lazer, Compras, Presentes e doações, Pets, Assinaturas, Impostos e taxas, Repasse, Outros
 
 - **"Reembolso"** recebe as partes de uma saída dividida ([ADR 0042](../adr/0042-pessoas-e-rateio.md)), e **"Repasse"** as de uma entrada dividida ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)). As duas são fixas: marcadas no banco (`split_role`), não se renomeiam, arquivam nem excluem (nota no ADR 0052).
 - **Os destinos de guardar padrão** são Reserva de emergência e Investimentos, e cada um cria a sua categoria de débito com o mesmo nome ([ADR 0047](../adr/0047-orcamento-real-por-destino.md)).

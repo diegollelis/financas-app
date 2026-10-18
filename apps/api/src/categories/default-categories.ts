@@ -8,7 +8,11 @@ import { setWorkspaceContext } from '../prisma/prisma.service.js';
  * (docs/dominio/modelo.md). Generic on purpose: each person adds their own. "Reembolso" is the
  * category of the shares of a split debit (ADR 0042), "Repasse" of a split credit (ADR 0052).
  * "Bônus" is what the employer pays besides the salary (PLR, a bonus); "Renda extra", what comes
- * from elsewhere. "Beleza" (salão, barbeiro, cosméticos) apart from "Saúde". No "Cartão de crédito": how it was paid is the payment method, not a category (ADR 0054).
+ * from elsewhere. "Cuidados pessoais" (salon, barber, hygiene, cosmetics) apart from "Saúde";
+ * "Presentes e doações" and "Pets", common in personal finance apps and the IBGE POF
+ * (ADR 0024 note). No "Viagens": it is a saving goal of the budget, which creates its own category
+ * (ADR 0047). No "Cartão de crédito": how it was paid is the payment method, not a category
+ * (ADR 0054).
  * Workspaces created before this list keep the one they got, from the source spreadsheet.
  */
 export const DEFAULT_CATEGORIES: Record<TransactionType, readonly string[]> = {
@@ -20,10 +24,12 @@ export const DEFAULT_CATEGORIES: Record<TransactionType, readonly string[]> = {
     'Restaurantes',
     'Transporte',
     'Saúde',
-    'Beleza',
+    'Cuidados pessoais',
     'Educação',
     'Lazer',
     'Compras',
+    'Presentes e doações',
+    'Pets',
     'Assinaturas',
     'Impostos e taxas',
     'Repasse',

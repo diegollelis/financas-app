@@ -177,8 +177,17 @@ describe('payment method', () => {
 
     expect(names).not.toContain('Cartão de crédito (DEBIT)');
     expect(names).toContain('Bônus (CREDIT)');
-    // Beleza too (ADR 0024 note of 2026-10-18).
-    expect(names).toContain('Beleza (DEBIT)');
+    // And the ones the market lists most (ADR 0024 note of 2026-10-18).
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'Cuidados pessoais (DEBIT)',
+        'Presentes e doações (DEBIT)',
+        'Pets (DEBIT)',
+      ]),
+    );
+    expect(names).not.toContain('Beleza (DEBIT)');
+    // A saving goal of the budget, which creates its own category (ADR 0047).
+    expect(names).not.toContain('Viagens (DEBIT)');
   });
 
   it('takes a meal or food voucher', async () => {
