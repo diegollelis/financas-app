@@ -1,7 +1,10 @@
 import {
+  importInstallmentPlanInputSchema,
   plainTransactionInputSchema,
   normalizeName,
   type Category,
+  type ImportInstallmentPlanInput,
+  type ImportMerchantAliasInput,
   type ImportTransactionInput,
   type PaymentMethod,
   type TemplateDraft,
@@ -33,8 +36,17 @@ export type ReviewRow = {
   occurredOn: string | null;
   dueDate: string | null;
   settledAt: string | null;
-  /** Warnings of the report (installment in the text, personal data...). */
+  /** Warnings of the report (installment in the text, personal data...), or why a line of a
+   * card statement becomes what it becomes, or comes unchecked. */
   warnings: string[];
+  /** A card statement's line (ADR 0055): the title as the bank wrote it. */
+  statementTitle?: string;
+  /** Its merchant came from an alias: there is no alias to learn. */
+  merchantByAlias?: boolean;
+  /** The alias to remember for its merchant on import; null or absent: none. */
+  rememberAlias?: string | null;
+  /** An installment of a statement that starts a plan: N installments, created from `firstNumber`. */
+  plan?: { installments: number; firstNumber: number };
 };
 
 /** "DEBIT|mercado": a spreadsheet category, per type, whatever the case or accents. */
@@ -129,6 +141,75 @@ export function toTransaction(
     };
   }
   return { ok: false, problems: [...new Set(result.error.issues.map((issue) => issue.message))] };
+}
+
+/**
+ * The installment plan a statement's row becomes (ADR 0055): the bill's line as its installment,
+ * due on the bill's day in the competência of each installment; or what is still wrong.
+ */
+export function toPlan(
+  row: ReviewRow,
+  categoryId: string | null,
+): { ok: true; plan: ImportInstallmentPlanInput } | { ok: false; problems: string[] } {
+  if (!categoryId) return { ok: false, problems: ['Escolha a categoria.'] };
+  const merchantName = row.merchantName.trim();
+  const result = importInstallmentPlanInputSchema.safeParse({
+    type: row.type,
+    description: row.description,
+    notes: row.notes,
+    categoryId,
+    installments: row.plan?.installments,
+    firstNumber: row.plan?.firstNumber,
+    amountCents: row.amountCents,
+    firstPeriod: row.period,
+    occurredOn: row.occurredOn,
+    dueDay: row.dueDate ? Number(row.dueDate.slice(8)) : null,
+    // The bill's month is the competência, and it is due in it.
+    dueMonthOffset: 0,
+    ...(row.paymentMethod && { paymentMethod: row.paymentMethod }),
+    ...(merchantName && { merchantName }),
+  });
+  if (result.success) return { ok: true, plan: result.data };
+  return { ok: false, problems: [...new Set(result.error.issues.map((issue) => issue.message))] };
+}
+
+/** What still keeps a row out of the import: a transaction's problems, or a plan's. */
+export function rowProblems(row: ReviewRow, categoryId: string | null): string[] {
+  const result = row.plan ? toPlan(row, categoryId) : toTransaction(row, categoryId);
+  return result.ok ? [] : result.problems;
+}
+
+/** What the import sends: the transactions, the plans and the aliases learned (ADR 0055). */
+export type ReadyImport = {
+  transactions: ImportTransactionInput[];
+  plans: ImportInstallmentPlanInput[];
+  aliases: ImportMerchantAliasInput[];
+};
+
+/** The checked rows that are ready, as the API takes them, with the aliases to remember. */
+export function readyImport(
+  rows: ReviewRow[],
+  categories: Category[],
+  matches: ReadonlyMap<string, string>,
+): ReadyImport {
+  const ready: ReadyImport = { transactions: [], plans: [], aliases: [] };
+  for (const row of rows) {
+    if (!row.included) continue;
+    const categoryId = resolveCategory(row, categories, matches);
+    if (row.plan) {
+      const result = toPlan(row, categoryId);
+      if (!result.ok) continue;
+      ready.plans.push(result.plan);
+    } else {
+      const result = toTransaction(row, categoryId);
+      if (!result.ok) continue;
+      ready.transactions.push(result.transaction);
+    }
+    const alias = row.rememberAlias?.trim();
+    const merchantName = row.merchantName.trim();
+    if (alias && merchantName) ready.aliases.push({ merchantName, alias });
+  }
+  return ready;
 }
 
 /** The checked rows that are ready, as the API takes them. */
