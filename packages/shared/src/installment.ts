@@ -32,9 +32,15 @@ export const createInstallmentPlanInputSchema = z
     notes: transactionNotesSchema.optional(),
     categoryId: z.uuid('Escolha uma categoria.'),
     installments: installmentCountSchema,
+    /**
+     * The number of the first installment created (ADR 0055), 1 by default: 3 for a purchase
+     * already at 3/10, which gets installments 3 to 10. The amount, as total or per installment,
+     * is then of those created.
+     */
+    firstNumber: z.number().int().min(1).optional(),
     amountCents: amountCentsSchema,
     amountIs: installmentAmountIsSchema,
-    /** The competência of the first installment. */
+    /** The competência of the first installment created. */
     firstPeriod: periodSchema,
     dueDay: dueDaySchema.nullable().optional(),
     /** Each installment due in its own month (0, the default) or in the next one (1). */
@@ -56,15 +62,20 @@ export const createInstallmentPlanInputSchema = z
       .max(MAX_SPLIT_PEOPLE, `Divida com no máximo ${MAX_SPLIT_PEOPLE} pessoas.`)
       .optional(),
   })
+  .refine((input) => (input.firstNumber ?? 1) <= input.installments, {
+    message: 'A parcela inicial passa do número de parcelas.',
+    path: ['firstNumber'],
+  })
   .refine(
     (input) =>
-      input.amountIs === 'TOTAL' || input.amountCents * input.installments <= MAX_AMOUNT_CENTS,
+      input.amountIs === 'TOTAL' ||
+      input.amountCents * installmentsCreated(input) <= MAX_AMOUNT_CENTS,
     { message: 'Valor total alto demais.', path: ['amountCents'] },
   )
-  .refine((input) => input.amountIs === 'INSTALLMENT' || input.amountCents >= input.installments, {
-    message: 'O total precisa dar ao menos um centavo por parcela.',
-    path: ['amountCents'],
-  })
+  .refine(
+    (input) => input.amountIs === 'INSTALLMENT' || input.amountCents >= installmentsCreated(input),
+    { message: 'O total precisa dar ao menos um centavo por parcela.', path: ['amountCents'] },
+  )
   .superRefine((input, context) => {
     if (!input.split) return;
     const issue = (message: string) =>
@@ -74,7 +85,7 @@ export const createInstallmentPlanInputSchema = z
     if (others > input.amountCents) issue('As partes dos outros passam do valor do lançamento.');
     if (
       input.amountIs === 'TOTAL' &&
-      input.split.some((share) => share.amountCents < input.installments)
+      input.split.some((share) => share.amountCents < installmentsCreated(input))
     ) {
       issue('Cada parte precisa dar ao menos um centavo por parcela.');
     }
@@ -84,6 +95,11 @@ export const createInstallmentPlanInputSchema = z
 
 export type CreateInstallmentPlanInput = z.infer<typeof createInstallmentPlanInputSchema>;
 
+/** How many installments a plan creates: from its first number to the last (ADR 0055). */
+export function installmentsCreated(plan: { installments: number; firstNumber?: number }) {
+  return plan.installments - (plan.firstNumber ?? 1) + 1;
+}
+
 export const installmentPlanSchema = z.object({
   id: z.uuid(),
   type: transactionTypeSchema,
@@ -92,6 +108,8 @@ export const installmentPlanSchema = z.object({
   categoryId: z.uuid(),
   totalCents: z.number().int(),
   installments: z.number().int(),
+  /** The number of its first installment (ADR 0055): 1, or 3 for one created at 3/10. */
+  firstNumber: z.number().int().default(1),
   firstPeriod: periodSchema,
   dueDay: z.number().int().nullable(),
   dueMonthOffset: z.number().int().default(0),
@@ -131,9 +149,11 @@ export function splitInstallments(totalCents: number, installments: number): num
   );
 }
 
-/** The total of a plan, from the amount typed and what it means. */
+/** The total of a plan's installments, from the amount typed and what it means. */
 export function installmentPlanTotal(input: CreateInstallmentPlanInput): number {
-  return input.amountIs === 'TOTAL' ? input.amountCents : input.amountCents * input.installments;
+  return input.amountIs === 'TOTAL'
+    ? input.amountCents
+    : input.amountCents * installmentsCreated(input);
 }
 
 /**
@@ -153,6 +173,7 @@ export const updateInstallmentPlanInputSchema = z
     merchantId: z.uuid().nullable(),
     paymentMethod: paymentMethodSchema.nullable(),
     installments: installmentCountSchema,
+    firstNumber: z.number().int().min(1),
     amountCents: amountCentsSchema,
     amountIs: installmentAmountIsSchema,
     firstPeriod: periodSchema,
@@ -180,5 +201,6 @@ export const INSTALLMENT_AMOUNT_FIELDS = [
   'amountCents',
   'amountIs',
   'installments',
+  'firstNumber',
   'firstPeriod',
 ] as const satisfies readonly (keyof UpdateInstallmentPlanInput)[];

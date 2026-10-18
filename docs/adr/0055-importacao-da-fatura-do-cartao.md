@@ -107,3 +107,11 @@ O arquivo de exemplo é uma fatura real do dono. Como o repositório é público
 - **Lista:** "Compra em 28/09" (ou "Em 03/10", numa entrada) antes do vencimento, com o ano só quando não é o do mês de referência.
 - **Tabela:** uma coluna "Data" própria antes do vencimento, que também ordena. Na prévia foram descartadas a data dentro da coluna do vencimento (a linha ficava mais alta) e embaixo da descrição (sem ordenar e menos à vista).
 - **Revisão da importação:** a data aparece na linha e pode ser corrigida em "Editar".
+
+## Nota (apelidos e parcela inicial na API, 2026-10-18)
+
+- **Apelidos:** a tabela `merchant_aliases` (com RLS) guarda o texto como foi digitado e a forma limpa (`normalized`), única no espaço. A rota `POST …/merchants/:merchantId/aliases` acrescenta um apelido e devolve o estabelecimento com todos os seus; `DELETE …/aliases/:aliasId` remove um. Um apelido de outro estabelecimento é recusado com o nome dele (409 `MERCHANT_ALIAS_EXISTS`), e um apelido que fica vazio depois da limpeza (só "Parcela 1/2") é recusado como inválido. A lista de estabelecimentos devolve os apelidos, e a exportação os leva.
+- **A comparação** fica em `packages/shared` (`normalizeStatementTitle` e `findMerchantByAlias`), para o leitor da fatura usar no navegador.
+- **Parcela inicial:** `installment_plans.first_number` (1 por padrão, com CHECK de 1 até o número de parcelas). Com 3 de 10, o parcelamento cria só as parcelas 3 a 10, cada lançamento com o seu número de verdade, e as partes de uma divisão dizem "(3/10)".
+- **O valor de um parcelamento em andamento** é o das parcelas criadas: "da parcela" é cada uma delas, e "total" é a soma delas (o que falta pagar), não o da compra inteira. É o que a fatura mostra e o que a pessoa sabe; o total da compra inteira incluiria parcelas que o app não tem.
+- **Mudar a parcela inicial** refaz as parcelas, como mudar os valores, e só enquanto nenhuma foi paga e o parcelamento não é dividido.

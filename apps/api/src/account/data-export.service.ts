@@ -18,6 +18,7 @@ export const EXPORTED_TABLES: Record<string, string> = {
   categories: 'categories',
   people: 'people',
   merchants: 'merchants',
+  merchant_aliases: 'merchants[].aliases',
   transactions: 'transactions',
   budget_configs: 'budgets',
   budget_destinations: 'budgetDestinations',
@@ -120,7 +121,11 @@ export class DataExportService {
       this.prisma.invitation.findMany({ where, orderBy: { createdAt: 'asc' } }),
       db.category.findMany({ where, orderBy: [{ type: 'asc' }, { name: 'asc' }] }),
       db.person.findMany({ where, orderBy: { name: 'asc' } }),
-      db.merchant.findMany({ where, orderBy: { name: 'asc' } }),
+      db.merchant.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        include: { aliases: { orderBy: { alias: 'asc' }, select: { alias: true } } },
+      }),
       db.transaction.findMany({
         where,
         include: { occurrence: { select: { recurrenceId: true } } },
@@ -207,6 +212,7 @@ export class DataExportService {
         id: merchant.id,
         name: merchant.name,
         archivedAt: isoOrNull(merchant.archivedAt),
+        aliases: merchant.aliases.map((item) => item.alias),
         createdAt: iso(merchant.createdAt),
       })),
       budgets: budgets.map((budget) => ({
@@ -259,6 +265,7 @@ export class DataExportService {
         categoryId: plan.categoryId,
         totalCents: plan.totalCents,
         installments: plan.installments,
+        firstNumber: plan.firstNumber,
         firstPeriod: plan.firstPeriod,
         dueDay: plan.dueDay,
         dueMonthOffset: plan.dueMonthOffset,

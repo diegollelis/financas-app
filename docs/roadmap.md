@@ -167,7 +167,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] ADR: mês de referência da fatura, parcelas (casar ou criar o parcelamento, com a parcela inicial), apelidos pelo começo do título, "Data da compra" / "Data", aviso de fatura lançada inteira
   - [x] API: a data da compra nos lançamentos, na planilha modelo (coluna "Data") e na exportação
   - [x] Tela: a data no formulário, na linha e na tabela (coluna "Data" própria, escolhida na prévia)
-  - [ ] API: apelidos de estabelecimento e parcela inicial no parcelamento
+  - [x] API: apelidos de estabelecimento e parcela inicial no parcelamento
   - [ ] Tela: apelidos em Estabelecimentos e no seletor; parcela inicial no "Parcelado"
   - [ ] API: a importação aceita parcelamentos, apelidos e a data
   - [ ] Tela: o leitor do CSV do Nubank e a revisão

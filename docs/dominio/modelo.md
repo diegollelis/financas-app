@@ -43,6 +43,7 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 - `workspace_id`, `description`, `total_cents`, `installments`, `first_period`
 - Gera, ao ser criado, um `Transaction` por parcela (`installment_plan_id`, `installment_number`), uma por competência; o total pode ser digitado como total ou como valor da parcela, e a diferença de arredondamento vai para a última parcela ([ADR 0038](../adr/0038-recorrencias-e-parcelamentos.md)).
 - Encerrar remove as parcelas pendentes do mês atual em diante; as pagas ficam.
+- `first_number` (1 por padrão): a parcela inicial de uma compra já em andamento. Com 3 de 10, o app cria só as parcelas 3 a 10, numeradas como na fatura, e o valor (total ou da parcela) é o dessas parcelas ([ADR 0055](../adr/0055-importacao-da-fatura-do-cartao.md)).
 
 ### Recurrence (Recorrência) — fase 5 ([ADR 0038](../adr/0038-recorrencias-e-parcelamentos.md))
 
@@ -67,6 +68,8 @@ Pessoa (`Person`): um contato do espaço, só o nome, para quem usa ou não o ap
 ### Merchant (Estabelecimento) — fase 5 ([ADR 0053](../adr/0053-estabelecimentos.md))
 
 Onde se comprou ou quem pagou: um cadastro do espaço, só o nome (único no espaço, ignorando maiúsculas e acentos), sem tipo e sem categoria fixa. Lançamentos, recorrências e parcelamentos têm um `merchant_id` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Pessoa responde "com quem", estabelecimento responde "onde", e um lançamento pode ter os dois. Arquiva-se em vez de excluir; só um arquivado sem uso é excluído (`MERCHANT_IN_USE`).
+
+Apelidos (`MerchantAlias`, [ADR 0055](../adr/0055-importacao-da-fatura-do-cartao.md)): os textos como o estabelecimento aparece no extrato do cartão. Cada apelido é de um estabelecimento só e não se repete no espaço, comparado sem maiúsculas, acentos, espaços a mais e o " - Parcela n/N" do fim (`normalizeStatementTitle`). Um título do extrato é do estabelecimento cujo apelido o começa; o mais longo vence (`findMerchantByAlias`). Excluir o estabelecimento leva os apelidos.
 
 ### PaymentMethod (Meio de pagamento) — fase 5 ([ADR 0054](../adr/0054-meio-de-pagamento.md))
 

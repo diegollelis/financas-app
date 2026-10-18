@@ -2,6 +2,7 @@ import {
   currentPeriod,
   dueDateFor,
   installmentPlanTotal,
+  installmentsCreated,
   shareDescription,
   shiftPeriod,
   splitInstallments,
@@ -45,6 +46,7 @@ function toResponse(
     categoryId: plan.categoryId,
     totalCents: plan.totalCents,
     installments: plan.installments,
+    firstNumber: plan.firstNumber,
     firstPeriod: plan.firstPeriod,
     dueDay: plan.dueDay,
     dueMonthOffset: plan.dueMonthOffset,
@@ -132,7 +134,9 @@ export class InstallmentsService {
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     const totalCents = installmentPlanTotal(input);
-    const amounts = splitInstallments(totalCents, input.installments);
+    // From the first number on (ADR 0055): a purchase at 3/10 gets installments 3 to 10.
+    const firstNumber = input.firstNumber ?? 1;
+    const amounts = splitInstallments(totalCents, installmentsCreated(input));
     const dueDay = input.dueDay ?? null;
     const dueMonthOffset = input.dueMonthOffset ?? 0;
     const personId = input.personId ?? null;
@@ -148,6 +152,7 @@ export class InstallmentsService {
         categoryId: input.categoryId,
         totalCents,
         installments: input.installments,
+        firstNumber,
         firstPeriod: input.firstPeriod,
         dueDay,
         dueMonthOffset,
@@ -171,7 +176,7 @@ export class InstallmentsService {
               amountCents,
               period,
               dueDate,
-              installmentNumber: index + 1,
+              installmentNumber: firstNumber + index,
               ...(input.split && { shares: { create: sharesOf(index, period, dueDate) } }),
             };
           }),
@@ -208,10 +213,12 @@ export class InstallmentsService {
       split.map((share) => resolveSplitPerson(this.prisma, workspaceId, share)),
     );
     const count = input.installments;
+    const created = installmentsCreated(input);
+    const firstNumber = input.firstNumber ?? 1;
     const perInstallment = split.map((share) =>
       splitInstallments(
-        input.amountIs === 'TOTAL' ? share.amountCents : share.amountCents * count,
-        count,
+        input.amountIs === 'TOTAL' ? share.amountCents : share.amountCents * created,
+        created,
       ),
     );
     return (index: number, period: string, dueDate: Date | null) =>
@@ -219,7 +226,7 @@ export class InstallmentsService {
         workspaceId,
         type,
         // "Geladeira (3/10)": which installment it is a share of (ADR 0052 note).
-        description: shareDescription(input.description, { number: index + 1, count }),
+        description: shareDescription(input.description, { number: firstNumber + index, count }),
         categoryId,
         amountCents: perInstallment[k]![index]!,
         period,
@@ -300,14 +307,22 @@ export class InstallmentsService {
         });
       }
       const installments = input.installments ?? plan.installments;
+      const firstNumber = input.firstNumber ?? plan.firstNumber;
+      if (firstNumber > installments) {
+        throw new BadRequestException({
+          code: 'INVALID_INPUT',
+          message: 'A parcela inicial passa do número de parcelas.',
+        });
+      }
+      const created = installmentsCreated({ installments, firstNumber });
       const firstPeriod = input.firstPeriod ?? plan.firstPeriod;
       const totalCents =
         input.amountCents === undefined
           ? plan.totalCents
           : input.amountIs === 'TOTAL'
             ? input.amountCents
-            : input.amountCents * installments;
-      if (totalCents < installments) {
+            : input.amountCents * created;
+      if (totalCents < created) {
         throw new BadRequestException({
           code: 'INVALID_INPUT',
           message: 'O total precisa dar ao menos um centavo por parcela.',
@@ -315,13 +330,14 @@ export class InstallmentsService {
       }
       // Nothing is settled: the installments are made again from scratch.
       await db.transaction.deleteMany({ where: { workspaceId, installmentPlanId: planId } });
-      const amounts = splitInstallments(totalCents, installments);
+      const amounts = splitInstallments(totalCents, created);
       const updated = await db.installmentPlan.update({
         where: { id: planId, workspaceId },
         data: {
           ...merged,
           totalCents,
           installments,
+          firstNumber,
           firstPeriod,
           transactions: {
             create: amounts.map((amountCents, index) => {
@@ -338,7 +354,7 @@ export class InstallmentsService {
                 amountCents,
                 period,
                 dueDate: dueDateIn(period),
-                installmentNumber: index + 1,
+                installmentNumber: firstNumber + index,
               };
             }),
           },

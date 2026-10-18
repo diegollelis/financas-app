@@ -67,6 +67,8 @@ const exportMerchantSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   archivedAt: instant.nullable(),
+  /** How it appears in card statements (ADR 0055). */
+  aliases: z.array(z.string()),
   createdAt: instant,
 });
 
@@ -126,6 +128,7 @@ const exportInstallmentPlanSchema = z.object({
   categoryId: z.uuid(),
   totalCents: z.number().int(),
   installments: z.number().int(),
+  firstNumber: z.number().int(),
   firstPeriod: period,
   dueDay: z.number().int().nullable(),
   dueMonthOffset: z.number().int(),

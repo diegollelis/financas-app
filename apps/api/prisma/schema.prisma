@@ -35,6 +35,7 @@ model Workspace {
   budgetShares       BudgetShare[]
   recurrenceShares   RecurrenceShare[]
   merchants          Merchant[]
+  merchantAliases    MerchantAlias[]
   createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -379,11 +380,30 @@ model Merchant {
   transactions     Transaction[]
   recurrences      Recurrence[]
   installmentPlans InstallmentPlan[]
+  aliases          MerchantAlias[]
 
   @@unique([workspaceId, name])
   // Target of the composite foreign keys of transactions, recurrences and installment plans.
   @@unique([id, workspaceId])
   @@map("merchants")
+}
+
+// Apelido de estabelecimento (ADR 0055): how a merchant appears in a card statement. Unique per
+// workspace by `normalized` (no case, accents, extra spaces or installment at the end, as
+// `normalizeStatementTitle` gives it); deleting the merchant deletes its aliases.
+model MerchantAlias {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  merchantId  String    @map("merchant_id") @db.Uuid
+  merchant    Merchant  @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: Cascade, onUpdate: NoAction)
+  alias       String    @db.VarChar(100)
+  normalized  String    @db.VarChar(100)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([workspaceId, normalized])
+  @@index([merchantId])
+  @@map("merchant_aliases")
 }
 
 // Importação (ADR 0040): one spreadsheet import, all its transactions created at once and
@@ -423,6 +443,9 @@ model InstallmentPlan {
   category       Category        @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
   totalCents     Int             @map("total_cents")
   installments   Int             @db.SmallInt
+  // The number of the first installment created (ADR 0055): 3 for a purchase already at 3/10,
+  // which gets installments 3 to 10. CHECK (1 to installments) in the migration.
+  firstNumber    Int             @default(1) @map("first_number") @db.SmallInt
   firstPeriod    String          @map("first_period") @db.Char(7)
   dueDay         Int?            @map("due_day") @db.SmallInt
   // Each installment due in its own month (0) or in the next one (1), ADR 0038 note.
