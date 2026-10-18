@@ -1,5 +1,5 @@
 import { TEMPLATE_HEADERS } from '@financas/shared';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import writeXlsxFile from 'write-excel-file/browser';
@@ -382,10 +382,10 @@ describe('ImportPage', () => {
       await userEvent.click(await screen.findByRole('radio', { name: 'Fatura Nubank' }));
       await userEvent.upload(screen.getByLabelText('Escolher fatura (.csv)'), file);
     };
-    /** The due date is always typed (ADR 0055 note). */
+    /** The due date is typed at the top of the review (ADR 0055 note). */
+    const dueDateField = () => screen.findByLabelText('Vencimento da fatura', { exact: true });
     const typeDueDate = async (date = '2026-11-04') => {
-      await userEvent.type(await screen.findByLabelText('Vencimento da fatura'), date);
-      await userEvent.click(screen.getByRole('button', { name: 'Revisar a fatura' }));
+      await userEvent.type(await dueDateField(), date);
     };
 
     it('reviews the statement, learns an alias and imports with its origin and due date', async () => {
@@ -393,10 +393,10 @@ describe('ImportPage', () => {
       renderApp(page);
 
       await chooseStatement();
-      await typeDueDate();
 
-      // In the month of the purchase, not the bill's (ADR 0055 note).
+      // The review opens right away, in the month of the latest purchase (ADR 0055 note).
       const october = await screen.findByRole('region', { name: 'outubro de 2026' });
+      expect(screen.getByLabelText('Mês de referência')).toHaveValue('2026-10');
       const [pizza, unknown, payment] = within(october).getAllByRole('listitem');
       // By the alias, named by the merchant, with the bank's text to check.
       expect(pizza).toHaveTextContent('Pizzaria Exemplo');
@@ -410,9 +410,14 @@ describe('ImportPage', () => {
         within(unknown!).getByRole('combobox', { name: 'Categoria de Spaceship.Com* Gypcbz' }),
       );
       await userEvent.click(await screen.findByRole('option', { name: 'Moradia' }));
-      // Ready without a merchant: only a hint says it is optional.
-      expect(screen.getByRole('button', { name: 'Importar 2 lançamentos' })).toBeEnabled();
+      // Ready without a merchant: only a hint says it is optional. The due date is still missing.
       expect(unknown).toHaveTextContent('Sem estabelecimento (opcional).');
+      expect(screen.getByRole('button', { name: 'Importar 2 lançamentos' })).toBeDisabled();
+      expect(
+        screen.getByText('Informe o vencimento da fatura, no topo, para importar.'),
+      ).toBeInTheDocument();
+      await typeDueDate();
+      expect(screen.getByRole('button', { name: 'Importar 2 lançamentos' })).toBeEnabled();
       await userEvent.click(within(unknown!).getByRole('button', { name: /^(Editar|Corrigir)/ }));
       const dialog = await screen.findByRole('dialog', { name: 'Linha 3 da fatura' });
       await userEvent.click(
@@ -445,19 +450,24 @@ describe('ImportPage', () => {
       });
     });
 
-    it('always asks for the due date, whatever the file name says', async () => {
+    it('takes the due date typed, whatever the file name says, and another reference month', async () => {
       mockStatement();
       renderApp(page);
 
       await chooseStatement();
       // The name carries a date, and the field still comes empty.
-      expect(await screen.findByLabelText('Vencimento da fatura')).toHaveValue('');
-      await userEvent.click(screen.getByRole('button', { name: 'Revisar a fatura' }));
-      expect(await screen.findByText('Informe o vencimento da fatura.')).toBeInTheDocument();
+      expect(await dueDateField()).toHaveValue('');
+      expect(screen.getByText('Informe o vencimento da fatura.')).toBeInTheDocument();
       await typeDueDate('2026-11-10');
+      const october = await screen.findByRole('region', { name: 'outubro de 2026' });
+      expect(within(october).getAllByRole('listitem')[0]).toHaveTextContent('Vence em 10/11/2026');
 
-      expect(await screen.findByRole('region', { name: 'outubro de 2026' })).toBeInTheDocument();
-      expect(screen.getByText('10/11/2026')).toBeInTheDocument();
+      const month = screen.getByLabelText('Mês de referência');
+      // jsdom does not type into a month field: the change, as the browser sends it.
+      fireEvent.change(month, { target: { value: '2026-09' } });
+
+      expect(await screen.findByRole('region', { name: 'setembro de 2026' })).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'outubro de 2026' })).not.toBeInTheDocument();
     });
 
     it('refuses a file that is not a Nubank statement', async () => {

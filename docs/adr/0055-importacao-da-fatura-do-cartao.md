@@ -186,3 +186,14 @@ O primeiro teste com uma fatura real mostrou duas coisas, e a regra do mês foi 
 - **Uma fatura cobre vários meses,** então a revisão lê os lançamentos de cada mês envolvido para as comparações ("já importada", "já lançada pela recorrência"), e cada comparação olha só o mês da linha.
 - **O vencimento é sempre digitado,** com o campo vazio: o nome do arquivo não é uma fonte confiável (pode ter sido renomeado, e não se sabe se a data dele é sempre a do vencimento). `statementDueDateFromFileName` saiu.
 - **O estabelecimento é opcional e diz isso:** "Sem estabelecimento" deixou de ser um aviso com o ícone dos problemas, ao lado de "Escolha a categoria.", e virou uma dica em texto apagado, "Sem estabelecimento (opcional). Escolha um em 'Editar' para a próxima fatura já vir com ele.", só numa linha que já tem categoria.
+
+## Nota (o mês de referência da fatura, 2026-10-18)
+
+O segundo teste mostrou que o mês da compra também não serve: uma compra de 29/09, feita depois de o cartão virar, está na fatura de outubro e pertence a outubro. O cartão segue o **ciclo da fatura**, não o mês do calendário. A regra fica:
+
+- **Um mês de referência para a fatura inteira,** escolhido na revisão: todas as linhas entram nele, as compras, o estorno e as parcelas cobradas nesta fatura. É o mês do ciclo (outubro), não o do vencimento (novembro), como era na primeira decisão.
+- **Sugerido pelo mês da compra mais recente** da fatura, perto do fechamento; as parcelas ficam de fora da sugestão, porque a data delas é a da compra original. A pessoa troca se precisar, e uma linha isolada ainda pode ir para outro mês em "Editar".
+- **Uma parcela cobrada nesta fatura começa o parcelamento no mês de referência,** e as próximas seguem mês a mês, cada uma vencendo no dia da fatura, tão longe do mês dela quanto esta (`dueMonthOffset` 0 ou 1). Um vencimento mais longe que o mês seguinte recusa o parcelamento, com o motivo. O "mês da compra + número da parcela" e o caso da compra depois do fechamento saíram.
+- **O vencimento é digitado na revisão,** ao lado do mês e da "Origem", e não num passo antes dela: a revisão abre logo depois de escolher o arquivo, e "Importar" fica bloqueado até o vencimento ser informado.
+- **Trocar o mês ou o vencimento refaz a revisão** (as comparações "já importada" e "já lançada pela recorrência" passam a olhar o novo mês), e uma linha em que a pessoa já mexeu (marcou, escolheu categoria ou estabelecimento, editou) mantém as escolhas dela (`mergeStatementRows`).
+- **A visão continua sendo a do consumo:** quase todas as compras de uma fatura de outubro são de outubro; só as feitas entre o fechamento e a virada do mês mudam, para o mês em que aparecem na fatura.

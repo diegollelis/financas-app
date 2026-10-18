@@ -33,7 +33,20 @@ import {
   unmatchedCategories,
   type ReviewRow,
 } from './review';
-import { applyToSameTitle, sameTitleCount } from './statement-review';
+import { applyToSameTitle, mergeStatementRows, sameTitleCount } from './statement-review';
+
+/**
+ * A card statement's review (ADR 0055 notes): its reference month and due date, chosen here, and
+ * the rows as the statement gives them for these (null while the month's transactions load).
+ */
+export type StatementReviewProps = {
+  period: string;
+  dueDate: string | null;
+  onPeriodChange: (period: string) => void;
+  onDueDateChange: (dueDate: string | null) => void;
+  baseRows: ReviewRow[] | null;
+  notices: string[];
+};
 import { useCreateImport } from './use-imports';
 
 const typeLabel = { CREDIT: 'entrada', DEBIT: 'saída' } as const;
@@ -193,8 +206,8 @@ export function ImportReview({
   /** Offered when choosing a row's merchant (a card statement's review, ADR 0055). */
   merchants?: Merchant[];
   previousImports: Import[];
-  /** A card statement (ADR 0055): its due date and what the review found before opening. */
-  statement?: { dueDate: string; notices: string[] };
+  /** A card statement (ADR 0055): its month and due date, and what the review found. */
+  statement?: StatementReviewProps;
   /** The "Origem" it starts with ("Fatura Nubank", "Planilha modelo"). */
   defaultLabel: string;
   onChooseAnother: () => void;
@@ -202,6 +215,14 @@ export function ImportReview({
 }) {
   const [rows, setRows] = useState(initialRows);
   const [label, setLabel] = useState(defaultLabel);
+  // A new month or due date gives new rows; what the person chose on a row stays (ADR 0055 note).
+  const [base, setBase] = useState(statement?.baseRows ?? null);
+  if (statement?.baseRows && statement.baseRows !== base) {
+    const previousPeriod = base?.[0]?.period ?? null;
+    setBase(statement.baseRows);
+    setRows((current) => mergeStatementRows(current, statement.baseRows!, previousPeriod));
+  }
+  const missingDueDate = Boolean(statement) && !statement?.dueDate;
   const [matches, setMatches] = useState<ReadonlyMap<string, string>>(new Map());
   // The line being edited; the button that opened it gets the focus back.
   const [editing, setEditing] = useState<number | null>(null);
@@ -253,7 +274,7 @@ export function ImportReview({
         ...(ready.plans.length > 0 && { plans: ready.plans }),
         ...(ready.aliases.length > 0 && { aliases: ready.aliases }),
         label,
-        ...(statement && { statementDueDate: statement.dueDate }),
+        ...(statement?.dueDate && { statementDueDate: statement.dueDate }),
       },
       {
         onSuccess: (created) => {
@@ -284,16 +305,39 @@ export function ImportReview({
         </Button>
       </div>
 
-      {/* What tells this import apart later, in "Importações anteriores" (ADR 0055 note). */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* The statement's month and due date (ADR 0055 note), and what tells this import apart
+          later, in "Importações anteriores". */}
+      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {statement && (
-          <div className="grid gap-1">
-            <p className="text-sm font-medium">Vencimento da fatura</p>
-            <p className="tabular-nums">{formatIsoDate(statement.dueDate)}</p>
-            <p className="text-muted-foreground text-sm">
-              Cada compra entra no mês em que foi feita, e todas vencem nesse dia.
-            </p>
-          </div>
+          <>
+            <FormField
+              id="import-period"
+              label="Mês de referência"
+              hint="O mês da fatura: todas as linhas entram nele."
+            >
+              <Input
+                type="month"
+                value={statement.period}
+                onChange={(event) => {
+                  if (/^\d{4}-\d{2}$/.test(event.target.value)) {
+                    statement.onPeriodChange(event.target.value);
+                  }
+                }}
+              />
+            </FormField>
+            <FormField
+              id="import-due-date"
+              label="Vencimento da fatura"
+              hint="Todas as linhas vencem nesse dia."
+              error={missingDueDate ? 'Informe o vencimento da fatura.' : undefined}
+            >
+              <Input
+                type="date"
+                value={statement.dueDate ?? ''}
+                onChange={(event) => statement.onDueDateChange(event.target.value || null)}
+              />
+            </FormField>
+          </>
         )}
         <FormField
           id="import-label"
@@ -309,6 +353,7 @@ export function ImportReview({
         </FormField>
       </div>
 
+      {statement && !statement.baseRows && <p role="status">Atualizando a revisão…</p>}
       {statement?.notices.map((notice) => (
         <p key={notice} role="note" className="bg-muted rounded-lg p-3">
           {notice}
@@ -401,12 +446,12 @@ export function ImportReview({
                     )}
                     problems={problems}
                     onToggle={(included) =>
-                      update(row.line, (current) => ({ ...current, included }))
+                      update(row.line, (current) => ({ ...current, included, touched: true }))
                     }
                     // The same choice goes to the lines of the same title (ADR 0055 note).
                     onCategory={(chosen) =>
                       setRows((current) =>
-                        applyToSameTitle(current, { ...row, categoryId: chosen }),
+                        applyToSameTitle(current, { ...row, categoryId: chosen, touched: true }),
                       )
                     }
                     onEdit={(trigger) => {
@@ -432,6 +477,11 @@ export function ImportReview({
             As linhas das categorias sem correspondência só entram depois de escolher uma.
           </p>
         )}
+        {missingDueDate && (
+          <p className="text-muted-foreground text-sm">
+            Informe o vencimento da fatura, no topo, para importar.
+          </p>
+        )}
         <p className="text-muted-foreground text-sm">
           Tudo ou nada: se algum lançamento falhar, nenhum entra. Dá para desfazer a importação
           depois.
@@ -441,7 +491,12 @@ export function ImportReview({
           // The layout keeps room for it below the footer (data-fab).
           data-fab
           onClick={submit}
-          disabled={readyCount === 0 || create.isPending}
+          disabled={
+            readyCount === 0 ||
+            missingDueDate ||
+            (Boolean(statement) && !statement?.baseRows) ||
+            create.isPending
+          }
           className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-20 shadow-lg md:static md:shadow-none"
         >
           {create.isPending
@@ -470,7 +525,7 @@ export function ImportReview({
             categoryId={resolveCategory(editingRow, categories, matches)}
             onSave={(fixed) => {
               // On a statement, the choices go to the other lines of the same title too.
-              setRows((current) => applyToSameTitle(current, fixed));
+              setRows((current) => applyToSameTitle(current, { ...fixed, touched: true }));
               setEditing(null);
             }}
             onCancel={() => setEditing(null)}

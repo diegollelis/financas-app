@@ -9,9 +9,10 @@ import { describe, expect, it } from 'vitest';
 import { readyImport } from './review';
 import {
   applyToSameTitle,
+  mergeStatementRows,
   sameTitleCount,
   startStatementReview,
-  statementPeriods,
+  suggestedPeriod,
   wholeBillAlreadyLaunched,
   type StatementContext,
 } from './statement-review';
@@ -61,6 +62,7 @@ const transaction = (n: number, fields: Partial<Transaction>): Transaction => ({
 });
 
 const context = (more: Partial<StatementContext> = {}): StatementContext => ({
+  period: '2026-10',
   dueDate: '2026-11-04',
   merchants: [pizzaria, loja, netflix],
   categories: [lazer, compras, assinaturas],
@@ -81,7 +83,7 @@ const lines = (...rows: string[]) =>
   parseNubankCsv(['date,title,amount', ...rows].join('\n')).lines;
 
 describe('startStatementReview', () => {
-  it('makes a purchase a debit of the month it was made in, due on the bill: merchant by alias, named by it', () => {
+  it("makes a purchase a debit of the statement's month, due on the bill: merchant by alias, named by it", () => {
     const [row] = startStatementReview(lines('2026-10-03,IFD*PIZZARIA EXEMPLO,"86,50"'), context());
 
     expect(row).toMatchObject({
@@ -93,7 +95,7 @@ describe('startStatementReview', () => {
       categoryId: lazer.id,
       paymentMethod: 'CREDIT_CARD',
       amountCents: 8_650,
-      // The purchase's month, not the bill's (ADR 0055 note).
+      // The statement's reference month (ADR 0055 note).
       period: '2026-10',
       occurredOn: '2026-10-03',
       dueDate: '2026-11-04',
@@ -103,6 +105,7 @@ describe('startStatementReview', () => {
   });
 
   it('keeps the statement text without a merchant, with no warning: the merchant is optional', () => {
+    // Bought on September 29th, after the card turned: it belongs to October's statement.
     const [row] = startStatementReview(
       lines('2026-09-29,Spaceship.Com* Gypcbz,"32,40"'),
       context(),
@@ -112,12 +115,26 @@ describe('startStatementReview', () => {
       description: 'Spaceship.Com* Gypcbz',
       merchantName: '',
       categoryId: null,
-      period: '2026-09',
+      period: '2026-10',
+      occurredOn: '2026-09-29',
       warnings: [],
     });
   });
 
-  it('puts an installment in the purchase month plus its number, starting a plan due the next month', () => {
+  it("suggests the month of the statement's latest purchase, leaving installments out", () => {
+    expect(
+      suggestedPeriod(
+        lines(
+          '2026-09-29,Loja A,"10,00"',
+          '2026-10-27,Loja B,"10,00"',
+          '2026-12-01,Loja C - Parcela 2/3,"10,00"',
+          '2026-10-30,Pagamento recebido,"- 10,00"',
+        ),
+      ),
+    ).toBe('2026-10');
+  });
+
+  it("puts an installment billed here in the statement's month, starting a plan from it", () => {
     const geladeira: InstallmentPlan = {
       id: id(80),
       type: 'DEBIT',
@@ -148,11 +165,10 @@ describe('startStatementReview', () => {
     );
     const rows = startStatementReview(statement, context({ plans: [geladeira] }));
 
-    // August + 2: October, due on November 4th like every installment after it.
     expect(rows[0]).toMatchObject({
       included: true,
       period: '2026-10',
-      plan: { installments: 10, firstNumber: 3, dueMonthOffset: 1 },
+      plan: { installments: 10, firstNumber: 3 },
     });
     expect(plain(rows[0]?.warnings)).toEqual([
       'Vai criar um parcelamento: da 3/10 à 10/10, 8 parcelas de R$ 50,00, a primeira em outubro de 2026.',
@@ -162,23 +178,27 @@ describe('startStatementReview', () => {
       warnings: ['Já lançada: é a parcela 4/10 do parcelamento "Geladeira".'],
     });
     expect(rows[1]?.plan).toBeUndefined();
-    // May + 5: October, a plain transaction.
     expect(rows[2]).toMatchObject({ included: true, period: '2026-10', notes: 'Parcela 6/6' });
     expect(rows[2]?.plan).toBeUndefined();
-    expect(statementPeriods(statement)).toEqual(['2026-10']);
   });
 
-  it('starts a plan a month later when the purchase came after the bill closed', () => {
-    // Bought on September 30th, first charged in the bill due on November 4th.
-    const [row] = startStatementReview(
-      lines('2026-09-30,Loja.Exemplo - Parcela 1/3,"30,00"'),
-      context(),
+  it('waits for the due date, and refuses a plan due beyond the next month', () => {
+    const [waiting] = startStatementReview(
+      lines('2026-08-28,Loja.Exemplo - Parcela 3/10,"50,00"'),
+      context({ dueDate: null }),
     );
+    expect(waiting).toMatchObject({ dueDate: null, period: '2026-10' });
 
-    expect(row).toMatchObject({
-      period: '2026-10',
-      plan: { installments: 3, firstNumber: 1, dueMonthOffset: 1 },
-    });
+    const [late] = startStatementReview(
+      lines('2026-08-28,Loja.Exemplo - Parcela 3/10,"50,00"'),
+      context({ dueDate: '2026-12-04' }),
+    );
+    const ready = readyImport(
+      [{ ...late!, categoryId: compras.id }],
+      context().categories,
+      new Map(),
+    );
+    expect(ready.plans).toEqual([]);
   });
 
   it('leaves out the last bill payment, and brings a refund in as an inflow', () => {
@@ -196,7 +216,7 @@ describe('startStatementReview', () => {
     expect(refund?.warnings[0]).toMatch(/^Valor negativo na fatura: entra como entrada/);
   });
 
-  it('leaves out a purchase already in its month, and the month of a recurrence', () => {
+  it("leaves out a purchase already in the statement's month, and the month of a recurrence", () => {
     const rows = startStatementReview(
       lines('2026-10-03,Ifd*Pizzaria Exemplo,"86,50"', '2026-10-20,Netflix.Com,"56,90"'),
       context({
@@ -281,6 +301,8 @@ describe('startStatementReview', () => {
         dueDate: '2026-11-04',
       },
     ]);
+    // Due in the month after the reference month.
+    expect(ready.plans[0]?.dueMonthOffset).toBe(1);
     expect(ready.aliases).toEqual([{ merchantName: 'Spaceship', alias: 'Spaceship.Com' }]);
   });
 });
@@ -311,6 +333,35 @@ describe('applyToSameTitle', () => {
       categoryId: assinaturas.id,
     });
     expect(applied[2]).toMatchObject({ merchantName: '', categoryId: null });
+  });
+});
+
+describe('mergeStatementRows', () => {
+  it('keeps what the person chose on a row when the month changes, and moves it to the new month', () => {
+    const statement = lines(
+      '2026-10-05,Spaceship.Com* Gypcbz,"32,40"',
+      '2026-10-06,Outra Loja,"10,00"',
+    );
+    const october = startStatementReview(statement, context());
+    const chosen = [
+      { ...october[0]!, categoryId: assinaturas.id, included: false, touched: true },
+      october[1]!,
+    ];
+    const september = startStatementReview(
+      statement,
+      context({ period: '2026-09', dueDate: '2026-10-04' }),
+    );
+
+    const merged = mergeStatementRows(chosen, september, '2026-10');
+
+    expect(merged[0]).toMatchObject({
+      categoryId: assinaturas.id,
+      included: false,
+      period: '2026-09',
+      dueDate: '2026-10-04',
+    });
+    // An untouched row is simply the new one.
+    expect(merged[1]).toBe(september[1]);
   });
 });
 

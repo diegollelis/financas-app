@@ -45,12 +45,17 @@ export type ReviewRow = {
   merchantByAlias?: boolean;
   /** The alias to remember for its merchant on import; null or absent: none. */
   rememberAlias?: string | null;
-  /**
-   * An installment of a statement that starts a plan: N installments, created from
-   * `firstNumber`, each due `dueMonthOffset` months after its own (the bill's month).
-   */
-  plan?: { installments: number; firstNumber: number; dueMonthOffset: number };
+  /** An installment of a statement that starts a plan: N installments, created from `firstNumber`. */
+  plan?: { installments: number; firstNumber: number };
+  /** A statement's row the person changed: a new reference month keeps their choices. */
+  touched?: boolean;
 };
+
+/** "2026-11" − "2026-10" = 1: how many months the first is after the second. */
+const monthsBetween = (later: string, earlier: string) =>
+  (Number(later.slice(0, 4)) - Number(earlier.slice(0, 4))) * 12 +
+  Number(later.slice(5, 7)) -
+  Number(earlier.slice(5, 7));
 
 /** "DEBIT|mercado": a spreadsheet category, per type, whatever the case or accents. */
 export const categoryKey = (type: TransactionType, name: string) =>
@@ -148,7 +153,8 @@ export function toTransaction(
 
 /**
  * The installment plan a statement's row becomes (ADR 0055): the bill's line as its installment,
- * each due on the bill's day, in the month after its own (ADR 0055 note); or what is wrong.
+ * from the reference month on, each due on the bill's day as far from its month as this one; or
+ * what is wrong.
  */
 export function toPlan(
   row: ReviewRow,
@@ -156,6 +162,15 @@ export function toPlan(
 ): { ok: true; plan: ImportInstallmentPlanInput } | { ok: false; problems: string[] } {
   if (!categoryId) return { ok: false, problems: ['Escolha a categoria.'] };
   const merchantName = row.merchantName.trim();
+  // A plan is due in the month of each installment or the next (ADR 0038 note).
+  const dueMonthOffset =
+    row.dueDate && row.period ? monthsBetween(row.dueDate.slice(0, 7), row.period) : 0;
+  if (dueMonthOffset < 0 || dueMonthOffset > 1) {
+    return {
+      ok: false,
+      problems: ['Num parcelamento, o vencimento fica no mês de referência ou no seguinte.'],
+    };
+  }
   const result = importInstallmentPlanInputSchema.safeParse({
     type: row.type,
     description: row.description,
@@ -167,7 +182,7 @@ export function toPlan(
     firstPeriod: row.period,
     occurredOn: row.occurredOn,
     dueDay: row.dueDate ? Number(row.dueDate.slice(8)) : null,
-    dueMonthOffset: row.plan?.dueMonthOffset ?? 0,
+    dueMonthOffset,
     ...(row.paymentMethod && { paymentMethod: row.paymentMethod }),
     ...(merchantName && { merchantName }),
   });
