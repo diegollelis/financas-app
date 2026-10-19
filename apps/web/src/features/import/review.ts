@@ -11,6 +11,7 @@ import {
   type TemplateRow,
   type TransactionType,
 } from '@financas/shared';
+import { newCategoryName } from '@/features/categories/new-category';
 
 // The import review (ADR 0040), kept apart from the screen: what each row will become, which
 // categories still need a match, and what is ready to send. Nothing here talks to the API.
@@ -26,9 +27,12 @@ export type ReviewRow = {
   categoryName: string;
   /** Where it was bought or who paid it (ADR 0053); '' when none. A new name is created. */
   merchantName: string;
+  /** A receber de / a pagar para (ADR 0040 note); '' or absent when none. A new name is
+   * created on import. */
+  personName?: string;
   /** How it was paid or received (ADR 0054); null when none. */
   paymentMethod: PaymentMethod | null;
-  /** Chosen in the form; otherwise the category comes from the name. */
+  /** Chosen in the form (`newCategoryValue` for one to create on import); otherwise the category comes from the name. */
   categoryId: string | null;
   amountCents: number | null;
   period: string | null;
@@ -50,6 +54,14 @@ export type ReviewRow = {
   /** A statement's row the person changed: a new reference month keeps their choices. */
   touched?: boolean;
 };
+
+/**
+ * A category still to create (`newCategoryValue`) is checked as if it existed: it becomes a
+ * real one when the import is sent, and the value goes along until then.
+ */
+const NEW_CATEGORY_STAND_IN = '01920000-0000-7000-8000-000000000000';
+const checkable = (categoryId: string) =>
+  newCategoryName(categoryId) === null ? categoryId : NEW_CATEGORY_STAND_IN;
 
 /** "2026-11" − "2026-10" = 1: how many months the first is after the second. */
 const monthsBetween = (later: string, earlier: string) =>
@@ -132,7 +144,7 @@ export function toTransaction(
     type: row.type,
     description: row.description,
     notes: row.notes,
-    categoryId,
+    categoryId: checkable(categoryId),
     amountCents: row.amountCents,
     period: row.period,
     dueDate: row.dueDate,
@@ -143,9 +155,15 @@ export function toTransaction(
   });
   if (result.success) {
     const merchantName = row.merchantName.trim();
+    const personName = row.personName?.trim();
     return {
       ok: true,
-      transaction: merchantName ? { ...result.data, merchantName } : result.data,
+      transaction: {
+        ...result.data,
+        categoryId,
+        ...(merchantName && { merchantName }),
+        ...(personName && { personName }),
+      },
     };
   }
   return { ok: false, problems: [...new Set(result.error.issues.map((issue) => issue.message))] };
@@ -175,7 +193,7 @@ export function toPlan(
     type: row.type,
     description: row.description,
     notes: row.notes,
-    categoryId,
+    categoryId: checkable(categoryId),
     installments: row.plan?.installments,
     firstNumber: row.plan?.firstNumber,
     amountCents: row.amountCents,
@@ -186,7 +204,7 @@ export function toPlan(
     ...(row.paymentMethod && { paymentMethod: row.paymentMethod }),
     ...(merchantName && { merchantName }),
   });
-  if (result.success) return { ok: true, plan: result.data };
+  if (result.success) return { ok: true, plan: { ...result.data, categoryId } };
   return { ok: false, problems: [...new Set(result.error.issues.map((issue) => issue.message))] };
 }
 

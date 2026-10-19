@@ -41,6 +41,7 @@ describe('parseTemplateRows', () => {
         notes: null,
         categoryName: 'Mercado',
         merchantName: '',
+        personName: '',
         paymentMethod: null,
         amountCents: 64_035,
         period: '2026-09',
@@ -188,6 +189,7 @@ describe('parseTemplateRows', () => {
         notes: 'Conferir na fatura',
         categoryName: 'Mercado',
         merchantName: '',
+        personName: '',
         paymentMethod: null,
         // The zero stays, to be corrected; the unreadable date comes empty.
         amountCents: 0,

@@ -32,6 +32,7 @@ const parsedRow = (line: number, overrides: Partial<TemplateRow> = {}): Template
   notes: null,
   categoryName: 'mercado',
   merchantName: '',
+  personName: '',
   paymentMethod: null,
   amountCents: 64_035,
   period: '2026-09',

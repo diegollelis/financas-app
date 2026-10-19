@@ -33,10 +33,16 @@ const previousImport = {
 
 const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
+/** The template before the "Pessoa" column (ADR 0040 note): still read, columns go by title. */
+const EARLIER_HEADERS = TEMPLATE_HEADERS.filter((title) => title !== 'Pessoa');
+
 /** A filled-in template, as a file the person would choose. */
-async function spreadsheet(rows: (string | number | Date | null)[][]) {
+async function spreadsheet(
+  rows: (string | number | Date | null)[][],
+  headers: readonly string[] = EARLIER_HEADERS,
+) {
   const blob = await writeXlsxFile([
-    { sheet: 'Lançamentos', data: [[...TEMPLATE_HEADERS], ...rows], dateFormat: 'dd/mm/yyyy' },
+    { sheet: 'Lançamentos', data: [[...headers], ...rows], dateFormat: 'dd/mm/yyyy' },
   ]).toBlob();
   return new File([blob], 'minha-planilha.xlsx', {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -189,6 +195,42 @@ describe('ImportPage', () => {
     });
   });
 
+  it('shows the person of a row and sends it by name (ADR 0040 note)', async () => {
+    const fetchMock = mockImport();
+    renderApp(page);
+
+    await choose(
+      await spreadsheet(
+        [
+          [
+            '2026-08',
+            'Saída',
+            'Conta de luz',
+            'Moradia',
+            null,
+            'Ana Exemplo',
+            null,
+            189.9,
+            null,
+            null,
+            null,
+            null,
+          ],
+        ],
+        TEMPLATE_HEADERS,
+      ),
+    );
+
+    const august = await screen.findByRole('region', { name: 'agosto de 2026' });
+    expect(within(august).getByRole('listitem')).toHaveTextContent('A pagar para Ana Exemplo');
+    await userEvent.click(screen.getByRole('button', { name: 'Importar 1 lançamento' }));
+
+    await expectCall(fetchMock, `${base}/imports`, {
+      method: 'POST',
+      body: expect.stringContaining('"personName":"Ana Exemplo"') as unknown,
+    });
+  });
+
   it('shows the payment method of a row and sends it (ADR 0054)', async () => {
     const fetchMock = mockImport();
     renderApp(page);
@@ -243,6 +285,46 @@ describe('ImportPage', () => {
       await screen.findByRole('button', { name: 'Importar 2 lançamentos' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Categorias' })).not.toBeInTheDocument();
+  });
+
+  it('creates a category the workspace does not have, on import', async () => {
+    const feira = category(4, 'Feira', 'DEBIT');
+    const fetchMock = mockImport({
+      [`POST ${base}/categories`]: { status: 201, body: feira },
+      [`POST ${base}/imports`]: {
+        status: 201,
+        body: { ...previousImport, firstPeriod: '2026-08' },
+      },
+    });
+    renderApp(page);
+    await choose(
+      await spreadsheet([
+        salaryRow,
+        ['2026-08', 'Débito', 'Feira do sábado', 'Feira', null, null, 85, null, null, null],
+      ]),
+    );
+
+    const matching = await screen.findByRole('region', { name: 'Categorias' });
+    await userEvent.click(within(matching).getByRole('button', { name: 'Criar “Feira”' }));
+
+    // Not created yet: the row says so, and it is ready.
+    const august = screen.getByRole('region', { name: 'agosto de 2026' });
+    expect(august).toHaveTextContent('Feira (nova)');
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      new URL(`${base}/categories`, 'http://api.test'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Importar 2 lançamentos' }));
+
+    // Created first, then the import with its id.
+    await expectCall(fetchMock, `${base}/categories`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Feira', type: 'DEBIT' }),
+    });
+    await expectCall(fetchMock, `${base}/imports`, {
+      method: 'POST',
+      body: expect.stringContaining(`"categoryId":"${feira.id}"`) as unknown,
+    });
   });
 
   it('fixes a row with an error and brings it into the import', async () => {

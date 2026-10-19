@@ -5,6 +5,7 @@ import {
   MERCHANT_NAME_MAX_LENGTH,
   paymentMethodFieldLabels,
   paymentMethodSchema,
+  PERSON_NAME_MAX_LENGTH,
   periodSchema,
   reaisInputSchema,
   transactionDescriptionSchema,
@@ -56,6 +57,11 @@ const rowFormSchema = (categoryRequired: boolean) =>
         .string()
         .trim()
         .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
+      /** A receber de / a pagar para, as a name (ADR 0040 note); a new one is created on import. */
+      person: z
+        .string()
+        .trim()
+        .max(PERSON_NAME_MAX_LENGTH, `Use no máximo ${PERSON_NAME_MAX_LENGTH} caracteres.`),
       /** '' = none (ADR 0054). */
       paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
       /** A statement's line (ADR 0055): remember its text as an alias of the merchant chosen. */
@@ -126,6 +132,7 @@ export function ImportRowForm({
       settledAt: row.settledAt ?? '',
       notes: row.notes ?? '',
       merchant: row.merchantName,
+      person: row.personName ?? '',
       paymentMethod: row.paymentMethod ?? '',
       // Learning an alias is the default on a statement's line without one (ADR 0055).
       remember:
@@ -161,6 +168,7 @@ export function ImportRowForm({
       rememberAlias: offersAlias && values.remember && values.merchant ? values.alias : null,
       notes: values.notes,
       merchantName: values.merchant,
+      personName: values.person,
       paymentMethod: values.paymentMethod || null,
       categoryId: values.categoryId || null,
       amountCents: values.amount,
@@ -200,7 +208,12 @@ export function ImportRowForm({
         name="categoryId"
         render={({ field, fieldState }) => (
           <FormField id={id('category')} label="Categoria" error={fieldState.error?.message}>
-            <CategorySelect value={field.value} onChange={field.onChange} options={options} />
+            <CategorySelect
+              value={field.value}
+              onChange={field.onChange}
+              options={options}
+              allowAdd
+            />
           </FormField>
         )}
       />
@@ -230,6 +243,16 @@ export function ImportRowForm({
           error={formState.errors.merchant?.message}
         >
           <Input autoComplete="off" {...register('merchant')} />
+        </FormField>
+      )}
+      {/* The spreadsheet's "Pessoa" (ADR 0040 note); a statement's line has none. */}
+      {!row.statementTitle && (
+        <FormField
+          id={id('person')}
+          label={type === 'CREDIT' ? 'A receber de (opcional)' : 'A pagar para (opcional)'}
+          error={formState.errors.person?.message}
+        >
+          <Input autoComplete="off" {...register('person')} />
         </FormField>
       )}
       {offersAlias && merchantName && (

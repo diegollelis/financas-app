@@ -32,6 +32,7 @@ describe('planilha modelo', () => {
         notes: null,
         categoryName: 'Moradia',
         merchantName: 'Imobiliária Exemplo',
+        personName: '',
         paymentMethod: 'BOLETO',
         amountCents: 150_000,
         period: '2026-09',
