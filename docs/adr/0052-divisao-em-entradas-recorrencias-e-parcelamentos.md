@@ -138,4 +138,4 @@ O dono importou a conta de energia pela planilha e quis dividi-la depois, mas a 
 - **Sem pessoa:** um lançamento com "A receber de" ou "A pagar para" é recusado, a menos que a mesma mudança tire a pessoa.
 - **As partes dos outros cabem no valor**, contando o valor novo quando ele muda junto.
 
-O próximo passo é o "Tornar recorrente" aceitar um lançamento dividido, levando as partes para a recorrência.
+O "Tornar recorrente" ([ADR 0038](0038-recorrencias-e-parcelamentos.md)) também aceita um lançamento dividido: as partes dele viram a divisão da recorrência, com o valor de cada pessoa numa recorrência fixa, ou a parte do valor em % (pontos-base, arredondados) numa variável, como na criação. As partes do mês do lançamento são adotadas como estão, sem duplicar, e os meses seguintes nascem com as suas. Uma parte sem pessoa, ou a mesma pessoa em duas partes, recusa (409 `NOT_REPEATABLE`).

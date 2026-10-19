@@ -4,6 +4,7 @@ import {
   dueMonthOffsetOf,
   MAX_DUE_MONTH_OFFSET,
   estimateAmount,
+  FULL_BASIS_POINTS,
   isRecurrenceMonth,
   shareDescription,
   shareOfAmount,
@@ -141,13 +142,18 @@ export class RecurrencesService {
    * "Tornar recorrente": the transaction becomes the first month of a new recurrence that takes
    * everything from it (type, description, notes, category, amount, due day, person, merchant),
    * linked by its occurrence, so it is not generated again. One already in a recurrence or a
-   * plan, a split one and a share are refused: the screen does not offer them.
+   * plan and a share are refused: the screen does not offer them. A split one (ADR 0052 note)
+   * takes its shares along: in a fixed recurrence each person's amount, in a variable one the
+   * share of the amount in basis points; this month's shares are adopted as they are.
    */
   async repeat(workspaceId: string, input: RepeatTransactionInput): Promise<Recurrence> {
     const db = this.prisma.forWorkspace(workspaceId);
     const transaction = await db.transaction.findFirst({
       where: { id: input.transactionId, workspaceId },
-      include: { occurrence: true, _count: { select: { shares: true } } },
+      include: {
+        occurrence: true,
+        shares: { select: { personId: true, amountCents: true } },
+      },
     });
     if (!transaction) throw new NotFoundException();
     const refuse = (message: string) => new ConflictException({ code: 'NOT_REPEATABLE', message });
@@ -155,11 +161,24 @@ export class RecurrencesService {
     if (transaction.installmentPlanId)
       throw refuse('Este lançamento é a parcela de um parcelamento.');
     if (transaction.splitOfId) throw refuse('Esta é a parte de uma divisão.');
-    if (transaction._count.shares > 0) {
-      throw refuse(
-        'Um lançamento dividido não se torna recorrente por aqui: crie a recorrência dividida pelo Novo lançamento.',
-      );
+    const variableAmount = input.variableAmount ?? false;
+    const split = transaction.shares.map((share) => {
+      if (!share.personId) throw refuse('Uma das partes desta divisão está sem pessoa.');
+      return variableAmount
+        ? {
+            personId: share.personId,
+            amountCents: null,
+            basisPoints: Math.max(
+              1,
+              Math.round((share.amountCents * FULL_BASIS_POINTS) / transaction.amountCents),
+            ),
+          }
+        : { personId: share.personId, amountCents: share.amountCents, basisPoints: null };
+    });
+    if (new Set(split.map((share) => share.personId)).size !== split.length) {
+      throw refuse('A mesma pessoa aparece em duas partes desta divisão.');
     }
+    for (const share of split) await ensureUsablePerson(this.prisma, workspaceId, share.personId);
     // Each month due as far from its competência as this one, when that is a month at most.
     const dueDate = transaction.dueDate ? toIsoDate(transaction.dueDate) : null;
     const dueMonthOffset = dueDate ? dueMonthOffsetOf(transaction.period, dueDate) : 0;
@@ -185,7 +204,7 @@ export class RecurrencesService {
           notes: transaction.notes,
           categoryId: transaction.categoryId,
           amountCents: transaction.amountCents,
-          variableAmount: input.variableAmount ?? false,
+          variableAmount,
           dueDay: dueDate ? Number(dueDate.slice(8)) : null,
           dueMonthOffset,
           intervalMonths: input.intervalMonths ?? 1,
@@ -193,6 +212,7 @@ export class RecurrencesService {
           merchantId: transaction.merchantId,
           paymentMethod: transaction.paymentMethod,
           startPeriod: transaction.period,
+          shares: { create: split.map((share) => ({ workspaceId, ...share })) },
           // The transaction is this month's: it keeps its amount, real even in a variable one.
           occurrences: {
             create: { period: transaction.period, workspaceId, transactionId: transaction.id },
