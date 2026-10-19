@@ -1,6 +1,8 @@
 import {
   currentPeriod,
   dueDateFor,
+  dueMonthOffsetOf,
+  MAX_DUE_MONTH_OFFSET,
   installmentPlanTotal,
   installmentsCreated,
   shareDescription,
@@ -9,6 +11,7 @@ import {
   INSTALLMENT_AMOUNT_FIELDS,
   type CreateInstallmentPlanInput,
   type InstallmentPlan,
+  type InstallmentsFromTransactionInput,
   type SplitShareInput,
   type UpdateInstallmentPlanInput,
 } from '@financas/shared';
@@ -24,7 +27,7 @@ import { shareCategoryId } from '../categories/share-category.js';
 import type { Prisma, InstallmentPlan as PlanRow } from '../generated/prisma/client.js';
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { optionalDate, toDate, toIsoDate } from '../transactions/dates.js';
 import {
   followDescription,
@@ -204,6 +207,123 @@ export class InstallmentsService {
         lastPeriod: shiftPeriod(input.firstPeriod, amounts.length - 1),
       },
       Boolean(input.split),
+    );
+  }
+
+  /**
+   * "Tornar parcelado" (ADR 0038 note): the transaction becomes installment `firstNumber` of a
+   * new plan that takes everything from it, in the same write that creates the plan and the next
+   * installments, one per month after its own. Given as the total, its amount becomes its
+   * installment's. One already in a plan or a recurrence, a share, a split one and a settled one
+   * given as the total are refused.
+   */
+  async fromTransaction(
+    workspaceId: string,
+    input: InstallmentsFromTransactionInput,
+  ): Promise<InstallmentPlan> {
+    const db = this.prisma.forWorkspace(workspaceId);
+    const transaction = await db.transaction.findFirst({
+      where: { id: input.transactionId, workspaceId },
+      include: { occurrence: true, _count: { select: { shares: true } } },
+    });
+    if (!transaction) throw new NotFoundException();
+    const refuse = (message: string) => new ConflictException({ code: 'NOT_INSTALLABLE', message });
+    if (transaction.installmentPlanId) {
+      throw refuse('Este lançamento já é a parcela de um parcelamento.');
+    }
+    if (transaction.occurrence) throw refuse('Este lançamento é de uma recorrência.');
+    if (transaction.splitOfId) throw refuse('Esta é a parte de uma divisão.');
+    if (transaction._count.shares > 0) {
+      throw refuse('Um lançamento dividido não vira parcelamento por aqui.');
+    }
+    if (transaction.settledAt && input.amountIs === 'TOTAL') {
+      throw refuse(
+        'Este lançamento já foi pago: informe o valor dele como o de uma parcela, que não muda.',
+      );
+    }
+    // Each installment due as far from its competência as this one, a month at most.
+    const dueIso = transaction.dueDate ? toIsoDate(transaction.dueDate) : null;
+    const dueMonthOffset = dueIso ? dueMonthOffsetOf(transaction.period, dueIso) : 0;
+    if (dueMonthOffset < 0 || dueMonthOffset > MAX_DUE_MONTH_OFFSET) {
+      throw refuse('O vencimento deste lançamento fica longe demais do mês dele para parcelar.');
+    }
+    // What every installment will carry must still be usable.
+    await ensureUsableCategory(this.prisma, workspaceId, transaction.categoryId, transaction.type);
+    if (transaction.personId) {
+      await ensureUsablePerson(this.prisma, workspaceId, transaction.personId);
+    }
+    if (transaction.merchantId) {
+      await ensureUsableMerchant(this.prisma, workspaceId, transaction.merchantId);
+    }
+    const firstNumber = input.firstNumber ?? 1;
+    const created = installmentsCreated({ installments: input.installments, firstNumber });
+    const totalCents =
+      input.amountIs === 'TOTAL' ? transaction.amountCents : transaction.amountCents * created;
+    if (totalCents < created) throw refuse('O valor não dá um centavo por parcela.');
+    const amounts = splitInstallments(totalCents, created);
+    const dueDay = dueIso ? Number(dueIso.slice(8)) : null;
+    const next = amounts.slice(1).map((amountCents, index) => {
+      const period = shiftPeriod(transaction.period, index + 1);
+      return {
+        workspaceId,
+        type: transaction.type,
+        description: transaction.description,
+        notes: transaction.notes,
+        categoryId: transaction.categoryId,
+        personId: transaction.personId,
+        merchantId: transaction.merchantId,
+        paymentMethod: transaction.paymentMethod,
+        amountCents,
+        period,
+        dueDate: dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset)),
+        occurredOn: transaction.occurredOn,
+        installmentNumber: firstNumber + index + 1,
+      };
+    });
+    // One interactive transaction with the RLS context (ADR 0028): the plan with the next
+    // installments, then this one adopted as its installment, or neither.
+    const plan = await this.prisma.$transaction(async (tx) => {
+      await setWorkspaceContext(tx, workspaceId);
+      const created = await tx.installmentPlan.create({
+        data: {
+          workspaceId,
+          type: transaction.type,
+          description: transaction.description,
+          notes: transaction.notes,
+          categoryId: transaction.categoryId,
+          totalCents,
+          installments: input.installments,
+          firstNumber,
+          occurredOn: transaction.occurredOn,
+          firstPeriod: transaction.period,
+          dueDay,
+          dueMonthOffset,
+          personId: transaction.personId,
+          merchantId: transaction.merchantId,
+          paymentMethod: transaction.paymentMethod,
+          transactions: { create: next },
+        },
+      });
+      await tx.transaction.update({
+        where: { id: transaction.id, workspaceId },
+        data: {
+          amountCents: amounts[0],
+          installmentPlanId: created.id,
+          installmentNumber: firstNumber,
+        },
+      });
+      return created;
+    });
+    const settled = transaction.settledAt ? 1 : 0;
+    return toResponse(
+      plan,
+      settled,
+      {
+        count: amounts.length - settled,
+        cents: settled ? totalCents - amounts[0]! : totalCents,
+        lastPeriod: shiftPeriod(transaction.period, amounts.length - 1),
+      },
+      false,
     );
   }
 

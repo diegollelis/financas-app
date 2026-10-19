@@ -27,6 +27,11 @@ const installmentRoutes: WorkspaceRoute[] = [
   { method: 'get', path: (id) => `/api/workspaces/${id}/installments` },
   { method: 'post', path: (id) => `/api/workspaces/${id}/installments`, body: {} },
   {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/installments/from-transaction`,
+    body: {},
+  },
+  {
     method: 'patch',
     path: (id) => `/api/workspaces/${id}/installments/01920000-0000-7000-8000-000000000999`,
     body: { description: 'Intruso' },
@@ -609,6 +614,145 @@ describe('installments', () => {
         expect.objectContaining({ id: paidShare.id, splitOfId: null }),
       ]);
       expect(await transactionsOf(month(1))).toEqual([]);
+    });
+  });
+
+  describe('"Tornar parcelado" (ADR 0038 note)', () => {
+    async function launched(
+      browser: Browser,
+      base: string,
+      categoryId: string,
+      fields: Record<string, unknown> = {},
+    ) {
+      const response = await browser
+        .post(`${base}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'Notebook',
+          categoryId,
+          amountCents: 50_000,
+          period: thisMonth,
+          dueDate: `${month(1)}-10`,
+          occurredOn: `${thisMonth}-02`,
+          ...fields,
+        })
+        .expect(201);
+      return response.body as { id: string };
+    }
+
+    it('adopts the transaction as its installment and creates the next ones', async () => {
+      const { browser, base, categoryId, transactionsOf, plans } = await setUp();
+      const notebook = await launched(browser, base, categoryId('Compras', 'DEBIT'));
+
+      const response = await browser
+        .post(`${base}/installments/from-transaction`)
+        .send({
+          transactionId: notebook.id,
+          installments: 10,
+          firstNumber: 3,
+          amountIs: 'INSTALLMENT',
+        })
+        .expect(201);
+
+      expect(installmentPlanSchema.parse(response.body)).toMatchObject({
+        description: 'Notebook',
+        installments: 10,
+        firstNumber: 3,
+        totalCents: 400_000,
+        firstPeriod: thisMonth,
+        dueDay: 10,
+        dueMonthOffset: 1,
+        occurredOn: `${thisMonth}-02`,
+        pendingCount: 8,
+      });
+      // This month's is the same transaction, now 3/10; the next is 4/10, due the month after.
+      const now = await transactionsOf(thisMonth);
+      expect(now).toEqual([
+        expect.objectContaining({
+          id: notebook.id,
+          amountCents: 50_000,
+          installment: expect.objectContaining({ number: 3, count: 10 }) as unknown,
+        }),
+      ]);
+      expect((await transactionsOf(month(1)))[0]).toMatchObject({
+        amountCents: 50_000,
+        dueDate: `${month(2)}-10`,
+        occurredOn: `${thisMonth}-02`,
+        installment: { number: 4, count: 10 },
+      });
+      expect((await transactionsOf(month(7)))[0]?.installment?.number).toBe(10);
+      expect(await transactionsOf(month(8))).toEqual([]);
+      expect(await plans()).toHaveLength(1);
+    });
+
+    it('splits a total like a new plan, this transaction becoming its first installment', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const sofa = await launched(browser, base, categoryId('Compras', 'DEBIT'), {
+        description: 'Sofá',
+        amountCents: 100_000,
+      });
+
+      await browser
+        .post(`${base}/installments/from-transaction`)
+        .send({ transactionId: sofa.id, installments: 3, amountIs: 'TOTAL' })
+        .expect(201);
+
+      expect((await transactionsOf(thisMonth))[0]).toMatchObject({
+        id: sofa.id,
+        amountCents: 33_333,
+        installment: { number: 1, count: 3 },
+      });
+      expect((await transactionsOf(month(2)))[0]?.amountCents).toBe(33_334);
+    });
+
+    it('refuses one in a plan or a recurrence, a share, a split one, a settled total, the last installment', async () => {
+      const { browser, base, categoryId, create, fridge, transactionsOf } = await setUp();
+      const compras = categoryId('Compras', 'DEBIT');
+      await create(fridge({ firstPeriod: month(1) }));
+      const installment = (await transactionsOf(month(1))).find((item) => item.installment)!;
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Internet',
+          categoryId: compras,
+          amountCents: 10_000,
+          startPeriod: thisMonth,
+        })
+        .expect(201);
+      const month0 = await transactionsOf(thisMonth);
+      const generated = month0.find((item) => item.recurrenceId)!;
+      const split = await launched(browser, base, compras, {
+        description: 'Jantar',
+        split: [{ newPersonName: 'Ana', amountCents: 10_000 }],
+      });
+      const share = (await transactionsOf(thisMonth)).find((item) => item.splitOfId === split.id)!;
+      const settled = await launched(browser, base, compras, { settledAt: `${thisMonth}-02` });
+      const once = await launched(browser, base, compras);
+      const make = (body: object) =>
+        browser.post(`${base}/installments/from-transaction`).send(body);
+
+      for (const id of [installment.id, generated.id, split.id, share.id]) {
+        const response = await make({
+          transactionId: id,
+          installments: 3,
+          amountIs: 'INSTALLMENT',
+        });
+        expect(response.status).toBe(409);
+        expect(response.body).toMatchObject({ code: 'NOT_INSTALLABLE' });
+      }
+      await make({ transactionId: settled.id, installments: 3, amountIs: 'TOTAL' }).expect(409);
+      // Settled, as an installment's amount it does not change: accepted.
+      await make({ transactionId: settled.id, installments: 3, amountIs: 'INSTALLMENT' }).expect(
+        201,
+      );
+      // The last installment has nothing after it.
+      await make({
+        transactionId: once.id,
+        installments: 3,
+        firstNumber: 3,
+        amountIs: 'INSTALLMENT',
+      }).expect(400);
     });
   });
 
