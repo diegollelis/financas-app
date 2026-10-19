@@ -4,6 +4,7 @@ import { installmentCountSchema, installmentsCreated } from './installment.ts';
 import { createMerchantAliasInputSchema, merchantNameSchema } from './merchant.ts';
 import { amountCentsSchema, isoDateSchema, periodSchema } from './money-and-dates.ts';
 import { paymentMethodSchema } from './payment-method.ts';
+import { personNameSchema } from './person.ts';
 import { dueDaySchema, dueMonthOffsetSchema } from './recurrence.ts';
 import {
   plainTransactionInputSchema,
@@ -30,11 +31,13 @@ export const importLabelSchema = z
   .transform((label) => label || null);
 
 /**
- * One imported transaction: the plain fields, plus the merchant by name (ADR 0053). A name the
- * workspace does not have becomes a merchant in the import; an archived one comes back.
+ * One imported transaction: the plain fields, plus the merchant (ADR 0053) and the person (a
+ * receber de / a pagar para, ADR 0042) by name. A name the workspace does not have becomes a
+ * merchant or a person in the import; an archived one comes back.
  */
 export const importTransactionInputSchema = plainTransactionInputSchema.extend({
   merchantName: merchantNameSchema.optional(),
+  personName: personNameSchema.optional(),
 });
 
 export type ImportTransactionInput = z.infer<typeof importTransactionInputSchema>;
