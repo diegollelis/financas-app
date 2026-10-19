@@ -166,6 +166,46 @@ describe('imports', () => {
     expect(september.find((item) => item.type === 'DEBIT')?.merchantId).toBe(archived.id);
   });
 
+  it('names people: a new one is created, an existing one reused, an archived one comes back (ADR 0042)', async () => {
+    const { browser, base, rows, transactionsOf } = await setUp();
+    const existing = (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201))
+      .body as { id: string };
+    const archived = (await browser.post(`${base}/people`).send({ name: 'Bruno' }).expect(201))
+      .body as { id: string };
+    await browser.patch(`${base}/people/${archived.id}`).send({ archived: true }).expect(200);
+    const [salary, grocery, salary2, grocery2] = rows;
+
+    await browser
+      .post(`${base}/imports`)
+      .send({
+        transactions: [
+          { ...salary, personName: 'Carla Exemplo' },
+          { ...grocery, personName: 'ANA' },
+          { ...salary2, personName: 'carla exemplo' },
+          { ...grocery2, personName: 'bruno' },
+        ],
+      })
+      .expect(201);
+
+    const people = (await browser.get(`${base}/people`).expect(200)).body as {
+      id: string;
+      name: string;
+      archived: boolean;
+    }[];
+    const created = people.find((person) => person.name === 'Carla Exemplo');
+    expect(people.map(({ name, archived }) => [name, archived])).toEqual([
+      ['Ana', false],
+      ['Bruno', false],
+      ['Carla Exemplo', false],
+    ]);
+    const august = await transactionsOf('2026-08');
+    const september = await transactionsOf('2026-09');
+    expect(august.find((item) => item.type === 'CREDIT')?.personId).toBe(created?.id);
+    expect(august.find((item) => item.type === 'DEBIT')?.personId).toBe(existing.id);
+    expect(september.find((item) => item.type === 'CREDIT')?.personId).toBe(created?.id);
+    expect(september.find((item) => item.type === 'DEBIT')?.personId).toBe(archived.id);
+  });
+
   it('keeps the payment method of each transaction (ADR 0054)', async () => {
     const { browser, base, rows, transactionsOf } = await setUp();
     const [salary, grocery] = rows;

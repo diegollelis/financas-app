@@ -100,3 +100,9 @@ A planilha antiga deixou de ser lida diretamente. A importação aceita **só um
 - **Categorias:** um nome da planilha que bate com uma categoria ativa do mesmo tipo (sem depender de maiúsculas ou acentos) entra direto. Os outros aparecem em "Categorias" para escolher a correspondente; a escolha vale para todas as linhas daquele nome.
 - **"Importar N lançamentos"** envia só as linhas marcadas e válidas, conferidas com o mesmo schema da API. Depois, leva à primeira competência importada.
 - **O script de capturas** (`apps/web/scripts/screenshots.ts`) passou a confirmar o e-mail do usuário fictício pelo Mailpit, já que entrar com senha agora exige e-mail verificado ([ADR 0022](0022-envio-de-email.md)).
+
+## Nota (a pessoa na importação, 2026-10-19)
+
+O dono importou a conta de energia pela planilha e quis ligá-la a uma pessoa. A planilha passa a ter a coluna opcional "Pessoa" (a receber de, numa entrada; a pagar para, numa saída, [ADR 0042](0042-pessoas-e-rateio.md)), lida pela tela num passo seguinte. Na API, cada lançamento importado aceita `personName`, tratado como o estabelecimento: a importação acha a pessoa pelo nome, sem diferenciar maiúsculas nem acentos, como a página Pessoas mostra (um membro pelo nome da conta dele), reativa uma arquivada ou cria um contato novo. Desfazer a importação mantém as pessoas.
+
+"Dividir com" e "Repetir" ficam fora da planilha. Uma célula com várias pessoas e as partes de cada uma é fácil de digitar errado, e uma planilha de histórico tem a mesma conta em vários meses, cada um numa linha, o que geraria a recorrência várias vezes. O caminho é importar os lançamentos simples e, no app, dividir e tornar recorrente o mês mais recente.
