@@ -431,7 +431,7 @@ describe('recurrences', () => {
       expect((await transactionsOf(month(1)))[0]).toMatchObject({ amountEstimated: true });
     });
 
-    it('refuses one already repeating, an installment, a split one and a share', async () => {
+    it('refuses one already repeating, an installment and a share', async () => {
       const { browser, base, categoryId, create, energy, transactionsOf } = await setUp();
       const category = categoryId('Contas da casa', 'DEBIT');
       await create(energy());
@@ -458,9 +458,64 @@ describe('recurrences', () => {
       const repeat = (transactionId: string) =>
         browser.post(`${base}/recurrences/from-transaction`).send({ transactionId }).expect(409);
 
-      for (const id of [generated.id, installment.id, split.id, share.id]) {
+      for (const id of [generated.id, installment.id, share.id]) {
         expect((await repeat(id)).body).toMatchObject({ code: 'NOT_REPEATABLE' });
       }
+    });
+
+    it('takes the shares of a split one along: amounts when fixed, adopting this month (ADR 0052 note)', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const ana = personSchema.parse(
+        (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201)).body,
+      );
+      const bill = await launched(browser, base, {
+        description: 'Aluguel',
+        categoryId: categoryId('Moradia', 'DEBIT'),
+        amountCents: 150_000,
+        split: [{ personId: ana.id, amountCents: 75_000 }],
+      });
+
+      const response = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: bill.id })
+        .expect(201);
+
+      expect(recurrenceSchema.parse(response.body).split).toEqual([
+        { personId: ana.id, amountCents: 75_000, basisPoints: null },
+      ]);
+      // This month's share stays the only one; the next month comes with its own.
+      expect((await transactionsOf(thisMonth)).filter((t) => t.splitOfId === bill.id)).toHaveLength(
+        1,
+      );
+      const next = await transactionsOf(month(1));
+      const rent = next.find((t) => t.description === 'Aluguel' && t.type === 'DEBIT')!;
+      expect(next.find((t) => t.splitOfId === rent.id)).toMatchObject({
+        type: 'CREDIT',
+        amountCents: 75_000,
+        personId: ana.id,
+      });
+    });
+
+    it('turns the shares of a variable one into percentages of the amount', async () => {
+      const { browser, base, categoryId } = await setUp();
+      const ana = personSchema.parse(
+        (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201)).body,
+      );
+      const bill = await launched(browser, base, {
+        description: 'Conta de luz',
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
+        amountCents: 20_000,
+        split: [{ personId: ana.id, amountCents: 5_000 }],
+      });
+
+      const response = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: bill.id, variableAmount: true })
+        .expect(201);
+
+      expect(recurrenceSchema.parse(response.body).split).toEqual([
+        { personId: ana.id, amountCents: null, basisPoints: 2_500 },
+      ]);
     });
 
     it('answers 404 for a transaction of another workspace', async () => {
