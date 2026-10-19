@@ -15,6 +15,7 @@ import {
   type InstallmentPlan,
   type UpdateInstallmentPlanInput,
   type PaymentMethod,
+  type Merchant,
   type Person,
   type Recurrence,
   type TransactionType,
@@ -61,6 +62,7 @@ import {
   useInstallmentPlans,
   useUpdateInstallmentPlan,
 } from '@/features/installments/use-installments';
+import { useMerchants, useResolveMerchant } from '@/features/merchants/use-merchants';
 import { usePeople, useResolvePerson } from '@/features/people/use-people';
 import { dueDayLabel, frequencyLabel, monthNameOf } from '@/features/recurrences/due';
 import { RecurrenceForm } from '@/features/recurrences/recurrence-form';
@@ -324,19 +326,26 @@ function EditRecurrence({
   recurrence,
   categories,
   people,
+  merchants,
   onDone,
 }: {
   workspaceId: string;
   recurrence: Recurrence;
   categories: Category[];
   people: Person[];
+  merchants: Merchant[];
   onDone: () => void;
 }) {
   const user = useCurrentUser();
   const update = useUpdateRecurrence(workspaceId);
   const person = useResolvePerson(workspaceId, people);
+  const merchant = useResolveMerchant(workspaceId, merchants);
   const category = useResolveCategory(workspaceId, categories);
-  const save = async (changes: UpdateRecurrenceInput, personName: string | undefined) => {
+  const save = async (
+    changes: UpdateRecurrenceInput,
+    personName: string | undefined,
+    merchantName: string | undefined,
+  ) => {
     if (changes.categoryId !== undefined) {
       // A category added in the form is created first (or an archived one comes back).
       try {
@@ -351,6 +360,14 @@ function EditRecurrence({
         changes.personId = await person.resolve(personName);
       } catch {
         return; // Shown by the form, from person.error.
+      }
+    }
+    if (merchantName !== undefined) {
+      // A new name becomes a merchant first (ADR 0053); '' unlinks.
+      try {
+        changes.merchantId = await merchant.resolve(merchantName);
+      } catch {
+        return; // Shown by the form, from merchant.error.
       }
     }
     // Nothing changed: nothing to send, and the pending months stay as they are.
@@ -371,10 +388,11 @@ function EditRecurrence({
       recurrence={recurrence}
       categories={categories}
       people={people}
+      merchants={merchants}
       userId={user.id}
-      pending={update.isPending || person.isPending || category.isPending}
-      error={category.error ?? person.error ?? update.error}
-      onSubmit={(changes, personName) => void save(changes, personName)}
+      pending={update.isPending || person.isPending || merchant.isPending || category.isPending}
+      error={category.error ?? person.error ?? merchant.error ?? update.error}
+      onSubmit={(changes, personName, merchantName) => void save(changes, personName, merchantName)}
       onCancel={onDone}
     />
   );
@@ -386,19 +404,26 @@ function EditPlan({
   plan,
   categories,
   people,
+  merchants,
   onDone,
 }: {
   workspaceId: string;
   plan: InstallmentPlan;
   categories: Category[];
   people: Person[];
+  merchants: Merchant[];
   onDone: () => void;
 }) {
   const user = useCurrentUser();
   const update = useUpdateInstallmentPlan(workspaceId);
   const person = useResolvePerson(workspaceId, people);
+  const merchant = useResolveMerchant(workspaceId, merchants);
   const category = useResolveCategory(workspaceId, categories);
-  const save = async (changes: UpdateInstallmentPlanInput, personName: string | undefined) => {
+  const save = async (
+    changes: UpdateInstallmentPlanInput,
+    personName: string | undefined,
+    merchantName: string | undefined,
+  ) => {
     if (changes.categoryId !== undefined) {
       try {
         changes.categoryId = await category.resolve(changes.categoryId, plan.type);
@@ -411,6 +436,14 @@ function EditPlan({
         changes.personId = await person.resolve(personName);
       } catch {
         return; // Shown by the form, from person.error.
+      }
+    }
+    if (merchantName !== undefined) {
+      // A new name becomes a merchant first (ADR 0053); '' unlinks.
+      try {
+        changes.merchantId = await merchant.resolve(merchantName);
+      } catch {
+        return; // Shown by the form, from merchant.error.
       }
     }
     if (Object.keys(changes).length === 0) return onDone();
@@ -430,10 +463,11 @@ function EditPlan({
       plan={plan}
       categories={categories}
       people={people}
+      merchants={merchants}
       userId={user.id}
-      pending={update.isPending || person.isPending || category.isPending}
-      error={category.error ?? person.error ?? update.error}
-      onSubmit={(changes, personName) => void save(changes, personName)}
+      pending={update.isPending || person.isPending || merchant.isPending || category.isPending}
+      error={category.error ?? person.error ?? merchant.error ?? update.error}
+      onSubmit={(changes, personName, merchantName) => void save(changes, personName, merchantName)}
       onCancel={onDone}
     />
   );
@@ -465,6 +499,7 @@ function RecurrenceItem({
   recurrence,
   categories,
   people,
+  merchants,
   canEdit,
   asTable,
 }: {
@@ -472,6 +507,7 @@ function RecurrenceItem({
   recurrence: Recurrence;
   categories: Category[];
   people: Person[];
+  merchants: Merchant[];
   canEdit: boolean;
   /** A table row ("Ver como: Tabela"), or a list row. */
   asTable: boolean;
@@ -526,6 +562,7 @@ function RecurrenceItem({
           recurrence={recurrence}
           categories={categories}
           people={people}
+          merchants={merchants}
           onDone={() => setEditing(false)}
         />
       </ResponsiveDialog>
@@ -607,6 +644,7 @@ function PlanItem({
   plan,
   categories,
   people,
+  merchants,
   canEdit,
   asTable,
 }: {
@@ -614,6 +652,7 @@ function PlanItem({
   plan: InstallmentPlan;
   categories: Category[];
   people: Person[];
+  merchants: Merchant[];
   canEdit: boolean;
   /** A table row ("Ver como: Tabela"), or a list row. */
   asTable: boolean;
@@ -680,6 +719,7 @@ function PlanItem({
             plan={plan}
             categories={categories}
             people={people}
+            merchants={merchants}
             onDone={() => setEditing(false)}
           />
         </ResponsiveDialog>
@@ -848,9 +888,14 @@ export function RecurrencesPage() {
   const plans = useInstallmentPlans(workspace.id);
   const categories = useCategories(workspace.id);
   const people = usePeople(workspace.id);
+  const merchants = useMerchants(workspace.id);
   const canEdit = hasRole(workspace.role, 'EDITOR');
   const ready =
-    recurrences.isSuccess && plans.isSuccess && categories.isSuccess && people.isSuccess;
+    recurrences.isSuccess &&
+    plans.isSuccess &&
+    categories.isSuccess &&
+    people.isSuccess &&
+    merchants.isSuccess;
 
   // "Ver como: Tabela", from xl (ADR 0045 note); the list everywhere else.
   const asTable = useShowsTable('recorrencias');
@@ -866,6 +911,7 @@ export function RecurrencesPage() {
       recurrence={recurrence}
       categories={categories.data ?? []}
       people={people.data ?? []}
+      merchants={merchants.data ?? []}
       canEdit={canEdit}
       asTable={asTable}
     />
@@ -877,6 +923,7 @@ export function RecurrencesPage() {
       plan={plan}
       categories={categories.data ?? []}
       people={people.data ?? []}
+      merchants={merchants.data ?? []}
       canEdit={canEdit}
       asTable={asTable}
     />
@@ -928,7 +975,7 @@ export function RecurrencesPage() {
       >
         <ViewModeToggle page="recorrencias" />
       </PageHeader>
-      <QueryState queries={[recurrences, plans, categories, people]} />
+      <QueryState queries={[recurrences, plans, categories, people, merchants]} />
       {ready &&
         (recurrences.data.length === 0 && plans.data.length === 0 ? (
           <p className="text-muted-foreground">

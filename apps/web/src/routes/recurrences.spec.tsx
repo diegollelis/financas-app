@@ -43,12 +43,22 @@ const person = (n: number, name: string) => ({
 });
 const ana = person(1, 'Ana');
 const bruno = person(2, 'Bruno');
+const merchant = (n: number, name: string, archived = false) => ({
+  id: `01920000-0000-7000-8000-0000000005${String(n).padStart(2, '0')}`,
+  name,
+  archived,
+  inUse: true,
+  aliases: [],
+});
+const imobiliaria = merchant(1, 'Imobiliária Exemplo');
+const lojaAntiga = merchant(2, 'Loja Antiga', true);
 
 const aluguel = recurrence(1, {
   description: 'Aluguel',
   amountCents: 150_000,
   dueDay: 10,
   personId: ana.id,
+  merchantId: imobiliaria.id,
 });
 const energia = recurrence(2, {
   description: 'Conta de luz',
@@ -76,6 +86,7 @@ const plan = (n: number, fields: object) => ({
 const geladeira = plan(1, {
   description: 'Geladeira',
   personId: bruno.id,
+  merchantId: lojaAntiga.id,
   totalCents: 100_000,
   installments: 3,
   settledCount: 1,
@@ -102,6 +113,7 @@ function mockRecurrences(overrides: Record<string, { status?: number; body: unkn
     [`GET ${base}/recurrences`]: { body: [aluguel, energia, academia] },
     [`GET ${base}/installments`]: { body: [geladeira, sofa] },
     [`GET ${base}/people`]: { body: [ana, bruno] },
+    [`GET ${base}/merchants`]: { body: [imobiliaria, lojaAntiga] },
     ...overrides,
   });
 }
@@ -363,6 +375,40 @@ describe('RecurrencesPage', () => {
     });
   });
 
+  it('changes the merchant of a recurrence, a new name becoming a merchant first (ADR 0053)', async () => {
+    const corretora = merchant(3, 'Corretora Exemplo');
+    const fetchMock = mockRecurrences({
+      [`POST ${base}/merchants`]: { status: 201, body: corretora },
+      [`PATCH ${base}/recurrences/${aluguel.id}`]: {
+        body: { ...aluguel, merchantId: corretora.id },
+      },
+    });
+    renderApp(page);
+
+    await choose('Aluguel', 'Editar');
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
+    const field = within(dialog).getByRole('combobox', { name: 'Estabelecimento (opcional)' });
+    expect(field).toHaveTextContent('Imobiliária Exemplo');
+    await userEvent.click(field);
+    await userEvent.type(
+      await screen.findByPlaceholderText('Buscar ou adicionar estabelecimento'),
+      'Corretora Exemplo',
+    );
+    await userEvent.click(
+      await screen.findByRole('option', { name: 'Adicionar “Corretora Exemplo”' }),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/merchants`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Corretora Exemplo' }),
+    });
+    await expectCall(fetchMock, `${base}/recurrences/${aluguel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ merchantId: corretora.id }),
+    });
+  });
+
   it('turns a fixed recurrence variable, and validates the day', async () => {
     const fetchMock = mockRecurrences({
       [`PATCH ${base}/recurrences/${aluguel.id}`]: { body: { ...aluguel, variableAmount: true } },
@@ -503,6 +549,10 @@ describe('RecurrencesPage', () => {
       const dialog = await screen.findByRole('dialog', { name: 'Editar Geladeira' });
       expect(within(dialog).getByLabelText('Valor total (R$)')).toHaveAttribute('readonly');
       expect(dialog).toHaveTextContent('Com parcelas pagas, o valor e as parcelas não mudam');
+      // Its archived merchant shows and stays as it is: not sent, not reactivated.
+      expect(
+        within(dialog).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+      ).toHaveTextContent('Loja Antiga');
       const description = within(dialog).getByLabelText('Descrição');
       await userEvent.clear(description);
       await userEvent.type(description, 'Geladeira nova');
@@ -511,6 +561,32 @@ describe('RecurrencesPage', () => {
       await expectCall(fetchMock, `${base}/installments/${geladeira.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ description: 'Geladeira nova' }),
+      });
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        new URL(`${base}/merchants/${lojaAntiga.id}`, 'http://api.test'),
+        expect.anything(),
+      );
+    });
+
+    it('takes the merchant out of a plan (ADR 0053)', async () => {
+      const fetchMock = mockRecurrences({
+        [`PATCH ${base}/installments/${geladeira.id}`]: {
+          body: { ...geladeira, merchantId: null },
+        },
+      });
+      renderApp(page);
+
+      await choose('Geladeira', 'Editar');
+      const dialog = await screen.findByRole('dialog', { name: 'Editar Geladeira' });
+      await userEvent.click(
+        within(dialog).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+      );
+      await userEvent.click(await screen.findByRole('option', { name: 'Nenhum' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+      await expectCall(fetchMock, `${base}/installments/${geladeira.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ merchantId: null }),
       });
     });
 

@@ -2,6 +2,7 @@ import {
   dueDaySchema,
   installmentCountSchema,
   isoDateSchema,
+  MERCHANT_NAME_MAX_LENGTH,
   normalizeName,
   occurredOnLabels,
   paymentMethodFieldLabels,
@@ -11,6 +12,7 @@ import {
   transactionNotesSchema,
   type Category,
   type InstallmentPlan,
+  type Merchant,
   type Person,
   type UpdateInstallmentPlanInput,
 } from '@financas/shared';
@@ -22,6 +24,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CategorySelect } from '@/features/categories/category-picker';
+import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PersonSelect } from '@/features/people/person-picker';
 import { PaymentMethodSelect } from '@/features/transactions/payment-method-select';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -58,6 +61,11 @@ const planFormSchema = z
       .pipe(dueDaySchema.nullable()),
     dueMonth: z.enum(['SAME', 'NEXT']),
     paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
+    /** Where it is bought or who pays it (ADR 0053): a name, resolved to a merchant on save. */
+    merchant: z
+      .string()
+      .trim()
+      .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
     /** A receber de / a pagar para: a name, resolved to a person on save. */
     person: z.string().trim(),
   })
@@ -108,6 +116,7 @@ export function PlanForm({
   plan,
   categories,
   people,
+  merchants,
   userId,
   pending,
   error,
@@ -117,17 +126,25 @@ export function PlanForm({
   plan: InstallmentPlan;
   categories: Category[];
   people: Person[];
+  /** The workspace's merchants, for "Estabelecimento" (ADR 0053). */
+  merchants: Merchant[];
   userId: string;
   pending: boolean;
   error: unknown;
   /**
-   * Only what changed; empty when nothing did. `person` is the name picked when it changed ('' to
-   * unlink), undefined otherwise: a new name has to become a person first.
+   * Only what changed; empty when nothing did. `person` and `merchant` are the names picked when
+   * they changed ('' to unlink), undefined otherwise: a new name has to be created first.
    */
-  onSubmit: (changes: UpdateInstallmentPlanInput, person: string | undefined) => void;
+  onSubmit: (
+    changes: UpdateInstallmentPlanInput,
+    person: string | undefined,
+    merchant: string | undefined,
+  ) => void;
   onCancel: () => void;
 }) {
   const currentPerson = people.find((person) => person.id === plan.personId)?.name ?? '';
+  // Archived or not: the current one stays as it is unless another is picked.
+  const currentMerchant = merchants.find((merchant) => merchant.id === plan.merchantId)?.name ?? '';
   // Paid installments are history, and a split's shares follow the amounts (ADR 0038 note).
   const amountsLocked = plan.settledCount > 0 || plan.isSplit;
   const { register, handleSubmit, formState, control } = useForm<FormInput, unknown, FormValues>({
@@ -144,6 +161,7 @@ export function PlanForm({
       dueMonth: plan.dueMonthOffset === 1 ? 'NEXT' : 'SAME',
       paymentMethod: plan.paymentMethod ?? '',
       person: currentPerson,
+      merchant: currentMerchant,
     },
   });
   // Only categories of its type; an archived one only if it is already the current one.
@@ -164,6 +182,9 @@ export function PlanForm({
             normalizeName(values.person) === normalizeName(currentPerson)
               ? undefined
               : values.person,
+            normalizeName(values.merchant) === normalizeName(currentMerchant)
+              ? undefined
+              : values.merchant,
           ),
         )(event)
       }
@@ -296,6 +317,19 @@ export function PlanForm({
             error={fieldState.error?.message}
           >
             <PaymentMethodSelect value={field.value} onChange={field.onChange} />
+          </FormField>
+        )}
+      />
+      <Controller
+        control={control}
+        name="merchant"
+        render={({ field, fieldState }) => (
+          <FormField
+            id={id('merchant')}
+            label="Estabelecimento (opcional)"
+            error={fieldState.error?.message}
+          >
+            <MerchantSelect value={field.value} onChange={field.onChange} merchants={merchants} />
           </FormField>
         )}
       />

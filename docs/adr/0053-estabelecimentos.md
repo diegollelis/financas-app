@@ -92,3 +92,11 @@ Decidido com o dono do projeto, no passo 7:
 - **Como aparece:** num lançamento novo, a categoria **vazia** é preenchida, com a nota "Sugerida pelo histórico". A sugestão só troca o que ela mesma preencheu; uma categoria escolhida à mão nunca muda. Não vale na edição nem no "Guardar" do Painel.
 - **O estabelecimento não é sugerido:** continua escolhido à mão.
 - **Na prática, a descrição é quem mais sugere:** o estabelecimento fica em "Mais opções", abaixo da categoria.
+
+## Nota de 2026-10-18: o estabelecimento na edição de recorrências e parcelamentos
+
+Um teste do dono mostrou que a edição em Recorrências não mostrava o estabelecimento, embora a API já o aceitasse desde o passo 1. Agora:
+
+- **Os dois formulários de edição** (recorrência e parcelamento) têm "Estabelecimento (opcional)", com o mesmo `MerchantSelect` do lançamento: a busca pelo apelido e "Adicionar 'Nome'", que cria o estabelecimento ao salvar.
+- **Só vai quando muda,** como os outros campos: o novo alcança os lançamentos pendentes deste mês em diante (recorrência) ou as parcelas pendentes (parcelamento); "Nenhum" desliga.
+- **O atual fica como está,** mesmo arquivado: aparece no campo e não é reativado nem reenviado enquanto a pessoa não escolhe outro.
