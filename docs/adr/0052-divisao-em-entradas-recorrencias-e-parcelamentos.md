@@ -129,3 +129,13 @@ As partes nasciam **sem vencimento**: copiavam a descrição, o valor e a compet
 - **E acompanha a mudança, como a descrição:** mudar o vencimento de um lançamento dividido, o "Vence dia" (ou "Vence no") de uma recorrência (nos meses pendentes deste mês em diante) ou o de um parcelamento (nas parcelas pendentes) move também as **partes pendentes**. Uma parte já paga ou recebida fica como está (`followDueDate`, ao lado de `followDescription`).
 - **As partes pendentes já gravadas** ganham, pela migração, o vencimento da origem quando estão sem data. As pagas ou recebidas não mudam.
 - **O vencimento da própria parte** ainda pode ser editado à mão, como o de qualquer lançamento; a próxima mudança da origem o substitui.
+
+## Nota (dividir um lançamento já lançado, 2026-10-19)
+
+O dono importou a conta de energia pela planilha e quis dividi-la depois, mas a divisão só existia na criação. Agora um lançamento avulso também se divide na edição: `PATCH …/transactions/:id` aceita `split`, com as mesmas regras da criação, e as partes nascem pendentes, na mesma escrita, com o que o lançamento fica depois da mudança (descrição, mês, vencimento e data).
+
+- **Só um lançamento avulso que ainda não foi dividido:** uma parte de divisão, um lançamento já dividido, um mês de recorrência e uma parcela são recusados (409 `NOT_SPLITTABLE`). Para mudar uma divisão já feita, exclua as partes e divida de novo.
+- **Sem pessoa:** um lançamento com "A receber de" ou "A pagar para" é recusado, a menos que a mesma mudança tire a pessoa.
+- **As partes dos outros cabem no valor**, contando o valor novo quando ele muda junto.
+
+O próximo passo é o "Tornar recorrente" aceitar um lançamento dividido, levando as partes para a recorrência.
