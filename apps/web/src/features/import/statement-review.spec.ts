@@ -10,6 +10,7 @@ import { readyImport } from './review';
 import {
   applyToSameTitle,
   mergeStatementRows,
+  pendingMerchants,
   sameTitleCount,
   startStatementReview,
   suggestedPeriod,
@@ -333,6 +334,60 @@ describe('applyToSameTitle', () => {
       categoryId: assinaturas.id,
     });
     expect(applied[2]).toMatchObject({ merchantName: '', categoryId: null });
+  });
+
+  it('gives them to the lines the alias learned begins, as the next statement would', () => {
+    const rows = startStatementReview(
+      lines(
+        '2026-10-05,Spaceship.Com* Gypcbz,"32,40"',
+        '2026-10-07,Spaceship.Com* H2m9u1,"46,97"',
+        '2026-10-08,Spaceship Outra,"10,00"',
+      ),
+      context(),
+    );
+    const fixed = {
+      ...rows[0]!,
+      merchantName: 'Spaceship',
+      description: 'Spaceship',
+      rememberAlias: 'Spaceship.Com*',
+    };
+
+    // Without the alias, no other line has the same title.
+    expect(sameTitleCount(rows, rows[0]!)).toBe(0);
+    expect(sameTitleCount(rows, rows[0]!, 'Spaceship.Com*')).toBe(1);
+    const applied = applyToSameTitle(rows, fixed);
+
+    // Its merchant came from the alias: there is none to learn on it.
+    expect(applied[1]).toMatchObject({
+      merchantName: 'Spaceship',
+      description: 'Spaceship',
+      merchantByAlias: true,
+    });
+    expect(applied[2]).toMatchObject({ merchantName: '' });
+  });
+});
+
+describe('pendingMerchants', () => {
+  it('lists the merchants named in the review that do not exist yet, with their aliases', () => {
+    const rows = startStatementReview(
+      lines(
+        '2026-10-05,Spaceship.Com* Gypcbz,"32,40"',
+        '2026-10-06,Ifd*Pizzaria Exemplo,"50,00"',
+        '2026-10-07,Varejao de Frutas,"20,00"',
+      ),
+      context(),
+    );
+    const named = [
+      { ...rows[0]!, merchantName: 'Spaceship', rememberAlias: 'Spaceship.Com*' },
+      // Already a merchant, by its alias: not pending.
+      rows[1]!,
+      { ...rows[2]!, merchantName: ' Varejão de Frutas ' },
+    ];
+
+    expect(pendingMerchants(named, [pizzaria, loja, netflix])).toEqual([
+      { name: 'Spaceship', aliases: ['Spaceship.Com*'] },
+      { name: 'Varejão de Frutas', aliases: [] },
+    ]);
   });
 });
 

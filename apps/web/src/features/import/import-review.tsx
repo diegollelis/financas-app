@@ -33,7 +33,12 @@ import {
   unmatchedCategories,
   type ReviewRow,
 } from './review';
-import { applyToSameTitle, mergeStatementRows, sameTitleCount } from './statement-review';
+import {
+  applyToSameTitle,
+  mergeStatementRows,
+  pendingMerchants,
+  sameTitleCount,
+} from './statement-review';
 
 /**
  * A card statement's review (ADR 0055 notes): its reference month and due date, chosen here, and
@@ -231,6 +236,16 @@ export function ImportReview({
 
   const ready = readyImport(rows, categories, matches);
   const readyCount = ready.transactions.length + ready.plans.length;
+  // Optional, but worth a word before importing (ADR 0055 note).
+  const withoutMerchant = statement
+    ? rows.filter(
+        (row) =>
+          row.included &&
+          row.type === 'DEBIT' &&
+          !row.merchantName.trim() &&
+          rowProblems(row, resolveCategory(row, categories, matches)).length === 0,
+      ).length
+    : 0;
   const unmatched = unmatchedCategories(rows, categories).filter(
     (entry) => !matches.has(entry.key),
   );
@@ -482,6 +497,13 @@ export function ImportReview({
             Informe o vencimento da fatura, no topo, para importar.
           </p>
         )}
+        {withoutMerchant > 0 && (
+          <p className="text-muted-foreground text-sm">
+            {withoutMerchant === 1
+              ? '1 saída vai sem estabelecimento. É opcional: dá para escolher em "Editar".'
+              : `${withoutMerchant} saídas vão sem estabelecimento. É opcional: dá para escolher em "Editar".`}
+          </p>
+        )}
         <p className="text-muted-foreground text-sm">
           Tudo ou nada: se algum lançamento falhar, nenhum entra. Dá para desfazer a importação
           depois.
@@ -521,7 +543,8 @@ export function ImportReview({
             row={editingRow}
             categories={categories}
             merchants={merchants}
-            sameTitle={sameTitleCount(rows, editingRow)}
+            pendingMerchants={merchants && pendingMerchants(rows, merchants)}
+            sameLines={(alias) => sameTitleCount(rows, editingRow, alias)}
             categoryId={resolveCategory(editingRow, categories, matches)}
             onSave={(fixed) => {
               // On a statement, the choices go to the other lines of the same title too.
