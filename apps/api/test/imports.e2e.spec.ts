@@ -348,6 +348,12 @@ describe('imports', () => {
         occurredOn: '2026-08-28',
         pendingCount: 8,
       });
+      // The merchant named reaches the plan and every installment (ADR 0053).
+      const merchants = merchantListResponseSchema.parse(
+        (await browser.get(`${base}/merchants`).expect(200)).body,
+      );
+      const loja = merchants.find((merchant) => merchant.name === 'Loja Exemplo');
+      expect(plan?.merchantId).toBe(loja?.id);
       const installment = (await transactionsOf(statementPeriod)).find((t) => t.installment);
       expect(installment).toMatchObject({
         installment: { number: 3, count: 10 },
@@ -355,7 +361,10 @@ describe('imports', () => {
         dueDate: '2026-11-04',
         occurredOn: '2026-08-28',
         paymentMethod: 'CREDIT_CARD',
+        merchantId: loja?.id,
       });
+      const last = (await transactionsOf('2027-06')).find((t) => t.installment);
+      expect(last).toMatchObject({ installment: { number: 10 }, merchantId: loja?.id });
 
       await browser.delete(`${base}/imports/${created.id}`).expect(204);
 

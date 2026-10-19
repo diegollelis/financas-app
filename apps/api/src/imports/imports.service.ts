@@ -88,7 +88,9 @@ export class ImportsService {
         })),
       });
     }
-    const installmentsOf = plans.map((plan) => this.installments(workspaceId, plan));
+    const installmentsOf = plans.map((plan) =>
+      this.installments(workspaceId, plan, merchantOf(plan.merchantName)),
+    );
     const periods = [
       ...input.transactions.map((transaction) => transaction.period),
       ...installmentsOf.flat().map((installment) => installment.period),
@@ -147,9 +149,14 @@ export class ImportsService {
 
   /**
    * A plan's installments, as `InstallmentsService.create` makes them: from its first number
-   * on, one per competência from the first, each of the statement line's amount (ADR 0055).
+   * on, one per competência from the first, each of the statement line's amount (ADR 0055),
+   * with the plan's merchant, as every installment carries it (ADR 0053).
    */
-  private installments(workspaceId: string, plan: ImportInstallmentPlanInput) {
+  private installments(
+    workspaceId: string,
+    plan: ImportInstallmentPlanInput,
+    merchantId: string | null,
+  ) {
     const firstNumber = plan.firstNumber ?? 1;
     const dueDay = plan.dueDay ?? null;
     return Array.from({ length: installmentsCreated(plan) }, (_, index) => {
@@ -166,6 +173,7 @@ export class ImportsService {
           dueDay === null ? null : toDate(dueDateFor(period, dueDay, plan.dueMonthOffset ?? 0)),
         occurredOn: plan.occurredOn ? toDate(plan.occurredOn) : null,
         paymentMethod: plan.paymentMethod ?? null,
+        merchantId,
         installmentNumber: firstNumber + index,
       };
     });
