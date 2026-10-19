@@ -36,39 +36,42 @@ const optionalDate = z
  * One spreadsheet row, fixed before the import (ADR 0040): the fields of a new transaction plus
  * the competência and the settlement date, which the spreadsheet carries. Same shared rules.
  */
-const rowFormSchema = z
-  .object({
-    type: transactionTypeSchema,
-    description: transactionDescriptionSchema,
-    categoryId: z.string().min(1, 'Escolha uma categoria.'),
-    amount: reaisInputSchema,
-    period: periodSchema,
-    /** The day it happened (ADR 0055). */
-    occurredOn: optionalDate,
-    dueDate: optionalDate,
-    settledAt: optionalDate,
-    notes: transactionNotesSchema,
-    /** A name; a new one becomes a merchant in the import (ADR 0053). */
-    merchant: z
-      .string()
-      .trim()
-      .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
-    /** '' = none (ADR 0054). */
-    paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
-    /** A statement's line (ADR 0055): remember its text as an alias of the merchant chosen. */
-    remember: z.boolean(),
-    alias: z
-      .string()
-      .trim()
-      .max(MERCHANT_ALIAS_MAX_LENGTH, `Use no máximo ${MERCHANT_ALIAS_MAX_LENGTH} caracteres.`),
-  })
-  .refine((values) => !values.remember || !values.merchant || values.alias !== '', {
-    message: 'Informe o apelido, ou desmarque "Lembrar como apelido".',
-    path: ['alias'],
-  });
+const rowFormSchema = (categoryRequired: boolean) =>
+  z
+    .object({
+      type: transactionTypeSchema,
+      description: transactionDescriptionSchema,
+      // A statement's line may be saved for its merchant alone (ADR 0055 note): the category
+      // is still asked on its card before the import.
+      categoryId: categoryRequired ? z.string().min(1, 'Escolha uma categoria.') : z.string(),
+      amount: reaisInputSchema,
+      period: periodSchema,
+      /** The day it happened (ADR 0055). */
+      occurredOn: optionalDate,
+      dueDate: optionalDate,
+      settledAt: optionalDate,
+      notes: transactionNotesSchema,
+      /** A name; a new one becomes a merchant in the import (ADR 0053). */
+      merchant: z
+        .string()
+        .trim()
+        .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
+      /** '' = none (ADR 0054). */
+      paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
+      /** A statement's line (ADR 0055): remember its text as an alias of the merchant chosen. */
+      remember: z.boolean(),
+      alias: z
+        .string()
+        .trim()
+        .max(MERCHANT_ALIAS_MAX_LENGTH, `Use no máximo ${MERCHANT_ALIAS_MAX_LENGTH} caracteres.`),
+    })
+    .refine((values) => !values.remember || !values.merchant || values.alias !== '', {
+      message: 'Informe o apelido, ou desmarque "Lembrar como apelido".',
+      path: ['alias'],
+    });
 
-type FormInput = z.input<typeof rowFormSchema>;
-type FormValues = z.output<typeof rowFormSchema>;
+type FormInput = z.input<ReturnType<typeof rowFormSchema>>;
+type FormValues = z.output<ReturnType<typeof rowFormSchema>>;
 
 const amountText = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 });
 
@@ -85,7 +88,8 @@ export function ImportRowForm({
   row,
   categories,
   merchants,
-  sameTitle = 0,
+  pendingMerchants,
+  sameLines,
   categoryId,
   onSave,
   onCancel,
@@ -94,8 +98,10 @@ export function ImportRowForm({
   categories: Category[];
   /** A statement's review picks the merchant from the workspace's (ADR 0055). */
   merchants?: Merchant[];
-  /** How many other lines of the statement have the same title, and take these choices. */
-  sameTitle?: number;
+  /** The merchants added elsewhere in this review, created on import. */
+  pendingMerchants?: readonly { name: string; aliases: readonly string[] }[];
+  /** How many other lines of the statement take these choices, with the alias typed. */
+  sameLines?: (alias: string | null) => number;
   /** The category the row goes to now, if any. */
   categoryId: string | null;
   /** The row as fixed, checked again for the import. */
@@ -107,7 +113,7 @@ export function ImportRowForm({
     unknown,
     FormValues
   >({
-    resolver: zodResolver(rowFormSchema),
+    resolver: zodResolver(rowFormSchema(!row.statementTitle)),
     defaultValues: {
       type: row.type ?? 'DEBIT',
       description: row.description,
@@ -130,9 +136,13 @@ export function ImportRowForm({
   });
   const merchantName = useWatch({ control, name: 'merchant' });
   const remember = useWatch({ control, name: 'remember' });
+  const alias = useWatch({ control, name: 'alias' });
   // A statement's line whose merchant did not come from an alias may teach one.
   const offersAlias = Boolean(row.statementTitle) && !row.merchantByAlias;
   const type = useWatch({ control, name: 'type' });
+  // The alias counts only while it is to be remembered for a merchant.
+  const sameCount =
+    sameLines?.(offersAlias && remember && merchantName ? alias || null : null) ?? 0;
   const options = categories.filter((category) => category.type === type && !category.archived);
   const id = (field: string) => `import-row-${row.line}-${field}`;
   // A merchant chosen for a line that had none names it, as the statement's review does (ADR
@@ -152,7 +162,7 @@ export function ImportRowForm({
       notes: values.notes,
       merchantName: values.merchant,
       paymentMethod: values.paymentMethod || null,
-      categoryId: values.categoryId,
+      categoryId: values.categoryId || null,
       amountCents: values.amount,
       period: values.period,
       occurredOn: values.occurredOn,
@@ -204,7 +214,12 @@ export function ImportRowForm({
               label="Estabelecimento (opcional)"
               error={fieldState.error?.message}
             >
-              <MerchantSelect value={field.value} onChange={field.onChange} merchants={merchants} />
+              <MerchantSelect
+                value={field.value}
+                onChange={field.onChange}
+                merchants={merchants}
+                pending={pendingMerchants}
+              />
             </FormField>
           )}
         />
@@ -253,11 +268,11 @@ export function ImportRowForm({
           )}
         </div>
       )}
-      {sameTitle > 0 && (
+      {sameCount > 0 && (
         <p className="text-muted-foreground text-sm">
-          {sameTitle === 1
-            ? 'Mais 1 linha desta fatura tem o mesmo texto e recebe o mesmo estabelecimento e categoria.'
-            : `Mais ${sameTitle} linhas desta fatura têm o mesmo texto e recebem o mesmo estabelecimento e categoria.`}
+          {sameCount === 1
+            ? 'Mais 1 linha desta fatura, com o mesmo texto ou que começa com o apelido, recebe o mesmo estabelecimento e categoria, se ainda não tiver.'
+            : `Mais ${sameCount} linhas desta fatura, com o mesmo texto ou que começam com o apelido, recebem o mesmo estabelecimento e categoria, se ainda não tiverem.`}
         </p>
       )}
       <Controller

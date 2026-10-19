@@ -5,6 +5,7 @@ import {
   formatPeriod,
   installmentsCreated,
   normalizeName,
+  normalizeStatementTitle,
   statementTitleKey,
   suggestCategory,
   TRANSACTION_DESCRIPTION_MAX_LENGTH,
@@ -251,17 +252,29 @@ export function wholeBillAlreadyLaunched(lines: StatementLine[], context: Statem
 }
 
 /**
- * The choices made on one line of a statement go to the other lines of the same title that do
- * not have them yet (ADR 0055 note): the merchant (and its name as the description, when the
+ * How another line relates to the one whose choices were made: the same title, or a title the
+ * alias learned on it begins (as the next statement would read it); null for neither.
+ */
+function sameLine(row: ReviewRow, other: ReviewRow, alias: string | null | undefined) {
+  if (other.line === row.line || !row.statementTitle || !other.statementTitle) return null;
+  if (other.type !== row.type) return null;
+  const title = statementTitleKey({ title: other.statementTitle });
+  if (title === statementTitleKey({ title: row.statementTitle })) return 'TITLE';
+  const key = alias ? normalizeStatementTitle(alias) : '';
+  return key && title.startsWith(key) ? 'ALIAS' : null;
+}
+
+/**
+ * The choices made on one line of a statement go to the other lines that do not have them yet
+ * (ADR 0055 notes): those of the same title and, with an alias to remember, those it begins, as
+ * the next statement would find them. The merchant (and its name as the description, when the
  * description was still the statement's text) and the category.
  */
 export function applyToSameTitle(rows: ReviewRow[], fixed: ReviewRow): ReviewRow[] {
-  if (!fixed.statementTitle) return rows.map((row) => (row.line === fixed.line ? fixed : row));
-  const key = statementTitleKey({ title: fixed.statementTitle });
   return rows.map((row) => {
     if (row.line === fixed.line) return fixed;
-    if (!row.statementTitle || row.type !== fixed.type) return row;
-    if (statementTitleKey({ title: row.statementTitle }) !== key) return row;
+    const how = sameLine(fixed, row, fixed.rememberAlias);
+    if (!how) return row;
     const takesMerchant = !row.merchantName && Boolean(fixed.merchantName);
     const takesCategory = !row.categoryId && Boolean(fixed.categoryId);
     if (!takesMerchant && !takesCategory) return row;
@@ -269,21 +282,37 @@ export function applyToSameTitle(rows: ReviewRow[], fixed: ReviewRow): ReviewRow
       ...row,
       merchantName: takesMerchant ? fixed.merchantName : row.merchantName,
       description: takesMerchant ? fixed.merchantName : row.description,
+      // Its merchant came from the alias: there is none to learn on it.
+      ...(takesMerchant && how === 'ALIAS' && { merchantByAlias: true }),
       categoryId: row.categoryId ?? fixed.categoryId,
       touched: true,
     };
   });
 }
 
-/** How many other lines of the statement share this line's title (and so take its choices). */
-export function sameTitleCount(rows: ReviewRow[], row: ReviewRow) {
-  if (!row.statementTitle) return 0;
-  const key = statementTitleKey({ title: row.statementTitle });
-  return rows.filter(
-    (other) =>
-      other.line !== row.line &&
-      other.type === row.type &&
-      other.statementTitle &&
-      statementTitleKey({ title: other.statementTitle }) === key,
-  ).length;
+/**
+ * How many other lines of the statement take this line's choices: the same title, and those
+ * the alias begins.
+ */
+export function sameTitleCount(rows: ReviewRow[], row: ReviewRow, alias?: string | null) {
+  return rows.filter((other) => sameLine(row, other, alias)).length;
+}
+
+/**
+ * The merchants named in the review that do not exist yet (ADR 0055 note): created on import,
+ * offered meanwhile to the other lines, with the aliases they are to learn.
+ */
+export function pendingMerchants(rows: ReviewRow[], merchants: Merchant[]) {
+  const known = new Set(merchants.map((merchant) => normalizeName(merchant.name)));
+  const pending = new Map<string, { name: string; aliases: string[] }>();
+  for (const row of rows) {
+    const name = row.merchantName.trim();
+    const key = normalizeName(name);
+    if (!name || known.has(key)) continue;
+    const entry = pending.get(key) ?? { name, aliases: [] };
+    const alias = row.rememberAlias?.trim();
+    if (alias && !entry.aliases.includes(alias)) entry.aliases.push(alias);
+    pending.set(key, entry);
+  }
+  return [...pending.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }

@@ -450,6 +450,78 @@ describe('ImportPage', () => {
       });
     });
 
+    it('offers a merchant added on one line to the others, and applies its alias at once', async () => {
+      mockStatement();
+      renderApp(page);
+      const file = new File(
+        [
+          [
+            'date,title,amount',
+            '2026-10-05,Spaceship.Com* Gypcbz,"32,40"',
+            '2026-10-07,Spaceship.Com* H2m9u1,"46,97"',
+            '2026-10-08,Varejao de Frutas,"20,00"',
+          ].join('\n'),
+        ],
+        'Nubank_2026-11-04.csv',
+        { type: 'text/csv' },
+      );
+
+      await chooseStatement(file);
+      const october = await screen.findByRole('region', { name: 'outubro de 2026' });
+      await userEvent.click(
+        within(october).getByRole('button', { name: 'Editar Spaceship.Com* Gypcbz' }),
+      );
+      const dialog = await screen.findByRole('dialog', { name: 'Linha 2 da fatura' });
+      await userEvent.click(
+        within(dialog).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+      );
+      await userEvent.type(
+        await screen.findByPlaceholderText('Buscar ou adicionar estabelecimento'),
+        'Spaceship',
+      );
+      await userEvent.click(await screen.findByRole('option', { name: 'Adicionar “Spaceship”' }));
+      const alias = within(dialog).getByLabelText('Apelido');
+      await userEvent.clear(alias);
+      await userEvent.type(alias, 'Spaceship.Com*');
+      // The other line begins with the alias: it takes the merchant now.
+      expect(dialog).toHaveTextContent('Mais 1 linha desta fatura');
+      // Saved for its merchant alone: the category is still asked on the card.
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar na prévia' }));
+
+      const [first, second, fruits] = within(october).getAllByRole('listitem');
+      expect(first).toHaveTextContent('Spaceship');
+      expect(
+        within(first!).getByRole('combobox', { name: 'Categoria de Spaceship' }),
+      ).toBeVisible();
+      expect(second).toHaveTextContent('No extrato: Spaceship.Com* H2m9u1');
+      expect(within(second!).getByRole('button', { name: 'Editar Spaceship' })).toBeVisible();
+
+      // Not created yet, and offered to the other lines meanwhile.
+      await userEvent.click(
+        within(fruits!).getByRole('button', { name: 'Editar Varejao de Frutas' }),
+      );
+      const next = await screen.findByRole('dialog', { name: 'Linha 4 da fatura' });
+      await userEvent.click(
+        within(next).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+      );
+      expect(
+        await screen.findByRole('group', { name: 'Novos, criados ao importar' }),
+      ).toHaveTextContent('Spaceship');
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(within(next).getByRole('button', { name: 'Cancelar' }));
+
+      // A word on what goes without a merchant, once the line is ready.
+      await userEvent.click(
+        within(fruits!).getByRole('combobox', { name: 'Categoria de Varejao de Frutas' }),
+      );
+      await userEvent.click(await screen.findByRole('option', { name: 'Moradia' }));
+      expect(
+        screen.getByText(
+          '1 saída vai sem estabelecimento. É opcional: dá para escolher em "Editar".',
+        ),
+      ).toBeInTheDocument();
+    });
+
     it('takes the due date typed, whatever the file name says, and another reference month', async () => {
       mockStatement();
       renderApp(page);

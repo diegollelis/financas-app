@@ -201,3 +201,12 @@ O segundo teste mostrou que o mês da compra também não serve: uma compra de 2
 ## Nota (o estabelecimento nas parcelas importadas, 2026-10-19)
 
 Um teste do dono mostrou que o parcelamento importado da fatura tinha o estabelecimento, mas as parcelas dele não: a importação criava as parcelas sem o `merchantId` do parcelamento. Agora cada parcela recebe o estabelecimento do parcelamento, como no parcelamento criado pelo formulário ([ADR 0053](0053-estabelecimentos.md)). A migração `import_installment_merchant` corrige o que já foi importado: copia o estabelecimento do parcelamento para as parcelas que estão sem um, só nos parcelamentos vindos de uma importação.
+
+## Nota (os estabelecimentos na revisão da fatura, 2026-10-19)
+
+Um teste do dono com uma fatura real mostrou que a revisão escondia o que já tinha sido escolhido. Nada é gravado antes de "Importar" (de propósito: desistir não deixa rastro), então um estabelecimento adicionado numa linha não aparecia nas outras, e o apelido aprendido só valia na próxima fatura. Agora:
+
+- **Os novos aparecem no seletor:** os estabelecimentos adicionados em outras linhas da revisão ficam em "Novos, criados ao importar", abaixo dos "Cadastrados", com a busca pelo apelido (`pendingMerchants`). Continuam sendo criados só na importação.
+- **O apelido vale já nesta fatura:** ao salvar uma linha com "Lembrar como apelido", as outras linhas sem estabelecimento cujo título começa com o apelido recebem o estabelecimento, e a categoria se estiverem sem uma, como a próxima fatura as leria (`applyToSameTitle`). Essas linhas não oferecem outro apelido. O formulário conta, enquanto o apelido é digitado, quantas linhas recebem a escolha.
+- **"Editar" salva sem a categoria** numa linha da fatura: dá para escolher só o estabelecimento, e a categoria continua pedida no cartão antes de importar. Na planilha modelo, a categoria segue obrigatória ao corrigir uma linha.
+- **Um aviso antes de importar:** "N saídas vão sem estabelecimento", perto do botão, só informativo, porque o estabelecimento continua opcional.
