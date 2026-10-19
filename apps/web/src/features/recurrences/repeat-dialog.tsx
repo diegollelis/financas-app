@@ -1,4 +1,10 @@
-import { formatPeriod, type Transaction } from '@financas/shared';
+import {
+  formatBasisPoints,
+  formatCents,
+  formatPeriod,
+  FULL_BASIS_POINTS,
+  type Transaction,
+} from '@financas/shared';
 import { useState, type RefObject } from 'react';
 import { toast } from 'sonner';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
@@ -26,10 +32,12 @@ const amountKindOptions = [
 function RepeatForm({
   workspaceId,
   transaction,
+  shares,
   onDone,
 }: {
   workspaceId: string;
   transaction: Transaction;
+  shares: { name: string; amountCents: number }[];
   onDone: () => void;
 }) {
   const repeat = useRepeatTransaction(workspaceId);
@@ -90,6 +98,35 @@ function RepeatForm({
           {amountKindHint(amountKind === 'VARIABLE', yearly)}
         </p>
       </div>
+      {/* A split one takes its shares along (ADR 0052 note): amounts when fixed, the share
+          of each month's amount when variable, as the API keeps them. */}
+      {shares.length > 0 && (
+        <p>
+          {`Dividido com ${new Intl.ListFormat('pt-BR').format(
+            shares.map(
+              (share) =>
+                `${share.name} (${
+                  amountKind === 'VARIABLE'
+                    ? formatBasisPoints(
+                        Math.max(
+                          1,
+                          Math.round(
+                            (share.amountCents * FULL_BASIS_POINTS) / transaction.amountCents,
+                          ),
+                        ),
+                      )
+                    : formatCents(share.amountCents)
+                })`,
+            ),
+          )}`}
+          {amountKind === 'VARIABLE'
+            ? ', sobre o valor de cada mês.'
+            : yearly
+              ? ' a cada ano.'
+              : ' a cada mês.'}{' '}
+          As partes deste mês continuam como estão.
+        </p>
+      )}
       {repeat.isError && (
         <p role="alert" className="text-destructive">
           {apiErrorMessage(repeat.error)}
@@ -110,12 +147,15 @@ function RepeatForm({
 export function RepeatDialog({
   workspaceId,
   transaction,
+  shares = [],
   open,
   onOpenChange,
   returnFocusTo,
 }: {
   workspaceId: string;
   transaction: Transaction;
+  /** Its shares, when split: they go along (ADR 0052 note). */
+  shares?: { name: string; amountCents: number }[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   returnFocusTo: RefObject<HTMLButtonElement | null>;
@@ -131,6 +171,7 @@ export function RepeatDialog({
       <RepeatForm
         workspaceId={workspaceId}
         transaction={transaction}
+        shares={shares}
         onDone={() => onOpenChange(false)}
       />
     </ResponsiveDialog>

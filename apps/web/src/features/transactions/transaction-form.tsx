@@ -275,6 +275,7 @@ export function TransactionForm({
   onSubmit,
   onCancel,
   allowRepeat = false,
+  allowSplit = false,
 }: {
   /** Keeps the field ids unique when several forms are on the page. */
   idPrefix: string;
@@ -297,6 +298,11 @@ export function TransactionForm({
   onCancel?: () => void;
   /** Offers "Repetir": only for a new transaction. */
   allowRepeat?: boolean;
+  /**
+   * Offers "Dividir com alguém" when editing (ADR 0052 note): a transaction launched once that is
+   * not split yet. A new one always offers it.
+   */
+  allowSplit?: boolean;
 }) {
   const { register, handleSubmit, formState, control, setValue } = useForm<
     FormInput,
@@ -348,8 +354,9 @@ export function TransactionForm({
   const splitOn = useWatch({ control, name: 'splitOn' });
   const typedDueDate = useWatch({ control, name: 'dueDate' });
   // A new transaction, a credit too, launched once, every month or in installments, may be
-  // split; anything else may name one person, copied to each month (ADRs 0042, 0052).
-  const canSplit = allowRepeat;
+  // split, and so may one launched once and not split yet, when edited (ADR 0052 note); anything
+  // else may name one person, copied to each month (ADRs 0042, 0052).
+  const canSplit = allowRepeat || allowSplit;
   const splitting = canSplit && splitOn;
   const showPerson = !splitting;
   const user = useCurrentUser();

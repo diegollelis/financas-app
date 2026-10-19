@@ -139,3 +139,5 @@ O dono importou a conta de energia pela planilha e quis dividi-la depois, mas a 
 - **As partes dos outros cabem no valor**, contando o valor novo quando ele muda junto.
 
 O "Tornar recorrente" ([ADR 0038](0038-recorrencias-e-parcelamentos.md)) também aceita um lançamento dividido: as partes dele viram a divisão da recorrência, com o valor de cada pessoa numa recorrência fixa, ou a parte do valor em % (pontos-base, arredondados) numa variável, como na criação. As partes do mês do lançamento são adotadas como estão, sem duplicar, e os meses seguintes nascem com as suas. Uma parte sem pessoa, ou a mesma pessoa em duas partes, recusa (409 `NOT_REPEATABLE`).
+
+Na tela: "Editar" de um lançamento avulso que ainda não foi dividido tem "Dividir com alguém" em "Mais opções", como o lançamento novo (o mês de uma recorrência, a parcela, a parte e o já dividido não têm). O menu oferece "Tornar recorrente" também para um lançamento dividido, e o diálogo diz como a divisão segue: "Dividido com Ana (R$ 75,00) a cada mês" numa recorrência fixa, ou "Dividido com Ana (25%), sobre o valor de cada mês" numa variável.

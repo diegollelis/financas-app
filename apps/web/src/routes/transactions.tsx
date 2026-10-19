@@ -369,6 +369,8 @@ type RowProps = {
   personName: string | null;
   /** The people its shares are owed by, when it is a split debit. */
   sharedWith: string[];
+  /** Its shares with their amounts, for "Tornar recorrente" (ADR 0052 note). */
+  shares: { name: string; amountCents: number }[];
   canEdit: boolean;
   today: string;
   onEdit: (transaction: Transaction, returnFocusTo: HTMLElement | null) => void;
@@ -382,9 +384,10 @@ function useRowActions({
   workspaceId,
   transaction,
   sharedWith,
+  shares,
   today,
   onEdit,
-}: Pick<RowProps, 'workspaceId' | 'transaction' | 'sharedWith' | 'today' | 'onEdit'>) {
+}: Pick<RowProps, 'workspaceId' | 'transaction' | 'sharedWith' | 'shares' | 'today' | 'onEdit'>) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [repeating, setRepeating] = useState(false);
@@ -397,8 +400,9 @@ function useRowActions({
   const estimated = transaction.amountEstimated && !transaction.settledAt;
   // Part of a recurrence or of an installment plan, which can be ended from here (ADR 0038).
   const inSeries = Boolean(transaction.recurrenceId ?? transaction.installment);
-  // Launched once, not a split nor a share: it can become a recurrence ("Tornar recorrente").
-  const repeatable = !inSeries && !transaction.splitOfId && sharedWith.length === 0;
+  // Launched once and not a share: it can become a recurrence ("Tornar recorrente"), a split one
+  // with its shares (ADR 0052 note).
+  const repeatable = !inSeries && !transaction.splitOfId;
   const labels = settleActionLabels[transaction.type];
   const settledToast =
     transaction.type === 'CREDIT' ? 'Marcado como recebido' : 'Marcado como pago';
@@ -500,6 +504,7 @@ function useRowActions({
           <RepeatDialog
             workspaceId={workspaceId}
             transaction={transaction}
+            shares={shares}
             open={repeating}
             onOpenChange={setRepeating}
             returnFocusTo={actionsRef}
@@ -802,6 +807,13 @@ export function TransactionsPage() {
   const asTable = useShowsTable('lancamentos');
   const categoryName = (transaction: Transaction) =>
     categories.data?.find((item) => item.id === transaction.categoryId)?.name ?? null;
+  const sharesOf = (transaction: Transaction) =>
+    (transactions.data ?? [])
+      .filter((item) => item.splitOfId === transaction.id)
+      .map((item) => ({
+        name: personName(item.personId) ?? 'alguém',
+        amountCents: item.amountCents,
+      }));
   // One transaction, as a list item or a table row: the same data either way.
   const row = (transaction: Transaction, Row: typeof TransactionItem) => (
     <Row
@@ -812,9 +824,8 @@ export function TransactionsPage() {
       merchantName={merchantName(transaction.merchantId)}
       personName={personName(transaction.personId)}
       // The shares of a split debit are credits of the same competência.
-      sharedWith={(transactions.data ?? [])
-        .filter((item) => item.splitOfId === transaction.id)
-        .map((item) => personName(item.personId) ?? 'alguém')}
+      sharedWith={sharesOf(transaction).map((share) => share.name)}
+      shares={sharesOf(transaction)}
       canEdit={canEdit}
       today={today}
       onEdit={openForm}
@@ -951,6 +962,7 @@ export function TransactionsPage() {
             merchants={merchants.data}
             hints={hints.data}
             editing={form.editing}
+            editingIsSplit={Boolean(form.editing && sharesOf(form.editing).length > 0)}
             open={form.open}
             onOpenChange={(open) => setForm((current) => ({ ...current, open }))}
             returnFocusTo={form.returnFocusTo}
