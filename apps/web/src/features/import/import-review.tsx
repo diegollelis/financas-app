@@ -9,6 +9,7 @@ import {
   type Category,
   type Import,
   type Merchant,
+  type TransactionType,
 } from '@financas/shared';
 import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
@@ -33,6 +34,11 @@ import {
   unmatchedCategories,
   type ReviewRow,
 } from './review';
+import {
+  newCategoryName,
+  newCategoryValue,
+  useResolveCategory,
+} from '@/features/categories/new-category';
 import {
   applyToSameTitle,
   mergeStatementRows,
@@ -125,6 +131,11 @@ function RowItem({
                 : `${row.categoryName || 'Sem categoria'} (sem correspondência)`)}
           </span>
           {row.merchantName && <span>{row.merchantName}</span>}
+          {row.personName && row.type && (
+            <span>
+              {row.type === 'CREDIT' ? 'A receber de' : 'A pagar para'} {row.personName}
+            </span>
+          )}
           {row.paymentMethod && <span>{paymentMethodLabels[row.paymentMethod]}</span>}
           {row.occurredOn && (
             <span>
@@ -142,7 +153,7 @@ function RowItem({
         {picksCategory && row.included && (
           <div className="mt-1 grid max-w-xs gap-1">
             <FormField id={`import-row-${row.line}-category`} label={`Categoria de ${label}`}>
-              <CategorySelect value="" onChange={onCategory} options={categoryOptions} />
+              <CategorySelect value="" onChange={onCategory} options={categoryOptions} allowAdd />
             </FormField>
           </div>
         )}
@@ -251,8 +262,12 @@ export function ImportReview({
   );
   // A statement may be imported again on purpose: what is already in comes unchecked instead.
   const overlapping = statement ? [] : overlapsPrevious(previousImports, rows);
-  const nameOf = (id: string | null) =>
-    categories.find((category) => category.id === id)?.name ?? null;
+  const nameOf = (id: string | null) => {
+    // One to create on import says so.
+    const added = id && newCategoryName(id);
+    if (added) return `${added} (nova)`;
+    return categories.find((category) => category.id === id)?.name ?? null;
+  };
   const editingRow = rows.find((row) => row.line === editing);
   /** What keeps a row out, if anything. A spreadsheet category's "Escolha a categoria" is
    * answered above, for every row of that name at once, so it is not repeated on each row. */
@@ -282,11 +297,28 @@ export function ImportReview({
   const update = (line: number, change: (row: ReviewRow) => ReviewRow) =>
     setRows((current) => current.map((row) => (row.line === line ? change(row) : row)));
 
-  const submit = () =>
+  const category = useResolveCategory(workspaceId, categories);
+  const submit = async () => {
+    // The categories added in the review are created (or reactivated) first, one per name and
+    // type (ADR 0040 note); if the import then fails, they stay, like the merchants.
+    const created = new Map<string, string>();
+    try {
+      for (const item of [...ready.transactions, ...ready.plans]) {
+        const key = `${item.type}|${item.categoryId}`;
+        if (newCategoryName(item.categoryId) === null || created.has(key)) continue;
+        created.set(key, await category.resolve(item.categoryId, item.type));
+      }
+    } catch {
+      return; // Shown below, from category.error.
+    }
+    const real = <T extends { type: TransactionType; categoryId: string }>(item: T): T => ({
+      ...item,
+      categoryId: created.get(`${item.type}|${item.categoryId}`) ?? item.categoryId,
+    });
     create.mutate(
       {
-        transactions: ready.transactions,
-        ...(ready.plans.length > 0 && { plans: ready.plans }),
+        transactions: ready.transactions.map(real),
+        ...(ready.plans.length > 0 && { plans: ready.plans.map(real) }),
         ...(ready.aliases.length > 0 && { aliases: ready.aliases }),
         label,
         ...(statement?.dueDate && { statementDueDate: statement.dueDate }),
@@ -300,6 +332,7 @@ export function ImportReview({
         },
       },
     );
+  };
 
   return (
     <div className="grid gap-6">
@@ -397,8 +430,24 @@ export function ImportReview({
           </h2>
           <p className="text-muted-foreground">
             Estas categorias da planilha não existem no espaço. Escolha a correspondente de cada
-            uma, ou crie a categoria em Categorias e escolha o arquivo de novo.
+            uma, ou adicione uma nova: ela é criada ao importar.
           </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="sm:justify-self-start"
+            onClick={() =>
+              setMatches((current) => {
+                const next = new Map(current);
+                for (const entry of unmatched) next.set(entry.key, newCategoryValue(entry.name));
+                return next;
+              })
+            }
+          >
+            {unmatched.length === 1
+              ? `Criar “${unmatched[0]!.name}”`
+              : `Criar as ${unmatched.length} com o nome da planilha`}
+          </Button>
           <div className="grid gap-4 sm:grid-cols-2">
             {unmatched.map((entry) => (
               <FormField
@@ -414,6 +463,7 @@ export function ImportReview({
                   options={categories.filter(
                     (category) => category.type === entry.type && !category.archived,
                   )}
+                  allowAdd
                 />
               </FormField>
             ))}
@@ -481,9 +531,9 @@ export function ImportReview({
         );
       })}
 
-      {create.isError && (
+      {(Boolean(category.error) || create.isError) && (
         <p role="alert" className="text-destructive">
-          {apiErrorMessage(create.error)}
+          {apiErrorMessage(category.error ?? create.error)}
         </p>
       )}
       <div className="grid gap-1 md:justify-items-start">
@@ -512,16 +562,17 @@ export function ImportReview({
         <Button
           // The layout keeps room for it below the footer (data-fab).
           data-fab
-          onClick={submit}
+          onClick={() => void submit()}
           disabled={
             readyCount === 0 ||
             missingDueDate ||
             (Boolean(statement) && !statement?.baseRows) ||
+            category.isPending ||
             create.isPending
           }
           className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-20 shadow-lg md:static md:shadow-none"
         >
-          {create.isPending
+          {category.isPending || create.isPending
             ? 'Importando…'
             : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
                 ready.plans.length > 0

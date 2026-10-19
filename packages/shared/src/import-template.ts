@@ -3,6 +3,7 @@ import { MAX_IMPORT_TRANSACTIONS } from './import.ts';
 import { merchantNameSchema } from './merchant.ts';
 import { amountCentsSchema, isoDateSchema, parseReais, periodSchema } from './money-and-dates.ts';
 import { paymentMethodLabels, paymentMethodSchema, type PaymentMethod } from './payment-method.ts';
+import { personNameSchema } from './person.ts';
 import { transactionDescriptionSchema, transactionNotesSchema } from './transaction.ts';
 
 // Planilha modelo (ADR 0040): the one format the import reads. One row per transaction on the
@@ -32,6 +33,8 @@ const columns = [
   { key: 'category', title: 'Categoria', formerTitles: [], required: true },
   // Optional (ADR 0053): a template without it is read as before.
   { key: 'merchant', title: 'Estabelecimento', formerTitles: [], required: false },
+  // Optional (ADR 0040 note): a receber de, on an inflow; a pagar para, on an outflow.
+  { key: 'person', title: 'Pessoa', formerTitles: [], required: false },
   // Optional too (ADR 0054): one column for both sides, by the label the form shows.
   {
     key: 'paymentMethod',
@@ -64,6 +67,7 @@ export const TEMPLATE_EXAMPLE: readonly string[] = [
   'Aluguel',
   'Moradia',
   'Imobiliária Exemplo',
+  '',
   'Boleto',
   '1.500,00',
   '05/09/2026',
@@ -82,6 +86,8 @@ export type TemplateRow = {
   categoryName: string;
   /** Where it was bought or who paid it (ADR 0053), as a name; '' when none. */
   merchantName: string;
+  /** A receber de / a pagar para (ADR 0040 note), as a name; '' when none. */
+  personName: string;
   /** How it was paid or received (ADR 0054); null when empty or not in the list. */
   paymentMethod: PaymentMethod | null;
   amountCents: number;
@@ -103,6 +109,7 @@ export type TemplateDraft = {
   notes: string | null;
   categoryName: string;
   merchantName: string;
+  personName: string;
   paymentMethod: PaymentMethod | null;
   /** Null when missing or unreadable; a zero or negative amount stays, to be corrected. */
   amountCents: number | null;
@@ -263,6 +270,11 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
     if (merchantName && !merchant.success) {
       errors.push(`Estabelecimento: ${merchant.error.issues[0]?.message ?? 'nome inválido.'}`);
     }
+    const personName = text(cell('person'));
+    const person = personNameSchema.safeParse(personName);
+    if (personName && !person.success) {
+      errors.push(`Pessoa: ${person.error.issues[0]?.message ?? 'nome inválido.'}`);
+    }
     // Not in the list: a warning, and the transaction comes in without one (ADR 0054).
     const paymentMethod = readPaymentMethod(cell('paymentMethod')) ?? null;
     const unknownMethod = paymentMethod === null && !isEmpty(cell('paymentMethod'));
@@ -296,6 +308,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
         notes: text(cell('notes')) || null,
         categoryName,
         merchantName,
+        personName,
         paymentMethod,
         amountCents,
         period,
@@ -345,6 +358,7 @@ export function parseTemplateRows(rows: readonly (readonly TemplateCell[])[]): {
       notes: notes.success ? notes.data : null,
       categoryName,
       merchantName: merchant.success ? merchant.data : '',
+      personName: person.success ? person.data : '',
       paymentMethod,
       amountCents: amount.data,
       period,
