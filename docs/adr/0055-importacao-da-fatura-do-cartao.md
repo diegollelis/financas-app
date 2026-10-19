@@ -197,3 +197,7 @@ O segundo teste mostrou que o mês da compra também não serve: uma compra de 2
 - **O vencimento é digitado na revisão,** ao lado do mês e da "Origem", e não num passo antes dela: a revisão abre logo depois de escolher o arquivo, e "Importar" fica bloqueado até o vencimento ser informado.
 - **Trocar o mês ou o vencimento refaz a revisão** (as comparações "já importada" e "já lançada pela recorrência" passam a olhar o novo mês), e uma linha em que a pessoa já mexeu (marcou, escolheu categoria ou estabelecimento, editou) mantém as escolhas dela (`mergeStatementRows`).
 - **A visão continua sendo a do consumo:** quase todas as compras de uma fatura de outubro são de outubro; só as feitas entre o fechamento e a virada do mês mudam, para o mês em que aparecem na fatura.
+
+## Nota (o estabelecimento nas parcelas importadas, 2026-10-19)
+
+Um teste do dono mostrou que o parcelamento importado da fatura tinha o estabelecimento, mas as parcelas dele não: a importação criava as parcelas sem o `merchantId` do parcelamento. Agora cada parcela recebe o estabelecimento do parcelamento, como no parcelamento criado pelo formulário ([ADR 0053](0053-estabelecimentos.md)). A migração `import_installment_merchant` corrige o que já foi importado: copia o estabelecimento do parcelamento para as parcelas que estão sem um, só nos parcelamentos vindos de uma importação.
