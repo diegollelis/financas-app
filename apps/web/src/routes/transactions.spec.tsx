@@ -516,7 +516,7 @@ describe('TransactionsPage', () => {
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('offers "Tornar recorrente" only for a transaction launched once, not split', async () => {
+  it('offers "Tornar recorrente" only for a transaction launched once, a split one too (ADR 0052 note)', async () => {
     const jantar = transaction(4, {
       type: 'DEBIT',
       description: 'Jantar',
@@ -545,17 +545,77 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    for (const description of [
-      'Conta de luz',
-      'Compras da semana',
-      'Jantar',
-      'Ana: parte de Jantar',
-    ]) {
+    for (const description of ['Conta de luz', 'Compras da semana', 'Ana: parte de Jantar']) {
       const menu = await openActions(description);
       expect(
         within(menu).queryByRole('menuitem', { name: 'Tornar recorrente' }),
       ).not.toBeInTheDocument();
       await userEvent.keyboard('{Escape}');
+    }
+
+    // The split one goes with its shares: amounts when fixed, % of each month when variable.
+    const menu = await openActions('Jantar');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Tornar recorrente' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Tornar Jantar recorrente' });
+    expect(nbsp(dialog.textContent)).toContain('Dividido com alguém (R$ 60,00) a cada mês.');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Variável' }));
+    expect(nbsp(dialog.textContent)).toContain(
+      'Dividido com alguém (50%), sobre o valor de cada mês.',
+    );
+  });
+
+  it('splits a transaction launched once when editing it (ADR 0052 note)', async () => {
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`PATCH ${base}/${light.id}`]: { body: light },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    await pickPeople(form, ['Ana']);
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/${light.id}`, {
+      method: 'PATCH',
+      body: expect.stringContaining(
+        `"personId":null,"merchantId":null,"paymentMethod":null,"split":[{"personId":"${ana.id}","amountCents":7995}]`,
+      ) as unknown,
+    });
+    expect(await screen.findByText('Lançamento salvo, dividido com 1 pessoa')).toBeInTheDocument();
+  });
+
+  it('does not offer to split again one already split, nor a month of a recurrence', async () => {
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Conta de luz',
+      categoryId: salaryCategory.id,
+      amountCents: 6_000,
+      splitOfId: light.id,
+    });
+    const internet = transaction(6, {
+      type: 'DEBIT',
+      description: 'Internet',
+      categoryId: energyCategory.id,
+      amountCents: 10_000,
+      recurrenceId: '01920000-0000-7000-8000-000000000301',
+    });
+    mockTransactions({ [`GET ${base}`]: { body: [light, share, internet] } });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    for (const description of ['Conta de luz', 'Internet']) {
+      const [actions] = await screen.findAllByRole('button', { name: `Ações de ${description}` });
+      await userEvent.click(actions!);
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Editar' }));
+      const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+      await userEvent.click(within(form).getByText(/^Mais opções/));
+      expect(
+        within(form).queryByRole('checkbox', { name: 'Dividir com alguém' }),
+      ).not.toBeInTheDocument();
+      await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
     }
   });
 

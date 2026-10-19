@@ -38,6 +38,7 @@ export function TransactionDialog({
   merchants = [],
   hints,
   editing,
+  editingIsSplit = false,
   preset,
   open,
   onOpenChange,
@@ -53,6 +54,8 @@ export function TransactionDialog({
   hints?: CategoryHints;
   /** The transaction being edited; null to create one. */
   editing: Transaction | null;
+  /** It already has shares: it is not split again (ADR 0052 note). */
+  editingIsSplit?: boolean;
   /** For a new one: values to start from (an application to a destination, ADR 0047). */
   preset?: TransactionPreset;
   open: boolean;
@@ -151,8 +154,10 @@ export function TransactionDialog({
           personId,
           merchantId,
           paymentMethod,
+          // Split now (ADR 0052 note): its shares come pending with what it is after this change.
+          ...(splitting && { split }),
         },
-        { onSuccess: done('Lançamento salvo') },
+        { onSuccess: done(withPeople('Lançamento salvo')) },
       );
     } else if (values.repeat === 'INSTALLMENTS') {
       // All installments at once, one per month from this one (ADR 0038).
@@ -269,6 +274,13 @@ export function TransactionDialog({
         onSubmit={(values) => void submit(values)}
         onCancel={() => onOpenChange(false)}
         allowRepeat={!editing}
+        allowSplit={
+          Boolean(editing) &&
+          !editing?.recurrenceId &&
+          !editing?.installment &&
+          !editing?.splitOfId &&
+          !editingIsSplit
+        }
       />
     </ResponsiveDialog>
   );
