@@ -5,7 +5,12 @@ import {
   type Transaction,
   type UpdateTransactionInput,
 } from '@financas/shared';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
@@ -119,7 +124,10 @@ export class TransactionsService {
   /** The shares of a split: each person resolved (or created), on the side opposite the input. */
   private async shares(
     workspaceId: string,
-    input: CreateTransactionInput,
+    input: Pick<
+      CreateTransactionInput,
+      'type' | 'description' | 'period' | 'dueDate' | 'occurredOn'
+    >,
     split: SplitShareInput[],
   ) {
     const type = input.type === 'DEBIT' ? ('CREDIT' as const) : ('DEBIT' as const);
@@ -159,6 +167,10 @@ export class TransactionsService {
       await ensureUsableCategory(this.prisma, workspaceId, categoryId, type);
     }
 
+    const shares = input.split
+      ? await this.sharesOnEdit(workspaceId, current, input, input.split)
+      : [];
+
     try {
       const transaction = await this.prisma.forWorkspace(workspaceId).transaction.update({
         where: { id: transactionId, workspaceId },
@@ -175,6 +187,7 @@ export class TransactionsService {
           personId: input.personId,
           merchantId: input.merchantId,
           paymentMethod: input.paymentMethod,
+          ...(shares.length > 0 && { shares: { create: shares } }),
           // Giving the amount, or settling, confirms an estimate (ADR 0038). Undoing a settlement
           // does not make it an estimate again.
           amountEstimated:
@@ -242,6 +255,62 @@ export class TransactionsService {
   }
 
   /** An id that is not a uuid, or that belongs to another workspace, is simply not found. */
+  /**
+   * The shares of a transaction split after it was launched (ADR 0052 note), as on creation: only
+   * one launched once, with no person, not a share and not split yet; the others' shares within
+   * its amount. They take what it will be after this change.
+   */
+  private async sharesOnEdit(
+    workspaceId: string,
+    current: Awaited<ReturnType<TransactionsService['find']>>,
+    input: UpdateTransactionInput,
+    split: SplitShareInput[],
+  ) {
+    const refuse = (message: string) => new ConflictException({ code: 'NOT_SPLITTABLE', message });
+    const origin = await this.prisma.forWorkspace(workspaceId).transaction.findFirstOrThrow({
+      where: { id: current.id, workspaceId },
+      select: {
+        occurrence: { select: { recurrenceId: true } },
+        _count: { select: { shares: true } },
+      },
+    });
+    if (current.splitOfId) throw refuse('Uma parte de divisão não se divide de novo.');
+    if (origin._count.shares > 0) {
+      throw refuse(
+        'Este lançamento já está dividido. Para mudar, exclua as partes e divida de novo.',
+      );
+    }
+    if (origin.occurrence || current.installmentPlanId) {
+      throw refuse('Um mês de recorrência ou uma parcela não se divide sozinho.');
+    }
+    const personId = input.personId === undefined ? current.personId : input.personId;
+    if (personId) throw refuse('Um lançamento dividido não fica ligado a uma só pessoa.');
+    const amountCents = input.amountCents ?? current.amountCents;
+    if (split.reduce((sum, share) => sum + share.amountCents, 0) > amountCents) {
+      throw new BadRequestException({
+        code: 'INVALID_INPUT',
+        message: 'As partes dos outros passam do valor do lançamento.',
+      });
+    }
+    const dateOf = (field: 'dueDate' | 'occurredOn') => {
+      const given = input[field];
+      if (given !== undefined) return given;
+      const stored = current[field];
+      return stored ? toIsoDate(stored) : null;
+    };
+    return this.shares(
+      workspaceId,
+      {
+        type: input.type ?? current.type,
+        description: input.description ?? current.description,
+        period: input.period ?? current.period,
+        dueDate: dateOf('dueDate'),
+        occurredOn: dateOf('occurredOn'),
+      },
+      split,
+    );
+  }
+
   private async find(workspaceId: string, transactionId: string) {
     if (!z.uuid().safeParse(transactionId).success) throw new NotFoundException();
     const transaction = await this.prisma

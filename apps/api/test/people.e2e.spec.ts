@@ -671,6 +671,128 @@ describe('people and splits', () => {
     });
   });
 
+  describe('splitting a transaction already launched (ADR 0052 note)', () => {
+    async function launch(browser: Browser, base: string, categoryId: string, extra = {}) {
+      const response = await browser
+        .post(`${base}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          categoryId,
+          amountCents: 18_990,
+          period,
+          dueDate: `${period}-15`,
+          ...extra,
+        })
+        .expect(201);
+      return transactionSchema.parse(response.body);
+    }
+
+    it('splits it on edit: the shares come pending, with what it is after the change', async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const bill = await launch(browser, base, category('Moradia', 'DEBIT').id);
+
+      await browser
+        .patch(`${base}/transactions/${bill.id}`)
+        .send({
+          description: 'Energia',
+          amountCents: 20_000,
+          split: [
+            { personId: ana.id, amountCents: 10_000 },
+            { newPersonName: 'Bruno', amountCents: 5_000 },
+          ],
+        })
+        .expect(200);
+
+      const list = await transactions(browser, base);
+      const shares = list.filter((transaction) => transaction.splitOfId === bill.id);
+      expect(shares).toHaveLength(2);
+      for (const share of shares) {
+        expect(share).toMatchObject({
+          type: 'CREDIT',
+          description: 'Energia',
+          dueDate: `${period}-15`,
+          categoryId: category('Reembolso', 'CREDIT').id,
+          settledAt: null,
+        });
+      }
+      expect(shares.map((share) => share.amountCents).sort()).toEqual([10_000, 5_000].sort());
+      expect(list.find((transaction) => transaction.id === bill.id)?.amountCents).toBe(20_000);
+    });
+
+    it('refuses a transaction already split, a share, one with a person, or shares above it', async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const moradia = category('Moradia', 'DEBIT').id;
+      const split = [{ personId: ana.id, amountCents: 1_000 }];
+
+      const once = await launch(browser, base, moradia);
+      await browser.patch(`${base}/transactions/${once.id}`).send({ split }).expect(200);
+      const again = await browser
+        .patch(`${base}/transactions/${once.id}`)
+        .send({ split })
+        .expect(409);
+      expect(again.body).toMatchObject({ code: 'NOT_SPLITTABLE' });
+
+      const share = (await transactions(browser, base)).find((t) => t.splitOfId === once.id)!;
+      await browser.patch(`${base}/transactions/${share.id}`).send({ split }).expect(409);
+
+      const withPerson = await launch(browser, base, moradia, { personId: ana.id });
+      await browser.patch(`${base}/transactions/${withPerson.id}`).send({ split }).expect(409);
+      // Unlinking the person in the same change lets it be split.
+      await browser
+        .patch(`${base}/transactions/${withPerson.id}`)
+        .send({ personId: null, split })
+        .expect(200);
+
+      const small = await launch(browser, base, moradia);
+      const tooMuch = await browser
+        .patch(`${base}/transactions/${small.id}`)
+        .send({ split: [{ personId: ana.id, amountCents: 18_991 }] })
+        .expect(400);
+      expect(tooMuch.body).toMatchObject({
+        message: 'As partes dos outros passam do valor do lançamento.',
+      });
+    });
+
+    it('refuses a month of a recurrence and an installment', async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const moradia = category('Moradia', 'DEBIT').id;
+      const split = [{ personId: ana.id, amountCents: 1_000 }];
+
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Internet',
+          categoryId: moradia,
+          amountCents: 10_000,
+          startPeriod: period,
+        })
+        .expect(201);
+      await browser
+        .post(`${base}/installments`)
+        .send({
+          type: 'DEBIT',
+          description: 'Geladeira',
+          categoryId: moradia,
+          amountCents: 300_000,
+          amountIs: 'TOTAL',
+          installments: 3,
+          firstPeriod: period,
+        })
+        .expect(201);
+      const list = await transactions(browser, base);
+      const month = list.find((transaction) => transaction.recurrenceId)!;
+      const installment = list.find((transaction) => transaction.installment)!;
+
+      await browser.patch(`${base}/transactions/${month.id}`).send({ split }).expect(409);
+      await browser.patch(`${base}/transactions/${installment.id}`).send({ split }).expect(409);
+    });
+  });
+
   describe('splitting a credit (ADR 0052)', () => {
     it('creates the credit and one pending Repasse debit per person', async () => {
       const { browser, base, category } = await setup();
