@@ -2,9 +2,11 @@ import {
   createInstallmentPlanInputSchema,
   installmentPlanListResponseSchema,
   installmentPlanSchema,
+  installmentsFromTransactionInputSchema,
   updateInstallmentPlanInputSchema,
   type CreateInstallmentPlanInput,
   type InstallmentPlan,
+  type InstallmentsFromTransactionInput,
   type UpdateInstallmentPlanInput,
 } from '@financas/shared';
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
@@ -15,6 +17,7 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
   type SchemaObject,
@@ -61,6 +64,30 @@ export class InstallmentsController {
     @Body({ schema: createInstallmentPlanInputSchema }) input: CreateInstallmentPlanInput,
   ): Promise<InstallmentPlan> {
     return this.installments.create(membership.workspaceId, input);
+  }
+
+  @Post('from-transaction')
+  @RequireRole('EDITOR')
+  @ApiBody({ schema: openApi(installmentsFromTransactionInputSchema) })
+  @ApiCreatedResponse({
+    description: 'Created with the transaction as one of its installments ("Tornar parcelado").',
+    schema: openApi(installmentPlanSchema),
+  })
+  @ApiBadRequestResponse({
+    description: 'INVALID_INPUT, or an archived category, person or merchant.',
+  })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  @ApiNotFoundResponse({ description: 'Not a transaction of this workspace.' })
+  @ApiConflictResponse({
+    description:
+      'NOT_INSTALLABLE: already in a plan or a recurrence, a share, split, or settled given as the total.',
+  })
+  fromTransaction(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Body({ schema: installmentsFromTransactionInputSchema })
+    input: InstallmentsFromTransactionInput,
+  ): Promise<InstallmentPlan> {
+    return this.installments.fromTransaction(membership.workspaceId, input);
   }
 
   @Patch(':planId')

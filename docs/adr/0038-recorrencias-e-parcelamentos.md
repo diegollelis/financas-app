@@ -151,3 +151,12 @@ O dono precisou lançar o que se repete uma vez por ano (IPVA, IPTU, anuidade, s
 - **Uma recorrência encerrada mostra do primeiro ao último mês:** "Janeiro a maio de 2026", "Outubro de 2025 a março de 2026" ou "Em maio de 2026", na lista e na coluna "Período" da tabela de Recorrências. Antes mostrava só "Até maio de 2026", e o início, que continua gravado (`startPeriod`), sumia da tela.
 - **Uma ativa continua com "Desde outubro de 2026"** (ou "A partir de…", quando começa num mês futuro).
 - **Não há data de início digitada:** o mês de início já decide a geração, e o dia de cada mês está no vencimento.
+
+## Nota (tornar parcelado, 2026-10-19)
+
+O dono importou pela planilha uma compra que era parcelada e não tinha como transformá-la em parcelas. Agora, como o "Tornar recorrente", um lançamento avulso pode virar parcelamento: `POST …/installments/from-transaction { transactionId, installments, firstNumber?, amountIs }`.
+
+- **O lançamento é adotado como uma das parcelas,** a de número `firstNumber` (1 por padrão), no mês dele, sem duplicar; as seguintes nascem pendentes, uma por mês. O parcelamento leva tudo do lançamento: descrição, observações, categoria, pessoa, estabelecimento, meio de pagamento, data da compra e o dia do vencimento, no mesmo mês ou no seguinte, como ele.
+- **O valor:** "parcela" repete o valor dele em todas; "total" divide como um parcelamento novo, com os centavos que sobram na última, e o valor dele passa a ser o da parcela dele.
+- **Recusas (409 `NOT_INSTALLABLE`):** um lançamento que já é parcela ou de uma recorrência, uma parte de divisão, um lançamento dividido e um já pago informado como total (o valor dele mudaria). A última parcela não tem outras depois e é recusada como entrada inválida.
+- **Uma só escrita:** o parcelamento com as parcelas seguintes e a adoção do lançamento ficam numa transação interativa com o contexto do RLS ([ADR 0028](0028-row-level-security.md)), porque o Prisma não cria o parcelamento pelo lado da parcela já existente.

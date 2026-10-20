@@ -158,6 +158,31 @@ export function splitInstallments(totalCents: number, installments: number): num
   );
 }
 
+/**
+ * "Tornar parcelado" (ADR 0038 note): a transaction launched once becomes installment
+ * `firstNumber` of a plan of `installments`, adopted in its month; the next ones come after.
+ * `amountIs` says whether its amount is one installment's or the whole purchase's.
+ */
+export const installmentsFromTransactionInputSchema = z
+  .object({
+    transactionId: z.uuid('Escolha um lançamento.'),
+    installments: installmentCountSchema,
+    firstNumber: z.number().int().min(1).optional(),
+    amountIs: installmentAmountIsSchema,
+  })
+  .refine((input) => (input.firstNumber ?? 1) <= input.installments, {
+    message: 'A parcela deste lançamento passa do número de parcelas.',
+    path: ['firstNumber'],
+  })
+  .refine((input) => input.installments - (input.firstNumber ?? 1) >= 1, {
+    message: 'Sendo a última parcela, não há outras para criar: o lançamento fica como está.',
+    path: ['firstNumber'],
+  });
+
+export type InstallmentsFromTransactionInput = z.infer<
+  typeof installmentsFromTransactionInputSchema
+>;
+
 /** The total of a plan's installments, from the amount typed and what it means. */
 export function installmentPlanTotal(input: CreateInstallmentPlanInput): number {
   return input.amountIs === 'TOTAL'
