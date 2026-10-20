@@ -53,3 +53,5 @@ Trocar entrada por saída, ou o contrário, deixava a série ou a divisão incoe
 - **uma parcela.**
 
 Mandar o mesmo tipo de novo não é troca e passa. Um lançamento avulso e não dividido continua podendo trocar de tipo, com a categoria junto. A revisão da importação continua com o tipo editável, porque ali nada foi gravado ainda.
+
+**Na tela:** ao editar um lançamento, "Saída | Entrada" continua no lugar de sempre. O tipo dele fica marcado, o outro aparece desativado, e uma frase embaixo diz o motivo: "O tipo não muda depois de lançado. Para trocar, exclua e lance de novo." A tela trava o tipo em toda edição, também num lançamento avulso que a API ainda aceitaria trocar, para a regra ser uma só para quem usa. O leitor de tela anuncia a frase com o grupo, e as setas do teclado pulam a opção desativada.
