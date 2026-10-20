@@ -174,16 +174,29 @@ describe('TransactionsPage', () => {
     expect(await screen.findByText('outubro de 2026')).toBeInTheDocument();
     await expectCall(fetchMock, `${base}?period=2026-10`, {});
     const credits = await section('Entradas');
-    expect(credits).toHaveTextContent('Total: R$ 5.000,00');
+    expect(credits).toHaveTextContent('Total: + R$ 5.000,00');
     expect(within(credits).getByText('Recebido em 05/10')).toBeInTheDocument();
     const debits = await section('Saídas');
-    expect(debits).toHaveTextContent('Total: R$ 509,90');
+    expect(debits).toHaveTextContent('Total: − R$ 509,90');
     const lightItem = row(debits, 'Conta de luz');
     expect(within(lightItem).getByText('Energia')).toBeInTheDocument();
     expect(within(lightItem).getByText('Vence em 10/10/2026')).toBeInTheDocument();
-    expect(lightItem).toHaveTextContent('R$ 159,90');
+    // The sign says money in or out; the green is only on top of it (ADR 0036 note).
+    expect(lightItem).toHaveTextContent('− R$ 159,90');
     expect(lightItem).toHaveTextContent('Vencido');
-    expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
+    expect(within(credits).getByText('+ R$ 5.000,00')).toHaveClass('text-credit-foreground');
+    // Pending is what "○ Pagar" already says: no badge for whoever can pay it.
+    expect(row(debits, 'Compras da semana')).not.toHaveTextContent('Pendente');
+  });
+
+  it('sums up the month at the top, whatever the filter (ADR 0036 note)', async () => {
+    mockTransactions();
+    renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-10&situacao=vencidos`);
+
+    const totals = await screen.findByLabelText('Resumo do mês');
+    expect(totals).toHaveTextContent('Entradas+ R$ 5.000,00');
+    expect(totals).toHaveTextContent('Saídas− R$ 509,90');
+    expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
   });
 
   it('finds a transaction by status or by what is typed; the status stays in the address', async () => {
@@ -199,7 +212,7 @@ describe('TransactionsPage', () => {
     expect(within(debits).queryByText('Compras da semana')).not.toBeInTheDocument();
     // How many are shown, and the total of those.
     expect(debits).toHaveTextContent('1 de 2');
-    expect(debits).toHaveTextContent('Total: R$ 159,90');
+    expect(debits).toHaveTextContent('Total: − R$ 159,90');
     expect(await section('Entradas')).toHaveTextContent('Nenhuma entrada com esse filtro.');
 
     await userEvent.click(screen.getByRole('radio', { name: 'Todos' }));
@@ -311,6 +324,102 @@ describe('TransactionsPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('repeats a transaction every year, in the month it is launched (ADR 0038 note)', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/recurrences`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000307',
+          type: 'DEBIT',
+          description: 'IPVA',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 120_000,
+          variableAmount: false,
+          dueDay: 20,
+          dueMonthOffset: 0,
+          intervalMonths: 12,
+          startPeriod: '2026-10',
+          endPeriod: null,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'IPVA');
+    await chooseCategory(form, 'Energia');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '1.200,00');
+    await userEvent.type(within(form).getByLabelText('Vencimento (opcional)'), '2026-10-20');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo ano' }));
+    expect(
+      within(form).getByText(/Um lançamento pendente todo ano em outubro, a partir deste/),
+    ).toBeInTheDocument();
+    expect(within(form).getByText('Cada ano vence no dia 20.')).toBeInTheDocument();
+    expect(
+      within(form).getByText('O mesmo valor todo ano, como uma anuidade.'),
+    ).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'IPVA',
+        notes: null,
+        categoryId: energyCategory.id,
+        amountCents: 120_000,
+        dueDay: 20,
+        dueMonthOffset: 0,
+        startPeriod: '2026-10',
+        intervalMonths: 12,
+        variableAmount: false,
+        personId: null,
+      }),
+    });
+    expect(
+      await screen.findByText('Lançamento adicionado, repetindo todo ano'),
+    ).toBeInTheDocument();
+  });
+
+  it('makes a transaction recurrent every year, from its menu', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/recurrences/from-transaction`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000308',
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          notes: null,
+          categoryId: energyCategory.id,
+          amountCents: 15_990,
+          variableAmount: false,
+          dueDay: 10,
+          dueMonthOffset: 0,
+          intervalMonths: 12,
+          startPeriod: '2026-10',
+          endPeriod: null,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Tornar recorrente' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Tornar Conta de luz recorrente' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Todo ano' }));
+    expect(dialog).toHaveTextContent(
+      'Todo ano em outubro, a partir de outubro de 2026, vencendo no dia 10. Este lançamento vira o primeiro ano',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tornar recorrente' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/recurrences/from-transaction`, {
+      method: 'POST',
+      body: JSON.stringify({ transactionId: light.id, variableAmount: false, intervalMonths: 12 }),
+    });
+    expect(await screen.findByText('Agora se repete todo ano')).toBeInTheDocument();
+  });
+
   it('repeats a bill due in the next month, and refuses a due date further away', async () => {
     const fetchMock = mockTransactions({
       [`POST /api/workspaces/${houseId}/recurrences`]: {
@@ -407,7 +516,7 @@ describe('TransactionsPage', () => {
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('offers "Tornar recorrente" only for a transaction launched once, not split', async () => {
+  it('offers "Tornar recorrente" only for a transaction launched once, a split one too (ADR 0052 note)', async () => {
     const jantar = transaction(4, {
       type: 'DEBIT',
       description: 'Jantar',
@@ -436,18 +545,92 @@ describe('TransactionsPage', () => {
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    for (const description of [
-      'Conta de luz',
-      'Compras da semana',
-      'Jantar',
-      'Ana: parte de Jantar',
-    ]) {
+    for (const description of ['Conta de luz', 'Compras da semana', 'Ana: parte de Jantar']) {
       const menu = await openActions(description);
       expect(
         within(menu).queryByRole('menuitem', { name: 'Tornar recorrente' }),
       ).not.toBeInTheDocument();
       await userEvent.keyboard('{Escape}');
     }
+
+    // The split one goes with its shares: amounts when fixed, % of each month when variable.
+    const menu = await openActions('Jantar');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Tornar recorrente' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Tornar Jantar recorrente' });
+    expect(nbsp(dialog.textContent)).toContain('Dividido com alguém (R$ 60,00) a cada mês.');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Variável' }));
+    expect(nbsp(dialog.textContent)).toContain(
+      'Dividido com alguém (50%), sobre o valor de cada mês.',
+    );
+  });
+
+  it('splits a transaction launched once when editing it (ADR 0052 note)', async () => {
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`PATCH ${base}/${light.id}`]: { body: light },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Dividir com alguém' }));
+    await pickPeople(form, ['Ana']);
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/${light.id}`, {
+      method: 'PATCH',
+      body: expect.stringContaining(
+        `"personId":null,"merchantId":null,"paymentMethod":null,"split":[{"personId":"${ana.id}","amountCents":7995}]`,
+      ) as unknown,
+    });
+    expect(await screen.findByText('Lançamento salvo, dividido com 1 pessoa')).toBeInTheDocument();
+  });
+
+  it('does not offer to split again one already split, nor a month of a recurrence', async () => {
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Conta de luz',
+      categoryId: salaryCategory.id,
+      amountCents: 6_000,
+      splitOfId: light.id,
+    });
+    const internet = transaction(6, {
+      type: 'DEBIT',
+      description: 'Internet',
+      categoryId: energyCategory.id,
+      amountCents: 10_000,
+      recurrenceId: '01920000-0000-7000-8000-000000000301',
+    });
+    mockTransactions({ [`GET ${base}`]: { body: [light, share, internet] } });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    for (const description of ['Conta de luz', 'Internet']) {
+      const [actions] = await screen.findAllByRole('button', { name: `Ações de ${description}` });
+      await userEvent.click(actions!);
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Editar' }));
+      const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+      await userEvent.click(within(form).getByText(/^Mais opções/));
+      expect(
+        within(form).queryByRole('checkbox', { name: 'Dividir com alguém' }),
+      ).not.toBeInTheDocument();
+      await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
+    }
+  });
+
+  it('marks a transaction of a yearly recurrence as "Todo ano"', async () => {
+    const recurrenceId = '01920000-0000-7000-8000-000000000309';
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [salary, { ...light, recurrenceId, recurrenceIntervalMonths: 12 }, shopping],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Saídas');
+    expect(row(debits, 'Conta de luz')).toHaveTextContent('Todo ano');
+    expect(row(debits, 'Conta de luz')).not.toHaveTextContent('Todo mês');
   });
 
   it('marks a generated transaction and ends its recurrence from the menu', async () => {
@@ -728,12 +911,90 @@ describe('TransactionsPage', () => {
         amountCents: 100_000,
         amountIs: 'TOTAL',
         firstPeriod: '2026-10',
+        occurredOn: '2026-10-15',
         dueDay: null,
         dueMonthOffset: 0,
         personId: null,
       }),
     });
     expect(await screen.findByText('Parcelamento adicionado: 3 parcelas')).toBeInTheDocument();
+  });
+
+  it('starts a purchase already running at its installment, as the bill (ADR 0055)', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/installments`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000403',
+          type: 'DEBIT',
+          description: 'TV',
+          notes: null,
+          categoryId: marketCategory.id,
+          totalCents: 40_000,
+          installments: 10,
+          firstNumber: 3,
+          firstPeriod: '2026-10',
+          dueDay: null,
+          endedAt: null,
+          settledCount: 0,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'TV');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Parcelado' }));
+    // The day of the purchase stays: one day for every installment (ADR 0055 note).
+    await userEvent.clear(within(form).getByLabelText('Data da compra (opcional)'));
+    await userEvent.type(within(form).getByLabelText('Data da compra (opcional)'), '2026-08-28');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Da parcela' }));
+    await userEvent.type(within(form).getByLabelText('Valor da parcela (R$)'), '50');
+    await userEvent.type(within(form).getByLabelText('Parcelas'), '10');
+    await userEvent.type(within(form).getByLabelText('Começa na parcela (opcional)'), '3');
+    expect(nbsp(within(form).getByText(/^Da 3\/10/).textContent)).toBe(
+      'Da 3/10 à 10/10: 8 parcelas de R$ 50,00, total R$ 400,00.',
+    );
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/installments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'DEBIT',
+        description: 'TV',
+        notes: null,
+        categoryId: marketCategory.id,
+        installments: 10,
+        firstNumber: 3,
+        amountCents: 5_000,
+        amountIs: 'INSTALLMENT',
+        firstPeriod: '2026-10',
+        occurredOn: '2026-08-28',
+        dueDay: null,
+        dueMonthOffset: 0,
+        personId: null,
+      }),
+    });
+    expect(await screen.findByText('Parcelamento adicionado: 8 parcelas')).toBeInTheDocument();
+  });
+
+  it('refuses a first installment past the installments', async () => {
+    mockTransactions();
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'TV');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Parcelado' }));
+    await userEvent.type(within(form).getByLabelText('Valor total (R$)'), '400');
+    await userEvent.type(within(form).getByLabelText('Parcelas'), '4');
+    await userEvent.type(within(form).getByLabelText('Começa na parcela (opcional)'), '5');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    expect(
+      await within(form).findByText('Use um número de 1 até o total de parcelas.'),
+    ).toBeInTheDocument();
   });
 
   it('splits an installment plan too, showing each share per installment', async () => {
@@ -785,6 +1046,7 @@ describe('TransactionsPage', () => {
         amountCents: 100_000,
         amountIs: 'TOTAL',
         firstPeriod: '2026-10',
+        occurredOn: '2026-10-15',
         dueDay: null,
         dueMonthOffset: 0,
         personId: null,
@@ -879,6 +1141,7 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 15_990,
         dueDate: '2026-10-10',
+        occurredOn: '2026-10-15',
         period: '2026-10',
         personId: null,
       }),
@@ -988,7 +1251,9 @@ describe('TransactionsPage', () => {
         .getAllByRole('listitem')
         .find((li) => li.textContent?.startsWith('Aporte em Investimentos'))!;
     await within(debits).findByText('Aporte em Investimentos');
-    expect(item()).toHaveTextContent('Pendente');
+    expect(
+      within(item()).getByRole('button', { name: 'Pagar: Aporte em Investimentos' }),
+    ).toBeInTheDocument();
 
     await userEvent.click(
       within(debits).getByRole('button', { name: 'Pagar: Aporte em Investimentos' }),
@@ -1078,12 +1343,39 @@ describe('TransactionsPage', () => {
         categoryId: energyCategory.id,
         amountCents: 17_250,
         dueDate: '2026-10-10',
+        occurredOn: null,
         personId: null,
         merchantId: null,
         paymentMethod: null,
       }),
     });
     expect(await screen.findByText('Lançamento salvo')).toBeInTheDocument();
+  });
+
+  it('edits a month of a recurrence without a day, unless it has one (ADR 0055 note)', async () => {
+    const recurrenceId = '01920000-0000-7000-8000-000000000301';
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [
+          { ...light, recurrenceId },
+          // The first month, from "Tornar recorrente", keeps the day it had.
+          { ...shopping, recurrenceId, occurredOn: '2026-10-03' },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    let menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    let form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    expect(within(form).queryByLabelText('Data da compra (opcional)')).not.toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Cancelar' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    menu = await openActions('Compras da semana');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    expect(within(form).getByLabelText('Data da compra (opcional)')).toHaveValue('2026-10-03');
   });
 
   it('asks for confirmation, naming the transaction, before deleting', async () => {
@@ -1146,6 +1438,7 @@ describe('TransactionsPage', () => {
         categoryId: marketCategory.id,
         amountCents: 30_000,
         dueDate: null,
+        occurredOn: '2026-10-15',
         period: '2026-10',
         split: [
           { personId: ana.id, amountCents: 10_000 },
@@ -1235,6 +1528,7 @@ describe('TransactionsPage', () => {
         categoryId: salaryCategory.id,
         amountCents: 100_000,
         dueDate: null,
+        occurredOn: '2026-10-15',
         period: '2026-10',
         split: [{ personId: ana.id, amountCents: 50_000 }],
       }),
@@ -1569,6 +1863,37 @@ describe('TransactionsPage', () => {
     ).toBe(false);
   });
 
+  it('finds a merchant by its alias in the picker, saying which (ADR 0055)', async () => {
+    mockTransactions({
+      [`GET /api/workspaces/${houseId}/merchants`]: {
+        body: [
+          {
+            id: '01920000-0000-7000-8000-000000000603',
+            name: 'Pizzaria Exemplo',
+            archived: false,
+            inUse: false,
+            aliases: [{ id: '01920000-0000-7000-8000-000000000701', alias: 'Ifd*Pizzaria' }],
+          },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    await userEvent.click(
+      within(form).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+    );
+    await userEvent.type(
+      await screen.findByPlaceholderText('Buscar ou adicionar estabelecimento'),
+      'ifd',
+    );
+
+    expect(await screen.findByRole('option', { name: /Pizzaria Exemplo/ })).toHaveTextContent(
+      'Pizzaria ExemploIfd*Pizzaria',
+    );
+  });
+
   it('names a new merchant on a new transaction, creating it first', async () => {
     const mercado = {
       id: '01920000-0000-7000-8000-000000000601',
@@ -1616,6 +1941,7 @@ describe('TransactionsPage', () => {
         categoryId: marketCategory.id,
         amountCents: 5_000,
         dueDate: null,
+        occurredOn: '2026-10-15',
         period: '2026-10',
         personId: null,
         merchantId: mercado.id,
@@ -1668,7 +1994,10 @@ describe('TransactionsPage', () => {
 
     renderApp(`/espacos/${houseId}/lancamentos`);
 
-    expect(await section('Saídas')).toHaveTextContent('Conta de luz');
+    const debits = await section('Saídas');
+    expect(debits).toHaveTextContent('Conta de luz');
+    // No "○ Pagar" to say it: pending is written out.
+    expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
     // Only the competência picker, which navigates; nothing that edits.
     expect(
       within(screen.getByRole('main'))
@@ -1720,11 +2049,46 @@ describe('TransactionsPage', () => {
         categoryId: marketCategory.id,
         amountCents: 2_500,
         dueDate: null,
+        occurredOn: '2026-10-15',
         period: '2026-10',
         personId: null,
         paymentMethod: 'CREDIT_CARD',
       }),
     });
+  });
+
+  it('shows the day it happened, and starts a new one of this month on today (ADR 0055)', async () => {
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [
+          { ...salary, occurredOn: '2026-10-05' },
+          light,
+          { ...shopping, occurredOn: '2025-12-28' },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    // Of another year, the day keeps its year.
+    expect(row(await section('Saídas'), 'Compras da semana')).toHaveTextContent(
+      'Compra em 28/12/2025',
+    );
+    expect(row(await section('Entradas'), 'Salário de outubro')).toHaveTextContent('Em 05/10');
+    const form = await openNewTransaction();
+    expect(within(form).getByLabelText('Data da compra (opcional)')).toHaveValue('2026-10-15');
+    await userEvent.click(within(form).getByRole('radio', { name: 'Entrada' }));
+    expect(within(form).getByLabelText('Data (opcional)')).toHaveValue('2026-10-15');
+    // Each generated month comes without a day.
+    await userEvent.click(within(form).getByRole('radio', { name: 'Todo mês' }));
+    expect(within(form).queryByLabelText('Data (opcional)')).not.toBeInTheDocument();
+  });
+
+  it('starts a new one of another month without a day (ADR 0055)', async () => {
+    mockTransactions();
+    renderApp(`/espacos/${houseId}/lancamentos?competencia=2026-11`);
+
+    const form = await openNewTransaction();
+    expect(within(form).getByLabelText('Data da compra (opcional)')).toHaveValue('');
   });
 
   describe('as a table (from xl)', () => {
@@ -1733,7 +2097,7 @@ describe('TransactionsPage', () => {
       within(within(container).getByRole('table'))
         .getAllByRole('row')
         .slice(1)
-        .map((tableRow) => within(tableRow).getAllByRole('cell')[1]?.textContent);
+        .map((tableRow) => within(tableRow).getAllByRole('cell')[2]?.textContent);
 
     it('offers "Ver como" only where a table fits, and keeps the list on the phone', async () => {
       window.localStorage.setItem('financas:visao:lancamentos', 'TABLE');
@@ -1754,9 +2118,12 @@ describe('TransactionsPage', () => {
       await userEvent.click(await screen.findByRole('radio', { name: 'Tabela' }));
 
       const debits = await section('Saídas');
-      expect(within(debits).getByRole('columnheader', { name: 'Situação' })).toBeInTheDocument();
+      // The status sits under the due date, with no column of its own (ADR 0036 note).
       expect(
-        within(debits).getByRole('columnheader', { name: /^Estabelecimento . Meio/ }),
+        within(debits).queryByRole('columnheader', { name: 'Situação' }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(debits).getByRole('columnheader', { name: /^Onde . Meio/ }),
       ).toBeInTheDocument();
       // By due date at first, one without a date last.
       expect(tableRows(debits)).toEqual(['Conta de luz', 'Compras da semana']);
@@ -1766,7 +2133,7 @@ describe('TransactionsPage', () => {
       expect(amount).toHaveAttribute('aria-sort', 'descending');
       expect(tableRows(debits)).toEqual(['Compras da semana', 'Conta de luz']);
       expect(within(debits).getByRole('row', { name: /Conta de luz/ })).toHaveTextContent(
-        /10\/10\/2026.*Energia.*Vencido.*R\$.159,90/,
+        /10\/10\/2026.*Vencido.*Conta de luz.*Energia.*R\$.159,90/,
       );
       expect(window.localStorage.getItem('financas:visao:lancamentos')).toBe('TABLE');
     });

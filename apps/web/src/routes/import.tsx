@@ -1,6 +1,14 @@
-import { formatPeriod, hasRole, type Import } from '@financas/shared';
+import {
+  formatCents,
+  formatIsoDate,
+  formatPeriod,
+  hasRole,
+  parseNubankCsv,
+  type Import,
+  type StatementLine,
+} from '@financas/shared';
 import { Download, FileUp } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
@@ -15,12 +23,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { SegmentedControl } from '@/components/segmented-control';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { useCategories } from '@/features/categories/use-categories';
+import { useCategories, useCategoryHints } from '@/features/categories/use-categories';
 import { ImportReview } from '@/features/import/import-review';
 import { startReview, type ReviewRow } from '@/features/import/review';
+import {
+  startStatementReview,
+  suggestedPeriod,
+  wholeBillAlreadyLaunched,
+} from '@/features/import/statement-review';
+import { useInstallmentPlans } from '@/features/installments/use-installments';
+import { useMerchants } from '@/features/merchants/use-merchants';
+import { useTransactions } from '@/features/transactions/use-transactions';
 import { useImports, useUndoImport } from '@/features/import/use-imports';
 import { downloadTemplate, readTemplate, TemplateReadError } from '@/features/import/workbook';
+import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 import { cn } from '@/lib/utils';
@@ -62,14 +80,23 @@ function PreviousImport({
       (error: unknown) => toast.error(apiErrorMessage(error)),
     );
 
+  const counts = `${item.transactionCount} ${item.transactionCount === 1 ? 'lançamento' : 'lançamentos'}${
+    item.planCount > 0
+      ? ` e ${item.planCount} ${item.planCount === 1 ? 'parcelamento' : 'parcelamentos'}`
+      : ''
+  }, ${periodsOf(item)}`;
+  // Its "Origem" and the statement's due date tell it apart (ADR 0055 note); an import made
+  // before them shows what it brought, as it always did.
+  const name = item.label
+    ? `${item.label}${item.statementDueDate ? ` · vence ${formatIsoDate(item.statementDueDate)}` : ''}`
+    : null;
+
   return (
     <li className="flex items-center justify-between gap-3 py-3">
       <div className="grid min-w-0 gap-1">
-        <p className="font-medium">
-          {item.transactionCount} {item.transactionCount === 1 ? 'lançamento' : 'lançamentos'},{' '}
-          {periodsOf(item)}
-        </p>
+        <p className="font-medium break-words">{name ?? counts}</p>
         <p className="text-muted-foreground text-sm">
+          {name && `${counts} · `}
           {when}
           {item.createdBy && `, por ${item.createdBy.name}`}
         </p>
@@ -95,8 +122,10 @@ function PreviousImport({
               <AlertDialogHeader>
                 <AlertDialogTitle>Desfazer a importação de {when}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Os {item.transactionCount} lançamentos dela saem, inclusive os que foram editados
-                  ou marcados como pagos ou recebidos depois. Não é possível desfazer.
+                  Os {item.transactionCount} lançamentos dela saem
+                  {item.planCount > 0 && ', com os parcelamentos que ela criou'}, inclusive os que
+                  foram editados ou marcados como pagos ou recebidos depois. Estabelecimentos e
+                  apelidos ficam. Não é possível desfazer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -113,9 +142,116 @@ function PreviousImport({
   );
 }
 
+/** Where the transactions come from (ADR 0055): the app's template, or a bank's card statement. */
+type Origin = 'TEMPLATE' | 'NUBANK';
+
+const originOptions = [
+  { value: 'TEMPLATE', label: 'Planilha modelo' },
+  { value: 'NUBANK', label: 'Fatura Nubank' },
+] as const;
+
+/** A statement read. */
+type StatementFile = { lines: StatementLine[]; unread: string[] };
+
 /**
- * Importar planilha (ADR 0040): download the template, choose the filled-in file, review it and
- * import. The file is read here, on the device; only the confirmed transactions go to the API.
+ * The review of a card statement (ADR 0055), opened once what it compares with is loaded: the
+ * workspace's merchants, plans and history, and the transactions of the reference month. The
+ * month (suggested) and the due date (typed) are chosen in the review, and changing the month
+ * reads that month's transactions again (ADR 0055 note).
+ */
+function StatementReview({
+  workspaceId,
+  statement,
+  previousImports,
+  onChooseAnother,
+  onImported,
+}: {
+  workspaceId: string;
+  statement: StatementFile;
+  previousImports: Import[];
+  onChooseAnother: () => void;
+  onImported: (firstPeriod: string) => void;
+}) {
+  const categories = useCategories(workspaceId);
+  const merchants = useMerchants(workspaceId);
+  const plans = useInstallmentPlans(workspaceId);
+  const hints = useCategoryHints(workspaceId);
+  const [period, setPeriod] = useState(() => suggestedPeriod(statement.lines));
+  const [dueDate, setDueDate] = useState<string | null>(null);
+  const transactions = useTransactions(workspaceId, period);
+  // The history only suggests: a failure there does not hold the review.
+  const context = useMemo(
+    () =>
+      categories.data && merchants.data && plans.data && transactions.data && !hints.isPending
+        ? {
+            period,
+            dueDate,
+            merchants: merchants.data,
+            categories: categories.data,
+            hints: hints.data,
+            plans: plans.data,
+            transactions: transactions.data,
+          }
+        : null,
+    [
+      period,
+      dueDate,
+      categories.data,
+      merchants.data,
+      plans.data,
+      transactions.data,
+      hints.data,
+      hints.isPending,
+    ],
+  );
+  const baseRows = useMemo(
+    () => (context ? startStatementReview(statement.lines, context) : null),
+    [context, statement.lines],
+  );
+  // The review opens with the first rows; later ones are merged into it.
+  const [initialRows, setInitialRows] = useState<ReviewRow[] | null>(null);
+  if (!initialRows && baseRows) setInitialRows(baseRows);
+  if (!initialRows || !categories.data || !merchants.data) {
+    return <QueryState queries={[categories, merchants, plans, transactions]} />;
+  }
+  const wholeBill = context && wholeBillAlreadyLaunched(statement.lines, context);
+  const notices = [
+    ...(wholeBill
+      ? [
+          `${formatPeriod(wholeBill.transaction.period)} já tem a saída "${wholeBill.transaction.description}" de ${formatCents(wholeBill.transaction.amountCents)} no Crédito, perto do total desta fatura (${formatCents(wholeBill.totalCents)}). Se ela é esta fatura lançada inteira, importar as compras conta duas vezes: exclua aquela saída ou desmarque as compras.`,
+        ]
+      : []),
+    ...(statement.unread.length > 0
+      ? [
+          `Algumas linhas do arquivo não puderam ser lidas e ficam de fora: ${statement.unread.join('; ')}.`,
+        ]
+      : []),
+  ];
+  return (
+    <ImportReview
+      workspaceId={workspaceId}
+      initialRows={initialRows}
+      categories={categories.data}
+      merchants={merchants.data}
+      previousImports={previousImports}
+      statement={{
+        period,
+        dueDate,
+        onPeriodChange: setPeriod,
+        onDueDateChange: setDueDate,
+        baseRows,
+        notices,
+      }}
+      defaultLabel="Fatura Nubank"
+      onChooseAnother={onChooseAnother}
+      onImported={onImported}
+    />
+  );
+}
+
+/**
+ * Importar (ADRs 0040 and 0055): the app's template, or a card statement. The file is read here,
+ * on the device; only the confirmed transactions go to the API.
  */
 export function ImportPage() {
   const workspace = useCurrentWorkspace();
@@ -127,7 +263,38 @@ export function ImportPage() {
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [origin, setOrigin] = useState<Origin>('TEMPLATE');
+  // A card statement read: its review opens right away (ADR 0055 note).
+  const [statement, setStatement] = useState<StatementFile | null>(null);
   const ready = categories.isSuccess && imports.isSuccess;
+  const reviewing = Boolean(review) || Boolean(statement);
+  const chooseAnother = () => {
+    setReview(null);
+    setStatement(null);
+  };
+  const imported = (firstPeriod: string) =>
+    void navigate(`/espacos/${workspace.id}/lancamentos?competencia=${firstPeriod}`);
+
+  const chooseStatement = async (file: File | undefined) => {
+    if (!file) return;
+    setReading(true);
+    setReadError(null);
+    try {
+      const parsed = parseNubankCsv(await file.text());
+      const fatal = parsed.issues.find((issue) => issue.line === 1 || issue.line === null);
+      if (fatal) setReadError(fatal.message);
+      else {
+        setStatement({
+          lines: parsed.lines,
+          unread: parsed.issues.map((issue) => `linha ${issue.line} (${issue.message})`),
+        });
+      }
+    } catch {
+      setReadError('Não foi possível ler o arquivo.');
+    } finally {
+      setReading(false);
+    }
+  };
 
   const chooseFile = async (file: File | undefined) => {
     if (!file) return;
@@ -163,12 +330,76 @@ export function ImportPage() {
   return (
     <>
       <PageHeader
-        title="Importar planilha"
-        description="Traga lançamentos de uma planilha. O arquivo é lido aqui, no seu aparelho: só os lançamentos que você confirmar são enviados."
+        title="Importar"
+        description="Traga lançamentos de uma planilha ou da fatura do cartão. O arquivo é lido aqui, no seu aparelho: só os lançamentos que você confirmar são enviados."
       />
       <QueryState queries={[categories, imports]} />
       {/* The steps, numbered: choosing the file only opens the review, nothing is imported. */}
-      {ready && canEdit && !review && (
+      {ready && canEdit && !reviewing && (
+        <div className="grid gap-2">
+          <p aria-hidden className="text-sm font-medium">
+            De onde vêm os lançamentos?
+          </p>
+          <SegmentedControl
+            label="De onde vêm os lançamentos?"
+            options={originOptions}
+            value={origin}
+            onChange={(value) => {
+              setOrigin(value);
+              setReadError(null);
+              setStatement(null);
+            }}
+            className="sm:justify-self-start"
+          />
+        </div>
+      )}
+      {ready && canEdit && !reviewing && origin === 'NUBANK' && (
+        <>
+          <section aria-labelledby="import-step-statement" className="grid gap-2">
+            <h2 id="import-step-statement" className="font-medium">
+              1. Baixe a fatura em CSV
+            </h2>
+            <p>
+              No app ou no site do Nubank, abra a fatura do cartão e exporte em CSV. Na revisão,
+              você confirma o mês da fatura e informa o vencimento; as parcelas viram parcelamentos.
+            </p>
+          </section>
+          <section aria-labelledby="import-step-statement-file" className="grid gap-2">
+            <h2 id="import-step-statement-file" className="font-medium">
+              2. Escolha o arquivo da fatura
+            </h2>
+            <input
+              id="import-statement-input"
+              type="file"
+              accept=".csv,text/csv"
+              disabled={reading}
+              className="peer sr-only"
+              aria-describedby={readError ? 'import-file-error' : undefined}
+              onChange={(event) => {
+                void chooseStatement(event.currentTarget.files?.[0]);
+                event.currentTarget.value = '';
+              }}
+            />
+            <label
+              htmlFor="import-statement-input"
+              className={cn(
+                buttonVariants({ variant: 'outline' }),
+                'peer-focus-visible:border-ring peer-focus-visible:ring-ring/50 cursor-pointer justify-self-start peer-focus-visible:ring-3 peer-disabled:cursor-default peer-disabled:opacity-50',
+              )}
+            >
+              <FileUp aria-hidden />
+              Escolher fatura (.csv)
+            </label>
+            {readError && (
+              <p id="import-file-error" role="alert" className="text-destructive">
+                {readError}
+              </p>
+            )}
+            {reading && <p role="status">Lendo a fatura…</p>}
+          </section>
+        </>
+      )}
+      {ready && canEdit && !reviewing && origin === 'TEMPLATE' && (
         <>
           <section aria-labelledby="import-step-template" className="grid gap-2">
             <h2 id="import-step-template" className="font-medium">
@@ -231,9 +462,9 @@ export function ImportPage() {
         </>
       )}
       {ready && !canEdit && (
-        <p className="text-muted-foreground">Quem só visualiza o espaço não importa planilhas.</p>
+        <p className="text-muted-foreground">Quem só visualiza o espaço não importa arquivos.</p>
       )}
-      {ready && review && <h2 className="font-medium">3. Revise e importe</h2>}
+      {ready && reviewing && <h2 className="font-medium">3. Revise e importe</h2>}
       {ready && review && (
         <ImportReview
           key={review.openings}
@@ -241,19 +472,27 @@ export function ImportPage() {
           initialRows={review.rows}
           categories={categories.data}
           previousImports={imports.data}
-          onChooseAnother={() => setReview(null)}
-          onImported={(firstPeriod) =>
-            void navigate(`/espacos/${workspace.id}/lancamentos?competencia=${firstPeriod}`)
-          }
+          defaultLabel="Planilha modelo"
+          onChooseAnother={chooseAnother}
+          onImported={imported}
         />
       )}
-      {ready && !review && imports.data.length > 0 && (
+      {ready && statement && (
+        <StatementReview
+          workspaceId={workspace.id}
+          statement={statement}
+          previousImports={imports.data}
+          onChooseAnother={chooseAnother}
+          onImported={imported}
+        />
+      )}
+      {ready && !reviewing && imports.data.length > 0 && (
         <section aria-labelledby={PREVIOUS_TITLE_ID} className="grid gap-2">
           {/* Focusable from script: where focus goes after undoing one. */}
           <h2 id={PREVIOUS_TITLE_ID} tabIndex={-1} className="font-medium outline-none">
             Importações anteriores
           </h2>
-          <ul className="divide-y rounded-xl border px-4">
+          <ul className={DIVIDED_LIST}>
             {imports.data.map((item) => (
               <PreviousImport
                 key={item.id}

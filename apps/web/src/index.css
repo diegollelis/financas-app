@@ -48,6 +48,7 @@
   --color-warning-muted: var(--warning-muted);
   --color-credit: var(--credit);
   --color-credit-muted: var(--credit-muted);
+  --color-credit-foreground: var(--credit-foreground);
   --color-debit: var(--debit);
   --color-debit-muted: var(--debit-muted);
   --color-brand-secondary: var(--brand-secondary);
@@ -114,6 +115,8 @@
      Never the only cue: a sign or a label goes with them. The -muted fills are derived tints. */
   --credit: #16a34a;
   --credit-muted: #dcfce7;
+  /* Money in as text (an amount "+ R$ 45,00"): the darker variant, 4.5:1 (ADR 0043). */
+  --credit-foreground: #15803d;
   --debit: #ef4444;
   --debit-muted: #fee2e2;
   /* The other two brand colors: decoration only (about 2:1 on white), never text. */
@@ -170,6 +173,7 @@
   --warning-muted: #3a2a0c;
   --credit: #22c55e;
   --credit-muted: #0f3b2a;
+  --credit-foreground: #22c55e;
   --debit: #f87171;
   --debit-muted: #3b1520;
   --brand-secondary: #00c2ff;

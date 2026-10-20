@@ -4,8 +4,10 @@ import {
   formatCents,
   formatPeriod,
   hasRole,
+  nextRecurrencePeriod,
   paymentMethodLabels,
   settledLabels,
+  installmentsCreated,
   shiftPeriod,
   splitInstallments,
   transactionTypeLabels,
@@ -13,6 +15,7 @@ import {
   type InstallmentPlan,
   type UpdateInstallmentPlanInput,
   type PaymentMethod,
+  type Merchant,
   type Person,
   type Recurrence,
   type TransactionType,
@@ -59,8 +62,9 @@ import {
   useInstallmentPlans,
   useUpdateInstallmentPlan,
 } from '@/features/installments/use-installments';
+import { useMerchants, useResolveMerchant } from '@/features/merchants/use-merchants';
 import { usePeople, useResolvePerson } from '@/features/people/use-people';
-import { dueDayLabel } from '@/features/recurrences/due';
+import { dueDayLabel, frequencyLabel, monthNameOf } from '@/features/recurrences/due';
 import { RecurrenceForm } from '@/features/recurrences/recurrence-form';
 import {
   useEndRecurrence,
@@ -70,6 +74,7 @@ import {
 import { sortRows, useSort, type SortValue } from '@/features/view-mode/sort';
 import { SortableHead } from '@/features/view-mode/sortable-head';
 import { useShowsTable } from '@/features/view-mode/view-mode';
+import { CARD_LIST, CARD_ROW, STRIPED_ROW, TABLE_BOX } from '@/features/view-mode/row-styles';
 import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -87,13 +92,42 @@ function since(period: string) {
   return `${period > currentPeriod() ? 'A partir de' : 'Desde'} ${formatPeriod(period)}`;
 }
 
+const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase('pt-BR') + text.slice(1);
+
+/**
+ * An ended one, from its first month to its last, so the start is not lost: "Janeiro a maio de
+ * 2026", "Outubro de 2025 a março de 2026", or "Em maio de 2026" for a single month.
+ */
+function periodRange(start: string, end: string) {
+  if (start === end) return `Em ${formatPeriod(end)}`;
+  const from = start.slice(0, 4) === end.slice(0, 4) ? monthNameOf(start) : formatPeriod(start);
+  return `${capitalized(from)} a ${formatPeriod(end)}`;
+}
+
+/** "Próximo: março de 2027": when a yearly one comes again (ADR 0038 note); null otherwise. */
+function nextLine(recurrence: Recurrence) {
+  if (recurrence.intervalMonths !== 12 || recurrence.endPeriod !== null) return null;
+  const next = nextRecurrencePeriod(
+    recurrence.startPeriod,
+    recurrence.intervalMonths,
+    currentPeriod(),
+  );
+  return `Próximo: ${formatPeriod(next)}`;
+}
+
 /** The competência of a plan's last installment. */
 const lastPeriodOf = (plan: InstallmentPlan) =>
-  shiftPeriod(plan.firstPeriod, plan.installments - 1);
+  shiftPeriod(plan.firstPeriod, installmentsCreated(plan) - 1);
 
 /** Ended, or every installment already paid: history, no longer something to act on. */
 const planIsOver = (plan: InstallmentPlan) =>
-  plan.endedAt !== null || plan.settledCount >= plan.installments;
+  plan.endedAt !== null || plan.settledCount >= installmentsCreated(plan);
+
+/**
+ * Installments paid, counting those before a plan created at 3/10 (ADR 0055): the bill had
+ * already charged 1/10 and 2/10, so "2 de 10" before the first one here is paid.
+ */
+const paidCount = (plan: InstallmentPlan) => plan.firstNumber - 1 + plan.settledCount;
 
 /** The confirmation before ending a series (ADR 0038): what goes and what stays. */
 function EndDialog({
@@ -165,7 +199,7 @@ function SeriesRow({
   menu: ReactNode;
 }) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 py-3">
+    <li className={`${CARD_ROW} grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1`}>
       <p className="font-medium break-words">{title}</p>
       <div className="flex items-start gap-2 md:row-span-2 md:gap-1">
         <SeriesAmount amount={amount} note={amountNote} />
@@ -211,7 +245,7 @@ function SeriesTable<T>({
   const sortBy = columns[Number(sort.key)]?.sort;
   const sorted = sortBy ? sortRows(rows, sortBy, sort.direction) : rows;
   return (
-    <div className="rounded-xl border px-2">
+    <div className={TABLE_BOX}>
       <Table className="table-fixed">
         <colgroup>
           {columns.map((column) => (
@@ -292,19 +326,26 @@ function EditRecurrence({
   recurrence,
   categories,
   people,
+  merchants,
   onDone,
 }: {
   workspaceId: string;
   recurrence: Recurrence;
   categories: Category[];
   people: Person[];
+  merchants: Merchant[];
   onDone: () => void;
 }) {
   const user = useCurrentUser();
   const update = useUpdateRecurrence(workspaceId);
   const person = useResolvePerson(workspaceId, people);
+  const merchant = useResolveMerchant(workspaceId, merchants);
   const category = useResolveCategory(workspaceId, categories);
-  const save = async (changes: UpdateRecurrenceInput, personName: string | undefined) => {
+  const save = async (
+    changes: UpdateRecurrenceInput,
+    personName: string | undefined,
+    merchantName: string | undefined,
+  ) => {
     if (changes.categoryId !== undefined) {
       // A category added in the form is created first (or an archived one comes back).
       try {
@@ -319,6 +360,14 @@ function EditRecurrence({
         changes.personId = await person.resolve(personName);
       } catch {
         return; // Shown by the form, from person.error.
+      }
+    }
+    if (merchantName !== undefined) {
+      // A new name becomes a merchant first (ADR 0053); '' unlinks.
+      try {
+        changes.merchantId = await merchant.resolve(merchantName);
+      } catch {
+        return; // Shown by the form, from merchant.error.
       }
     }
     // Nothing changed: nothing to send, and the pending months stay as they are.
@@ -339,10 +388,11 @@ function EditRecurrence({
       recurrence={recurrence}
       categories={categories}
       people={people}
+      merchants={merchants}
       userId={user.id}
-      pending={update.isPending || person.isPending || category.isPending}
-      error={category.error ?? person.error ?? update.error}
-      onSubmit={(changes, personName) => void save(changes, personName)}
+      pending={update.isPending || person.isPending || merchant.isPending || category.isPending}
+      error={category.error ?? person.error ?? merchant.error ?? update.error}
+      onSubmit={(changes, personName, merchantName) => void save(changes, personName, merchantName)}
       onCancel={onDone}
     />
   );
@@ -354,19 +404,26 @@ function EditPlan({
   plan,
   categories,
   people,
+  merchants,
   onDone,
 }: {
   workspaceId: string;
   plan: InstallmentPlan;
   categories: Category[];
   people: Person[];
+  merchants: Merchant[];
   onDone: () => void;
 }) {
   const user = useCurrentUser();
   const update = useUpdateInstallmentPlan(workspaceId);
   const person = useResolvePerson(workspaceId, people);
+  const merchant = useResolveMerchant(workspaceId, merchants);
   const category = useResolveCategory(workspaceId, categories);
-  const save = async (changes: UpdateInstallmentPlanInput, personName: string | undefined) => {
+  const save = async (
+    changes: UpdateInstallmentPlanInput,
+    personName: string | undefined,
+    merchantName: string | undefined,
+  ) => {
     if (changes.categoryId !== undefined) {
       try {
         changes.categoryId = await category.resolve(changes.categoryId, plan.type);
@@ -379,6 +436,14 @@ function EditPlan({
         changes.personId = await person.resolve(personName);
       } catch {
         return; // Shown by the form, from person.error.
+      }
+    }
+    if (merchantName !== undefined) {
+      // A new name becomes a merchant first (ADR 0053); '' unlinks.
+      try {
+        changes.merchantId = await merchant.resolve(merchantName);
+      } catch {
+        return; // Shown by the form, from merchant.error.
       }
     }
     if (Object.keys(changes).length === 0) return onDone();
@@ -398,10 +463,11 @@ function EditPlan({
       plan={plan}
       categories={categories}
       people={people}
+      merchants={merchants}
       userId={user.id}
-      pending={update.isPending || person.isPending || category.isPending}
-      error={category.error ?? person.error ?? update.error}
-      onSubmit={(changes, personName) => void save(changes, personName)}
+      pending={update.isPending || person.isPending || merchant.isPending || category.isPending}
+      error={category.error ?? person.error ?? merchant.error ?? update.error}
+      onSubmit={(changes, personName, merchantName) => void save(changes, personName, merchantName)}
       onCancel={onDone}
     />
   );
@@ -433,6 +499,7 @@ function RecurrenceItem({
   recurrence,
   categories,
   people,
+  merchants,
   canEdit,
   asTable,
 }: {
@@ -440,6 +507,7 @@ function RecurrenceItem({
   recurrence: Recurrence;
   categories: Category[];
   people: Person[];
+  merchants: Merchant[];
   canEdit: boolean;
   /** A table row ("Ver como: Tabela"), or a list row. */
   asTable: boolean;
@@ -461,10 +529,16 @@ function RecurrenceItem({
   const who =
     personLine(recurrence.type, recurrence.personId, people) ?? splitLine(recurrence.split, people);
   const period = ended
-    ? `Até ${formatPeriod(recurrence.endPeriod ?? '')}`
+    ? periodRange(recurrence.startPeriod, recurrence.endPeriod ?? recurrence.startPeriod)
     : since(recurrence.startPeriod);
   // A variable one: the amount typed is only the starting estimate (ADR 0038).
-  const amountNote = recurrence.variableAmount ? 'Varia todo mês' : null;
+  const frequency = frequencyLabel(recurrence.intervalMonths, recurrence.startPeriod);
+  const next = nextLine(recurrence);
+  const amountNote = recurrence.variableAmount
+    ? recurrence.intervalMonths === 12
+      ? 'Varia todo ano'
+      : 'Varia todo mês'
+    : null;
   const menu = canEdit && !ended && (
     <>
       <DropdownMenu>
@@ -488,6 +562,7 @@ function RecurrenceItem({
           recurrence={recurrence}
           categories={categories}
           people={people}
+          merchants={merchants}
           onDone={() => setEditing(false)}
         />
       </ResponsiveDialog>
@@ -505,7 +580,7 @@ function RecurrenceItem({
 
   if (asTable) {
     return (
-      <TableRow>
+      <TableRow className={STRIPED_ROW}>
         <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
         <TableCell>{typeLabel[recurrence.type]}</TableCell>
         <TableCell className="whitespace-normal">
@@ -513,9 +588,22 @@ function RecurrenceItem({
         </TableCell>
         <TableCell className="whitespace-normal">{who ?? '—'}</TableCell>
         <TableCell className="whitespace-normal">
-          {dueCell(recurrence.dueDay, recurrence.dueMonthOffset)}
+          {/* How often, with the due day under it (ADR 0038 note). */}
+          <span className="grid">
+            <span>{frequency}</span>
+            {recurrence.dueDay !== null && (
+              <span className="text-muted-foreground">
+                {dueCell(recurrence.dueDay, recurrence.dueMonthOffset)}
+              </span>
+            )}
+          </span>
         </TableCell>
-        <TableCell className="whitespace-normal">{period}</TableCell>
+        <TableCell className="whitespace-normal">
+          <span className="grid">
+            <span>{period}</span>
+            {next && <span className="text-muted-foreground">{next}</span>}
+          </span>
+        </TableCell>
         <TableCell>
           <SeriesAmount amount={formatCents(recurrence.amountCents)} note={amountNote} />
         </TableCell>
@@ -533,6 +621,7 @@ function RecurrenceItem({
       title={description}
       meta={[
         typeLabel[recurrence.type],
+        frequency,
         category?.name ?? 'Categoria',
         recurrence.paymentMethod && paymentMethodLabels[recurrence.paymentMethod],
         personLine(recurrence.type, recurrence.personId, people),
@@ -541,6 +630,7 @@ function RecurrenceItem({
           ? null
           : `Vence ${dueDayLabel(recurrence.dueDay, recurrence.dueMonthOffset)}`,
         period,
+        next,
       ]}
       amount={formatCents(recurrence.amountCents)}
       amountNote={amountNote}
@@ -554,6 +644,7 @@ function PlanItem({
   plan,
   categories,
   people,
+  merchants,
   canEdit,
   asTable,
 }: {
@@ -561,6 +652,7 @@ function PlanItem({
   plan: InstallmentPlan;
   categories: Category[];
   people: Person[];
+  merchants: Merchant[];
   canEdit: boolean;
   /** A table row ("Ver como: Tabela"), or a list row. */
   asTable: boolean;
@@ -574,7 +666,8 @@ function PlanItem({
   // Nothing paid: no history to keep, so it is deleted rather than ended (ADR 0038 note).
   const nothingPaid = plan.settledCount === 0;
   const category = categories.find((item) => item.id === plan.categoryId);
-  const parts = splitInstallments(plan.totalCents, plan.installments);
+  const created = installmentsCreated(plan);
+  const parts = splitInstallments(plan.totalCents, created);
   const first = parts[0] ?? 0;
   const confirmEnd = () =>
     void end.mutateAsync(plan.id).then(() => {
@@ -585,15 +678,20 @@ function PlanItem({
   const status =
     plan.endedAt !== null
       ? 'Encerrado'
-      : plan.settledCount >= plan.installments
+      : plan.settledCount >= created
         ? settledLabels[plan.type]
         : remaining(plan);
   // The amount is the purchase's total: "total em 10 de R$ 99,90", or just how many when the
   // leftover cents make the last one differ.
   const amountNote =
     parts.at(-1) === first
-      ? `total em ${plan.installments} de ${formatCents(first)}`
-      : `total em ${plan.installments} parcelas`;
+      ? `total em ${created} de ${formatCents(first)}`
+      : `total em ${created} parcelas`;
+  // A plan created at 3/10 (ADR 0055) says which ones it has, beside what was paid.
+  const which =
+    plan.firstNumber > 1
+      ? `Da ${plan.firstNumber}/${plan.installments} à ${plan.installments}/${plan.installments}`
+      : null;
   const pendingText =
     plan.pendingCount === 1 ? '1 parcela pendente' : `${plan.pendingCount} parcelas pendentes`;
   // A running one, or an ended one with nothing paid (still to delete).
@@ -621,6 +719,7 @@ function PlanItem({
             plan={plan}
             categories={categories}
             people={people}
+            merchants={merchants}
             onDone={() => setEditing(false)}
           />
         </ResponsiveDialog>
@@ -647,7 +746,7 @@ function PlanItem({
 
   if (asTable) {
     return (
-      <TableRow>
+      <TableRow className={STRIPED_ROW}>
         <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
         <TableCell>{typeLabel[plan.type]}</TableCell>
         <TableCell className="whitespace-normal">
@@ -656,8 +755,13 @@ function PlanItem({
         <TableCell className="whitespace-normal">
           {personLine(plan.type, plan.personId, people) ?? '—'}
         </TableCell>
-        <TableCell className="tabular-nums">
-          {plan.settledCount} de {plan.installments}
+        <TableCell className="whitespace-normal tabular-nums">
+          <span className="grid">
+            <span>
+              {paidCount(plan)} de {plan.installments}
+            </span>
+            {which && <span className="text-muted-foreground">{which}</span>}
+          </span>
         </TableCell>
         <TableCell className="whitespace-normal">{status}</TableCell>
         <TableCell>
@@ -680,7 +784,8 @@ function PlanItem({
         category?.name ?? 'Categoria',
         plan.paymentMethod && paymentMethodLabels[plan.paymentMethod],
         personLine(plan.type, plan.personId, people),
-        `${plan.settledCount} de ${plan.installments} pagas`,
+        `${paidCount(plan)} de ${plan.installments} pagas`,
+        which,
         status,
       ]}
       amount={formatCents(plan.totalCents)}
@@ -701,10 +806,25 @@ function remaining(plan: InstallmentPlan) {
 }
 
 /**
- * What the active recurrences add up to each month, by type: "Por mês: R$ 224,90 em saídas, dos
- * quais R$ 180,00 estimados." The variable ones are only an estimate, and it says so.
+ * What the active recurrences add up to, by type: "Por mês: R$ 224,90 em saídas, dos quais
+ * R$ 180,00 estimados." The variable ones are only an estimate, and it says so. The yearly ones
+ * come apart, "Por ano: …", since they fall in one month only (ADR 0038 note).
  */
-function monthlyTotal(recurrences: Recurrence[]) {
+function recurrenceTotals(recurrences: Recurrence[]) {
+  const lines = [
+    total(
+      recurrences.filter((item) => item.intervalMonths !== 12),
+      'Por mês',
+    ),
+    total(
+      recurrences.filter((item) => item.intervalMonths === 12),
+      'Por ano',
+    ),
+  ].filter(Boolean);
+  return lines.length === 0 ? null : lines.join(' ');
+}
+
+function total(recurrences: Recurrence[], label: string) {
   const sides = (['DEBIT', 'CREDIT'] as const).flatMap((type) => {
     const items = recurrences.filter((item) => item.type === type);
     if (items.length === 0) return [];
@@ -721,7 +841,7 @@ function monthlyTotal(recurrences: Recurrence[]) {
           : `, dos quais ${formatCents(estimated)} estimados`;
     return [`${formatCents(total)} em ${noun}${part}`];
   });
-  return sides.length === 0 ? null : `Por mês: ${sides.join('; ')}.`;
+  return sides.length === 0 ? null : `${label}: ${sides.join('; ')}.`;
 }
 
 function Section({
@@ -768,9 +888,14 @@ export function RecurrencesPage() {
   const plans = useInstallmentPlans(workspace.id);
   const categories = useCategories(workspace.id);
   const people = usePeople(workspace.id);
+  const merchants = useMerchants(workspace.id);
   const canEdit = hasRole(workspace.role, 'EDITOR');
   const ready =
-    recurrences.isSuccess && plans.isSuccess && categories.isSuccess && people.isSuccess;
+    recurrences.isSuccess &&
+    plans.isSuccess &&
+    categories.isSuccess &&
+    people.isSuccess &&
+    merchants.isSuccess;
 
   // "Ver como: Tabela", from xl (ADR 0045 note); the list everywhere else.
   const asTable = useShowsTable('recorrencias');
@@ -786,6 +911,7 @@ export function RecurrencesPage() {
       recurrence={recurrence}
       categories={categories.data ?? []}
       people={people.data ?? []}
+      merchants={merchants.data ?? []}
       canEdit={canEdit}
       asTable={asTable}
     />
@@ -797,6 +923,7 @@ export function RecurrencesPage() {
       plan={plan}
       categories={categories.data ?? []}
       people={people.data ?? []}
+      merchants={merchants.data ?? []}
       canEdit={canEdit}
       asTable={asTable}
     />
@@ -805,12 +932,14 @@ export function RecurrencesPage() {
     { label: 'Descrição', sort: (item) => item.description },
     { label: 'Tipo', width: 'w-20' },
     { label: 'Categoria', width: 'w-32', sort: (item) => categoryName(item.categoryId) },
-    { label: 'Pessoa', width: 'w-44' },
+    { label: 'Pessoa', width: 'w-40' },
     {
-      label: 'Vence',
-      width: 'w-32',
-      // The next month's day 1 comes after this month's 31.
-      sort: (item) => (item.dueDay === null ? null : item.dueMonthOffset * 31 + item.dueDay),
+      label: 'Repete',
+      width: 'w-40',
+      // Monthly ones first, then by due day: the next month's day 1 comes after this month's 31.
+      sort: (item) =>
+        item.intervalMonths * 100 +
+        (item.dueDay === null ? 99 : item.dueMonthOffset * 31 + item.dueDay),
     },
     { label: 'Período', width: 'w-36', sort: (item) => item.endPeriod ?? item.startPeriod },
     { label: 'Valor', width: 'w-32', align: 'right', sort: (item) => item.amountCents },
@@ -820,7 +949,7 @@ export function RecurrencesPage() {
     { label: 'Tipo', width: 'w-20' },
     { label: 'Categoria', width: 'w-32', sort: (item) => categoryName(item.categoryId) },
     { label: 'Pessoa', width: 'w-36', sort: (item) => personName(item.personId) },
-    { label: 'Pagas', width: 'w-24', sort: (item) => item.settledCount / item.installments },
+    { label: 'Pagas', width: 'w-32', sort: (item) => paidCount(item) / item.installments },
     { label: 'Falta', width: 'w-48', sort: (item) => item.pendingCents },
     { label: 'Total', width: 'w-36', align: 'right', sort: (item) => item.totalCents },
   ];
@@ -834,18 +963,19 @@ export function RecurrencesPage() {
     rows.length === 0 ? null : asTable ? (
       <SeriesTable rows={rows} columns={columns} actions={actions} renderRow={item} />
     ) : (
-      <ul className="divide-y rounded-xl border px-4">{rows.map(item)}</ul>
+      // One card per item, like Lançamentos (ADR 0036 note).
+      <ul className={CARD_LIST}>{rows.map(item)}</ul>
     );
 
   return (
     <>
       <PageHeader
         title="Recorrências"
-        description="O que se repete todo mês e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi pago ou recebido não muda."
+        description="O que se repete todo mês ou todo ano e as compras parceladas. Mudanças valem para os lançamentos pendentes deste mês em diante. O que já passou ou foi pago ou recebido não muda."
       >
         <ViewModeToggle page="recorrencias" />
       </PageHeader>
-      <QueryState queries={[recurrences, plans, categories, people]} />
+      <QueryState queries={[recurrences, plans, categories, people, merchants]} />
       {ready &&
         (recurrences.data.length === 0 && plans.data.length === 0 ? (
           <p className="text-muted-foreground">
@@ -856,9 +986,9 @@ export function RecurrencesPage() {
           <>
             <Section
               titleId={MONTHLY_TITLE_ID}
-              title="Todo mês"
+              title="Recorrentes"
               empty="Nenhuma recorrência ativa."
-              summary={monthlyTotal(recurrences.data.filter((item) => item.endPeriod === null))}
+              summary={recurrenceTotals(recurrences.data.filter((item) => item.endPeriod === null))}
               active={show(
                 recurrences.data.filter((item) => item.endPeriod === null),
                 recurrenceColumns,

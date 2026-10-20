@@ -19,16 +19,19 @@ describe('splitEvenly', () => {
 });
 
 describe('shareDescription', () => {
-  it('names whose share it is', () => {
-    expect(shareDescription('Ana', 'Jantar de aniversário')).toBe(
-      'Ana: parte de Jantar de aniversário',
-    );
+  it('repeats the description, without the person (ADR 0052 note)', () => {
+    expect(shareDescription('Jantar de aniversário')).toBe('Jantar de aniversário');
   });
 
-  it('stays within the description limit', () => {
-    const text = shareDescription('Ana', 'x'.repeat(200));
+  it('says which installment it is a share of', () => {
+    expect(shareDescription('Geladeira', { number: 3, count: 10 })).toBe('Geladeira (3/10)');
+  });
+
+  it('stays within the description limit, keeping the installment', () => {
+    const text = shareDescription('x'.repeat(200), { number: 3, count: 10 });
     expect(text).toHaveLength(200);
-    expect(text.endsWith('…')).toBe(true);
+    expect(text.endsWith('… (3/10)')).toBe(true);
+    expect(shareDescription('x'.repeat(200))).toHaveLength(200);
   });
 });
 

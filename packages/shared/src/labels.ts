@@ -16,6 +16,18 @@ export const settledLabels = {
   DEBIT: 'Pago',
 } as const satisfies Record<TransactionType, string>;
 
+/** The day it happened (ADR 0055): an outflow's is the purchase's, an inflow's just its day. */
+export const occurredOnLabels = {
+  CREDIT: 'Data',
+  DEBIT: 'Data da compra',
+} as const satisfies Record<TransactionType, string>;
+
+/** The same on a row, before the day: "Compra em 28/09", "Em 03/10". */
+export const occurredOnRowLabels = {
+  CREDIT: 'Em',
+  DEBIT: 'Compra em',
+} as const satisfies Record<TransactionType, string>;
+
 /**
  * The action that settles a transaction, its short label on the row's button (beside the status
  * badge, it reads as what to do; the full one is in the menu), and the one that takes it back.

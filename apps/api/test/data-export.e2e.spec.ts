@@ -53,6 +53,7 @@ describe('data export', () => {
         amountCents: 8_550,
         period,
         dueDate: `${period}-10`,
+        occurredOn: `${period}-08`,
       })
       .expect(201);
     const [despesas] = budgetDestinationListResponseSchema.parse(
@@ -128,6 +129,7 @@ describe('data export', () => {
         period,
         dueDate: `${period}-10`,
         settledAt: null,
+        occurredOn: `${period}-08`,
       }),
     );
     // The recurrence's first month and the three installments are transactions too.
@@ -135,7 +137,9 @@ describe('data export', () => {
     expect(personal!.recurrences).toMatchObject([
       { description: 'Internet de exemplo', generatedPeriods: [period] },
     ]);
-    expect(personal!.installmentPlans).toMatchObject([{ totalCents: 300_000, installments: 3 }]);
+    expect(personal!.installmentPlans).toMatchObject([
+      { totalCents: 300_000, installments: 3, firstNumber: 1 },
+    ]);
     expect(personal!.budgets).toMatchObject([
       {
         period,

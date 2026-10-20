@@ -8,6 +8,7 @@ const conflict = (code: string, message: string) =>
 describe('apiErrorMessage', () => {
   it.each([
     'CATEGORY_OF_DESTINATION',
+    'CATEGORY_OF_SPLIT',
     'DESTINATION_EXISTS',
     'DESTINATION_FIXED',
     'DESTINATION_IN_USE',

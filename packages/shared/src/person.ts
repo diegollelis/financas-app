@@ -72,8 +72,19 @@ export function splitEvenly(totalCents: number, parts: number): number[] {
   return [totalCents - share * (parts - 1), ...Array.from({ length: parts - 1 }, () => share)];
 }
 
-/** "Ana: parte de Jantar", within the description limit (200). */
-export function shareDescription(personName: string, description: string, max = 200): string {
-  const text = `${personName}: parte de ${description}`;
-  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+/**
+ * The description of a share (ADR 0052 note): the same as the split transaction's, plus which
+ * installment it is of, "Geladeira (3/10)", within the description limit (200). The person is not
+ * in the text: the row shows "A receber de Ana" from the share's person, always by its current
+ * name.
+ */
+export function shareDescription(
+  description: string,
+  installment?: { number: number; count: number },
+  max = 200,
+): string {
+  const suffix = installment ? ` (${installment.number}/${installment.count})` : '';
+  const room = max - suffix.length;
+  const text = description.length <= room ? description : `${description.slice(0, room - 1)}…`;
+  return text + suffix;
 }

@@ -1,13 +1,17 @@
 import {
   currentPeriod,
   dueDateFor,
+  dueMonthOffsetOf,
+  MAX_DUE_MONTH_OFFSET,
   installmentPlanTotal,
+  installmentsCreated,
   shareDescription,
   shiftPeriod,
   splitInstallments,
   INSTALLMENT_AMOUNT_FIELDS,
   type CreateInstallmentPlanInput,
   type InstallmentPlan,
+  type InstallmentsFromTransactionInput,
   type SplitShareInput,
   type UpdateInstallmentPlanInput,
 } from '@financas/shared';
@@ -23,8 +27,13 @@ import { shareCategoryId } from '../categories/share-category.js';
 import type { Prisma, InstallmentPlan as PlanRow } from '../generated/prisma/client.js';
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
-import { PrismaService } from '../prisma/prisma.service.js';
-import { toDate } from '../transactions/dates.js';
+import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
+import { optionalDate, toDate, toIsoDate } from '../transactions/dates.js';
+import {
+  followDescription,
+  followDueDate,
+  followShares,
+} from '../transactions/share-description.js';
 
 type Pending = { count: number; cents: number; lastPeriod: string | null };
 
@@ -44,6 +53,8 @@ function toResponse(
     categoryId: plan.categoryId,
     totalCents: plan.totalCents,
     installments: plan.installments,
+    firstNumber: plan.firstNumber,
+    occurredOn: plan.occurredOn && toIsoDate(plan.occurredOn),
     firstPeriod: plan.firstPeriod,
     dueDay: plan.dueDay,
     dueMonthOffset: plan.dueMonthOffset,
@@ -52,6 +63,7 @@ function toResponse(
     paymentMethod: plan.paymentMethod,
     isSplit,
     endedAt: plan.endedAt?.toISOString() ?? null,
+    adoptedTransactionId: plan.adoptedTransactionId,
     settledCount,
     pendingCount: pending.count,
     pendingCents: pending.cents,
@@ -131,12 +143,16 @@ export class InstallmentsService {
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     const totalCents = installmentPlanTotal(input);
-    const amounts = splitInstallments(totalCents, input.installments);
+    // From the first number on (ADR 0055): a purchase at 3/10 gets installments 3 to 10.
+    const firstNumber = input.firstNumber ?? 1;
+    const amounts = splitInstallments(totalCents, installmentsCreated(input));
     const dueDay = input.dueDay ?? null;
     const dueMonthOffset = input.dueMonthOffset ?? 0;
     const personId = input.personId ?? null;
     const merchantId = input.merchantId ?? null;
     const paymentMethod = input.paymentMethod ?? null;
+    // The day of the purchase, the same on every installment and share (ADR 0055 note).
+    const occurredOn = optionalDate(input.occurredOn) ?? null;
     const sharesOf = input.split ? await this.shares(workspaceId, input, input.split) : () => [];
     const plan = await this.prisma.forWorkspace(workspaceId).installmentPlan.create({
       data: {
@@ -147,6 +163,8 @@ export class InstallmentsService {
         categoryId: input.categoryId,
         totalCents,
         installments: input.installments,
+        firstNumber,
+        occurredOn,
         firstPeriod: input.firstPeriod,
         dueDay,
         dueMonthOffset,
@@ -156,6 +174,8 @@ export class InstallmentsService {
         transactions: {
           create: amounts.map((amountCents, index) => {
             const period = shiftPeriod(input.firstPeriod, index);
+            const dueDate =
+              dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset));
             return {
               workspaceId,
               type: input.type,
@@ -167,9 +187,12 @@ export class InstallmentsService {
               paymentMethod,
               amountCents,
               period,
-              dueDate: dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset)),
-              installmentNumber: index + 1,
-              ...(input.split && { shares: { create: sharesOf(index, period) } }),
+              dueDate,
+              occurredOn,
+              installmentNumber: firstNumber + index,
+              ...(input.split && {
+                shares: { create: sharesOf(index, period, dueDate, occurredOn) },
+              }),
             };
           }),
         },
@@ -185,6 +208,126 @@ export class InstallmentsService {
         lastPeriod: shiftPeriod(input.firstPeriod, amounts.length - 1),
       },
       Boolean(input.split),
+    );
+  }
+
+  /**
+   * "Tornar parcelado" (ADR 0038 note): the transaction becomes installment `firstNumber` of a
+   * new plan that takes everything from it, in the same write that creates the plan and the next
+   * installments, one per month after its own. Given as the total, its amount becomes its
+   * installment's. One already in a plan or a recurrence, a share, a split one and a settled one
+   * given as the total are refused.
+   */
+  async fromTransaction(
+    workspaceId: string,
+    input: InstallmentsFromTransactionInput,
+  ): Promise<InstallmentPlan> {
+    const db = this.prisma.forWorkspace(workspaceId);
+    const transaction = await db.transaction.findFirst({
+      where: { id: input.transactionId, workspaceId },
+      include: { occurrence: true, _count: { select: { shares: true } } },
+    });
+    if (!transaction) throw new NotFoundException();
+    const refuse = (message: string) => new ConflictException({ code: 'NOT_INSTALLABLE', message });
+    if (transaction.installmentPlanId) {
+      throw refuse('Este lançamento já é a parcela de um parcelamento.');
+    }
+    if (transaction.occurrence) throw refuse('Este lançamento é de uma recorrência.');
+    if (transaction.splitOfId) throw refuse('Esta é a parte de uma divisão.');
+    if (transaction._count.shares > 0) {
+      throw refuse('Um lançamento dividido não vira parcelamento por aqui.');
+    }
+    if (transaction.settledAt && input.amountIs === 'TOTAL') {
+      throw refuse(
+        'Este lançamento já foi pago: informe o valor dele como o de uma parcela, que não muda.',
+      );
+    }
+    // Each installment due as far from its competência as this one, a month at most.
+    const dueIso = transaction.dueDate ? toIsoDate(transaction.dueDate) : null;
+    const dueMonthOffset = dueIso ? dueMonthOffsetOf(transaction.period, dueIso) : 0;
+    if (dueMonthOffset < 0 || dueMonthOffset > MAX_DUE_MONTH_OFFSET) {
+      throw refuse('O vencimento deste lançamento fica longe demais do mês dele para parcelar.');
+    }
+    // What every installment will carry must still be usable.
+    await ensureUsableCategory(this.prisma, workspaceId, transaction.categoryId, transaction.type);
+    if (transaction.personId) {
+      await ensureUsablePerson(this.prisma, workspaceId, transaction.personId);
+    }
+    if (transaction.merchantId) {
+      await ensureUsableMerchant(this.prisma, workspaceId, transaction.merchantId);
+    }
+    const firstNumber = input.firstNumber ?? 1;
+    const created = installmentsCreated({ installments: input.installments, firstNumber });
+    const totalCents =
+      input.amountIs === 'TOTAL' ? transaction.amountCents : transaction.amountCents * created;
+    if (totalCents < created) throw refuse('O valor não dá um centavo por parcela.');
+    const amounts = splitInstallments(totalCents, created);
+    const dueDay = dueIso ? Number(dueIso.slice(8)) : null;
+    const next = amounts.slice(1).map((amountCents, index) => {
+      const period = shiftPeriod(transaction.period, index + 1);
+      return {
+        workspaceId,
+        type: transaction.type,
+        description: transaction.description,
+        notes: transaction.notes,
+        categoryId: transaction.categoryId,
+        personId: transaction.personId,
+        merchantId: transaction.merchantId,
+        paymentMethod: transaction.paymentMethod,
+        amountCents,
+        period,
+        dueDate: dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset)),
+        occurredOn: transaction.occurredOn,
+        installmentNumber: firstNumber + index + 1,
+      };
+    });
+    // One interactive transaction with the RLS context (ADR 0028): the plan with the next
+    // installments, then this one adopted as its installment, or neither.
+    const plan = await this.prisma.$transaction(async (tx) => {
+      await setWorkspaceContext(tx, workspaceId);
+      const created = await tx.installmentPlan.create({
+        data: {
+          workspaceId,
+          type: transaction.type,
+          description: transaction.description,
+          notes: transaction.notes,
+          categoryId: transaction.categoryId,
+          totalCents,
+          installments: input.installments,
+          firstNumber,
+          occurredOn: transaction.occurredOn,
+          firstPeriod: transaction.period,
+          dueDay,
+          dueMonthOffset,
+          personId: transaction.personId,
+          merchantId: transaction.merchantId,
+          paymentMethod: transaction.paymentMethod,
+          // Given back as launched once, with this amount, if the plan is ended or deleted.
+          adoptedTransactionId: transaction.id,
+          adoptedAmountCents: transaction.amountCents,
+          transactions: { create: next },
+        },
+      });
+      await tx.transaction.update({
+        where: { id: transaction.id, workspaceId },
+        data: {
+          amountCents: amounts[0],
+          installmentPlanId: created.id,
+          installmentNumber: firstNumber,
+        },
+      });
+      return created;
+    });
+    const settled = transaction.settledAt ? 1 : 0;
+    return toResponse(
+      plan,
+      settled,
+      {
+        count: amounts.length - settled,
+        cents: settled ? totalCents - amounts[0]! : totalCents,
+        lastPeriod: shiftPeriod(transaction.period, amounts.length - 1),
+      },
+      false,
     );
   }
 
@@ -205,28 +348,33 @@ export class InstallmentsService {
       split.map((share) => resolveSplitPerson(this.prisma, workspaceId, share)),
     );
     const count = input.installments;
+    const created = installmentsCreated(input);
+    const firstNumber = input.firstNumber ?? 1;
     const perInstallment = split.map((share) =>
       splitInstallments(
-        input.amountIs === 'TOTAL' ? share.amountCents : share.amountCents * count,
-        count,
+        input.amountIs === 'TOTAL' ? share.amountCents : share.amountCents * created,
+        created,
       ),
     );
-    return (index: number, period: string) =>
+    return (index: number, period: string, dueDate: Date | null, occurredOn: Date | null) =>
       people.map((person, k) => ({
         workspaceId,
         type,
-        // "Ana: parte de Geladeira (3/10)": which installment it is a share of.
-        description: shareDescription(person.name, `${input.description} (${index + 1}/${count})`),
+        // "Geladeira (3/10)": which installment it is a share of (ADR 0052 note).
+        description: shareDescription(input.description, { number: firstNumber + index, count }),
         categoryId,
         amountCents: perInstallment[k]![index]!,
         period,
+        // Due with its installment (ADR 0052 note), and of the same day (ADR 0055 note).
+        dueDate,
+        occurredOn,
         personId: person.id,
       }));
   }
 
   /**
    * Changes a running plan (ADR 0038 note). What it is (description, notes, category, person,
-   * merchant, payment method, due day) reaches the plan and its pending installments; settled
+   * merchant, payment method, due day, day of the purchase) reaches the plan and its pending installments; settled
    * ones are history. The amounts remake every installment, as if it had just been created, and
    * so only while none is settled and it is not split.
    */
@@ -275,6 +423,7 @@ export class InstallmentsService {
       personId: input.personId === undefined ? plan.personId : input.personId,
       merchantId: input.merchantId === undefined ? plan.merchantId : input.merchantId,
       paymentMethod: input.paymentMethod === undefined ? plan.paymentMethod : input.paymentMethod,
+      occurredOn: input.occurredOn === undefined ? plan.occurredOn : optionalDate(input.occurredOn),
     };
     const dueDateIn = (period: string) =>
       merged.dueDay === null
@@ -295,29 +444,41 @@ export class InstallmentsService {
         });
       }
       const installments = input.installments ?? plan.installments;
+      const firstNumber = input.firstNumber ?? plan.firstNumber;
+      if (firstNumber > installments) {
+        throw new BadRequestException({
+          code: 'INVALID_INPUT',
+          message: 'A parcela inicial passa do número de parcelas.',
+        });
+      }
+      const created = installmentsCreated({ installments, firstNumber });
       const firstPeriod = input.firstPeriod ?? plan.firstPeriod;
       const totalCents =
         input.amountCents === undefined
           ? plan.totalCents
           : input.amountIs === 'TOTAL'
             ? input.amountCents
-            : input.amountCents * installments;
-      if (totalCents < installments) {
+            : input.amountCents * created;
+      if (totalCents < created) {
         throw new BadRequestException({
           code: 'INVALID_INPUT',
           message: 'O total precisa dar ao menos um centavo por parcela.',
         });
       }
-      // Nothing is settled: the installments are made again from scratch.
+      // Nothing is settled: the installments are made again from scratch, the adopted one too
+      // (it is no longer the transaction that existed before).
       await db.transaction.deleteMany({ where: { workspaceId, installmentPlanId: planId } });
-      const amounts = splitInstallments(totalCents, installments);
+      const amounts = splitInstallments(totalCents, created);
       const updated = await db.installmentPlan.update({
         where: { id: planId, workspaceId },
         data: {
           ...merged,
           totalCents,
           installments,
+          firstNumber,
           firstPeriod,
+          adoptedTransactionId: null,
+          adoptedAmountCents: null,
           transactions: {
             create: amounts.map((amountCents, index) => {
               const period = shiftPeriod(firstPeriod, index);
@@ -333,7 +494,8 @@ export class InstallmentsService {
                 amountCents,
                 period,
                 dueDate: dueDateIn(period),
-                installmentNumber: index + 1,
+                occurredOn: merged.occurredOn,
+                installmentNumber: firstNumber + index,
               };
             }),
           },
@@ -353,9 +515,10 @@ export class InstallmentsService {
     const dueChanged = input.dueDay !== undefined || input.dueMonthOffset !== undefined;
     const pending = await db.transaction.findMany({
       where: { workspaceId, installmentPlanId: planId, settledAt: null },
-      select: { id: true, period: true },
+      select: { id: true, period: true, installmentNumber: true },
     });
     for (const installment of pending) {
+      const dueDate = dueChanged ? dueDateIn(installment.period) : undefined;
       await db.transaction.update({
         where: { id: installment.id, workspaceId },
         data: {
@@ -365,9 +528,31 @@ export class InstallmentsService {
           personId: input.personId,
           merchantId: input.merchantId,
           paymentMethod: input.paymentMethod,
-          dueDate: dueChanged ? dueDateIn(installment.period) : undefined,
+          dueDate,
+          occurredOn: optionalDate(input.occurredOn),
         },
       });
+      // Its pending shares fall due with it (ADR 0052 note) and take its day (ADR 0055 note).
+      if (dueDate !== undefined) {
+        await followDueDate(this.prisma, workspaceId, installment.id, dueDate);
+      }
+      if (input.occurredOn !== undefined) {
+        await followShares(this.prisma, workspaceId, installment.id, {
+          occurredOn: optionalDate(input.occurredOn),
+        });
+      }
+      // Its pending shares take the new name, with their installment (ADR 0052 note).
+      if (input.description !== undefined && installment.installmentNumber !== null) {
+        await followDescription(
+          this.prisma,
+          workspaceId,
+          installment.id,
+          shareDescription(input.description, {
+            number: installment.installmentNumber,
+            count: plan.installments,
+          }),
+        );
+      }
     }
     const list = await this.list(workspaceId);
     return list.find((item) => item.id === planId) ?? toResponse(updated, settledCount);
@@ -385,6 +570,25 @@ export class InstallmentsService {
     const settled = await db.transaction.count({
       where: { workspaceId, installmentPlanId: planId, settledAt: { not: null } },
     });
+    // The transaction it adopted ("Tornar parcelado") existed before it: still pending, it goes
+    // back to being launched once, with its amount (ADR 0038 note). Ending a plan with payments
+    // keeps its past months as history, so then only from this month on.
+    if (plan.adoptedTransactionId) {
+      await db.transaction.updateMany({
+        where: {
+          id: plan.adoptedTransactionId,
+          workspaceId,
+          installmentPlanId: planId,
+          settledAt: null,
+          ...(settled > 0 && { period: { gte: currentPeriod() } }),
+        },
+        data: {
+          installmentPlanId: null,
+          installmentNumber: null,
+          ...(plan.adoptedAmountCents !== null && { amountCents: plan.adoptedAmountCents }),
+        },
+      });
+    }
     if (settled === 0) {
       // The pending shares first (a settled one, money already received, stays unlinked); the
       // installments go with the plan, by cascade.

@@ -166,6 +166,8 @@ async function seed(api: APIRequestContext, workspaceId: string, period: string,
       description: 'Mercado',
       categoryId: pick('DEBIT', 'Mercado'),
       amountCents: vary(64035),
+      // The day it happened (ADR 0055), apart from the due date.
+      occurredOn: day(2),
       dueDate: day(3),
       settledAt: day(3),
     },

@@ -1,8 +1,10 @@
 import {
+  createMerchantAliasInputSchema,
   createMerchantInputSchema,
   merchantListResponseSchema,
   merchantSchema,
   updateMerchantInputSchema,
+  type CreateMerchantAliasInput,
   type CreateMerchantInput,
   type Merchant,
   type UpdateMerchantInput,
@@ -31,7 +33,10 @@ import { MerchantsService } from './merchants.service.js';
 const openApi = (schema: z.ZodType) =>
   z.toJSONSchema(schema, { target: 'openapi-3.0', io: 'input' }) as SchemaObject;
 
-/** Merchants of one workspace (ADR 0053): every member reads them, EDITORs and OWNERs change them. */
+/**
+ * Merchants of one workspace (ADR 0053) and their aliases (ADR 0055): every member reads them,
+ * EDITORs and OWNERs change them.
+ */
 @ApiTags('merchants')
 @Controller('workspaces/:workspaceId/merchants')
 @WorkspaceScoped()
@@ -74,6 +79,39 @@ export class MerchantsController {
     @Body({ schema: updateMerchantInputSchema }) input: UpdateMerchantInput,
   ): Promise<Merchant> {
     return this.merchants.update(membership.workspaceId, merchantId, input);
+  }
+
+  @Post(':merchantId/aliases')
+  @RequireRole('EDITOR')
+  @ApiBody({ schema: openApi(createMerchantAliasInputSchema) })
+  @ApiCreatedResponse({
+    description: 'Alias added (ADR 0055); answers the merchant with its aliases.',
+    schema: openApi(merchantSchema),
+  })
+  @ApiBadRequestResponse({ description: 'Invalid input (code INVALID_INPUT).' })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  @ApiConflictResponse({
+    description: "MERCHANT_ALIAS_EXISTS: the same alias, cleaned, is already a merchant's.",
+  })
+  addAlias(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('merchantId') merchantId: string,
+    @Body({ schema: createMerchantAliasInputSchema }) input: CreateMerchantAliasInput,
+  ): Promise<Merchant> {
+    return this.merchants.addAlias(membership.workspaceId, merchantId, input);
+  }
+
+  @Delete(':merchantId/aliases/:aliasId')
+  @RequireRole('EDITOR')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Alias removed.' })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  removeAlias(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('merchantId') merchantId: string,
+    @Param('aliasId') aliasId: string,
+  ): Promise<void> {
+    return this.merchants.removeAlias(membership.workspaceId, merchantId, aliasId);
   }
 
   @Delete(':merchantId')

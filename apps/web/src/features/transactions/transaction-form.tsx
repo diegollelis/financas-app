@@ -1,11 +1,13 @@
 import {
   plainTransactionInputSchema,
+  currentPeriod,
   formatCents,
   installmentCountSchema,
   MAX_DUE_MONTH_OFFSET,
   parseReais,
   splitInstallments,
   isoDateSchema,
+  occurredOnLabels,
   PERSON_NAME_MAX_LENGTH,
   reaisInputSchema,
   MERCHANT_NAME_MAX_LENGTH,
@@ -13,6 +15,7 @@ import {
   paymentMethodSchema,
   suggestCategory,
   suggestPaymentMethod,
+  todayIso,
   type Category,
   type CategoryHints,
   type Merchant,
@@ -35,7 +38,7 @@ import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { findMerchant } from '@/features/merchants/use-merchants';
 import { PersonSelect } from '@/features/people/person-picker';
-import { dueDayLabel, dueOf } from '@/features/recurrences/due';
+import { amountKindHint, dueDayLabel, dueOf, monthNameOf } from '@/features/recurrences/due';
 import { apiErrorMessage } from '@/lib/error-message';
 import { cn } from '@/lib/utils';
 import { shareCents } from './split';
@@ -57,17 +60,24 @@ const transactionFormSchema = plainTransactionInputSchema
       .string()
       .transform((date) => date || null)
       .pipe(isoDateSchema.nullable()),
+    /** The day it happened (ADR 0055); '' for none. Only when launched once. */
+    occurredOn: z
+      .string()
+      .transform((date) => date || null)
+      .pipe(isoDateSchema.nullable()),
     /** The competência it is launched in: how far a repeated one's due date may fall. Never sent. */
     period: z.string(),
     /**
      * Only when creating: once, every month from this competência on, or in installments
      * (ADR 0038).
      */
-    repeat: z.enum(['NONE', 'MONTHLY', 'INSTALLMENTS']),
+    repeat: z.enum(['NONE', 'MONTHLY', 'YEARLY', 'INSTALLMENTS']),
     /** Of a monthly one: the same every month, or changing (energy, water), ADR 0038. */
     amountKind: z.enum(['FIXED', 'VARIABLE']),
     /** Of installments: how many, as typed. */
     installments: z.string(),
+    /** Of installments: the first one created, for a purchase already running (ADR 0055); '' = 1. */
+    firstNumber: z.string(),
     /** Of installments: whether the amount typed is the whole purchase or each installment. */
     amountIs: z.enum(['TOTAL', 'INSTALLMENT']),
     /** Where it was bought or who paid it (ADR 0053): a name; a new one is created on save. */
@@ -162,7 +172,20 @@ const transactionFormSchema = plainTransactionInputSchema
         message: count.error.issues[0]?.message ?? 'Informe o número de parcelas.',
       });
     }
+    const first = firstNumberOf(values.firstNumber);
+    if (!Number.isInteger(first) || first < 1 || (count.success && first > count.data)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['firstNumber'],
+        message: 'Use um número de 1 até o total de parcelas.',
+      });
+    }
   });
+
+/** "Começa na parcela", as typed: blank is the first one. */
+function firstNumberOf(text: string) {
+  return text.trim() === '' ? 1 : Number(text);
+}
 
 type FormInput = z.input<typeof transactionFormSchema>;
 export type TransactionFormValues = z.output<typeof transactionFormSchema>;
@@ -183,6 +206,7 @@ const amountKindOptions = [
 const repeatOptions = [
   { value: 'NONE', label: 'Não repetir' },
   { value: 'MONTHLY', label: 'Todo mês' },
+  { value: 'YEARLY', label: 'Todo ano' },
   { value: 'INSTALLMENTS', label: 'Parcelado' },
 ] as const;
 
@@ -193,25 +217,33 @@ const amountIsOptions = [
 
 /**
  * "10 parcelas de R$ 35,00, total R$ 350,00", or, when cents are left over, "3 parcelas:
- * 2 de R$ 333,33 e a última de R$ 333,34": what will be created, before it is.
+ * 2 de R$ 333,33 e a última de R$ 333,34": what will be created, before it is. A purchase already
+ * running says which ones: "Da 3/10 à 10/10: 8 parcelas de R$ 50,00, total R$ 400,00."
  */
 function installmentsPreview(
   amountText: string,
   countText: string,
+  firstText: string,
   amountIs: 'TOTAL' | 'INSTALLMENT',
 ) {
   const cents = parseReais(amountText);
   const count = installmentCountSchema.safeParse(Number(countText));
+  const firstNumber = firstNumberOf(firstText);
   if (cents === null || cents <= 0 || !count.success) return null;
-  const total = amountIs === 'TOTAL' ? cents : cents * count.data;
-  if (amountIs === 'TOTAL' && total < count.data) return null;
-  const parts = splitInstallments(total, count.data);
+  if (!Number.isInteger(firstNumber) || firstNumber < 1 || firstNumber > count.data) return null;
+  const created = count.data - firstNumber + 1;
+  const total = amountIs === 'TOTAL' ? cents : cents * created;
+  if (amountIs === 'TOTAL' && total < created) return null;
+  const parts = splitInstallments(total, created);
   const first = parts[0] ?? 0;
   const last = parts.at(-1) ?? 0;
+  const which =
+    firstNumber > 1 ? `Da ${firstNumber}/${count.data} à ${count.data}/${count.data}: ` : '';
+  const many = created === 1 ? '1 parcela' : `${created} parcelas`;
   if (first === last) {
-    return `${count.data} parcelas de ${formatCents(first)}, total ${formatCents(total)}.`;
+    return `${which}${many} de ${formatCents(first)}, total ${formatCents(total)}.`;
   }
-  return `${count.data} parcelas: ${count.data - 1} de ${formatCents(first)} e a última de ${formatCents(last)}, total ${formatCents(total)}.`;
+  return `${which}${many}: ${created - 1} de ${formatCents(first)} e a última de ${formatCents(last)}, total ${formatCents(total)}.`;
 }
 
 /** Values a new transaction starts from, e.g. an application to a budget destination. */
@@ -243,6 +275,7 @@ export function TransactionForm({
   onSubmit,
   onCancel,
   allowRepeat = false,
+  allowSplit = false,
 }: {
   /** Keeps the field ids unique when several forms are on the page. */
   idPrefix: string;
@@ -265,6 +298,11 @@ export function TransactionForm({
   onCancel?: () => void;
   /** Offers "Repetir": only for a new transaction. */
   allowRepeat?: boolean;
+  /**
+   * Offers "Dividir com alguém" when editing (ADR 0052 note): a transaction launched once that is
+   * not split yet. A new one always offers it.
+   */
+  allowSplit?: boolean;
 }) {
   const { register, handleSubmit, formState, control, setValue } = useForm<
     FormInput,
@@ -284,10 +322,17 @@ export function TransactionForm({
           ? amountText.format(preset.amountCents / 100)
           : '',
       dueDate: initial?.dueDate ?? '',
+      // Today in this month; blank in another, so no wrong day is saved unseen (ADR 0055).
+      occurredOn: initial
+        ? (initial.occurredOn ?? '')
+        : period && period === currentPeriod()
+          ? todayIso()
+          : '',
       period: initial?.period ?? period ?? '',
       repeat: 'NONE',
       amountKind: 'FIXED',
       installments: '',
+      firstNumber: '',
       amountIs: 'TOTAL',
       merchant: merchants.find((merchant) => merchant.id === initial?.merchantId)?.name ?? '',
       paymentMethod: initial?.paymentMethod ?? '',
@@ -305,11 +350,13 @@ export function TransactionForm({
   const amountIs = useWatch({ control, name: 'amountIs' });
   const typedAmount = useWatch({ control, name: 'amount' });
   const typedInstallments = useWatch({ control, name: 'installments' });
+  const typedFirstNumber = useWatch({ control, name: 'firstNumber' });
   const splitOn = useWatch({ control, name: 'splitOn' });
   const typedDueDate = useWatch({ control, name: 'dueDate' });
   // A new transaction, a credit too, launched once, every month or in installments, may be
-  // split; anything else may name one person, copied to each month (ADRs 0042, 0052).
-  const canSplit = allowRepeat;
+  // split, and so may one launched once and not split yet, when edited (ADR 0052 note); anything
+  // else may name one person, copied to each month (ADRs 0042, 0052).
+  const canSplit = allowRepeat || allowSplit;
   const splitting = canSplit && splitOn;
   const showPerson = !splitting;
   const user = useCurrentUser();
@@ -317,8 +364,18 @@ export function TransactionForm({
     const cents = parseReais(typedAmount ?? '');
     return cents !== null && cents > 0 ? cents : null;
   })();
-  const variable = repeat === 'MONTHLY' && amountKind === 'VARIABLE';
+  // Every month or every year (ADR 0038 note): the same fields, only the cycle differs.
+  const recurring = repeat === 'MONTHLY' || repeat === 'YEARLY';
+  const yearly = repeat === 'YEARLY';
+  const variable = recurring && amountKind === 'VARIABLE';
   const installments = repeat === 'INSTALLMENTS';
+  // A recurrence's months come without a day: the due date says it. An installment purchase
+  // happened on one day, the same for every installment (ADR 0055 and its note).
+  // A month of a recurrence offers it only when it already has one, so it can be fixed or cleared
+  // (the first month, from "Tornar recorrente", keeps the day it had).
+  const withDay =
+    (repeat === 'NONE' || repeat === 'INSTALLMENTS') &&
+    !(initial?.recurrenceId && !initial.occurredOn);
   const amountLabel = variable
     ? 'Valor estimado (R$)'
     : installments
@@ -334,10 +391,15 @@ export function TransactionForm({
     due.dueDay !== null &&
     due.dueMonthOffset >= 0 &&
     due.dueMonthOffset <= MAX_DUE_MONTH_OFFSET
-      ? `${installments ? 'Cada parcela' : 'Cada mês'} vence no ${dueDayLabel(due.dueDay, due.dueMonthOffset)}.`
+      ? `${installments ? 'Cada parcela' : yearly ? 'Cada ano' : 'Cada mês'} vence no ${dueDayLabel(due.dueDay, due.dueMonthOffset)}.`
       : null;
   const preview = installments
-    ? installmentsPreview(typedAmount ?? '', typedInstallments ?? '', amountIs ?? 'TOTAL')
+    ? installmentsPreview(
+        typedAmount ?? '',
+        typedInstallments ?? '',
+        typedFirstNumber ?? '',
+        amountIs ?? 'TOTAL',
+      )
     : null;
   // Only categories of the chosen type; an archived one only if it is already the current one.
   const options = categories.filter(
@@ -475,8 +537,14 @@ export function TransactionForm({
           />
         )}
       </div>
-      {/* One column on the phone, two from sm, three from lg (the method, with the longest label, a little wider). */}
-      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr]">
+      {/* One column on the phone, two from sm: the amount and its day, then when it is due and how.
+          Without the day, three from lg (the method, with the longest label, a little wider). */}
+      <div
+        className={cn(
+          'grid items-start gap-4 sm:grid-cols-2',
+          !withDay && 'lg:grid-cols-[1fr_1fr_1.4fr]',
+        )}
+      >
         <FormField id={id('amount')} label={amountLabel} error={formState.errors.amount?.message}>
           <Input
             inputMode="decimal"
@@ -486,6 +554,15 @@ export function TransactionForm({
             {...register('amount')}
           />
         </FormField>
+        {withDay && (
+          <FormField
+            id={id('occurred-on')}
+            label={`${occurredOnLabels[type]} (opcional)`}
+            error={formState.errors.occurredOn?.message}
+          >
+            <Input type="date" {...register('occurredOn')} />
+          </FormField>
+        )}
         <FormField
           id={id('due-date')}
           label="Vencimento (opcional)"
@@ -498,7 +575,7 @@ export function TransactionForm({
           control={control}
           name="paymentMethod"
           render={({ field, fieldState }) => (
-            <div className="grid gap-1 sm:col-span-2 lg:col-span-1">
+            <div className={cn('grid gap-1', !withDay && 'sm:col-span-2 lg:col-span-1')}>
               <FormField
                 id={id('payment-method')}
                 label={`${paymentMethodFieldLabels[type]} (opcional)`}
@@ -524,7 +601,7 @@ export function TransactionForm({
             render={({ field }) => (
               <SegmentedControl
                 label="Repetir"
-                // An application repeats every month at most: installments make no sense here.
+                // An application repeats every month or every year: installments make no sense here.
                 options={
                   application
                     ? repeatOptions.filter((option) => option.value !== 'INSTALLMENTS')
@@ -532,19 +609,27 @@ export function TransactionForm({
                 }
                 value={field.value}
                 onChange={field.onChange}
+                // Four options do not fit in 360px: two rows on the phone.
+                className={
+                  application
+                    ? undefined
+                    : 'grid-flow-row grid-cols-2 sm:grid-flow-col sm:grid-cols-none'
+                }
               />
             )}
           />
-          {repeat === 'MONTHLY' && (
+          {recurring && (
             <p className="text-muted-foreground text-sm">
-              Um lançamento pendente em cada mês, a partir deste. Para parar, use "Encerrar
-              recorrência" no menu do lançamento.
+              {yearly
+                ? `Um lançamento pendente todo ano em ${monthNameOf(period ?? '')}, a partir deste.`
+                : 'Um lançamento pendente em cada mês, a partir deste.'}{' '}
+              Para parar, use "Encerrar recorrência" no menu do lançamento.
             </p>
           )}
           {dueNote && <p className="text-muted-foreground text-sm">{dueNote}</p>}
         </div>
       )}
-      {allowRepeat && repeat === 'MONTHLY' && (
+      {allowRepeat && recurring && (
         <div className="grid gap-2">
           <p aria-hidden className="text-sm font-medium">
             Valor
@@ -561,11 +646,7 @@ export function TransactionForm({
               />
             )}
           />
-          <p className="text-muted-foreground text-sm">
-            {variable
-              ? 'Para contas que mudam todo mês, como energia e água. Cada mês começa com a média dos 3 últimos pagos; ao marcar como pago, você informa o valor da fatura.'
-              : 'O mesmo valor todo mês, como internet e aluguel.'}
-          </p>
+          <p className="text-muted-foreground text-sm">{amountKindHint(variable, yearly)}</p>
         </div>
       )}
       {allowRepeat && installments && (
@@ -583,7 +664,21 @@ export function TransactionForm({
               {...register('installments')}
             />
           </FormField>
-          <div className="grid gap-2">
+          {/* A purchase already running, as the card bill shows it: 3 creates 3/10 to 10/10 (ADR 0055). */}
+          <FormField
+            id={id('first-number')}
+            label="Começa na parcela (opcional)"
+            error={formState.errors.firstNumber?.message}
+          >
+            <Input
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="1"
+              className="tabular-nums"
+              {...register('firstNumber')}
+            />
+          </FormField>
+          <div className="grid gap-2 sm:col-span-2">
             <p aria-hidden className="text-sm font-medium">
               O valor digitado é
             </p>
@@ -602,7 +697,7 @@ export function TransactionForm({
           </div>
           <p aria-live="polite" className="text-muted-foreground text-sm sm:col-span-2">
             {preview ??
-              'Uma parcela por mês, a partir deste, todas pendentes. Com o total, os centavos que sobram vão para a última.'}
+              'Uma parcela por mês, a partir deste, todas pendentes. Com o total, os centavos que sobram vão para a última. Numa compra já em andamento, informe em que parcela ela está.'}
           </p>
         </div>
       )}
@@ -709,10 +804,15 @@ export function TransactionForm({
                   userId={user.id}
                   installments={
                     repeat === 'INSTALLMENTS'
-                      ? { count: Number(typedInstallments), amountIs: amountIs ?? 'TOTAL' }
+                      ? {
+                          // The installments created: from the first number on (ADR 0055).
+                          count:
+                            Number(typedInstallments) - firstNumberOf(typedFirstNumber ?? '') + 1,
+                          amountIs: amountIs ?? 'TOTAL',
+                        }
                       : undefined
                   }
-                  monthly={repeat === 'MONTHLY' ? { variable } : undefined}
+                  monthly={recurring ? { variable, yearly } : undefined}
                 />
               )}
             </div>

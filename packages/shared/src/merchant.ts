@@ -29,12 +29,35 @@ export const updateMerchantInputSchema = z
 
 export type UpdateMerchantInput = z.infer<typeof updateMerchantInputSchema>;
 
+/** Matches the `merchant_aliases.alias` column (varchar 100). */
+export const MERCHANT_ALIAS_MAX_LENGTH = 100;
+
+/**
+ * Another text the merchant appears as, in a card statement (ADR 0055): "Ifd*Pizzaria Exemplo".
+ * It may be cut to the part that does not change ("Loja.Exemplo" for "Loja.Exemplo* H2m9u1").
+ */
+export const createMerchantAliasInputSchema = z.object({
+  alias: z
+    .string()
+    .trim()
+    .min(1, 'Informe o apelido.')
+    .max(MERCHANT_ALIAS_MAX_LENGTH, `Use no máximo ${MERCHANT_ALIAS_MAX_LENGTH} caracteres.`),
+});
+
+export type CreateMerchantAliasInput = z.infer<typeof createMerchantAliasInputSchema>;
+
+export const merchantAliasSchema = z.object({ id: z.uuid(), alias: z.string() });
+
+export type MerchantAlias = z.infer<typeof merchantAliasSchema>;
+
 export const merchantSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   archived: z.boolean(),
   /** Used by a transaction, a recurrence or an installment plan: it can only be archived. */
   inUse: z.boolean(),
+  /** How it appears in card statements (ADR 0055), by alias. */
+  aliases: z.array(merchantAliasSchema).default([]),
 });
 
 export type Merchant = z.infer<typeof merchantSchema>;

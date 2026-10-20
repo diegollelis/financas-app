@@ -296,7 +296,7 @@ describe('DashboardPage', () => {
       within(repeat)
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
-    ).toEqual(['Não repetir', 'Todo mês']);
+    ).toEqual(['Não repetir', 'Todo mês', 'Todo ano']);
 
     await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
 

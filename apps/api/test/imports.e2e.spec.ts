@@ -2,7 +2,9 @@ import {
   categoryListResponseSchema,
   importListResponseSchema,
   importSchema,
+  installmentPlanListResponseSchema,
   MAX_IMPORT_TRANSACTIONS,
+  merchantListResponseSchema,
   transactionListResponseSchema,
   type CreateTransactionInput,
   type TransactionType,
@@ -70,6 +72,7 @@ describe('imports', () => {
         categoryId: categoryId('Mercado', 'DEBIT'),
         amountCents: 64_035,
         period,
+        occurredOn: `${period}-03`,
         dueDate: null,
         settledAt: null,
       },
@@ -90,6 +93,10 @@ describe('imports', () => {
 
     expect(created).toMatchObject({
       transactionCount: 4,
+      planCount: 0,
+      // None given: as the imports made before the "Origem" (ADR 0055 note).
+      label: null,
+      statementDueDate: null,
       firstPeriod: '2026-08',
       lastPeriod: '2026-09',
       createdBy: { name: maria.name },
@@ -107,6 +114,8 @@ describe('imports', () => {
     expect(august.find((transaction) => transaction.type === 'DEBIT')).toMatchObject({
       notes: 'Importado da planilha',
       settledAt: null,
+      // The "Data" column of the template (ADR 0055).
+      occurredOn: '2026-08-03',
     });
 
     const list = importListResponseSchema.parse(
@@ -155,6 +164,46 @@ describe('imports', () => {
     expect(august.find((item) => item.type === 'DEBIT')?.merchantId).toBe(existing.id);
     expect(september.find((item) => item.type === 'CREDIT')?.merchantId).toBe(created?.id);
     expect(september.find((item) => item.type === 'DEBIT')?.merchantId).toBe(archived.id);
+  });
+
+  it('names people: a new one is created, an existing one reused, an archived one comes back (ADR 0042)', async () => {
+    const { browser, base, rows, transactionsOf } = await setUp();
+    const existing = (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201))
+      .body as { id: string };
+    const archived = (await browser.post(`${base}/people`).send({ name: 'Bruno' }).expect(201))
+      .body as { id: string };
+    await browser.patch(`${base}/people/${archived.id}`).send({ archived: true }).expect(200);
+    const [salary, grocery, salary2, grocery2] = rows;
+
+    await browser
+      .post(`${base}/imports`)
+      .send({
+        transactions: [
+          { ...salary, personName: 'Carla Exemplo' },
+          { ...grocery, personName: 'ANA' },
+          { ...salary2, personName: 'carla exemplo' },
+          { ...grocery2, personName: 'bruno' },
+        ],
+      })
+      .expect(201);
+
+    const people = (await browser.get(`${base}/people`).expect(200)).body as {
+      id: string;
+      name: string;
+      archived: boolean;
+    }[];
+    const created = people.find((person) => person.name === 'Carla Exemplo');
+    expect(people.map(({ name, archived }) => [name, archived])).toEqual([
+      ['Ana', false],
+      ['Bruno', false],
+      ['Carla Exemplo', false],
+    ]);
+    const august = await transactionsOf('2026-08');
+    const september = await transactionsOf('2026-09');
+    expect(august.find((item) => item.type === 'CREDIT')?.personId).toBe(created?.id);
+    expect(august.find((item) => item.type === 'DEBIT')?.personId).toBe(existing.id);
+    expect(september.find((item) => item.type === 'CREDIT')?.personId).toBe(created?.id);
+    expect(september.find((item) => item.type === 'DEBIT')?.personId).toBe(archived.id);
   });
 
   it('keeps the payment method of each transaction (ADR 0054)', async () => {
@@ -272,6 +321,166 @@ describe('imports', () => {
     expect((await browser.get(`${base}/imports`).expect(200)).body).toEqual([]);
     await browser.delete(`${base}/imports/${created.id}`).expect(404);
     await browser.delete(`${base}/imports/nao-e-um-id`).expect(404);
+  });
+
+  describe('a card statement (ADR 0055)', () => {
+    const statementPeriod = '2026-11';
+    const tv = (overrides: object = {}) => ({
+      type: 'DEBIT',
+      description: 'TV da sala',
+      installments: 10,
+      firstNumber: 3,
+      amountCents: 5_000,
+      firstPeriod: statementPeriod,
+      occurredOn: '2026-08-28',
+      dueDay: 4,
+      paymentMethod: 'CREDIT_CARD',
+      merchantName: 'Loja Exemplo',
+      ...overrides,
+    });
+    const plansOf = async (browser: ReturnType<typeof t.http>, base: string) =>
+      installmentPlanListResponseSchema.parse(
+        (await browser.get(`${base}/installments`).expect(200)).body,
+      );
+
+    it('creates the installment plans with the import, and undoing deletes them', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const compras = categoryId('Compras', 'DEBIT');
+
+      const created = importSchema.parse(
+        (
+          await browser
+            .post(`${base}/imports`)
+            .send({
+              transactions: [
+                {
+                  type: 'DEBIT',
+                  description: 'Pizza de sexta',
+                  categoryId: categoryId('Lazer', 'DEBIT'),
+                  amountCents: 8_650,
+                  period: statementPeriod,
+                  occurredOn: '2026-10-03',
+                  dueDate: '2026-11-04',
+                },
+              ],
+              plans: [tv({ categoryId: compras })],
+              label: ' Fatura Nubank ',
+              statementDueDate: '2026-11-04',
+            })
+            .expect(201)
+        ).body,
+      );
+
+      // The purchase and the eight installments, 3/10 to 10/10.
+      expect(created).toMatchObject({
+        transactionCount: 9,
+        planCount: 1,
+        label: 'Fatura Nubank',
+        statementDueDate: '2026-11-04',
+        firstPeriod: statementPeriod,
+        lastPeriod: '2027-06',
+      });
+      const [plan] = await plansOf(browser, base);
+      expect(plan).toMatchObject({
+        installments: 10,
+        firstNumber: 3,
+        totalCents: 40_000,
+        occurredOn: '2026-08-28',
+        pendingCount: 8,
+      });
+      // The merchant named reaches the plan and every installment (ADR 0053).
+      const merchants = merchantListResponseSchema.parse(
+        (await browser.get(`${base}/merchants`).expect(200)).body,
+      );
+      const loja = merchants.find((merchant) => merchant.name === 'Loja Exemplo');
+      expect(plan?.merchantId).toBe(loja?.id);
+      const installment = (await transactionsOf(statementPeriod)).find((t) => t.installment);
+      expect(installment).toMatchObject({
+        installment: { number: 3, count: 10 },
+        amountCents: 5_000,
+        dueDate: '2026-11-04',
+        occurredOn: '2026-08-28',
+        paymentMethod: 'CREDIT_CARD',
+        merchantId: loja?.id,
+      });
+      const last = (await transactionsOf('2027-06')).find((t) => t.installment);
+      expect(last).toMatchObject({ installment: { number: 10 }, merchantId: loja?.id });
+
+      await browser.delete(`${base}/imports/${created.id}`).expect(204);
+
+      expect(await plansOf(browser, base)).toEqual([]);
+      expect(await transactionsOf(statementPeriod)).toEqual([]);
+      expect(await transactionsOf('2027-06')).toEqual([]);
+    });
+
+    it('takes installment plans alone, but not an empty import', async () => {
+      const { browser, base, categoryId } = await setUp();
+
+      await browser
+        .post(`${base}/imports`)
+        .send({ transactions: [], plans: [tv({ categoryId: categoryId('Compras', 'DEBIT') })] })
+        .expect(201);
+      const empty = await browser
+        .post(`${base}/imports`)
+        .send({ transactions: [], plans: [] })
+        .expect(400);
+      expect(empty.body).toMatchObject({
+        message: 'Escolha ao menos um lançamento para importar.',
+      });
+    });
+
+    it('keeps the aliases learned, also after undoing, and refuses one of another merchant', async () => {
+      const { browser, base, rows } = await setUp();
+      const pizza = {
+        ...rows[1]!,
+        description: 'Pizza',
+        merchantName: 'Pizzaria Exemplo',
+      };
+
+      const created = importSchema.parse(
+        (
+          await browser
+            .post(`${base}/imports`)
+            .send({
+              transactions: [pizza],
+              aliases: [
+                { merchantName: 'Pizzaria Exemplo', alias: 'Ifd*Pizzaria Exemplo' },
+                // The same alias twice in the batch: once.
+                { merchantName: 'pizzaria exemplo', alias: 'IFD*PIZZARIA EXEMPLO' },
+              ],
+            })
+            .expect(201)
+        ).body,
+      );
+      await browser.delete(`${base}/imports/${created.id}`).expect(204);
+
+      const merchants = merchantListResponseSchema.parse(
+        (await browser.get(`${base}/merchants`).expect(200)).body,
+      );
+      expect(merchants.map(({ name, aliases }) => [name, aliases.map((a) => a.alias)])).toEqual([
+        ['Pizzaria Exemplo', ['Ifd*Pizzaria Exemplo']],
+      ]);
+      const refused = await browser
+        .post(`${base}/imports`)
+        .send({
+          transactions: [{ ...pizza, merchantName: 'Outra Pizzaria' }],
+          aliases: [
+            { merchantName: 'Outra Pizzaria', alias: 'Ifd*Pizzaria Exemplo - Parcela 1/2' },
+          ],
+        })
+        .expect(409);
+      expect(refused.body).toMatchObject({
+        code: 'MERCHANT_ALIAS_EXISTS',
+        message: 'O apelido "Ifd*Pizzaria Exemplo - Parcela 1/2" já é de "Pizzaria Exemplo".',
+      });
+      // Nothing of it was saved, not even the new merchant.
+      expect((await browser.get(`${base}/imports`).expect(200)).body).toEqual([]);
+      expect(
+        merchantListResponseSchema
+          .parse((await browser.get(`${base}/merchants`).expect(200)).body)
+          .map((merchant) => merchant.name),
+      ).toEqual(['Pizzaria Exemplo']);
+    });
   });
 
   it('a VIEWER sees the imports but does not import nor undo', async () => {

@@ -56,7 +56,7 @@ Escolhidos com o dono do projeto: **contatos por nome (opção 2)**, **valor a r
 - **Onde:** só no débito. No novo lançamento, "Dividir com alguém" recebe uma ou mais pessoas, existentes ou novas, e a parte de cada uma, em valor ou percentual.
 - **O que é criado,** numa escrita só, tudo ou nada:
   - o débito inteiro;
-  - um crédito pendente por pessoa: "Ana: parte de {descrição}", na categoria "Reembolso", na mesma competência, ligado à pessoa e ao débito (`transactions.split_of_id`).
+  - um crédito pendente por pessoa: "Ana: parte de {descrição}" (desde a nota de 2026-10-16 no [ADR 0052](0052-divisao-em-entradas-recorrencias-e-parcelamentos.md), só "{descrição}"), na categoria "Reembolso", na mesma competência, ligado à pessoa e ao débito (`transactions.split_of_id`).
 - **O centavo que sobra** de uma divisão em partes iguais fica na sua parte, a mesma regra de `splitInstallments`.
 - **A soma das partes dos outros** não passa do valor do gasto. A sua parte pode ser zero, quando você pagou só pelos outros.
 - **Os lançamentos são independentes depois de criados:** mudar o débito não muda as partes. Excluir o débito pergunta se exclui também os créditos ligados; se não, eles ficam, e a ligação é desfeita (`SET NULL`).
