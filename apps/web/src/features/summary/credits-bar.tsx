@@ -9,10 +9,14 @@ import { cn } from '@/lib/utils';
  */
 export function CreditsBar({ summary }: { summary: Summary }) {
   const { credits, debits, balance } = summary;
+  // A negative balance has no part of the credits: it leaves the bar and the legend, so the
+  // legend never shows "Saldo previsto R$ 0,00" under a negative one (ADR 0051 note).
   const segments = [
     { label: 'Saídas pagas', cents: debits.settledCents, color: 'bg-chart-1' },
     { label: 'Saídas a pagar', cents: debits.pendingCents, color: 'bg-chart-2' },
-    { label: 'Saldo previsto', cents: Math.max(balance.plannedCents, 0), color: 'bg-chart-3' },
+    ...(balance.plannedCents > 0
+      ? [{ label: 'Saldo previsto', cents: balance.plannedCents, color: 'bg-chart-3' }]
+      : []),
   ];
   const whole = segments.reduce((sum, segment) => sum + segment.cents, 0);
   if (whole === 0) {

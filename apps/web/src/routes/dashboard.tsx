@@ -10,6 +10,7 @@ import {
 import { TriangleAlert } from 'lucide-react';
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { InfoTip } from '@/components/info-tip';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { Button } from '@/components/ui/button';
@@ -37,11 +38,23 @@ function SignedCents({ cents }: { cents: number }) {
  * A secondary indicator: a row (label left, value right) on the phone, a tile from sm. Values
  * use proportional figures: they stand alone, not in a column (dataviz skill).
  */
-function StatTile({ label, children }: { label: string; children: ReactNode }) {
+function StatTile({
+  label,
+  help,
+  children,
+}: {
+  label: string;
+  /** What the label means, behind an "ⓘ" (InfoTip). */
+  help?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b py-2 last:border-b-0 sm:grid sm:justify-start sm:gap-1 sm:rounded-xl sm:border sm:p-4 sm:last:border-b">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-lg font-semibold">{children}</dd>
+      <dt className="text-muted-foreground flex items-center">
+        {label}
+        {help && <InfoTip term={label}>{help}</InfoTip>}
+      </dt>
+      <dd className="text-lg font-semibold whitespace-nowrap">{children}</dd>
     </div>
   );
 }
@@ -49,12 +62,15 @@ function StatTile({ label, children }: { label: string; children: ReactNode }) {
 function Section({
   title,
   level = 2,
+  help,
   className,
   children,
 }: {
   title: string;
   /** 3 for the blocks inside "Orçamento do mês". */
   level?: 2 | 3;
+  /** What the section shows, behind an "ⓘ" beside the title (InfoTip), out of the heading's name. */
+  help?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
@@ -62,21 +78,31 @@ function Section({
   const Heading = level === 2 ? 'h2' : 'h3';
   return (
     <section aria-labelledby={id} className={cn('grid content-start gap-3', className)}>
-      <Heading id={id} className="font-medium">
-        {title}
-      </Heading>
+      <div className="flex items-center">
+        <Heading id={id} className="font-medium">
+          {title}
+        </Heading>
+        {help && <InfoTip term={title}>{help}</InfoTip>}
+      </div>
       {children}
     </section>
   );
 }
 
 /** Label left, value right, one per line. */
-function AmountRows({ rows }: { rows: readonly (readonly [label: string, value: ReactNode])[] }) {
+function AmountRows({
+  rows,
+}: {
+  rows: readonly (readonly [label: string, value: ReactNode, help?: ReactNode])[];
+}) {
   return (
     <dl className="grid tabular-nums">
-      {rows.map(([label, value]) => (
-        <div key={label} className="flex justify-between gap-3 border-b py-2">
-          <dt className="text-muted-foreground">{label}</dt>
+      {rows.map(([label, value, help]) => (
+        <div key={label} className="flex items-center justify-between gap-3 border-b py-2">
+          <dt className="text-muted-foreground flex items-center">
+            {label}
+            {help}
+          </dt>
           <dd>{value}</dd>
         </div>
       ))}
@@ -156,8 +182,16 @@ function ExpensesBlock({ summary }: { summary: Summary }) {
   if (!goal) return null;
   const { expenses } = summary;
   return (
-    <Section title="Limite de gastos" level={3}>
-      <p className="text-muted-foreground">Quanto da renda líquida você planeja gastar no mês.</p>
+    <Section
+      title="Limite de gastos"
+      level={3}
+      help={
+        <>
+          <p>Quanto da renda líquida você planeja gastar no mês.</p>
+          <p>Usado do limite: o que já foi pago mais o que falta pagar.</p>
+        </>
+      }
+    >
       {goal.targetCents > 0 ? (
         <ExpensesMeter summary={summary} />
       ) : (
@@ -172,36 +206,38 @@ function ExpensesBlock({ summary }: { summary: Summary }) {
           ['Usado do limite', shareOfGoal(expenses.totalCents, goal.targetCents)],
         ]}
       />
-      <p className="text-muted-foreground text-sm">
-        Usado do limite: o que já foi pago mais o que falta pagar.
-      </p>
     </Section>
   );
 }
 
-/** The base of the saving goals, as a sum: where "Disponível para guardar" comes from. */
+/** The base of the saving goals, as a sum: where "Sobra para guardar" comes from. */
 function AvailableBlock({ summary }: { summary: Summary }) {
   return (
-    <Section title="O que sobra para guardar" level={3}>
-      <p className="text-muted-foreground">
-        As entradas previstas menos as despesas previstas: é sobre esse valor que as metas são
-        calculadas.
-      </p>
+    <Section
+      title="O que sobra para guardar"
+      level={3}
+      help={
+        <>
+          <p>
+            As entradas previstas menos as despesas previstas: é sobre esse valor que as metas são
+            calculadas.
+          </p>
+          <p>O que você guarda não entra na conta: guardar mais não diminui as metas.</p>
+        </>
+      }
+    >
       <AmountRows
         rows={[
           ['Entradas previstas', formatCents(summary.credits.totalCents)],
           ['Despesas previstas', `− ${formatCents(summary.expenses.totalCents)}`],
           [
-            'Disponível para guardar',
+            'Sobra para guardar',
             <span key="available" className="font-semibold">
               <SignedCents cents={summary.available.plannedCents} />
             </span>,
           ],
         ]}
       />
-      <p className="text-muted-foreground text-sm">
-        O que você guarda não entra na conta: guardar mais não diminui as metas.
-      </p>
     </Section>
   );
 }
@@ -270,6 +306,7 @@ function SavingsCards({
             [
               `Sem meta (${formatBasisPoints(summary.unallocated.basisPoints)})`,
               formatCents(summary.unallocated.targetCents),
+              unallocatedTip,
             ],
           ]}
         />
@@ -338,7 +375,7 @@ function SavingsTable({
         {unallocated.basisPoints > 0 && (
           <tr className="text-muted-foreground border-b">
             <th scope="row" className="py-2 text-left font-normal">
-              Sem meta
+              <span className="flex items-center">Sem meta{unallocatedTip}</span>
             </th>
             <td className="py-2 text-right">{formatBasisPoints(unallocated.basisPoints)}</td>
             <td className="py-2 text-right">{formatCents(unallocated.targetCents)}</td>
@@ -375,12 +412,18 @@ function SavingsTable({
 }
 
 /**
- * What "Sem meta" is: a share of the planned "Disponível para guardar" (`unallocated` comes from
+ * What "Sem meta" is: a share of the planned "Sobra para guardar" (`unallocated` comes from
  * `available.plannedCents`). It may be spent, and it is already in the planned balance: the note
- * only keeps it from being read as a balance of its own (ADR 0051).
+ * only keeps it from being read as a balance of its own (ADR 0051). Behind an "ⓘ" on its row.
  */
-const UNALLOCATED_NOTE =
-  'Sem meta: parte do Disponível para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo.';
+const unallocatedTip = (
+  <InfoTip term="Sem meta">
+    <p>
+      Parte do Sobra para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um
+      saldo.
+    </p>
+  </InfoTip>
+);
 
 /** The saving destinations, each a share of what is left after expenses (ADR 0047). */
 function SavingsBlock({
@@ -395,11 +438,23 @@ function SavingsBlock({
   const savings = summary.destinations.filter((destination) => destination.kind === 'SAVINGS');
   if (savings.length === 0) return null;
   return (
-    <Section title="Metas" level={3} className="xl:col-span-2">
-      <p className="text-muted-foreground">
-        Como você divide o que sobra entre as suas metas. Cada uma é uma parte do disponível para
-        guardar, não da renda.
-      </p>
+    <Section
+      title="Metas"
+      level={3}
+      className="xl:col-span-2"
+      help={
+        <>
+          <p>
+            Como você divide o que sobra entre as suas metas. Cada uma é uma parte da sobra para
+            guardar, não da renda.
+          </p>
+          <p>
+            Guardado: já lançado e pago. Pendente: lançado, ainda não pago. Falta: o que ainda não
+            foi lançado. Progresso: quanto da meta já foi guardado.
+          </p>
+        </>
+      }
+    >
       {summary.available.plannedCents <= 0 && (
         <p>Nada sobrou para guardar este mês: as despesas previstas alcançaram as entradas.</p>
       )}
@@ -407,15 +462,6 @@ function SavingsBlock({
         <SavingsTable savings={savings} summary={summary} onApply={onApply} />
       ) : (
         <SavingsCards savings={savings} summary={summary} onApply={onApply} />
-      )}
-      <p className="text-muted-foreground text-sm">
-        Guardado: já lançado e pago. Pendente: lançado, ainda não pago. Falta: o que ainda não foi
-        lançado. Progresso: quanto da meta já foi guardado.
-      </p>
-      {summary.unallocated.basisPoints > 0 && (
-        // A forecast share of what is left, never money in the account (ADR 0051): said here,
-        // where the row sits next to the balances.
-        <p className="text-muted-foreground text-sm">{UNALLOCATED_NOTE}</p>
       )}
     </Section>
   );
@@ -453,23 +499,28 @@ function Dashboard({
           {/* The one number the month leads with (dataviz skill: one hero per view). */}
           <div className="grid gap-1">
             <dl className="grid gap-1">
-              <dt className="text-muted-foreground">Saldo previsto</dt>
+              <dt className="text-muted-foreground flex items-center">
+                Saldo previsto
+                <InfoTip term="Saldo previsto">
+                  <p>Como o mês termina se tudo o que está previsto for recebido e pago.</p>
+                </InfoTip>
+              </dt>
               <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
                 <SignedCents cents={summary.balance.plannedCents} />
               </dd>
             </dl>
-            <p className="text-muted-foreground">
-              Como o mês termina se tudo o que está previsto for recebido e pago.
-            </p>
           </div>
           <dl className="grid sm:grid-cols-3 sm:gap-3">
-            <StatTile label="Saldo atual">
+            <StatTile label="Saldo atual" help={<p>Só o que já foi recebido ou pago.</p>}>
               <SignedCents cents={summary.balance.settledCents} />
             </StatTile>
-            <StatTile label="Disponível para guardar">
+            <StatTile
+              label="Sobra para guardar"
+              help={<p>As entradas menos as despesas: a base das metas.</p>}
+            >
               <SignedCents cents={summary.available.plannedCents} />
             </StatTile>
-            <StatTile label="Guardado">
+            <StatTile label="Guardado" help={<p>O que já foi para as metas neste mês.</p>}>
               <SignedCents cents={summary.applied.settledCents} />
             </StatTile>
           </dl>
@@ -480,10 +531,6 @@ function Dashboard({
             Inclui {formatCents(summary.estimatedCents)} em valores estimados, de contas que variam.
           </p>
         )}
-        <p className="text-muted-foreground text-sm">
-          Saldo atual: só o que já foi recebido ou pago. Disponível para guardar: as entradas menos
-          as despesas. Guardado: o que já foi para as metas.
-        </p>
       </Section>
       <Section title="Entradas e saídas">
         <dl className="grid tabular-nums sm:grid-cols-2 sm:gap-x-8">

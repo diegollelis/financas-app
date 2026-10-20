@@ -85,7 +85,7 @@ describe('DashboardPage', () => {
     expect(tile('Saldo previsto')).toHaveTextContent('R$ 2.990,10');
     expect(tile('Saldo atual')).toHaveTextContent('R$ 4.150,00');
     // Credits − expenses (the application is not an expense): 6.000,00 − 2.509,90.
-    expect(tile('Disponível para guardar')).toHaveTextContent('R$ 3.490,10');
+    expect(tile('Sobra para guardar')).toHaveTextContent('R$ 3.490,10');
     expect(tile('Guardado')).toHaveTextContent('R$ 500,00');
     expect(nbsp(screen.getByRole('status').textContent)).toContain(
       '1 lançamento vencido (R$ 159,90).',
@@ -118,7 +118,7 @@ describe('DashboardPage', () => {
     );
     // Where the saving goals come from.
     expect(nbsp((await section('O que sobra para guardar')).textContent)).toContain(
-      'Entradas previstasR$ 6.000,00Despesas previstas− R$ 2.509,90Disponível para guardarR$ 3.490,10',
+      'Entradas previstasR$ 6.000,00Despesas previstas− R$ 2.509,90Sobra para guardarR$ 3.490,10',
     );
     // On the phone, a card per saving destination: the table's columns do not fit.
     // Investimentos: 50% of 3.490,10 = 1.745,05; 500,00 applied, nothing scheduled, 1.245,05
@@ -178,12 +178,11 @@ describe('DashboardPage', () => {
     expect(within(savings).getByRole('row', { name: /Total/ })).toHaveTextContent(
       '100%R$ 3.490,10',
     );
-    // Never read as money to spend (ADR 0051).
-    expect(
-      within(savings).getByText(
-        'Sem meta: parte do Disponível para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo.',
-      ),
-    ).toBeInTheDocument();
+    // Never read as money to spend (ADR 0051): said behind the "ⓘ" on its row.
+    await userEvent.click(within(savings).getByRole('button', { name: 'Sobre Sem meta' }));
+    expect(await screen.findByRole('dialog', { name: 'Sem meta' })).toHaveTextContent(
+      'Parte do Sobra para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo.',
+    );
   });
 
   it('warns, in words, when debits pass the credits and the goal', async () => {
@@ -201,6 +200,12 @@ describe('DashboardPage', () => {
       ),
     ).toBeInTheDocument();
     expect(tile('Saldo previsto')).toHaveTextContent('-R$ 1.009,90');
+    // The legend leaves the balance out, never "Saldo previsto R$ 0,00" (ADR 0051 note).
+    const legend = within(await section('Para onde vão as entradas')).getAllByRole('listitem');
+    expect(legend.map((item) => item.textContent?.replace(/R\$.*/, ''))).toEqual([
+      'Saídas pagas',
+      'Saídas a pagar',
+    ]);
   });
 
   it('an empty month without income says what is missing', async () => {
