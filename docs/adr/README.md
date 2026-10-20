@@ -58,3 +58,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0052](0052-divisao-em-entradas-recorrencias-e-parcelamentos.md) | Pessoa e divisão em entradas, recorrências e parcelamentos; seletor de pessoa       | Aceita |
 | [0053](0053-estabelecimentos.md)                                 | Estabelecimentos: onde se comprou ou quem pagou, num cadastro próprio               | Aceita |
 | [0054](0054-meio-de-pagamento.md)                                | Meio de pagamento: como se pagou ou recebeu, numa lista fixa                        | Aceita |
+| [0055](0055-importacao-da-fatura-do-cartao.md)                   | Importação da fatura do cartão, data da compra e apelidos de estabelecimento        | Aceita |

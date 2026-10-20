@@ -185,3 +185,30 @@ O Claude Code passou a usar _skills_ (instruções que ele carrega quando o assu
 - **Por quê:** num desktop de 800 px de altura, com "Mais opções" aberto ou uma divisão, o formulário passava da altura e pedia rolagem dentro do diálogo, com espaço sobrando dos lados. Só alargar não resolveria: o ganho vem de pôr lado a lado o que é curto e relacionado.
 - **A ordem é a mesma do celular** (o quê, quanto, quando, como), lida e percorrida com Tab da esquerda para a direita. No celular e no tablet nada muda: a folha de baixo, um campo por linha.
 - **Só este diálogo:** os outros continuam com a largura de antes. Uma gaveta lateral foi descartada, porque mudaria o padrão de todos os diálogos sem ganho claro para um formulário deste tamanho.
+
+## Nota (leitura de Lançamentos, 2026-10-16)
+
+O dono achava a leitura de Lançamentos confusa às vezes. O valor de uma entrada e o de uma saída eram idênticos ("R$ 45,00"), só o título da seção os separava (e no celular ele sai da tela ao rolar), o selo "Pendente" aparecia em quase toda linha e não havia um resumo do mês.
+
+- **O valor tem sinal:** "+ R$ 45,00" numa entrada, "− R$ 69,90" (o sinal de menos tipográfico) numa saída, também nos totais das seções. O sinal é a pista principal; a cor só reforça.
+- **Verde só nas entradas** (`text-credit-foreground`, ADR 0043). As saídas ficam na cor do texto: gastar é o normal, e pintá-las de vermelho faria a lista de saídas inteira competir com o "Vencido", que continua vermelho.
+- **"Pendente" só para quem não pode agir:** para um EDITOR, o botão "○ Pagar / Receber" já diz que está pendente, e o selo em quase toda linha apagava o "Vencido". Um VIEWER, que não vê o botão, continua vendo "Pendente". "Vencido" e "Pago em / Recebido em" aparecem sempre.
+- **Resumo do mês no topo:** "Entradas", "Saídas" e "Saldo previsto" (o mesmo termo e a mesma conta do Painel), somados dos lançamentos já carregados, do mês inteiro, sem seguir a busca nem o filtro. No celular, uma linha por número, com o rótulo ao lado (três colunas quebravam o sinal); a partir de sm, três colunas. O saldo fica vermelho só quando é negativo.
+- **Um cartão por lançamento na lista:** a lista (fora da tabela) era um cartão por seção com divisórias finas, e os itens pareciam "tudo junto". Agora cada lançamento é um cartão próprio, numa coluna, com 8 px entre eles: onde um termina e o outro começa se vê sem esforço. Foram comparadas numa prévia: mais espaço com divisória mais forte (pouco efeito), cartões em grade (recusada: espalha os valores e a ordem por vencimento) e o "⋯" ao lado do "Pagar" também no celular (recusado: os ~120 px das duas ações tiram largura do texto, que passa a quebrar linha). A tabela não muda.
+- **O selo "Vencido"** passa a usar o fundo registrado `--debit-muted`, como "Pago" e os alertas usam os seus. O vermelho translúcido tirava o contraste do que estivesse embaixo e, sobre o cartão marinho, ficava abaixo de 4,5:1; o par entrou em `palette-contrast.spec.ts`.
+
+## Nota (tabela de Lançamentos, 2026-10-16)
+
+Comparadas numa prévia com divisórias (como antes) e com linhas separadas em blocos, o dono escolheu as faixas. A tabela (a partir de xl) passa a ter:
+
+- **Faixas no lugar das divisórias:** uma linha com fundo suave e a seguinte sem, e um fundo mais forte ao passar o mouse, para seguir uma linha larga até o "Pagar". Os fundos vêm de tokens que já existem com opacidade (`muted` no claro, `secondary` no escuro, onde `muted` é igual ao cartão), sem cor nova. A tabela fica sobre o fundo do cartão.
+- **Sem a coluna "Situação":** desde a nota anterior ela ficava quase sempre vazia; o "Vencido" ou o "Pago em / Recebido em" vai embaixo da data, na coluna Vencimento. Os ~140 px liberados vão para a descrição e para a coluna do estabelecimento.
+- **"Onde / Meio"** no lugar de "Estabelecimento / Meio", que quebrava em duas linhas. Sem estabelecimento, a coluna mostra só o meio, em texto suave (o título já diz o que ele é); o "—" fica para quando não há nenhum dos dois. Isso substitui o traço sempre presente da nota de 2026-10-15 no ADR 0054.
+
+## Nota (o mesmo padrão nas outras listas, 2026-10-17)
+
+- **Recorrências e a revisão da importação** passam a usar um cartão por item, como Lançamentos: são linhas com várias informações, um valor e ações. As tabelas de Recorrências ganham as faixas. Na revisão da importação, o cartão tem 8 px de margem lateral no celular, porque a caixa de marcação já tem a sua área de toque de 44 px.
+- **As listas de configuração** (Membros e convites, Importações anteriores, Aparelhos conectados) continuam com divisórias, num cartão só, agora sobre o fundo do cartão, como as demais: são poucos itens, perto de um formulário.
+- **Pessoas** passa a ter um cartão por pessoa, como Lançamentos: cada linha tem um valor ("Te deve R$ 100,00") e ações, e ficou parecendo de outro sistema ao lado das telas com cartões. O "Ver lançamentos" não quebra linha.
+- **Categorias e Estabelecimentos** viram **cartões compactos**: uma coluna no celular e duas a partir de lg (1024 px), em ordem alfabética. Ao contrário de Lançamentos, aqui a grade funciona: não há valores para comparar, e uma lista alfabética se lê bem lado a lado. Categorias cai pela metade da altura e ganha a mesma linguagem de blocos. As duas colunas começam em lg, não em md, porque a 768 px, ao lado da barra lateral, um nome longo com selo ("Reserva de emergência", "Meta") ficaria apertado.
+- As classes ficam num módulo só (`features/view-mode/row-styles.ts`: `CARD_LIST`, `CARD_ROW`, `TABLE_BOX`, `STRIPED_ROW`, `TILE_LIST`, `TILE_ROW`, `DIVIDED_LIST`), para as telas não divergirem.

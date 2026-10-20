@@ -38,6 +38,7 @@ export function TransactionDialog({
   merchants = [],
   hints,
   editing,
+  editingIsSplit = false,
   preset,
   open,
   onOpenChange,
@@ -53,6 +54,8 @@ export function TransactionDialog({
   hints?: CategoryHints;
   /** The transaction being edited; null to create one. */
   editing: Transaction | null;
+  /** It already has shares: it is not split again (ADR 0052 note). */
+  editingIsSplit?: boolean;
   /** For a new one: values to start from (an application to a destination, ADR 0047). */
   preset?: TransactionPreset;
   open: boolean;
@@ -73,7 +76,7 @@ export function TransactionDialog({
   const [repeat, setRepeat] = useState<TransactionFormValues['repeat']>('NONE');
   const mutation = editing
     ? update
-    : repeat === 'MONTHLY'
+    : repeat === 'MONTHLY' || repeat === 'YEARLY'
       ? createRecurrence
       : repeat === 'INSTALLMENTS'
         ? createPlan
@@ -138,15 +141,31 @@ export function TransactionDialog({
       ...(merchantId && { merchantId }),
       ...(paymentMethod && { paymentMethod }),
     };
+    // The day it happened (ADR 0055), on a new one only when there is one; also on an
+    // installment purchase (ADR 0055 note), never on a recurrence.
+    const withDay = values.occurredOn ? { occurredOn: values.occurredOn } : {};
     if (editing) {
       update.mutate(
-        { id: editing.id, ...fields, dueDate: values.dueDate, personId, merchantId, paymentMethod },
-        { onSuccess: done('Lançamento salvo') },
+        {
+          id: editing.id,
+          ...fields,
+          dueDate: values.dueDate,
+          occurredOn: values.occurredOn,
+          personId,
+          merchantId,
+          paymentMethod,
+          // Split now (ADR 0052 note): its shares come pending with what it is after this change.
+          ...(splitting && { split }),
+        },
+        { onSuccess: done(withPeople('Lançamento salvo')) },
       );
     } else if (values.repeat === 'INSTALLMENTS') {
       // All installments at once, one per month from this one (ADR 0038).
       setRepeat('INSTALLMENTS');
       const installments = Number(values.installments);
+      // A purchase already running starts at its installment (ADR 0055): 3 of 10 creates 8.
+      const firstNumber = values.firstNumber.trim() === '' ? 1 : Number(values.firstNumber);
+      const created = installments - firstNumber + 1;
       createPlan.mutate(
         {
           type: fields.type,
@@ -154,42 +173,51 @@ export function TransactionDialog({
           notes: fields.notes,
           categoryId: fields.categoryId,
           installments,
+          ...(firstNumber > 1 && { firstNumber }),
           amountCents: fields.amountCents,
           amountIs: values.amountIs,
           firstPeriod: period,
+          ...withDay,
           ...dueOf(period, values.dueDate),
           personId,
           ...withMerchant,
           ...(splitting && { split }),
         },
-        { onSuccess: done(withPeople(`Parcelamento adicionado: ${installments} parcelas`)) },
+        { onSuccess: done(withPeople(`Parcelamento adicionado: ${created} parcelas`)) },
       );
-    } else if (values.repeat === 'MONTHLY') {
-      // Every month from this one, due on the same day, in its month or the next (ADR 0038).
-      setRepeat('MONTHLY');
+    } else if (values.repeat === 'MONTHLY' || values.repeat === 'YEARLY') {
+      // Every month (or every year) from this one, due on the same day, in its month or the
+      // next (ADR 0038 and its notes).
+      const yearly = values.repeat === 'YEARLY';
+      setRepeat(values.repeat);
       createRecurrence.mutate(
         {
           ...fields,
           ...dueOf(period, values.dueDate),
           startPeriod: period,
+          ...(yearly && { intervalMonths: 12 as const }),
           variableAmount: values.amountKind === 'VARIABLE',
           personId,
           ...withMerchant,
           ...(splitting && { split: recurrenceSplit }),
         },
-        { onSuccess: done(withPeople('Lançamento adicionado, repetindo todo mês')) },
+        {
+          onSuccess: done(
+            withPeople(`Lançamento adicionado, repetindo ${yearly ? 'todo ano' : 'todo mês'}`),
+          ),
+        },
       );
     } else if (splitting) {
       // The transaction and one share per person on the other side, at once (ADRs 0042, 0052).
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, period, ...withMerchant, split },
+        { ...fields, dueDate: values.dueDate, ...withDay, period, ...withMerchant, split },
         { onSuccess: done(withPeople('Lançamento adicionado')) },
       );
     } else {
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, period, personId, ...withMerchant },
+        { ...fields, dueDate: values.dueDate, ...withDay, period, personId, ...withMerchant },
         { onSuccess: done('Lançamento adicionado') },
       );
     }
@@ -215,7 +243,7 @@ export function TransactionDialog({
         !editing && preset?.applicationTo
           ? `Em ${preset.applicationTo}, no mês de ${formatPeriod(period)} em ${workspaceName}.`
           : editing?.recurrenceId
-            ? `Mês de ${formatPeriod(editing.period)} em ${workspaceName}. Repete todo mês: esta mudança vale só para este mês.`
+            ? `Mês de ${formatPeriod(editing.period)} em ${workspaceName}. Repete ${editing.recurrenceIntervalMonths === 12 ? 'todo ano' : 'todo mês'}: esta mudança vale só para este mês.`
             : editing?.installment
               ? `Mês de ${formatPeriod(editing.period)} em ${workspaceName}. Parcela ${editing.installment.number} de ${editing.installment.count}: esta mudança vale só para esta parcela.`
               : `Mês de ${formatPeriod(editing?.period ?? period)} em ${workspaceName}.`
@@ -246,6 +274,13 @@ export function TransactionDialog({
         onSubmit={(values) => void submit(values)}
         onCancel={() => onOpenChange(false)}
         allowRepeat={!editing}
+        allowSplit={
+          Boolean(editing) &&
+          !editing?.recurrenceId &&
+          !editing?.installment &&
+          !editing?.splitOfId &&
+          !editingIsSplit
+        }
       />
     </ResponsiveDialog>
   );

@@ -1,10 +1,17 @@
 import {
   normalizeName,
+  normalizeStatementTitle,
+  type CreateMerchantAliasInput,
   type CreateMerchantInput,
   type Merchant,
   type UpdateMerchantInput,
 } from '@financas/shared';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma, type Merchant as MerchantRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -18,13 +25,23 @@ const merchantExists = () =>
     message: 'Já existe um estabelecimento com esse nome. Se ele estiver arquivado, reative-o.',
   });
 
-/** What tells whether a merchant is used, counted with it. */
+const aliasExists = (merchantName: string | null) =>
+  new ConflictException({
+    code: 'MERCHANT_ALIAS_EXISTS',
+    message: merchantName
+      ? `Esse apelido já é de "${merchantName}".`
+      : 'Esse apelido já é de outro estabelecimento.',
+  });
+
+/** What tells whether a merchant is used, counted with it, and its aliases (ADR 0055). */
 const withUses = {
   _count: { select: { transactions: true, recurrences: true, installmentPlans: true } },
+  aliases: { select: { id: true, alias: true } },
 } as const;
 
 type MerchantWithUses = MerchantRow & {
   _count: { transactions: number; recurrences: number; installmentPlans: number };
+  aliases: { id: string; alias: string }[];
 };
 
 function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
@@ -38,6 +55,7 @@ function toResponse(merchant: MerchantWithUses): Merchant {
     name: merchant.name,
     archived: merchant.archivedAt !== null,
     inUse: uses.transactions + uses.recurrences + uses.installmentPlans > 0,
+    aliases: [...merchant.aliases].sort((a, b) => collator.compare(a.alias, b.alias)),
   };
 }
 
@@ -113,6 +131,55 @@ export class MerchantsService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Another text the merchant appears as in a card statement (ADR 0055). Unique per workspace
+   * after the cleaning that statement titles get (`normalizeStatementTitle`): the same alias
+   * cannot point to two merchants. Answers the merchant with its aliases.
+   */
+  async addAlias(
+    workspaceId: string,
+    merchantId: string,
+    input: CreateMerchantAliasInput,
+  ): Promise<Merchant> {
+    await this.find(workspaceId, merchantId);
+    const normalized = normalizeStatementTitle(input.alias);
+    if (!normalized) {
+      throw new BadRequestException({
+        code: 'INVALID_INPUT',
+        message: 'O apelido precisa ter mais que o número da parcela.',
+      });
+    }
+    const db = this.prisma.forWorkspace(workspaceId);
+    const taken = await db.merchantAlias.findFirst({
+      where: { workspaceId, normalized },
+      select: { merchant: { select: { name: true } } },
+    });
+    if (taken) throw aliasExists(taken.merchant.name);
+    try {
+      await db.merchantAlias.create({
+        data: { workspaceId, merchantId, alias: input.alias, normalized },
+      });
+    } catch (error) {
+      // Taken at the same time elsewhere.
+      if (isPrismaError(error, 'P2002')) throw aliasExists(null);
+      throw error;
+    }
+    const merchant = await db.merchant.findFirstOrThrow({
+      where: { id: merchantId, workspaceId },
+      include: withUses,
+    });
+    return toResponse(merchant);
+  }
+
+  async removeAlias(workspaceId: string, merchantId: string, aliasId: string): Promise<void> {
+    await this.find(workspaceId, merchantId);
+    if (!z.uuid().safeParse(aliasId).success) throw new NotFoundException();
+    const { count } = await this.prisma
+      .forWorkspace(workspaceId)
+      .merchantAlias.deleteMany({ where: { id: aliasId, merchantId, workspaceId } });
+    if (count === 0) throw new NotFoundException();
   }
 
   /** An id that is not a uuid, or that belongs to another workspace, is simply not found. */

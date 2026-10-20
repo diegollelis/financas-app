@@ -12,7 +12,7 @@ import {
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_CATEGORIES } from '../src/categories/default-categories.js';
 import { createTestApp } from './app.js';
-import { resetDatabase } from './db.js';
+import { ownerClient, resetDatabase } from './db.js';
 import { expectHiddenFromOutsiders, type WorkspaceRoute } from './isolation.js';
 
 // Categories of a workspace, the first table with Row Level Security (ADR 0028).
@@ -105,6 +105,98 @@ describe('categories', () => {
     });
   });
 
+  describe('Reembolso and Repasse (ADR 0052 note)', () => {
+    const byRole = (categories: { splitRole?: string | null; name: string; type: string }[]) =>
+      categories
+        .filter((category) => category.splitRole)
+        .map(({ name, type, splitRole }) => ({ name, type, splitRole }));
+
+    /** A debit split with Ana: its share goes to the Reembolso category. */
+    async function split(browser: ReturnType<typeof t.http>, workspaceId: string) {
+      const categories = await list(browser, workspaceId);
+      const mercado = categories.find((c) => c.name === 'Mercado' && c.type === 'DEBIT')!;
+      await browser
+        .post(`/api/workspaces/${workspaceId}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'Feira',
+          categoryId: mercado.id,
+          amountCents: 10_000,
+          period: currentPeriod(),
+          split: [{ newPersonName: 'Ana', amountCents: 5_000 }],
+        })
+        .expect(201);
+    }
+
+    it('come marked with every new workspace', async () => {
+      const { browser, personalWorkspaceId } = await t.signUp(maria);
+
+      expect(byRole(await list(browser, personalWorkspaceId))).toEqual([
+        { name: 'Reembolso', type: 'CREDIT', splitRole: 'REIMBURSEMENT' },
+        { name: 'Repasse', type: 'DEBIT', splitRole: 'PASS_THROUGH' },
+      ]);
+    });
+
+    it('are never renamed, archived or deleted', async () => {
+      const { browser, personalWorkspaceId } = await t.signUp(maria);
+      const reembolso = (await list(browser, personalWorkspaceId)).find(
+        (category) => category.splitRole === 'REIMBURSEMENT',
+      )!;
+      const url = `/api/workspaces/${personalWorkspaceId}/categories/${reembolso.id}`;
+
+      for (const body of [{ name: 'Reembolsos' }, { archived: true }]) {
+        const response = await browser.patch(url).send(body).expect(409);
+        expect(response.body).toMatchObject({ code: 'CATEGORY_OF_SPLIT' });
+      }
+      await browser.delete(url).expect(409);
+      expect(byRole(await list(browser, personalWorkspaceId))).toHaveLength(2);
+    });
+
+    it('a split finds the marked one; a workspace from before the mark gets its own marked', async () => {
+      const { browser, personalWorkspaceId } = await t.signUp(maria);
+      const owner = ownerClient();
+      try {
+        // As before the mark: one named Reembolso, unmarked.
+        await owner.category.updateMany({
+          where: { workspaceId: personalWorkspaceId, splitRole: 'REIMBURSEMENT' },
+          data: { splitRole: null },
+        });
+
+        await split(browser, personalWorkspaceId);
+        await split(browser, personalWorkspaceId);
+      } finally {
+        await owner.$disconnect();
+      }
+
+      const categories = await list(browser, personalWorkspaceId);
+      // The same category, now marked; never a second Reembolso.
+      expect(categories.filter((c) => c.type === 'CREDIT' && c.name === 'Reembolso')).toEqual([
+        expect.objectContaining({ splitRole: 'REIMBURSEMENT' }),
+      ]);
+    });
+
+    it('a workspace that renamed its Reembolso before the mark gets a new one', async () => {
+      const { browser, personalWorkspaceId } = await t.signUp(maria);
+      const owner = ownerClient();
+      try {
+        await owner.category.updateMany({
+          where: { workspaceId: personalWorkspaceId, splitRole: 'REIMBURSEMENT' },
+          data: { splitRole: null, name: 'Devoluções' },
+        });
+
+        await split(browser, personalWorkspaceId);
+      } finally {
+        await owner.$disconnect();
+      }
+
+      const credits = (await list(browser, personalWorkspaceId)).filter((c) => c.type === 'CREDIT');
+      expect(credits.find((c) => c.name === 'Devoluções')).toMatchObject({ splitRole: null });
+      expect(credits.find((c) => c.name === 'Reembolso')).toMatchObject({
+        splitRole: 'REIMBURSEMENT',
+      });
+    });
+  });
+
   describe('recent uses', () => {
     it('counts each category’s transactions in the last months, for the "Mais usadas" group', async () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);
@@ -171,7 +263,7 @@ describe('categories', () => {
         categoryId: lazer.id,
         period: shiftPeriod(now, -CATEGORY_HINT_MONTHS),
       });
-      // A split's share ("Ana: parte de …") says nothing about the purchase.
+      // A split's share repeats the description, in Reembolso: it must not suggest Reembolso.
       await add({
         description: 'Jantar',
         categoryId: lazer.id,

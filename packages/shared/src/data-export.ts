@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { transactionTypeSchema } from './category.ts';
+import { splitRoleSchema, transactionTypeSchema } from './category.ts';
 import { paymentMethodSchema } from './payment-method.ts';
 import { workspaceRoleSchema } from './workspace.ts';
 
@@ -21,6 +21,8 @@ const exportCategorySchema = z.object({
   name: z.string(),
   type: transactionTypeSchema,
   archivedAt: instant.nullable(),
+  /** Reembolso or Repasse (ADR 0052 note); null for the others. */
+  splitRole: splitRoleSchema.nullable(),
   createdAt: instant,
 });
 
@@ -35,6 +37,8 @@ const exportTransactionSchema = z.object({
   period,
   dueDate: day.nullable(),
   settledAt: day.nullable(),
+  /** The day it happened (ADR 0055). */
+  occurredOn: day.nullable(),
   recurrenceId: z.uuid().nullable(),
   installmentPlanId: z.uuid().nullable(),
   installmentNumber: z.number().int().nullable(),
@@ -63,6 +67,8 @@ const exportMerchantSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   archivedAt: instant.nullable(),
+  /** How it appears in card statements (ADR 0055). */
+  aliases: z.array(z.string()),
   createdAt: instant,
 });
 
@@ -95,6 +101,7 @@ const exportRecurrenceSchema = z.object({
   variableAmount: z.boolean(),
   dueDay: z.number().int().nullable(),
   dueMonthOffset: z.number().int(),
+  intervalMonths: z.number().int(),
   personId: z.uuid().nullable(),
   merchantId: z.uuid().nullable(),
   paymentMethod: paymentMethodSchema.nullable(),
@@ -121,6 +128,9 @@ const exportInstallmentPlanSchema = z.object({
   categoryId: z.uuid(),
   totalCents: z.number().int(),
   installments: z.number().int(),
+  firstNumber: z.number().int(),
+  occurredOn: day.nullable(),
+  importId: z.uuid().nullable(),
   firstPeriod: period,
   dueDay: z.number().int().nullable(),
   dueMonthOffset: z.number().int(),
@@ -134,6 +144,8 @@ const exportInstallmentPlanSchema = z.object({
 const exportImportSchema = z.object({
   id: z.uuid(),
   transactionCount: z.number().int(),
+  label: z.string().nullable(),
+  statementDueDate: day.nullable(),
   firstPeriod: period,
   lastPeriod: period,
   createdAt: instant,

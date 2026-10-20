@@ -134,3 +134,39 @@ Uma recorrência **não tem fim**, então não dá para gerar todos os lançamen
   - um parcelamento encerrado não muda mais (`PLAN_ENDED`).
 - **Excluir em vez de encerrar:** sem nenhuma parcela paga não há histórico a guardar, então `DELETE …/installments/:planId` apaga o parcelamento com **todas** as parcelas, também as de meses anteriores, e as partes pendentes de uma divisão (uma parte já recebida fica, solta). Com alguma parcela paga, continua encerrando como antes. Um parcelamento já encerrado sem nada pago também pode ser excluído assim.
 - **O histórico com algo pago fica:** a recorrência ou o parcelamento encerrado com lançamentos pagos continua em Recorrências, porque esses vínculos são o histórico.
+
+## Nota (recorrência anual, 2026-10-16)
+
+O dono precisou lançar o que se repete uma vez por ano (IPVA, IPTU, anuidade, seguro). A Decisão já previa revisar o desenho para outra frequência.
+
+- **`interval_months` na recorrência,** 1 (todo mês, o padrão) ou 12 (todo ano), com CHECK. As recorrências existentes ficam mensais. Guardar o intervalo em meses deixa espaço para trimestral ou semestral, se aparecerem, liberando só um valor.
+- **Só o mês do ciclo é gerado:** uma anual tem lançamento no mês do início e a cada 12 meses (`isRecurrenceMonth`, em `packages/shared`). O resto do motor não muda: o lançamento nasce ao abrir o mês, o vencimento usa o dia e "Vence no", o valor variável é a média dos 3 últimos pagos (numa anual, os 3 últimos anos), e mudar ou encerrar toca só os pendentes deste mês em diante.
+- **A frequência não se altera,** como o tipo e o início: para mudar, encerre e crie outra. "Tornar recorrente" também aceita `intervalMonths`.
+- **O lançamento diz a frequência** (`recurrenceIntervalMonths`), para o selo "Todo mês" ou "Todo ano".
+- **No orçamento, a anual entra só no mês em que cai,** como qualquer lançamento. Reservar 1/12 por mês (provisão) fica para um ADR próprio, se a necessidade aparecer.
+- **Na tela,** "Todo ano" entra em "Repetir" no "Novo lançamento" (quatro opções, em duas linhas no celular) e em "Tornar recorrente". Em Recorrências, a seção "Todo mês" passa a se chamar "Recorrentes"; cada linha diz a frequência ("Todo ano em março") e uma anual mostra "Próximo: março de 2027"; na tabela, a frequência e o vencimento dividem a coluna "Repete" (uma coluna a mais apertava a descrição); e o total "Por mês" soma só as mensais, com "Por ano" à parte.
+
+## Nota (o período de uma encerrada, 2026-10-18)
+
+- **Uma recorrência encerrada mostra do primeiro ao último mês:** "Janeiro a maio de 2026", "Outubro de 2025 a março de 2026" ou "Em maio de 2026", na lista e na coluna "Período" da tabela de Recorrências. Antes mostrava só "Até maio de 2026", e o início, que continua gravado (`startPeriod`), sumia da tela.
+- **Uma ativa continua com "Desde outubro de 2026"** (ou "A partir de…", quando começa num mês futuro).
+- **Não há data de início digitada:** o mês de início já decide a geração, e o dia de cada mês está no vencimento.
+
+## Nota (tornar parcelado, 2026-10-19)
+
+O dono importou pela planilha uma compra que era parcelada e não tinha como transformá-la em parcelas. Agora, como o "Tornar recorrente", um lançamento avulso pode virar parcelamento: `POST …/installments/from-transaction { transactionId, installments, firstNumber?, amountIs }`.
+
+- **O lançamento é adotado como uma das parcelas,** a de número `firstNumber` (1 por padrão), no mês dele, sem duplicar; as seguintes nascem pendentes, uma por mês. O parcelamento leva tudo do lançamento: descrição, observações, categoria, pessoa, estabelecimento, meio de pagamento, data da compra e o dia do vencimento, no mesmo mês ou no seguinte, como ele.
+- **O valor:** "parcela" repete o valor dele em todas; "total" divide como um parcelamento novo, com os centavos que sobram na última, e o valor dele passa a ser o da parcela dele.
+- **Recusas (409 `NOT_INSTALLABLE`):** um lançamento que já é parcela ou de uma recorrência, uma parte de divisão, um lançamento dividido e um já pago informado como total (o valor dele mudaria). A última parcela não tem outras depois e é recusada como entrada inválida.
+- **Uma só escrita:** o parcelamento com as parcelas seguintes e a adoção do lançamento ficam numa transação interativa com o contexto do RLS ([ADR 0028](0028-row-level-security.md)), porque o Prisma não cria o parcelamento pelo lado da parcela já existente.
+
+## Nota (o lançamento adotado volta a ser avulso, 2026-10-19)
+
+Um teste do dono mostrou que encerrar uma recorrência criada pelo "Tornar recorrente" excluía também o lançamento que ela tinha adotado: ele era deste mês e estava pendente, e a recorrência não sabia que ele existia antes dela. O mesmo valia para o "Tornar parcelado" ao excluir ou encerrar o parcelamento.
+
+- **A recorrência e o parcelamento guardam o lançamento adotado** (`adopted_transaction_id`, sem chave estrangeira: um lançamento excluído deixa um id que não acha nada). O parcelamento guarda também o valor que ele tinha (`adopted_amount_cents`), porque o "Total" troca o valor pelo da parcela.
+- **Encerrar a recorrência** devolve o adotado como avulso, com as partes dele, se ainda estiver pendente e for deste mês em diante (o vínculo da ocorrência é desfeito). **Excluir ou encerrar o parcelamento** o devolve como avulso, com o valor de antes; ao excluir um sem nada pago, mesmo que seja de um mês passado, porque tudo some; ao encerrar um com parcelas pagas, só deste mês em diante, porque o passado fica como histórico. Um adotado já pago continua no histórico, como antes.
+- **Refazer as parcelas** (mudar valor, quantidade ou parcela inicial com nada pago) recria todas, inclusive a adotada, que deixa de ser o lançamento de antes: a marca é apagada.
+- **O que já existia:** a migração marca as recorrências do "Tornar recorrente" anteriores à coluna. O adotado é o lançamento do primeiro mês criado antes da recorrência; um mês gerado é sempre criado depois dela.
+- As respostas trazem `adoptedTransactionId`, para a tela avisar no encerramento.

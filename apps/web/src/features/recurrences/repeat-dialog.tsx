@@ -1,12 +1,23 @@
-import { formatPeriod, type Transaction } from '@financas/shared';
+import {
+  formatBasisPoints,
+  formatCents,
+  formatPeriod,
+  FULL_BASIS_POINTS,
+  type Transaction,
+} from '@financas/shared';
 import { useState, type RefObject } from 'react';
 import { toast } from 'sonner';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { apiErrorMessage } from '@/lib/error-message';
-import { dueDayLabel, dueOf } from './due';
+import { amountKindHint, dueDayLabel, dueOf, monthNameOf } from './due';
 import { useRepeatTransaction } from './use-recurrences';
+
+const frequencyOptions = [
+  { value: 'MONTHLY', label: 'Todo mês' },
+  { value: 'YEARLY', label: 'Todo ano' },
+] as const;
 
 const amountKindOptions = [
   { value: 'FIXED', label: 'Fixo' },
@@ -21,21 +32,29 @@ const amountKindOptions = [
 function RepeatForm({
   workspaceId,
   transaction,
+  shares,
   onDone,
 }: {
   workspaceId: string;
   transaction: Transaction;
+  shares: { name: string; amountCents: number }[];
   onDone: () => void;
 }) {
   const repeat = useRepeatTransaction(workspaceId);
+  const [frequency, setFrequency] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
   const [amountKind, setAmountKind] = useState<'FIXED' | 'VARIABLE'>('FIXED');
+  const yearly = frequency === 'YEARLY';
   const { dueDay, dueMonthOffset } = dueOf(transaction.period, transaction.dueDate);
   const submit = () =>
     repeat.mutate(
-      { transactionId: transaction.id, variableAmount: amountKind === 'VARIABLE' },
+      {
+        transactionId: transaction.id,
+        variableAmount: amountKind === 'VARIABLE',
+        ...(yearly && { intervalMonths: 12 as const }),
+      },
       {
         onSuccess: () => {
-          toast.success('Agora se repete todo mês');
+          toast.success(`Agora se repete ${yearly ? 'todo ano' : 'todo mês'}`);
           onDone();
         },
       },
@@ -43,12 +62,27 @@ function RepeatForm({
 
   return (
     <div className="grid gap-4">
+      <div className="grid gap-2">
+        <p aria-hidden className="text-sm font-medium">
+          Repetir
+        </p>
+        <SegmentedControl
+          label="Repetir"
+          options={frequencyOptions}
+          value={frequency}
+          onChange={setFrequency}
+        />
+      </div>
       <p>
-        Todo mês a partir de {formatPeriod(transaction.period)}
+        {yearly
+          ? `Todo ano em ${monthNameOf(transaction.period)}, a partir de ${formatPeriod(transaction.period)}`
+          : `Todo mês a partir de ${formatPeriod(transaction.period)}`}
         {dueDay === null
           ? ', sem vencimento.'
           : `, vencendo no ${dueDayLabel(dueDay, dueMonthOffset)}.`}{' '}
-        Este lançamento vira o primeiro mês; os próximos aparecem pendentes ao abrir cada mês.
+        {yearly
+          ? 'Este lançamento vira o primeiro ano; os próximos aparecem pendentes ao abrir o mês de cada ano.'
+          : 'Este lançamento vira o primeiro mês; os próximos aparecem pendentes ao abrir cada mês.'}
       </p>
       <div className="grid gap-2">
         <p aria-hidden className="text-sm font-medium">
@@ -61,11 +95,38 @@ function RepeatForm({
           onChange={setAmountKind}
         />
         <p className="text-muted-foreground text-sm">
-          {amountKind === 'VARIABLE'
-            ? 'Para contas que mudam todo mês, como energia e água. Cada mês começa com a média dos 3 últimos pagos; ao marcar como pago, você informa o valor da fatura.'
-            : 'O mesmo valor todo mês, como internet e aluguel.'}
+          {amountKindHint(amountKind === 'VARIABLE', yearly)}
         </p>
       </div>
+      {/* A split one takes its shares along (ADR 0052 note): amounts when fixed, the share
+          of each month's amount when variable, as the API keeps them. */}
+      {shares.length > 0 && (
+        <p>
+          {`Dividido com ${new Intl.ListFormat('pt-BR').format(
+            shares.map(
+              (share) =>
+                `${share.name} (${
+                  amountKind === 'VARIABLE'
+                    ? formatBasisPoints(
+                        Math.max(
+                          1,
+                          Math.round(
+                            (share.amountCents * FULL_BASIS_POINTS) / transaction.amountCents,
+                          ),
+                        ),
+                      )
+                    : formatCents(share.amountCents)
+                })`,
+            ),
+          )}`}
+          {amountKind === 'VARIABLE'
+            ? ', sobre o valor de cada mês.'
+            : yearly
+              ? ' a cada ano.'
+              : ' a cada mês.'}{' '}
+          As partes deste mês continuam como estão.
+        </p>
+      )}
       {repeat.isError && (
         <p role="alert" className="text-destructive">
           {apiErrorMessage(repeat.error)}
@@ -86,12 +147,15 @@ function RepeatForm({
 export function RepeatDialog({
   workspaceId,
   transaction,
+  shares = [],
   open,
   onOpenChange,
   returnFocusTo,
 }: {
   workspaceId: string;
   transaction: Transaction;
+  /** Its shares, when split: they go along (ADR 0052 note). */
+  shares?: { name: string; amountCents: number }[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   returnFocusTo: RefObject<HTMLButtonElement | null>;
@@ -102,11 +166,12 @@ export function RepeatDialog({
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
       title={`Tornar ${transaction.description} recorrente`}
-      description="Repete este lançamento todo mês, com a mesma categoria, valor e vencimento."
+      description="Repete este lançamento todo mês ou todo ano, com a mesma categoria, valor e vencimento."
     >
       <RepeatForm
         workspaceId={workspaceId}
         transaction={transaction}
+        shares={shares}
         onDone={() => onOpenChange(false)}
       />
     </ResponsiveDialog>

@@ -43,12 +43,22 @@ const person = (n: number, name: string) => ({
 });
 const ana = person(1, 'Ana');
 const bruno = person(2, 'Bruno');
+const merchant = (n: number, name: string, archived = false) => ({
+  id: `01920000-0000-7000-8000-0000000005${String(n).padStart(2, '0')}`,
+  name,
+  archived,
+  inUse: true,
+  aliases: [],
+});
+const imobiliaria = merchant(1, 'Imobiliária Exemplo');
+const lojaAntiga = merchant(2, 'Loja Antiga', true);
 
 const aluguel = recurrence(1, {
   description: 'Aluguel',
   amountCents: 150_000,
   dueDay: 10,
   personId: ana.id,
+  merchantId: imobiliaria.id,
 });
 const energia = recurrence(2, {
   description: 'Conta de luz',
@@ -76,6 +86,7 @@ const plan = (n: number, fields: object) => ({
 const geladeira = plan(1, {
   description: 'Geladeira',
   personId: bruno.id,
+  merchantId: lojaAntiga.id,
   totalCents: 100_000,
   installments: 3,
   settledCount: 1,
@@ -102,6 +113,7 @@ function mockRecurrences(overrides: Record<string, { status?: number; body: unkn
     [`GET ${base}/recurrences`]: { body: [aluguel, energia, academia] },
     [`GET ${base}/installments`]: { body: [geladeira, sofa] },
     [`GET ${base}/people`]: { body: [ana, bruno] },
+    [`GET ${base}/merchants`]: { body: [imobiliaria, lojaAntiga] },
     ...overrides,
   });
 }
@@ -129,11 +141,36 @@ async function choose(name: string, action: string) {
 }
 
 describe('RecurrencesPage', () => {
+  it('shows a yearly one with its month and when it comes again (ADR 0038 note)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-15T12:00:00-03:00'));
+    const ipva = recurrence(4, {
+      description: 'IPVA',
+      amountCents: 120_000,
+      startPeriod: '2026-03',
+      intervalMonths: 12,
+    });
+    mockRecurrences({ [`GET ${base}/recurrences`]: { body: [aluguel, ipva] } });
+    renderApp(page);
+
+    const recurring = await section('Recorrentes');
+    // A yearly one falls in one month only: its own total, not in the monthly one.
+    expect(nbsp(recurring.textContent)).toContain(
+      'Por mês: R$ 1.500,00 em saídas. Por ano: R$ 1.200,00 em saídas.',
+    );
+    const [active] = within(recurring).getAllByRole('list');
+    expect(rowsOf(active!)).toEqual([
+      expect.stringMatching(/Aluguel.*Todo mês/),
+      expect.stringMatching(/IPVA.*Todo ano em março.*Desde março de 2026.*Próximo: março de 2027/),
+    ]);
+    vi.useRealTimers();
+  });
+
   it('lists active recurrences and running plans, with the past ones apart', async () => {
     mockRecurrences();
     renderApp(page);
 
-    const monthly = await section('Todo mês');
+    const monthly = await section('Recorrentes');
     // What the active ones add up to; the variable one is an estimate. Academia ended.
     expect(nbsp(monthly.textContent)).toContain(
       'Por mês: R$ 1.689,90 em saídas, dos quais R$ 189,90 estimados.',
@@ -146,7 +183,8 @@ describe('RecurrencesPage', () => {
       expect.stringMatching(/Conta de luz.*Varia todo mês.*Contas da casa/),
     ]);
     expect(within(monthly).getByRole('heading', { name: 'Encerradas' })).toBeInTheDocument();
-    expect(rowsOf(ended!)).toEqual([expect.stringMatching(/Academia.*Até maio de 2026/)]);
+    // From its first month to its last: the start is not lost once it ends.
+    expect(rowsOf(ended!)).toEqual([expect.stringMatching(/Academia.*Janeiro a maio de 2026/)]);
     // History has nothing to act on.
     expect(screen.queryByRole('button', { name: 'Ações de Academia' })).not.toBeInTheDocument();
 
@@ -162,6 +200,27 @@ describe('RecurrencesPage', () => {
     expect(screen.queryByRole('button', { name: 'Ações de Sofá' })).not.toBeInTheDocument();
   });
 
+  it('shows a plan created at 3/10 as the bill does (ADR 0055)', async () => {
+    const tv = plan(3, {
+      description: 'TV',
+      totalCents: 40_000,
+      installments: 10,
+      firstNumber: 3,
+      settledCount: 1,
+      pendingCount: 7,
+      pendingCents: 35_000,
+      lastPendingPeriod: '2027-04',
+    });
+    mockRecurrences({ [`GET ${base}/installments`]: { body: [tv] } });
+    renderApp(page);
+
+    const plans = await section('Parcelamentos');
+    // 1/10 and 2/10 were charged before it, and one more is paid here.
+    expect(nbsp(rowsOf(within(plans).getByRole('list'))[0])).toMatch(
+      /TV.*total em 8 de R\$ 50,00.*3 de 10 pagas.*Da 3\/10 à 10\/10.*Faltam 7 parcelas/,
+    );
+  });
+
   it('shows who a recurrence is split with, and does not change the split when editing', async () => {
     const split = {
       ...energia,
@@ -173,7 +232,7 @@ describe('RecurrencesPage', () => {
     mockRecurrences({ [`GET ${base}/recurrences`]: { body: [aluguel, split] } });
     renderApp(page);
 
-    const monthly = await section('Todo mês');
+    const monthly = await section('Recorrentes');
     expect(nbsp(monthly.textContent)).toContain('Dividido com Ana (50%) e Bruno (R$ 30,00)');
 
     await choose('Conta de luz', 'Editar');
@@ -253,7 +312,7 @@ describe('RecurrencesPage', () => {
     });
     renderApp(page);
 
-    const monthly = await section('Todo mês');
+    const monthly = await section('Recorrentes');
     expect(monthly).toHaveTextContent('Vence dia 10 do mês seguinte');
     await choose('Aluguel', 'Editar');
     const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
@@ -313,6 +372,40 @@ describe('RecurrencesPage', () => {
     await expectCall(fetchMock, `${base}/recurrences/${aluguel.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ personId: carla.id }),
+    });
+  });
+
+  it('changes the merchant of a recurrence, a new name becoming a merchant first (ADR 0053)', async () => {
+    const corretora = merchant(3, 'Corretora Exemplo');
+    const fetchMock = mockRecurrences({
+      [`POST ${base}/merchants`]: { status: 201, body: corretora },
+      [`PATCH ${base}/recurrences/${aluguel.id}`]: {
+        body: { ...aluguel, merchantId: corretora.id },
+      },
+    });
+    renderApp(page);
+
+    await choose('Aluguel', 'Editar');
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
+    const field = within(dialog).getByRole('combobox', { name: 'Estabelecimento (opcional)' });
+    expect(field).toHaveTextContent('Imobiliária Exemplo');
+    await userEvent.click(field);
+    await userEvent.type(
+      await screen.findByPlaceholderText('Buscar ou adicionar estabelecimento'),
+      'Corretora Exemplo',
+    );
+    await userEvent.click(
+      await screen.findByRole('option', { name: 'Adicionar “Corretora Exemplo”' }),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/merchants`, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Corretora Exemplo' }),
+    });
+    await expectCall(fetchMock, `${base}/recurrences/${aluguel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ merchantId: corretora.id }),
     });
   });
 
@@ -456,6 +549,10 @@ describe('RecurrencesPage', () => {
       const dialog = await screen.findByRole('dialog', { name: 'Editar Geladeira' });
       expect(within(dialog).getByLabelText('Valor total (R$)')).toHaveAttribute('readonly');
       expect(dialog).toHaveTextContent('Com parcelas pagas, o valor e as parcelas não mudam');
+      // Its archived merchant shows and stays as it is: not sent, not reactivated.
+      expect(
+        within(dialog).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+      ).toHaveTextContent('Loja Antiga');
       const description = within(dialog).getByLabelText('Descrição');
       await userEvent.clear(description);
       await userEvent.type(description, 'Geladeira nova');
@@ -464,6 +561,32 @@ describe('RecurrencesPage', () => {
       await expectCall(fetchMock, `${base}/installments/${geladeira.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ description: 'Geladeira nova' }),
+      });
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        new URL(`${base}/merchants/${lojaAntiga.id}`, 'http://api.test'),
+        expect.anything(),
+      );
+    });
+
+    it('takes the merchant out of a plan (ADR 0053)', async () => {
+      const fetchMock = mockRecurrences({
+        [`PATCH ${base}/installments/${geladeira.id}`]: {
+          body: { ...geladeira, merchantId: null },
+        },
+      });
+      renderApp(page);
+
+      await choose('Geladeira', 'Editar');
+      const dialog = await screen.findByRole('dialog', { name: 'Editar Geladeira' });
+      await userEvent.click(
+        within(dialog).getByRole('combobox', { name: 'Estabelecimento (opcional)' }),
+      );
+      await userEvent.click(await screen.findByRole('option', { name: 'Nenhum' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+      await expectCall(fetchMock, `${base}/installments/${geladeira.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ merchantId: null }),
       });
     });
 
@@ -512,7 +635,7 @@ describe('RecurrencesPage', () => {
       mockRecurrences();
       renderApp(page);
 
-      const monthly = await section('Todo mês');
+      const monthly = await section('Recorrentes');
       expect(screen.queryByRole('radiogroup', { name: 'Ver como' })).not.toBeInTheDocument();
       expect(within(monthly).queryByRole('table')).not.toBeInTheDocument();
     });
@@ -524,7 +647,7 @@ describe('RecurrencesPage', () => {
 
       await userEvent.click(await screen.findByRole('radio', { name: 'Tabela' }));
 
-      const monthly = await section('Todo mês');
+      const monthly = await section('Recorrentes');
       const [active, ended] = within(monthly).getAllByRole('table');
       expect(within(active!).getByRole('row', { name: /Aluguel/ })).toHaveTextContent(
         /Aluguel.*Saída.*Moradia.*A pagar para Ana.*Dia 10.*Desde janeiro de 2026.*R\$.1\.500,00/,

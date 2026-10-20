@@ -1,13 +1,17 @@
 import {
+  importInstallmentPlanInputSchema,
   plainTransactionInputSchema,
   normalizeName,
   type Category,
+  type ImportInstallmentPlanInput,
+  type ImportMerchantAliasInput,
   type ImportTransactionInput,
   type PaymentMethod,
   type TemplateDraft,
   type TemplateRow,
   type TransactionType,
 } from '@financas/shared';
+import { newCategoryName } from '@/features/categories/new-category';
 
 // The import review (ADR 0040), kept apart from the screen: what each row will become, which
 // categories still need a match, and what is ready to send. Nothing here talks to the API.
@@ -23,17 +27,47 @@ export type ReviewRow = {
   categoryName: string;
   /** Where it was bought or who paid it (ADR 0053); '' when none. A new name is created. */
   merchantName: string;
+  /** A receber de / a pagar para (ADR 0040 note); '' or absent when none. A new name is
+   * created on import. */
+  personName?: string;
   /** How it was paid or received (ADR 0054); null when none. */
   paymentMethod: PaymentMethod | null;
-  /** Chosen in the form; otherwise the category comes from the name. */
+  /** Chosen in the form (`newCategoryValue` for one to create on import); otherwise the category comes from the name. */
   categoryId: string | null;
   amountCents: number | null;
   period: string | null;
+  /** The day it happened (ADR 0055); null when none. */
+  occurredOn: string | null;
   dueDate: string | null;
   settledAt: string | null;
-  /** Warnings of the report (installment in the text, personal data...). */
+  /** Warnings of the report (installment in the text, personal data...), or why a line of a
+   * card statement becomes what it becomes, or comes unchecked. */
   warnings: string[];
+  /** A card statement's line (ADR 0055): the title as the bank wrote it. */
+  statementTitle?: string;
+  /** Its merchant came from an alias: there is no alias to learn. */
+  merchantByAlias?: boolean;
+  /** The alias to remember for its merchant on import; null or absent: none. */
+  rememberAlias?: string | null;
+  /** An installment of a statement that starts a plan: N installments, created from `firstNumber`. */
+  plan?: { installments: number; firstNumber: number };
+  /** A statement's row the person changed: a new reference month keeps their choices. */
+  touched?: boolean;
 };
+
+/**
+ * A category still to create (`newCategoryValue`) is checked as if it existed: it becomes a
+ * real one when the import is sent, and the value goes along until then.
+ */
+const NEW_CATEGORY_STAND_IN = '01920000-0000-7000-8000-000000000000';
+const checkable = (categoryId: string) =>
+  newCategoryName(categoryId) === null ? categoryId : NEW_CATEGORY_STAND_IN;
+
+/** "2026-11" − "2026-10" = 1: how many months the first is after the second. */
+const monthsBetween = (later: string, earlier: string) =>
+  (Number(later.slice(0, 4)) - Number(earlier.slice(0, 4))) * 12 +
+  Number(later.slice(5, 7)) -
+  Number(earlier.slice(5, 7));
 
 /** "DEBIT|mercado": a spreadsheet category, per type, whatever the case or accents. */
 export const categoryKey = (type: TransactionType, name: string) =>
@@ -110,22 +144,107 @@ export function toTransaction(
     type: row.type,
     description: row.description,
     notes: row.notes,
-    categoryId,
+    categoryId: checkable(categoryId),
     amountCents: row.amountCents,
     period: row.period,
     dueDate: row.dueDate,
     settledAt: row.settledAt,
+    occurredOn: row.occurredOn,
     // Only when there is one, as a new transaction in the form (ADR 0054).
     ...(row.paymentMethod && { paymentMethod: row.paymentMethod }),
   });
   if (result.success) {
     const merchantName = row.merchantName.trim();
+    const personName = row.personName?.trim();
     return {
       ok: true,
-      transaction: merchantName ? { ...result.data, merchantName } : result.data,
+      transaction: {
+        ...result.data,
+        categoryId,
+        ...(merchantName && { merchantName }),
+        ...(personName && { personName }),
+      },
     };
   }
   return { ok: false, problems: [...new Set(result.error.issues.map((issue) => issue.message))] };
+}
+
+/**
+ * The installment plan a statement's row becomes (ADR 0055): the bill's line as its installment,
+ * from the reference month on, each due on the bill's day as far from its month as this one; or
+ * what is wrong.
+ */
+export function toPlan(
+  row: ReviewRow,
+  categoryId: string | null,
+): { ok: true; plan: ImportInstallmentPlanInput } | { ok: false; problems: string[] } {
+  if (!categoryId) return { ok: false, problems: ['Escolha a categoria.'] };
+  const merchantName = row.merchantName.trim();
+  // A plan is due in the month of each installment or the next (ADR 0038 note).
+  const dueMonthOffset =
+    row.dueDate && row.period ? monthsBetween(row.dueDate.slice(0, 7), row.period) : 0;
+  if (dueMonthOffset < 0 || dueMonthOffset > 1) {
+    return {
+      ok: false,
+      problems: ['Num parcelamento, o vencimento fica no mês de referência ou no seguinte.'],
+    };
+  }
+  const result = importInstallmentPlanInputSchema.safeParse({
+    type: row.type,
+    description: row.description,
+    notes: row.notes,
+    categoryId: checkable(categoryId),
+    installments: row.plan?.installments,
+    firstNumber: row.plan?.firstNumber,
+    amountCents: row.amountCents,
+    firstPeriod: row.period,
+    occurredOn: row.occurredOn,
+    dueDay: row.dueDate ? Number(row.dueDate.slice(8)) : null,
+    dueMonthOffset,
+    ...(row.paymentMethod && { paymentMethod: row.paymentMethod }),
+    ...(merchantName && { merchantName }),
+  });
+  if (result.success) return { ok: true, plan: { ...result.data, categoryId } };
+  return { ok: false, problems: [...new Set(result.error.issues.map((issue) => issue.message))] };
+}
+
+/** What still keeps a row out of the import: a transaction's problems, or a plan's. */
+export function rowProblems(row: ReviewRow, categoryId: string | null): string[] {
+  const result = row.plan ? toPlan(row, categoryId) : toTransaction(row, categoryId);
+  return result.ok ? [] : result.problems;
+}
+
+/** What the import sends: the transactions, the plans and the aliases learned (ADR 0055). */
+export type ReadyImport = {
+  transactions: ImportTransactionInput[];
+  plans: ImportInstallmentPlanInput[];
+  aliases: ImportMerchantAliasInput[];
+};
+
+/** The checked rows that are ready, as the API takes them, with the aliases to remember. */
+export function readyImport(
+  rows: ReviewRow[],
+  categories: Category[],
+  matches: ReadonlyMap<string, string>,
+): ReadyImport {
+  const ready: ReadyImport = { transactions: [], plans: [], aliases: [] };
+  for (const row of rows) {
+    if (!row.included) continue;
+    const categoryId = resolveCategory(row, categories, matches);
+    if (row.plan) {
+      const result = toPlan(row, categoryId);
+      if (!result.ok) continue;
+      ready.plans.push(result.plan);
+    } else {
+      const result = toTransaction(row, categoryId);
+      if (!result.ok) continue;
+      ready.transactions.push(result.transaction);
+    }
+    const alias = row.rememberAlias?.trim();
+    const merchantName = row.merchantName.trim();
+    if (alias && merchantName) ready.aliases.push({ merchantName, alias });
+  }
+  return ready;
 }
 
 /** The checked rows that are ready, as the API takes them. */

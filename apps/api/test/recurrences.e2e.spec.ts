@@ -431,7 +431,7 @@ describe('recurrences', () => {
       expect((await transactionsOf(month(1)))[0]).toMatchObject({ amountEstimated: true });
     });
 
-    it('refuses one already repeating, an installment, a split one and a share', async () => {
+    it('refuses one already repeating, an installment and a share', async () => {
       const { browser, base, categoryId, create, energy, transactionsOf } = await setUp();
       const category = categoryId('Contas da casa', 'DEBIT');
       await create(energy());
@@ -458,9 +458,88 @@ describe('recurrences', () => {
       const repeat = (transactionId: string) =>
         browser.post(`${base}/recurrences/from-transaction`).send({ transactionId }).expect(409);
 
-      for (const id of [generated.id, installment.id, split.id, share.id]) {
+      for (const id of [generated.id, installment.id, share.id]) {
         expect((await repeat(id)).body).toMatchObject({ code: 'NOT_REPEATABLE' });
       }
+    });
+
+    it('takes the shares of a split one along: amounts when fixed, adopting this month (ADR 0052 note)', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const ana = personSchema.parse(
+        (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201)).body,
+      );
+      const bill = await launched(browser, base, {
+        description: 'Aluguel',
+        categoryId: categoryId('Moradia', 'DEBIT'),
+        amountCents: 150_000,
+        split: [{ personId: ana.id, amountCents: 75_000 }],
+      });
+
+      const response = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: bill.id })
+        .expect(201);
+
+      expect(recurrenceSchema.parse(response.body).split).toEqual([
+        { personId: ana.id, amountCents: 75_000, basisPoints: null },
+      ]);
+      // This month's share stays the only one; the next month comes with its own.
+      expect((await transactionsOf(thisMonth)).filter((t) => t.splitOfId === bill.id)).toHaveLength(
+        1,
+      );
+      const next = await transactionsOf(month(1));
+      const rent = next.find((t) => t.description === 'Aluguel' && t.type === 'DEBIT')!;
+      expect(next.find((t) => t.splitOfId === rent.id)).toMatchObject({
+        type: 'CREDIT',
+        amountCents: 75_000,
+        personId: ana.id,
+      });
+    });
+
+    it('turns the shares of a variable one into percentages of the amount', async () => {
+      const { browser, base, categoryId } = await setUp();
+      const ana = personSchema.parse(
+        (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201)).body,
+      );
+      const bill = await launched(browser, base, {
+        description: 'Conta de luz',
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
+        amountCents: 20_000,
+        split: [{ personId: ana.id, amountCents: 5_000 }],
+      });
+
+      const response = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: bill.id, variableAmount: true })
+        .expect(201);
+
+      expect(recurrenceSchema.parse(response.body).split).toEqual([
+        { personId: ana.id, amountCents: null, basisPoints: 2_500 },
+      ]);
+    });
+
+    it('gives the adopted transaction back as launched once when ended (ADR 0038 note)', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const transaction = await launched(browser, base, {
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
+      });
+      const recurrence = recurrenceSchema.parse(
+        (
+          await browser
+            .post(`${base}/recurrences/from-transaction`)
+            .send({ transactionId: transaction.id })
+            .expect(201)
+        ).body,
+      );
+      await transactionsOf(month(1));
+
+      await browser.delete(`${base}/recurrences/${recurrence.id}`).expect(204);
+
+      // This month's is the transaction that existed before: it stays, launched once.
+      expect(await transactionsOf(thisMonth)).toEqual([
+        expect.objectContaining({ id: transaction.id, recurrenceId: null, amountCents: 12_000 }),
+      ]);
+      expect(await transactionsOf(month(1))).toEqual([]);
     });
 
     it('answers 404 for a transaction of another workspace', async () => {
@@ -598,13 +677,13 @@ describe('recurrences', () => {
         expect(await sharesIn(transactionsOf, period)).toEqual(
           expect.arrayContaining([
             {
-              description: 'Ana: parte de Conta de luz',
+              description: 'Conta de luz',
               amountCents: 6_000,
               type: 'CREDIT',
               settledAt: null,
             },
             {
-              description: 'Bruno: parte de Conta de luz',
+              description: 'Conta de luz',
               amountCents: 4_000,
               type: 'CREDIT',
               settledAt: null,
@@ -686,6 +765,41 @@ describe('recurrences', () => {
         .send(energy({ variableAmount: true, split: [{ newPersonName: 'Bia', amountCents: 100 }] }))
         .expect(400);
       expect(invalid.body).toMatchObject({ message: 'Num valor que varia, divida em percentual.' });
+    });
+
+    it('renames the pending shares from this month on with it (ADR 0052 note)', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const recurrence = await create(
+        energy({ startPeriod: month(-1), split: [{ newPersonName: 'Ana', basisPoints: 5_000 }] }),
+      );
+      await transactionsOf(month(1));
+
+      await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ description: 'Conta de energia' })
+        .expect(200);
+
+      // Last month is history; this month and the next follow.
+      expect((await sharesIn(transactionsOf, month(-1)))[0]?.description).toBe('Conta de luz');
+      expect((await sharesIn(transactionsOf, thisMonth))[0]?.description).toBe('Conta de energia');
+      expect((await sharesIn(transactionsOf, month(1)))[0]?.description).toBe('Conta de energia');
+    });
+
+    it('makes each month share due with it, and moves the pending ones from this month on (ADR 0052 note)', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      const recurrence = await create(
+        energy({ startPeriod: month(-1), split: [{ newPersonName: 'Ana', basisPoints: 5_000 }] }),
+      );
+      const dueOfShare = async (period: string) =>
+        (await transactionsOf(period)).find((t) => t.splitOfId !== null)?.dueDate;
+      expect(await dueOfShare(month(1))).toBe(`${month(1)}-10`);
+
+      await browser.patch(`${base}/recurrences/${recurrence.id}`).send({ dueDay: 25 }).expect(200);
+
+      // Last month is history; this month and the next follow.
+      expect(await dueOfShare(month(-1))).toBe(`${month(-1)}-10`);
+      expect(await dueOfShare(thisMonth)).toBe(`${thisMonth}-25`);
+      expect(await dueOfShare(month(1))).toBe(`${month(1)}-25`);
     });
 
     it('ends it with the shares still pending of the months removed', async () => {
@@ -799,6 +913,99 @@ describe('recurrences', () => {
       });
       const summary = await browser.get(`${base}/summary/${thisMonth}`).expect(200);
       expect(summary.body).toMatchObject({ estimatedCents: 18_000 });
+    });
+  });
+
+  describe('yearly (ADR 0038 note)', () => {
+    it('generates only the month of its start, every year, with the same due day', async () => {
+      const { create, energy, transactionsOf } = await setUp();
+      const recurrence = await create(
+        energy({ description: 'IPVA', amountCents: 120_000, intervalMonths: 12 }),
+      );
+
+      expect(recurrence.intervalMonths).toBe(12);
+      for (const offset of [1, 6, 11]) expect(await transactionsOf(month(offset))).toEqual([]);
+      expect(await transactionsOf(month(12))).toEqual([
+        expect.objectContaining({
+          description: 'IPVA',
+          dueDate: `${month(12)}-10`,
+          recurrenceId: recurrence.id,
+          recurrenceIntervalMonths: 12,
+        }),
+      ]);
+      expect(await transactionsOf(month(13))).toEqual([]);
+    });
+
+    it('tells a monthly transaction apart from a yearly one', async () => {
+      const { create, energy, transactionsOf } = await setUp();
+      await create(energy());
+
+      expect(await transactionsOf(thisMonth)).toEqual([
+        expect.objectContaining({ recurrenceIntervalMonths: 1 }),
+      ]);
+    });
+
+    it('estimates a variable one from the years settled', async () => {
+      const { create, energy, transactionsOf, base, browser } = await setUp();
+      await create(energy({ variableAmount: true, intervalMonths: 12, startPeriod: month(-24) }));
+      for (const [offset, amountCents] of [
+        [-24, 100_000],
+        [-12, 110_000],
+      ] as const) {
+        const [transaction] = await transactionsOf(month(offset));
+        await browser
+          .patch(`${base}/transactions/${transaction?.id}`)
+          .send({ amountCents, settledAt: `${month(offset)}-05` })
+          .expect(200);
+      }
+
+      expect((await transactionsOf(thisMonth))[0]).toMatchObject({
+        amountCents: 105_000,
+        amountEstimated: true,
+      });
+    });
+
+    it('makes a transaction recurrent every year', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const transaction = (
+        await browser
+          .post(`${base}/transactions`)
+          .send({
+            type: 'DEBIT',
+            description: 'Anuidade',
+            categoryId: categoryId('Contas da casa', 'DEBIT'),
+            amountCents: 40_000,
+            period: thisMonth,
+          })
+          .expect(201)
+      ).body as { id: string };
+
+      const response = await browser
+        .post(`${base}/recurrences/from-transaction`)
+        .send({ transactionId: transaction.id, intervalMonths: 12 })
+        .expect(201);
+
+      expect(recurrenceSchema.parse(response.body).intervalMonths).toBe(12);
+      expect(await transactionsOf(month(1))).toEqual([]);
+      expect(await transactionsOf(month(12))).toHaveLength(1);
+    });
+
+    it('never changes its interval, and refuses one other than 1 or 12', async () => {
+      const { create, energy, base, browser } = await setUp();
+      const recurrence = await create(energy({ intervalMonths: 12 }));
+
+      await browser
+        .patch(`${base}/recurrences/${recurrence.id}`)
+        .send({ intervalMonths: 1, amountCents: 19_000 })
+        .expect(200);
+      const list = recurrenceListResponseSchema.parse(
+        (await browser.get(`${base}/recurrences`).expect(200)).body,
+      );
+      expect(list[0]).toMatchObject({ intervalMonths: 12, amountCents: 19_000 });
+      await browser
+        .post(`${base}/recurrences`)
+        .send({ ...energy(), intervalMonths: 6 })
+        .expect(400);
     });
   });
 

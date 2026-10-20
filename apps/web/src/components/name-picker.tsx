@@ -26,7 +26,8 @@ const itemClass = 'min-h-11 text-base md:min-h-0 md:text-sm';
 export interface NameGroup {
   /** Shown above the group; none for a single group. */
   heading?: string;
-  items: { id: string; name: string }[];
+  /** `aliases`: other texts it is found by, as a merchant's in a statement (ADR 0055). */
+  items: { id: string; name: string; aliases?: readonly string[] }[];
 }
 
 /**
@@ -96,16 +97,28 @@ export function NameList({
           >
             {group.items.map((entry) => {
               const picked = isPicked(entry.name);
+              // Found by an alias, not by the name: says which one, so the result makes sense.
+              const byAlias =
+                typed && !matches(entry.name, typed)
+                  ? entry.aliases?.find((alias) => matches(alias, typed))
+                  : undefined;
               return (
                 <CommandItem
                   key={entry.id}
                   value={entry.id}
-                  keywords={[entry.name]}
+                  keywords={[entry.name, ...(entry.aliases ?? [])]}
                   data-checked={picked}
                   onSelect={() => onPick(entry.name)}
                   className={itemClass}
                 >
-                  {entry.name}
+                  {byAlias ? (
+                    <span className="grid">
+                      <span>{entry.name}</span>
+                      <span className="text-muted-foreground text-sm">{byAlias}</span>
+                    </span>
+                  ) : (
+                    entry.name
+                  )}
                   {multiple && picked && pickedText && (
                     <span className="sr-only">{pickedText}</span>
                   )}
