@@ -52,14 +52,19 @@ function mockDashboard(summary: object, period = '2026-10', role = house.role) {
 }
 
 const section = (name: string) => screen.findByRole('region', { name });
-// An indicator's value: the <dd> after its <dt>, in the "Saldo do mês" section (the chart
-// legend also says "Saldo previsto").
-const tile = (label: string) =>
-  within(screen.getByRole('region', { name: 'Saldo do mês' })).getByText(label, {
-    selector: 'dt',
-  }).nextElementSibling;
+// A labelled amount's value: the <dd> after its <dt>, in one card (the chart legend also says
+// "Saldo previsto").
+const figure = (card: string, label: string) =>
+  within(screen.getByRole('region', { name: card })).getByText(label, { selector: 'dt' })
+    .nextElementSibling;
+const tile = (label: string) => figure('Saldo do mês', label);
 // Intl separates "R$" from the number with a non-breaking space.
 const nbsp = (text: string | null | undefined) => text?.replace(/\u00a0/g, ' ');
+// A goal's line in the "Metas" card, by its name.
+const goal = (savings: HTMLElement, name: string) =>
+  within(savings)
+    .getAllByRole('listitem')
+    .find((item) => item.textContent?.startsWith(name));
 
 describe('DashboardPage', () => {
   it('says how much of the planned view is an estimate of bills that vary', async () => {
@@ -74,7 +79,7 @@ describe('DashboardPage', () => {
     );
   });
 
-  it('shows the balance, what is available to set aside and what was applied', async () => {
+  it('shows the balance, what is left to set aside and what was applied', async () => {
     mockDashboard(summarizePeriod(october, budget, today));
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
@@ -84,9 +89,16 @@ describe('DashboardPage', () => {
     // Credits − all debits: 6.000,00 − 3.009,90; settled: 5.000,00 − (350,00 + 500,00).
     expect(tile('Saldo previsto')).toHaveTextContent('R$ 2.990,10');
     expect(tile('Saldo atual')).toHaveTextContent('R$ 4.150,00');
+    // What comes in and goes out, with what already happened under it.
+    expect(nbsp(tile('Entradas')?.parentElement?.textContent)).toBe(
+      'EntradasR$ 6.000,00R$ 5.000,00 recebidos',
+    );
+    expect(nbsp(tile('Saídas')?.parentElement?.textContent)).toBe(
+      'SaídasR$ 3.009,90R$ 850,00 pagos',
+    );
     // Credits − expenses (the application is not an expense): 6.000,00 − 2.509,90.
-    expect(tile('Sobra para guardar')).toHaveTextContent('R$ 3.490,10');
-    expect(tile('Guardado')).toHaveTextContent('R$ 500,00');
+    expect(figure('Metas', 'Sobra para guardar')).toHaveTextContent('R$ 3.490,10');
+    expect(figure('Metas', 'Guardado')).toHaveTextContent('R$ 500,00');
     expect(nbsp(screen.getByRole('status').textContent)).toContain(
       '1 lançamento vencido (R$ 159,90).',
     );
@@ -97,69 +109,75 @@ describe('DashboardPage', () => {
     );
   });
 
-  it('shows where the credits go, the expenses goal and each saving destination', async () => {
+  it('shows where the credits go, the spending limit and each goal', async () => {
     mockDashboard(summarizePeriod(october, budget, today));
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const chart = await section('Para onde vão as entradas');
-    expect(nbsp(within(chart).getByRole('img').getAttribute('aria-label'))).toBe(
+    const balance = await section('Saldo do mês');
+    expect(nbsp(within(balance).getByRole('img').getAttribute('aria-label'))).toBe(
       'Entradas de R$ 6.000,00: saídas pagas R$ 850,00, saídas a pagar R$ 2.159,90, saldo previsto R$ 2.990,10.',
     );
-    const goal = await section('Orçamento do mês');
-    expect(goal).toHaveTextContent('R$ 2.509,90 de R$ 3.000,00 (limite de 60% da renda)');
-    expect(goal).toHaveTextContent('Folga de R$ 490,10.');
-    const destinations = await section('Orçamento do mês');
-    expect(destinations).toHaveTextContent('Orçamento herdado de setembro de 2026.');
-    // Despesas apart (ADR 0047): paid 350,00 and 2.159,90 to pay, 2.509,90 of 3.000,00.
-    const expenses = await section('Limite de gastos');
-    expect(nbsp(expenses.textContent)).toContain(
-      'PagoR$ 350,00A pagarR$ 2.159,90Usado do limite83,66%',
+    // The amounts are in the card: the legend names the parts only (ADR 0045 note).
+    expect(
+      within(balance)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Saídas pagas', 'Saídas a pagar', 'Saldo previsto']);
+    // The budget in a line above the cards, where it comes from behind its "ⓘ".
+    const budgetBar = await section('Orçamento do mês');
+    expect(nbsp(budgetBar.textContent)).toContain('Renda líquida: R$ 5.000,00');
+    await userEvent.click(
+      within(budgetBar).getByRole('button', { name: 'Sobre Orçamento do mês' }),
     );
-    // Where the saving goals come from.
-    expect(nbsp((await section('O que sobra para guardar')).textContent)).toContain(
-      'Entradas previstasR$ 6.000,00Despesas previstas− R$ 2.509,90Sobra para guardarR$ 3.490,10',
+    expect(await screen.findByRole('dialog', { name: 'Orçamento do mês' })).toHaveTextContent(
+      'Orçamento herdado de setembro de 2026.',
     );
-    // On the phone, a card per saving destination: the table's columns do not fit.
-    // Investimentos: 50% of 3.490,10 = 1.745,05; 500,00 applied, nothing scheduled, 1.245,05
+    await userEvent.keyboard('{Escape}');
+    // Despesas apart (ADR 0047): 2.509,90 of 3.000,00, paid 350,00 and 2.159,90 to pay.
+    const limit = await section('Limite de gastos');
+    expect(nbsp(limit.textContent)).toContain('GastosR$ 2.509,90 de R$ 3.000,00');
+    expect(nbsp(limit.textContent)).toContain(
+      'Sobram R$ 490,10 no limite. O limite é 60% da renda líquida.',
+    );
+    expect(nbsp(limit.textContent)).toContain('Gastos pagosR$ 350,00Gastos a pagarR$ 2.159,90');
+    // Investimentos: 50% of 3.490,10 = 1.745,05; 500,00 applied, nothing pending, 1.245,05
     // still to launch, 28,65% of the goal.
-    const investments = within(destinations)
-      .getAllByRole('listitem')
-      .find((item) => item.textContent?.startsWith('Investimentos'));
-    expect(nbsp(investments?.textContent)).toBe(
-      'Investimentos50%Valor da metaR$ 1.745,05GuardadoR$ 500,00PendenteR$ 0,00FaltaR$ 1.245,05Progresso: 28,65%',
-    );
-    expect(within(destinations).queryByRole('table')).not.toBeInTheDocument();
-    // Despesas is not one of the saving destinations.
     const savings = await section('Metas');
+    expect(nbsp(goal(savings, 'Investimentos')?.textContent)).toBe(
+      'Investimentos 50%R$ 500,00 de R$ 1.745,05 (28,65%)Falta lançar R$ 1.245,05.',
+    );
+    expect(
+      nbsp(
+        within(savings)
+          .getByRole('meter', { name: 'Progresso de Investimentos' })
+          .getAttribute('aria-valuetext'),
+      ),
+    ).toBe('R$ 500,00 guardados de R$ 1.745,05');
+    // Despesas is not one of the saving destinations.
     expect(
       within(savings)
         .getAllByRole('listitem')
-        .map((item) => item.textContent?.match(/^\D+/)?.[0]),
+        .map((item) => item.textContent?.match(/^\D+/)?.[0]?.trim()),
     ).toEqual(['Investimentos', 'Reserva de emergência', 'Viagens']);
+    expect(within(savings).queryByRole('table')).not.toBeInTheDocument();
     // Their shares add up to 100%: nothing is left without a destination.
     expect(savings).not.toHaveTextContent('Sem meta');
   });
 
-  it('shows the destinations as a table from md', async () => {
-    stubPrefersDark(false, { desktop: true });
-    mockDashboard(summarizePeriod(october, budget, today));
+  it('says what is pending on a goal and what is left to launch', async () => {
+    const scheduled = debit(30_000, '2026-10-25', null, investimentos);
+    mockDashboard(summarizePeriod([...october, scheduled], budget, today));
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const savings = await section('Metas');
-    const investments = within(savings).getByRole('row', { name: /Investimentos/ });
-    expect(investments).toHaveTextContent('50%R$ 1.745,05R$ 500,00R$ 0,00R$ 1.245,0528,65%');
-    expect(within(savings).queryByRole('row', { name: /Despesas/ })).not.toBeInTheDocument();
-    // The goals add up to what is available.
-    expect(within(savings).getByRole('row', { name: /Total/ })).toHaveTextContent(
-      // Falta: 1.245,05 + 1.047,03 + 698,02 still to launch.
-      '100%R$ 3.490,10R$ 500,00R$ 0,00R$ 2.990,1014,33%',
+    // 1.745,05 − 500,00 applied − 300,00 pending.
+    expect(nbsp(goal(await section('Metas'), 'Investimentos')?.textContent)).toContain(
+      'R$ 300,00 pendente. Falta lançar R$ 945,05.',
     );
   });
 
   it('shows what the saving shares leave without a destination', async () => {
-    stubPrefersDark(false, { desktop: true });
     const ninety = testBudget({
       period: '2026-10',
       netIncomeCents: 500_000,
@@ -172,16 +190,13 @@ describe('DashboardPage', () => {
 
     const savings = await section('Metas');
     // 10% of 3.490,10 has no destination.
-    expect(within(savings).getByRole('row', { name: /Sem meta/ })).toHaveTextContent(
-      '10%R$ 349,01',
-    );
-    expect(within(savings).getByRole('row', { name: /Total/ })).toHaveTextContent(
-      '100%R$ 3.490,10',
-    );
-    // Never read as money to spend (ADR 0051): said behind the "ⓘ" on its row.
+    const unallocated = within(savings).getByText(/^Sem meta/, { selector: 'dt' });
+    expect(unallocated).toHaveTextContent('Sem meta (10%)');
+    expect(nbsp(unallocated.nextElementSibling?.textContent)).toBe('R$ 349,01');
+    // Never read as money to spend (ADR 0051): said behind the "ⓘ" on its line.
     await userEvent.click(within(savings).getByRole('button', { name: 'Sobre Sem meta' }));
     expect(await screen.findByRole('dialog', { name: 'Sem meta' })).toHaveTextContent(
-      'Parte do Sobra para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo.',
+      'Parte da sobra para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo.',
     );
   });
 
@@ -201,11 +216,43 @@ describe('DashboardPage', () => {
     ).toBeInTheDocument();
     expect(tile('Saldo previsto')).toHaveTextContent('-R$ 1.009,90');
     // The legend leaves the balance out, never "Saldo previsto R$ 0,00" (ADR 0051 note).
-    const legend = within(await section('Para onde vão as entradas')).getAllByRole('listitem');
-    expect(legend.map((item) => item.textContent?.replace(/R\$.*/, ''))).toEqual([
-      'Saídas pagas',
-      'Saídas a pagar',
-    ]);
+    expect(
+      within(await section('Saldo do mês'))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Saídas pagas', 'Saídas a pagar']);
+    // Nothing left: every goal is worth nothing this month.
+    expect(goal(await section('Metas'), 'Investimentos')).toHaveTextContent('Sem valor este mês.');
+  });
+
+  it('keeps the reference month of the screenshots in place (regression)', async () => {
+    // The test account's month (fictitious): 5.200,00 received and 5.595,00 to come, 18.342,70
+    // to pay, nothing paid, no budget.
+    const reference = [
+      credit(520_000, '2026-10-05'),
+      credit(559_500),
+      debit(1_834_270, '2026-10-01'),
+    ];
+    mockDashboard(summarizePeriod(reference, testBudget({ period: '2026-10' }), today));
+
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    await section('Saldo do mês');
+    expect(tile('Saldo previsto')).toHaveTextContent('-R$ 7.547,70');
+    expect(tile('Saldo atual')).toHaveTextContent('R$ 5.200,00');
+    expect(nbsp(tile('Entradas')?.parentElement?.textContent)).toBe(
+      'EntradasR$ 10.795,00R$ 5.200,00 recebidos',
+    );
+    expect(nbsp(tile('Saídas')?.parentElement?.textContent)).toBe(
+      'SaídasR$ 18.342,70R$ 0,00 pagos',
+    );
+    expect(screen.getByText('As saídas passam das entradas em R$ 7.547,70.')).toBeInTheDocument();
+    // No budget: one card that says so, no empty limit or goals.
+    expect(await section('Orçamento do mês')).toHaveTextContent(
+      'Nenhum orçamento definido até aqui.',
+    );
+    expect(screen.queryByRole('region', { name: 'Limite de gastos' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Metas' })).not.toBeInTheDocument();
   });
 
   it('an empty month without income says what is missing', async () => {
@@ -271,7 +318,7 @@ describe('DashboardPage', () => {
     });
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const destinations = await section('Orçamento do mês');
+    const destinations = await section('Metas');
     // Despesas has no category to apply to: only the saving destinations have the button.
     expect(
       within(destinations).queryByRole('button', { name: 'Guardar em Despesas' }),
@@ -335,7 +382,7 @@ describe('DashboardPage', () => {
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
     await userEvent.click(
-      within(await section('Orçamento do mês')).getByRole('button', { name: 'Guardar em Viagens' }),
+      within(await section('Metas')).getByRole('button', { name: 'Guardar em Viagens' }),
     );
 
     const form = await screen.findByRole('dialog', { name: 'Registrar valor guardado' });
@@ -349,7 +396,7 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    await section('Orçamento do mês');
+    await section('Metas');
     expect(screen.queryByRole('button', { name: /^Guardar/ })).not.toBeInTheDocument();
   });
 

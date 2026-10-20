@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
  * Where the month's credits go: debits paid, debits still to pay and what is left (the planned
  * balance). It replaces the spreadsheet's pie ("débitos pagos × saldo final"): one stacked bar
  * reads better, and also shows what is still to pay. When debits are more than credits, the
- * bar is the debits alone and a note says by how much.
+ * bar is the debits alone and a note says by how much. The amounts are in the balance card around
+ * it, so the legend names the parts only (ADR 0045 note); the bar's label keeps the numbers.
  */
 export function CreditsBar({ summary }: { summary: Summary }) {
   const { credits, debits, balance } = summary;
@@ -26,40 +27,34 @@ export function CreditsBar({ summary }: { summary: Summary }) {
   const percent = (cents: number) => (cents / whole) * 100;
 
   return (
-    <figure className="grid gap-3">
-      {/* The legend below carries the numbers; the bar is a picture of them. */}
+    <figure className="grid gap-2">
       <div
         role="img"
         aria-label={`Entradas de ${formatCents(credits.totalCents)}: ${visible
           .map((segment) => `${segment.label.toLowerCase()} ${formatCents(segment.cents)}`)
           .join(', ')}.`}
-        className="flex h-6 gap-0.5"
+        className="flex h-2.5 gap-0.5 overflow-hidden rounded-full"
       >
-        {visible.map((segment, index) => (
+        {visible.map((segment) => (
           <div
             key={segment.label}
             title={`${segment.label}: ${formatCents(segment.cents)}`}
-            className={cn(segment.color, index === visible.length - 1 && 'rounded-r')}
+            className={segment.color}
             style={{ width: `${percent(segment.cents)}%` }}
           />
         ))}
       </div>
       <figcaption>
-        {/* In a row from sm; back to one per line from xl, where the dashboard puts the chart in
-            half of the width (ADR 0045). */}
-        <ul className="grid gap-1 sm:grid-cols-3 xl:grid-cols-1">
+        <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {segments.map((segment) => (
-            <li key={segment.label} className="flex items-center gap-2">
+            <li key={segment.label} className="flex items-center gap-1.5">
               <span aria-hidden className={cn('size-2.5 shrink-0 rounded-full', segment.color)} />
-              <span className="text-muted-foreground">{segment.label}</span>
-              <span className="ml-auto tabular-nums sm:ml-0 xl:ml-auto">
-                {formatCents(segment.cents)}
-              </span>
+              {segment.label}
             </li>
           ))}
         </ul>
         {balance.plannedCents < 0 && (
-          <p className="text-destructive mt-2">
+          <p className="text-destructive mt-2 tabular-nums">
             As saídas passam das entradas em {formatCents(-balance.plannedCents)}.
           </p>
         )}
