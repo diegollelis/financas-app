@@ -122,3 +122,12 @@ Escolhidos com o dono do projeto: **contatos por nome (opção 2)**, **valor a r
 ## Nota (entradas, recorrências e parcelamentos, 2026-10-12)
 
 O [ADR 0052](0052-divisao-em-entradas-recorrencias-e-parcelamentos.md) amplia esta decisão: uma pessoa e a divisão também em "Todo mês" e "Parcelado", dividir uma entrada (as partes viram saídas pendentes em "Repasse") e um seletor de pessoa no padrão do de categoria. Ele também abre uma exceção à independência das partes: numa recorrência dividida em percentual, as partes pendentes acompanham o valor real do mês.
+
+## Nota (o que está pendente agora, 2026-10-20)
+
+Os totais de cada pessoa somavam tudo o que estava pendente, de qualquer competência. Um parcelamento dividido cria de uma vez as partes de todas as parcelas, e uma recorrência cria o mês de cada competência aberta, então "Te deve" crescia a cada mês avançado e misturava o que vence agora com o que só vence daqui a meses.
+
+- **O que conta:** `receivableCents` e `payableCents` somam só o pendente desta competência e das anteriores.
+- **Vencidos:** a resposta traz também `overdueReceivableCents` e `overduePayableCents`, a parte desses totais com o vencimento antes de hoje, a mesma regra de `transactionStatus`.
+- **Parcelas futuras:** as parcelas pendentes dos meses seguintes, e as partes de divisão delas, vêm à parte (`futureInstallmentsReceivableCents` e `futureInstallmentsPayableCents`). Um parcelamento tem fim e valor conhecidos, por isso vale mostrar quanto ainda falta.
+- **O que fica de fora:** os meses de recorrência à frente, mensal ou anual, que já foram criados porque alguém abriu aquela competência. Uma recorrência não tem fim, então somar os meses à frente não diz quanto se deve. A lista da pessoa (`GET …/people/:personId/transactions`) continua mostrando tudo.

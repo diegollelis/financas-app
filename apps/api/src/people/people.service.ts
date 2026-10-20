@@ -1,5 +1,7 @@
 import {
   PERSON_TRANSACTIONS_LIMIT,
+  currentPeriod,
+  todayIso,
   type CreatePersonInput,
   type Person,
   type Transaction,
@@ -33,6 +35,34 @@ const personIsMember = () =>
     message: 'Esta pessoa é membro do espaço: o nome vem da conta dela, e ela continua na lista.',
   });
 
+type PendingRow = {
+  personId: string | null;
+  type: 'CREDIT' | 'DEBIT';
+  _sum: { amountCents: number | null };
+};
+
+/**
+ * What a person owes and is owed now (ADR 0042 note): pending, of this competência or an earlier
+ * one. Overdue is what is past its due date (transactionStatus). The installments of later
+ * months, and the shares of them, come apart; the months of a recurrence already opened ahead
+ * are left out. The person's page still lists everything.
+ */
+function pendingTotals(
+  [rows, overdue, future]: [PendingRow[], PendingRow[], PendingRow[]],
+  personId: string,
+) {
+  const sum = (list: PendingRow[], type: 'CREDIT' | 'DEBIT') =>
+    list.find((row) => row.personId === personId && row.type === type)?._sum.amountCents ?? 0;
+  return {
+    receivableCents: sum(rows, 'CREDIT'),
+    payableCents: sum(rows, 'DEBIT'),
+    overdueReceivableCents: sum(overdue, 'CREDIT'),
+    overduePayableCents: sum(overdue, 'DEBIT'),
+    futureInstallmentsReceivableCents: sum(future, 'CREDIT'),
+    futureInstallmentsPayableCents: sum(future, 'DEBIT'),
+  };
+}
+
 function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
 }
@@ -55,15 +85,9 @@ export class PeopleService {
     const db = this.prisma.forWorkspace(workspaceId);
     const [people, pending, members] = await Promise.all([
       db.person.findMany({ where: { workspaceId } }),
-      db.transaction.groupBy({
-        by: ['personId', 'type'],
-        where: { workspaceId, personId: { not: null }, settledAt: null },
-        _sum: { amountCents: true },
-      }),
+      this.pending(workspaceId, { not: null }),
       this.memberNames(workspaceId),
     ]);
-    const owed = (personId: string, type: 'CREDIT' | 'DEBIT') =>
-      pending.find((row) => row.personId === personId && row.type === type)?._sum.amountCents ?? 0;
     return people
       .map((person) => ({
         id: person.id,
@@ -71,8 +95,7 @@ export class PeopleService {
         memberUserId: person.memberUserId,
         isMember: isMember(person, members),
         archived: person.archivedAt !== null,
-        receivableCents: owed(person.id, 'CREDIT'),
-        payableCents: owed(person.id, 'DEBIT'),
+        ...pendingTotals(pending, person.id),
       }))
       .sort((a, b) => collator.compare(a.name, b.name));
   }
@@ -157,22 +180,41 @@ export class PeopleService {
     const members = person.memberUserId
       ? await this.memberNames(workspaceId)
       : new Map<string, string>();
-    const pending = await this.prisma.forWorkspace(workspaceId).transaction.groupBy({
-      by: ['type'],
-      where: { workspaceId, personId: person.id, settledAt: null },
-      _sum: { amountCents: true },
-    });
-    const sum = (type: 'CREDIT' | 'DEBIT') =>
-      pending.find((row) => row.type === type)?._sum.amountCents ?? 0;
+    const pending = await this.pending(workspaceId, person.id);
     return {
       id: person.id,
       name: displayName(person, members),
       memberUserId: person.memberUserId,
       isMember: isMember(person, members),
       archived: person.archivedAt !== null,
-      receivableCents: sum('CREDIT'),
-      payableCents: sum('DEBIT'),
+      ...pendingTotals(pending, person.id),
     };
+  }
+
+  /**
+   * Pending sums by person and type: up to this competência, the overdue part of them, and the
+   * installments of later months (an installment, or the share of one).
+   */
+  private pending(workspaceId: string, personId: string | { not: null }) {
+    const db = this.prisma.forWorkspace(workspaceId);
+    const thisMonth = currentPeriod();
+    const pending = { workspaceId, personId, settledAt: null };
+    const now = { ...pending, period: { lte: thisMonth } };
+    const today = new Date(`${todayIso()}T00:00:00Z`);
+    const sums = (where: Prisma.TransactionWhereInput) =>
+      db.transaction.groupBy({ by: ['personId', 'type'], where, _sum: { amountCents: true } });
+    return Promise.all([
+      sums(now),
+      sums({ ...now, dueDate: { lt: today } }),
+      sums({
+        ...pending,
+        period: { gt: thisMonth },
+        OR: [
+          { installmentPlanId: { not: null } },
+          { splitOf: { installmentPlanId: { not: null } } },
+        ],
+      }),
+    ]);
   }
 
   /** The names of the workspace's members, by user id. */
