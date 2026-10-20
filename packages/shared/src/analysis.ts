@@ -87,20 +87,34 @@ export interface AnalysisFilters {
   type: z.infer<typeof analysisTypeFilterSchema>;
   /** Only these categories; empty means all of them. */
   categoryIds: string[];
+  /** Only these payment methods, null for "Sem meio"; empty means all of them (ADR 0037 note). */
+  paymentMethods: (PaymentMethod | null)[];
+  /** Only these merchants; empty means all, with or without one (ADR 0037 note). */
+  merchantIds: string[];
 }
 
 export const defaultAnalysisFilters: AnalysisFilters = {
   view: 'PLANNED',
   type: 'BOTH',
   categoryIds: [],
+  paymentMethods: [],
+  merchantIds: [],
 };
 
 const amountOf = (row: AnalysisRow, view: AnalysisFilters['view']) =>
   view === 'SETTLED' ? row.settledCents : row.plannedCents;
 
+/** Whether a row passes every filter: each one empty means "all". */
 function matches(row: AnalysisRow, filters: AnalysisFilters) {
   if (filters.type !== 'BOTH' && row.type !== filters.type) return false;
-  return filters.categoryIds.length === 0 || filters.categoryIds.includes(row.categoryId);
+  if (filters.categoryIds.length > 0 && !filters.categoryIds.includes(row.categoryId)) return false;
+  if (filters.paymentMethods.length > 0 && !filters.paymentMethods.includes(row.paymentMethod)) {
+    return false;
+  }
+  return (
+    filters.merchantIds.length === 0 ||
+    (row.merchantId !== null && filters.merchantIds.includes(row.merchantId))
+  );
 }
 
 export interface MonthlyPoint {

@@ -132,3 +132,9 @@ Uma revisão externa da prévia das telas mudou cinco pontos da primeira versão
 - **Um valor negativo lê melhor:** "Sobra para guardar: −R$ 500,00", com o aviso "Nada sobrou para guardar este mês", em vez de um "disponível" negativo. "Quanto sobra no fim do mês" é a expressão de todo dia.
 
 **A legenda da barra "Para onde vão as entradas"** deixa de mostrar "Saldo previsto R$ 0,00" num mês negativo. A barra não desenha um valor negativo, e a legenda repetia o termo do número grande com outro valor. Agora essa parte sai da barra e da legenda, e o aviso "As saídas passam das entradas em R$ X" continua.
+
+## Nota ("Gastos" como termo único, 2026-10-20)
+
+O Painel chamava de "Gastos" o que conta no limite, e a Análise chamava a mesma conta de "Despesas". Lado a lado, as duas telas pareciam falar de coisas diferentes. Fica **"Gastos"** nas duas: no quadro da Análise, em "Gastos por categoria" e em "Gastos por meio de pagamento". É a palavra do dia a dia e explica sozinha por que o valor difere das saídas, que incluem o que foi para as metas. O código continua `expenses`.
+
+O destino fixo do orçamento continua com o nome gravado ("Despesas"), porque é um dado do espaço e não um texto da tela.

@@ -12,6 +12,7 @@ import {
 } from '@financas/shared';
 import { useRef, useState } from 'react';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { SectionCard } from '@/components/section-card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { describeRange, type AnalysisSettings } from './filters';
@@ -227,23 +228,31 @@ export function CategoryRanking({
   const folded = !showAll && ranking.length > VISIBLE;
   const shown = folded ? ranking.slice(0, VISIBLE - 1) : ranking;
   const largest = ranking[0]?.totalCents ?? 1;
-  const title = credit ? 'Entradas por categoria' : 'Despesas por categoria';
+  const title = credit ? 'Entradas por categoria' : 'Gastos por categoria';
   const open = settings.categoryId
     ? categories.find((category) => category.id === settings.categoryId)
     : undefined;
 
   return (
-    <section aria-labelledby="analysis-categories-title" className="grid content-start gap-3">
-      <h2 id="analysis-categories-title" className="font-medium">
-        {title}
-      </h2>
+    <SectionCard
+      title={title}
+      help={
+        <>
+          <p>
+            {credit
+              ? 'De onde veio o dinheiro no período: o total de cada categoria e a média por mês.'
+              : 'Para onde foi o dinheiro no período: o total de cada categoria e a média por mês. Guardar nas metas não é gasto e fica de fora.'}
+          </p>
+          <p>Toque numa categoria para ver o mês a mês dela e os estabelecimentos.</p>
+        </>
+      }
+    >
       {ranking.length === 0 ? (
         <p className="text-muted-foreground">
-          {credit ? 'Nenhuma entrada' : 'Nenhuma despesa'} no período.
+          {credit ? 'Nenhuma entrada' : 'Nenhum gasto'} no período.
         </p>
       ) : (
         <>
-          <p className="text-muted-foreground text-sm">Toque numa categoria para ver mês a mês.</p>
           <ul className="-mx-3 grid">
             {shown.map((share) => (
               <RankingRow
@@ -298,6 +307,6 @@ export function CategoryRanking({
           />
         )}
       </ResponsiveDialog>
-    </section>
+    </SectionCard>
   );
 }

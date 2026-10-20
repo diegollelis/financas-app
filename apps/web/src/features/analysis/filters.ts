@@ -2,15 +2,18 @@ import {
   analysisQuerySchema,
   currentPeriod,
   formatPeriod,
+  paymentMethodSchema,
   shiftPeriod,
   type AnalysisFilters,
+  type PaymentMethod,
 } from '@financas/shared';
 import { useSearchParams } from 'react-router';
 
 /**
  * The analysis filters live in the address (ADR 0037), in pt-BR like the page URLs (ADR 0021):
  * ?periodo=3|6|12|ano, or ?de=AAAA-MM&ate=AAAA-MM for a range of one's own; ?visao=efetivado;
- * ?tipo=creditos|debitos; ?categorias=id,id; ?categoria=id, the one open in detail. A link can
+ * ?tipo=creditos|debitos; ?categorias=id,id; ?meios=PIX,CREDIT_CARD,sem ("sem" for "Sem meio");
+ * ?estabelecimentos=id,id; ?categoria=id, the one open in detail. A link can
  * be shared, and the browser's back button undoes a change (or closes the category). Anything
  * invalid falls back to the default: the last 6 months, planned, all.
  */
@@ -57,9 +60,21 @@ function readSettings(params: URLSearchParams): AnalysisSettings {
     ...range,
     view: params.get('visao') === 'efetivado' ? 'SETTLED' : 'PLANNED',
     type: type === 'creditos' ? 'CREDIT' : type === 'debitos' ? 'DEBIT' : 'BOTH',
-    categoryIds: (params.get('categorias') ?? '').split(',').filter(Boolean),
+    categoryIds: listOf(params.get('categorias')),
+    paymentMethods: listOf(params.get('meios')).flatMap(readMethod),
+    merchantIds: listOf(params.get('estabelecimentos')),
     categoryId: params.get('categoria'),
   };
+}
+
+const listOf = (value: string | null) => (value ?? '').split(',').filter(Boolean);
+
+/** "sem" is "Sem meio"; anything else must be a method of the list, or it is dropped. */
+const NO_METHOD = 'sem';
+function readMethod(value: string): (PaymentMethod | null)[] {
+  if (value === NO_METHOD) return [null];
+  const method = paymentMethodSchema.safeParse(value);
+  return method.success ? [method.data] : [];
 }
 
 function writeSettings(settings: AnalysisSettings): URLSearchParams {
@@ -74,6 +89,12 @@ function writeSettings(settings: AnalysisSettings): URLSearchParams {
   if (settings.type !== 'BOTH')
     params.set('tipo', settings.type === 'CREDIT' ? 'creditos' : 'debitos');
   if (settings.categoryIds.length > 0) params.set('categorias', settings.categoryIds.join(','));
+  if (settings.paymentMethods.length > 0) {
+    params.set('meios', settings.paymentMethods.map((method) => method ?? NO_METHOD).join(','));
+  }
+  if (settings.merchantIds.length > 0) {
+    params.set('estabelecimentos', settings.merchantIds.join(','));
+  }
   if (settings.categoryId) params.set('categoria', settings.categoryId);
   return params;
 }
@@ -85,8 +106,27 @@ export function activeFilterCount(settings: AnalysisSettings): number {
     settings.view !== 'PLANNED',
     settings.type !== 'BOTH',
     settings.categoryIds.length > 0,
+    settings.paymentMethods.length > 0,
+    settings.merchantIds.length > 0,
   ].filter(Boolean).length;
 }
+
+/**
+ * The filters that narrow what is counted (type, categories, methods, merchants): "Limpar
+ * filtros" undoes them and keeps the period and the view, which every reading has.
+ */
+export const narrowsDown = (settings: AnalysisSettings) =>
+  settings.type !== 'BOTH' ||
+  settings.categoryIds.length > 0 ||
+  settings.paymentMethods.length > 0 ||
+  settings.merchantIds.length > 0;
+
+export const clearedFilters: Partial<AnalysisSettings> = {
+  type: 'BOTH',
+  categoryIds: [],
+  paymentMethods: [],
+  merchantIds: [],
+};
 
 export function useAnalysisSettings() {
   const [params, setParams] = useSearchParams();

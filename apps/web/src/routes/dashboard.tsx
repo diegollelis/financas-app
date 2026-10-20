@@ -13,6 +13,7 @@ import { Link } from 'react-router';
 import { InfoTip } from '@/components/info-tip';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
+import { SectionCard as Card } from '@/components/section-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PeriodNav } from '@/features/periods/period-nav';
@@ -31,38 +32,6 @@ import { cn } from '@/lib/utils';
 /** Colored by sign, as in the spreadsheet; the minus sign keeps it readable without color. */
 function SignedCents({ cents }: { cents: number }) {
   return <span className={cn(cents < 0 && 'text-destructive')}>{formatCents(cents)}</span>;
-}
-
-/**
- * One block of the month (ADR 0045 note): a card with its title, and what the title means behind
- * an "ⓘ" beside it (InfoTip), out of the heading's name.
- */
-function Card({
-  title,
-  help,
-  className,
-  children,
-}: {
-  title: string;
-  help?: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
-  const id = `dashboard-${title.toLowerCase().replace(/\W+/g, '-')}`;
-  return (
-    <section
-      aria-labelledby={id}
-      className={cn('bg-card grid content-start gap-4 rounded-xl border p-4 md:p-6', className)}
-    >
-      <div className="flex items-center">
-        <h2 id={id} className="font-semibold">
-          {title}
-        </h2>
-        {help && <InfoTip term={title}>{help}</InfoTip>}
-      </div>
-      {children}
-    </section>
-  );
 }
 
 /** A labelled amount, with an optional line under it ("R$ 5.200,00 recebidos"). */

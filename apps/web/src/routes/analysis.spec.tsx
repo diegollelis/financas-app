@@ -135,11 +135,11 @@ describe('AnalysisPage', () => {
     const stat = async (label: string) =>
       nbsp((await screen.findByText(label, { selector: 'dt' })).nextElementSibling?.textContent);
     // Spending is the expenses only; the application is shown apart.
-    expect(await stat('Despesas')).toBe('R$ 4.900,00');
+    expect(await stat('Gastos')).toBe('R$ 4.900,00');
     expect(await stat('Para guardar')).toBe('R$ 500,00');
     // The balance is after every debit, as on the dashboard.
     expect(await stat('Saldo do período')).toBe('R$ 4.600,00');
-    const ranking = await screen.findByRole('region', { name: 'Despesas por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
     expect(within(ranking).queryByText('Investimentos')).not.toBeInTheDocument();
   });
 
@@ -169,14 +169,12 @@ describe('AnalysisPage', () => {
 
     renderApp(`/espacos/${houseId}/analise`);
 
-    const gasto = await screen.findByText('Despesas', { selector: 'dt' });
+    const gasto = await screen.findByText('Gastos', { selector: 'dt' });
     expect(nbsp(gasto.nextElementSibling?.textContent)).toBe(
-      'R$ 4.900,00R$ 900,00 a mais que nos 6 meses anteriores.',
+      'R$ 4.900,00+ R$ 900,00 sobre o período anterior',
     );
     const recebido = screen.getByText('Entradas', { selector: 'dt' });
-    expect(nbsp(recebido.nextElementSibling?.textContent)).toContain(
-      'O mesmo que nos 6 meses anteriores.',
-    );
+    expect(nbsp(recebido.nextElementSibling?.textContent)).toContain('Igual ao período anterior');
   });
 
   it('shows the last 6 months by default: totals, and every month even without transactions', async () => {
@@ -205,7 +203,7 @@ describe('AnalysisPage', () => {
     renderApp(`/espacos/${houseId}/analise?periodo=12&visao=efetivado&tipo=debitos`);
 
     expect(await screen.findByText('Últimos 12 meses, realizado, só saídas')).toBeInTheDocument();
-    const spent = await screen.findByText('Despesas no período');
+    const spent = await screen.findByText('Gastos no período');
     expect(nbsp(spent.nextElementSibling?.textContent)).toBe('R$ 2.700,00');
     expect(requestedRanges(fetchMock)).toEqual(['?from=2025-11&to=2026-10']);
     const table = await monthlyTable();
@@ -267,7 +265,7 @@ describe('AnalysisPage', () => {
     expect(
       await screen.findByText('Últimos 6 meses, previsto, só saídas, Mercado'),
     ).toBeInTheDocument();
-    const spent = screen.getByText('Despesas no período');
+    const spent = screen.getByText('Gastos no período');
     expect(nbsp(spent.nextElementSibling?.textContent)).toBe('R$ 1.300,00');
     expect(requestedRanges(fetchMock)).toHaveLength(1);
   });
@@ -287,9 +285,10 @@ describe('AnalysisPage', () => {
     mockAnalysis('2026-05', '2026-10');
     renderApp(`/espacos/${houseId}/analise`);
 
-    const ranking = await screen.findByRole('region', { name: 'Despesas por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
     const rows = within(ranking)
       .getAllByRole('button')
+      .filter((button) => !button.getAttribute('aria-label')?.startsWith('Sobre '))
       .map((button) => nbsp(button.textContent));
     expect(rows).toEqual([
       'AluguelR$ 3.600,0073,47% do totalmédia de R$ 600,00 por mês',
@@ -309,7 +308,7 @@ describe('AnalysisPage', () => {
     mockAnalysis('2026-05', '2026-10');
     const { router } = renderApp(`/espacos/${houseId}/analise`);
 
-    const ranking = await screen.findByRole('region', { name: 'Despesas por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
     const mercadoRow = within(ranking).getByRole('button', { name: /^Mercado/ });
     await userEvent.click(mercadoRow);
 
@@ -384,7 +383,7 @@ describe('AnalysisPage', () => {
     });
     renderApp(`/espacos/${houseId}/analise?de=2026-09&ate=2026-10`);
 
-    const methods = await screen.findByRole('region', { name: 'Despesas por meio de pagamento' });
+    const methods = await screen.findByRole('region', { name: 'Gastos por meio de pagamento' });
     expect(
       within(methods)
         .getAllByRole('listitem')
@@ -394,6 +393,84 @@ describe('AnalysisPage', () => {
       'Vale-alimentação/refeiçãoR$ 1.000,0033,33% do totalmédia de R$ 500,00 por mês',
       'Sem meioR$ 200,006,67% do totalmédia de R$ 100,00 por mês',
     ]);
+  });
+
+  describe('payment method and merchant filters (ADR 0037 note)', () => {
+    const bomPreco = {
+      id: '01920000-0000-7000-8000-000000000601',
+      name: 'Mercado Bom Preço',
+      archived: false,
+      inUse: true,
+    };
+    const feira = { ...bomPreco, id: '01920000-0000-7000-8000-000000000602', name: 'Feira' };
+    const withMethods = {
+      from: '2026-09',
+      to: '2026-10',
+      rows: [
+        row('2026-10', 'CREDIT', salario.id, 500_000, 500_000, null, 'TRANSFER'),
+        row('2026-10', 'DEBIT', mercado.id, 70_000, 70_000, bomPreco.id, 'CREDIT_CARD'),
+        row('2026-10', 'DEBIT', mercado.id, 20_000, 20_000, feira.id, 'PIX'),
+        row('2026-10', 'DEBIT', aluguel.id, 180_000, 180_000, null, 'PIX'),
+        row('2026-10', 'DEBIT', aluguel.id, 10_000),
+      ],
+    };
+    const range = '?de=2026-09&ate=2026-10';
+
+    it('reads the methods and merchants from the address, says them, and keeps only them', async () => {
+      mockAnalysis('2026-09', '2026-10', withMethods, [], undefined, [bomPreco, feira]);
+
+      renderApp(`/espacos/${houseId}/analise${range}&meios=PIX,sem&estabelecimentos=${feira.id}`);
+
+      expect(
+        await screen.findByText(/^De setembro de 2026 a outubro de 2026, previsto, 2 meios, Feira/),
+      ).toBeInTheDocument();
+      // Pix or no method, and only Feira: the R$ 200,00 of the market.
+      const spent = await screen.findByText('Gastos', { selector: 'dt' });
+      expect(nbsp(spent.nextElementSibling?.textContent)).toBe('R$ 200,00');
+      expect(
+        nbsp(screen.getByText('Entradas', { selector: 'dt' }).nextElementSibling?.textContent),
+      ).toBe('R$ 0,00');
+    });
+
+    it('clears what narrows the numbers, keeping the period and the view', async () => {
+      mockAnalysis('2026-09', '2026-10', withMethods, [], undefined, [bomPreco, feira]);
+      const { router } = renderApp(
+        `/espacos/${houseId}/analise${range}&visao=efetivado&tipo=debitos&meios=PIX`,
+      );
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Limpar filtros' }));
+
+      expect(router.state.location.search).toBe(`${range}&visao=efetivado`);
+      expect(screen.queryByRole('button', { name: 'Limpar filtros' })).not.toBeInTheDocument();
+    });
+
+    it('picks methods and merchants under "Mais filtros" from md, and leaves the single method out of the ranking', async () => {
+      stubPrefersDark(false, { desktop: true });
+      mockAnalysis('2026-09', '2026-10', withMethods, [], undefined, [bomPreco, feira]);
+      const { router } = renderApp(`/espacos/${houseId}/analise${range}`);
+
+      const filters = await screen.findByRole('region', { name: 'Filtros' });
+      expect(within(filters).queryByRole('group', { name: 'Meio de pagamento' })).toBeNull();
+      await userEvent.click(await within(filters).findByRole('button', { name: 'Mais filtros' }));
+      const methods = within(filters).getByRole('group', { name: 'Meio de pagamento' });
+      await userEvent.click(within(methods).getByRole('button', { name: 'Crédito' }));
+
+      expect(router.state.location.search).toContain('meios=CREDIT_CARD');
+      expect(within(methods).getByRole('button', { name: 'Crédito' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(within(filters).getByRole('button', { name: /^Mais filtros \(1\)/ })).toBeVisible();
+      // One method only: its ranking would be a single bar.
+      expect(
+        screen.queryByRole('region', { name: 'Gastos por meio de pagamento' }),
+      ).not.toBeInTheDocument();
+
+      await userEvent.click(within(filters).getByRole('button', { name: 'Estabelecimentos' }));
+      await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Feira' }));
+      await userEvent.keyboard('{Escape}');
+      expect(router.state.location.search).toContain(`estabelecimentos=${feira.id}`);
+    });
   });
 
   it('folds the smallest categories into "Outras", and shows them all on request', async () => {
@@ -418,7 +495,7 @@ describe('AnalysisPage', () => {
     });
     renderApp(`/espacos/${houseId}/analise`);
 
-    const ranking = await screen.findByRole('region', { name: 'Despesas por categoria' });
+    const ranking = await screen.findByRole('region', { name: 'Gastos por categoria' });
     expect(within(ranking).getAllByRole('button', { name: /^Despesa/ })).toHaveLength(7);
     expect(within(ranking).getByText('Outras 3 categorias')).toBeInTheDocument();
     await userEvent.click(
