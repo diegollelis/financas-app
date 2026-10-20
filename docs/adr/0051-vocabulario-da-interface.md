@@ -122,3 +122,13 @@ Uma revisão externa da prévia das telas mudou cinco pontos da primeira versão
 - **Os docs já escritos ficam como estão:** os ADRs anteriores usam os nomes antigos, porque registram o que foi decidido na época. Notas nos ADRs [0031](0031-painel-do-mes-previsto-e-efetivado.md) e [0047](0047-orcamento-real-por-destino.md) apontam para este.
 - **Implementação:** este ADR e o glossário entram primeiro; as telas, a planilha modelo e os e-mails mudam num PR seguinte, com capturas e o axe zerado.
 - **Quando rever:** se surgir uma API pública ou integrações de terceiros, os nomes do contrato (em inglês) entram num ADR próprio, com versionamento da API.
+
+## Nota ("Sobra para guardar", 2026-10-20)
+
+"Disponível para guardar" virou **"Sobra para guardar"**. O código continua `available`.
+
+- **"Disponível" confundia.** Em app de banco, "disponível" é o dinheiro na conta ("saldo disponível"), e aqui é uma conta do planejamento: entradas previstas menos despesas previstas. Lido ao lado de "Saldo atual", parecia um segundo saldo.
+- **Havia dois nomes para a mesma coisa.** O bloco se chamava "O que sobra para guardar" e o valor dentro dele, "Disponível para guardar".
+- **Um valor negativo lê melhor:** "Sobra para guardar: −R$ 500,00", com o aviso "Nada sobrou para guardar este mês", em vez de um "disponível" negativo. "Quanto sobra no fim do mês" é a expressão de todo dia.
+
+**A legenda da barra "Para onde vão as entradas"** deixa de mostrar "Saldo previsto R$ 0,00" num mês negativo. A barra não desenha um valor negativo, e a legenda repetia o termo do número grande com outro valor. Agora essa parte sai da barra e da legenda, e o aviso "As saídas passam das entradas em R$ X" continua.

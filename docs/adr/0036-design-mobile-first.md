@@ -212,3 +212,14 @@ Comparadas numa prévia com divisórias (como antes) e com linhas separadas em b
 - **Pessoas** passa a ter um cartão por pessoa, como Lançamentos: cada linha tem um valor ("Te deve R$ 100,00") e ações, e ficou parecendo de outro sistema ao lado das telas com cartões. O "Ver lançamentos" não quebra linha.
 - **Categorias e Estabelecimentos** viram **cartões compactos**: uma coluna no celular e duas a partir de lg (1024 px), em ordem alfabética. Ao contrário de Lançamentos, aqui a grade funciona: não há valores para comparar, e uma lista alfabética se lê bem lado a lado. Categorias cai pela metade da altura e ganha a mesma linguagem de blocos. As duas colunas começam em lg, não em md, porque a 768 px, ao lado da barra lateral, um nome longo com selo ("Reserva de emergência", "Meta") ficaria apertado.
 - As classes ficam num módulo só (`features/view-mode/row-styles.ts`: `CARD_LIST`, `CARD_ROW`, `TABLE_BOX`, `STRIPED_ROW`, `TILE_LIST`, `TILE_ROW`, `DIVIDED_LIST`), para as telas não divergirem.
+
+## Nota (o ícone de ajuda, 2026-10-20)
+
+O Painel ficou carregado de explicações: eram nove parágrafos de definição sempre à vista ("Como o mês termina se…", "Saldo atual: só o que…", "Guardado: já lançado…"). As definições passam para um ícone ⓘ ao lado do termo (`InfoTip`, `components/info-tip.tsx`):
+
+- **Abre no toque ou no clique,** nunca ao passar o mouse, que o celular não tem. É um Popover: fecha com Esc ou com um toque fora, o foco volta ao ícone, e o balão mantém 16 px de margem da borda.
+- **Alvo de 44 px no celular** e 32 px a partir de md, com o ícone de 16 px. O nome acessível é "Sobre <termo>", e o balão começa pelo termo.
+- **Ao lado do termo, fora do título:** num título de seção, o ícone fica depois do `h3`, para o nome da seção não levar "Sobre…".
+- **Só definições.** O que é verdade sobre o mês continua como texto à vista: os vencidos, os valores estimados, "As saídas passam das entradas", "Nada sobrou para guardar" e a origem do orçamento.
+
+O mesmo componente serve às outras telas com explicações longas, como Recorrências, Pessoas e a revisão da importação, quando forem revistas.
