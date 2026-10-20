@@ -45,10 +45,24 @@ export const personSchema = z.object({
    */
   isMember: z.boolean(),
   archived: z.boolean(),
-  /** Pending credits linked to them: what they owe you. */
+  /**
+   * Pending credits linked to them, of this competência or an earlier one: what they owe you now.
+   * Future installments wait for their month (ADR 0042 note).
+   */
   receivableCents: z.number().int().nonnegative(),
-  /** Pending debits linked to them: what you owe them. */
+  /** Pending debits linked to them, of this competência or an earlier one: what you owe them now. */
   payableCents: z.number().int().nonnegative(),
+  /** The part of receivableCents past its due date. */
+  overdueReceivableCents: z.number().int().nonnegative().default(0),
+  /** The part of payableCents past its due date. */
+  overduePayableCents: z.number().int().nonnegative().default(0),
+  /**
+   * Pending credits of later competências that are installments, or shares of one: what they will
+   * owe you. Months of a recurrence ahead are left out.
+   */
+  futureInstallmentsReceivableCents: z.number().int().nonnegative().default(0),
+  /** The same for debits: the installments you will owe them. */
+  futureInstallmentsPayableCents: z.number().int().nonnegative().default(0),
 });
 
 export type Person = z.infer<typeof personSchema>;

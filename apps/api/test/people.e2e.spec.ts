@@ -100,10 +100,16 @@ describe('people and splits', () => {
       expect(response.body).toMatchObject({ code: 'PERSON_EXISTS' });
     });
 
-    it('sums what is pending each way, and leaves out what was settled', async () => {
+    it('sums what is pending each way up to this month, and leaves out what was settled', async () => {
       const { browser, base, category } = await setup();
       const ana = await addPerson(browser, base, 'Ana');
-      const add = (type: 'CREDIT' | 'DEBIT', amountCents: number, settledAt: string | null) =>
+      const lastMonth = shiftPeriod(period, -1);
+      const add = (
+        type: 'CREDIT' | 'DEBIT',
+        amountCents: number,
+        settledAt: string | null,
+        when: { period: string; dueDate?: string } = { period },
+      ) =>
         browser
           .post(`${base}/transactions`)
           .send({
@@ -111,20 +117,63 @@ describe('people and splits', () => {
             description: 'Exemplo',
             categoryId: category(type === 'CREDIT' ? 'Outros' : 'Lazer', type).id,
             amountCents,
-            period,
             settledAt,
             personId: ana.id,
+            ...when,
           })
           .expect(201);
 
       await add('CREDIT', 15_000, null);
       await add('CREDIT', 5_000, `${period}-01`);
       await add('DEBIT', 40_000, null);
+      await add('CREDIT', 3_000, null, { period: lastMonth, dueDate: `${lastMonth}-10` });
+      await add('DEBIT', 7_000, null, { period: shiftPeriod(period, 1) });
 
       expect((await people(browser, base))[0]).toMatchObject({
         name: 'Ana',
-        receivableCents: 15_000,
+        receivableCents: 18_000,
         payableCents: 40_000,
+        overdueReceivableCents: 3_000,
+        overduePayableCents: 0,
+      });
+    });
+
+    it('puts the installments of later months apart, and leaves out the months of a recurrence ahead', async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const moradia = category('Moradia', 'DEBIT').id;
+      await browser
+        .post(`${base}/installments`)
+        .send({
+          type: 'DEBIT',
+          description: 'Geladeira',
+          categoryId: moradia,
+          amountCents: 300_000,
+          amountIs: 'TOTAL',
+          installments: 3,
+          firstPeriod: period,
+          split: [{ personId: ana.id, amountCents: 30_000 }],
+        })
+        .expect(201);
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Internet',
+          categoryId: moradia,
+          amountCents: 10_000,
+          startPeriod: period,
+          personId: ana.id,
+        })
+        .expect(201);
+      // Opening next month creates its month of the recurrence.
+      await browser.get(`${base}/transactions?period=${shiftPeriod(period, 1)}`).expect(200);
+
+      expect((await people(browser, base))[0]).toMatchObject({
+        receivableCents: 10_000,
+        payableCents: 10_000,
+        futureInstallmentsReceivableCents: 20_000,
+        futureInstallmentsPayableCents: 0,
       });
     });
 
