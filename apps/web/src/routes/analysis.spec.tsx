@@ -444,23 +444,26 @@ describe('AnalysisPage', () => {
       expect(screen.queryByRole('button', { name: 'Limpar filtros' })).not.toBeInTheDocument();
     });
 
-    it('picks methods and merchants under "Mais filtros" from md, and leaves the single method out of the ranking', async () => {
+    it('shows every filter from md, methods and merchants in the same menu as the categories', async () => {
       stubPrefersDark(false, { desktop: true });
       mockAnalysis('2026-09', '2026-10', withMethods, [], undefined, [bomPreco, feira]);
       const { router } = renderApp(`/espacos/${houseId}/analise${range}`);
 
       const filters = await screen.findByRole('region', { name: 'Filtros' });
-      expect(within(filters).queryByRole('group', { name: 'Meio de pagamento' })).toBeNull();
-      await userEvent.click(await within(filters).findByRole('button', { name: 'Mais filtros' }));
-      const methods = within(filters).getByRole('group', { name: 'Meio de pagamento' });
-      await userEvent.click(within(methods).getByRole('button', { name: 'Crédito' }));
+      // Nothing hidden: no "Mais filtros".
+      expect(within(filters).queryByRole('button', { name: /^Mais filtros/ })).toBeNull();
+      await userEvent.click(
+        await within(filters).findByRole('button', { name: 'Meio de pagamento' }),
+      );
+      await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Crédito' }));
+      expect(screen.getByRole('menuitemcheckbox', { name: 'Sem meio' })).toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
 
       expect(router.state.location.search).toContain('meios=CREDIT_CARD');
-      expect(within(methods).getByRole('button', { name: 'Crédito' })).toHaveAttribute(
-        'aria-pressed',
-        'true',
+      // The button says what is on.
+      expect(within(filters).getByRole('button', { name: 'Meio de pagamento' })).toHaveTextContent(
+        'Crédito',
       );
-      expect(within(filters).getByRole('button', { name: /^Mais filtros \(1\)/ })).toBeVisible();
       // One method only: its ranking would be a single bar.
       expect(
         screen.queryByRole('region', { name: 'Gastos por meio de pagamento' }),
@@ -470,6 +473,17 @@ describe('AnalysisPage', () => {
       await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Feira' }));
       await userEvent.keyboard('{Escape}');
       expect(router.state.location.search).toContain(`estabelecimentos=${feira.id}`);
+    });
+
+    it('calls it "Meio de recebimento" when only credits are on screen', async () => {
+      stubPrefersDark(false, { desktop: true });
+      mockAnalysis('2026-09', '2026-10', withMethods, [], undefined, [bomPreco, feira]);
+      renderApp(`/espacos/${houseId}/analise${range}&tipo=creditos&meios=TRANSFER,PIX`);
+
+      const filters = await screen.findByRole('region', { name: 'Filtros' });
+      expect(
+        await within(filters).findByRole('button', { name: 'Meio de recebimento' }),
+      ).toHaveTextContent('2 meios');
     });
   });
 

@@ -99,7 +99,7 @@ A mesma função `matches` aplica os dois a tudo: os totais, o mês a mês e os 
 
 **Na tela:**
 
-- **No computador,** Período, Visão, Tipo e Categorias ficam numa linha a partir de xl. Os meios (botões de seleção múltipla, com o rótulo "Meio de recebimento" quando o tipo é Entradas) e os estabelecimentos ficam em "Mais filtros", que mostra quantos estão ativos e já abre aberto quando há algum. **No celular,** tudo fica na folha "Filtros".
+- **Os seis filtros ficam à vista,** sem "Mais filtros": Período, Visão e Tipo, e embaixo Categorias, Meio de pagamento e Estabelecimentos. São duas colunas a partir de md e três a partir de xl; no celular, uma coluna na folha "Filtros". As três listas usam o mesmo menu com caixas de seleção, e o botão diz o que está escolhido ("Todos os meios", "Crédito", "2 meios"). O meio vira "Meio de recebimento" quando o tipo é Entradas, e "Sem meio" é a última opção. Os meios chegaram a ser botões, mas ocupavam duas linhas no computador e quatro no celular, e destoavam das outras duas listas.
 - **O subtítulo diz todos os filtros ativos** ("Últimos 6 meses, previsto, Crédito, Mercado Bom Preço"). Ao lado, "Limpar filtros" desfaz tipo, categorias, meios e estabelecimentos, e mantém o período e a visão.
 - **Com um meio só escolhido,** o ranking por meio sai, porque seria uma barra só, e o de categorias ocupa a largura toda.
 
