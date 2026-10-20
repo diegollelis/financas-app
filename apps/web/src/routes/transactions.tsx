@@ -3,6 +3,7 @@ import {
   formatIsoDate,
   formatPeriod,
   hasRole,
+  occurredOnRowLabels,
   OVERDUE_LABEL,
   paymentMethodLabels,
   PENDING_LABEL,
@@ -73,6 +74,7 @@ import {
 import { sortRows, useSort, type SortValue } from '@/features/view-mode/sort';
 import { SortableHead } from '@/features/view-mode/sortable-head';
 import { useShowsTable } from '@/features/view-mode/view-mode';
+import { CARD_LIST, CARD_ROW, STRIPED_ROW, TABLE_BOX } from '@/features/view-mode/row-styles';
 import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -88,20 +90,89 @@ const sectionTitleId = (type: TransactionType) => `transactions-${type}`;
 const showError = (error: unknown) => toast.error(apiErrorMessage(error));
 
 /** Colors as in the spreadsheet: red while pending past the due date, green once settled. */
-function StatusBadge({ transaction, today }: { transaction: Transaction; today: string }) {
+/**
+ * "+ R$ 45,00" for money in, "− R$ 69,90" (a real minus sign) for money out: the sign always,
+ * the color only on top of it (ADR 0036 note).
+ */
+function signedCents(type: Transaction['type'], cents: number) {
+  return `${type === 'CREDIT' ? '+' : '−'} ${formatCents(cents)}`;
+}
+
+/**
+ * Settled and overdue always show; pending only to whoever cannot act on it, since the
+ * "○ Pagar / Receber" button already says it to an EDITOR (ADR 0036 note).
+ */
+/** "28/09": a day of the competência's year needs no year; another one keeps it. */
+function dayInPeriod(iso: string, period: string) {
+  const date = formatIsoDate(iso);
+  return iso.slice(0, 4) === period.slice(0, 4) ? date.slice(0, 5) : date;
+}
+
+function StatusBadge({
+  transaction,
+  today,
+  canEdit,
+}: {
+  transaction: Transaction;
+  today: string;
+  canEdit: boolean;
+}) {
   const status = transactionStatus(transaction, today);
   if (status === 'SETTLED') {
-    // What happened, in its own word; the year only when it is not the competência's.
-    const date = formatIsoDate(transaction.settledAt ?? '');
-    const sameYear = transaction.settledAt?.slice(0, 4) === transaction.period.slice(0, 4);
+    // What happened, in its own word.
     return (
       <Badge variant="success">
-        {settledLabels[transaction.type]} em {sameYear ? date.slice(0, 5) : date}
+        {settledLabels[transaction.type]} em{' '}
+        {dayInPeriod(transaction.settledAt ?? '', transaction.period)}
       </Badge>
     );
   }
   if (status === 'OVERDUE') return <Badge variant="destructive">{OVERDUE_LABEL}</Badge>;
-  return <Badge variant="outline">{PENDING_LABEL}</Badge>;
+  return canEdit ? null : <Badge variant="outline">{PENDING_LABEL}</Badge>;
+}
+
+/**
+ * What the month adds up to, whatever the search or the filter: what comes in, what goes out
+ * and how it ends if everything is paid and received, the Painel's "Saldo previsto" (ADR 0036
+ * note).
+ */
+function MonthTotals({ transactions }: { transactions: Transaction[] }) {
+  const sum = (type: Transaction['type']) =>
+    transactions
+      .filter((transaction) => transaction.type === type)
+      .reduce((total, transaction) => total + transaction.amountCents, 0);
+  const credits = sum('CREDIT');
+  const debits = sum('DEBIT');
+  const balance = credits - debits;
+  const items = [
+    { label: 'Entradas', value: signedCents('CREDIT', credits), tone: 'text-credit-foreground' },
+    { label: 'Saídas', value: signedCents('DEBIT', debits), tone: '' },
+    {
+      label: 'Saldo previsto',
+      value: formatCents(balance),
+      tone: balance < 0 ? 'text-destructive' : '',
+    },
+  ];
+  return (
+    // On the phone one line each, the label beside the amount, so a large amount never wraps;
+    // three columns from sm.
+    <dl
+      aria-label="Resumo do mês"
+      className="bg-card grid gap-1.5 rounded-xl border p-3 sm:grid-cols-3 sm:gap-3"
+    >
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex items-baseline justify-between gap-3 sm:grid sm:justify-start sm:gap-0.5"
+        >
+          <dt className="text-muted-foreground text-sm">{item.label}</dt>
+          <dd className={`font-semibold whitespace-nowrap tabular-nums ${item.tone}`}>
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 /** Asks before deleting, naming the transaction (ADR 0036). */
@@ -264,7 +335,7 @@ function LinkBadges({
       {transaction.recurrenceId && (
         <Badge variant="secondary">
           <Repeat aria-hidden />
-          Todo mês
+          {transaction.recurrenceIntervalMonths === 12 ? 'Todo ano' : 'Todo mês'}
         </Badge>
       )}
       {transaction.installment && (
@@ -298,6 +369,8 @@ type RowProps = {
   personName: string | null;
   /** The people its shares are owed by, when it is a split debit. */
   sharedWith: string[];
+  /** Its shares with their amounts, for "Tornar recorrente" (ADR 0052 note). */
+  shares: { name: string; amountCents: number }[];
   canEdit: boolean;
   today: string;
   onEdit: (transaction: Transaction, returnFocusTo: HTMLElement | null) => void;
@@ -311,9 +384,10 @@ function useRowActions({
   workspaceId,
   transaction,
   sharedWith,
+  shares,
   today,
   onEdit,
-}: Pick<RowProps, 'workspaceId' | 'transaction' | 'sharedWith' | 'today' | 'onEdit'>) {
+}: Pick<RowProps, 'workspaceId' | 'transaction' | 'sharedWith' | 'shares' | 'today' | 'onEdit'>) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [repeating, setRepeating] = useState(false);
@@ -326,8 +400,9 @@ function useRowActions({
   const estimated = transaction.amountEstimated && !transaction.settledAt;
   // Part of a recurrence or of an installment plan, which can be ended from here (ADR 0038).
   const inSeries = Boolean(transaction.recurrenceId ?? transaction.installment);
-  // Launched once, not a split nor a share: it can become a recurrence ("Tornar recorrente").
-  const repeatable = !inSeries && !transaction.splitOfId && sharedWith.length === 0;
+  // Launched once and not a share: it can become a recurrence ("Tornar recorrente"), a split one
+  // with its shares (ADR 0052 note).
+  const repeatable = !inSeries && !transaction.splitOfId;
   const labels = settleActionLabels[transaction.type];
   const settledToast =
     transaction.type === 'CREDIT' ? 'Marcado como recebido' : 'Marcado como pago';
@@ -429,6 +504,7 @@ function useRowActions({
           <RepeatDialog
             workspaceId={workspaceId}
             transaction={transaction}
+            shares={shares}
             open={repeating}
             onOpenChange={setRepeating}
             returnFocusTo={actionsRef}
@@ -493,12 +569,21 @@ function SettleButton({
   );
 }
 
-/** The amount, and "Estimado" under it while a variable bill's month is an estimate. */
+/**
+ * The amount with its sign, money in in green (ADR 0036 note), and "Estimado" under it while a
+ * variable bill's month is an estimate.
+ */
 function Amount({ transaction, estimated }: { transaction: Transaction; estimated: boolean }) {
   return (
     <span className="grid justify-items-end">
-      <span className="text-base font-semibold tabular-nums">
-        {formatCents(transaction.amountCents)}
+      <span
+        className={
+          transaction.type === 'CREDIT'
+            ? 'text-credit-foreground text-base font-semibold whitespace-nowrap tabular-nums'
+            : 'text-base font-semibold whitespace-nowrap tabular-nums'
+        }
+      >
+        {signedCents(transaction.type, transaction.amountCents)}
       </span>
       {/* In words, in text colors: an estimate is not a status of its own (ADR 0038). */}
       {estimated && <span className="text-muted-foreground text-xs">Estimado</span>}
@@ -515,7 +600,7 @@ function TransactionItem(props: RowProps) {
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
-    <li className="flex items-start gap-3 py-3">
+    <li className={`${CARD_ROW} flex items-start gap-3`}>
       <div className="grid min-w-0 flex-1 justify-items-start gap-1">
         <p className="font-medium break-words">{transaction.description}</p>
         <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
@@ -524,13 +609,20 @@ function TransactionItem(props: RowProps) {
           {transaction.paymentMethod && (
             <span>{paymentMethodLabels[transaction.paymentMethod]}</span>
           )}
+          {/* The day it happened (ADR 0055), before when it is due. */}
+          {transaction.occurredOn && (
+            <span>
+              {occurredOnRowLabels[transaction.type]}{' '}
+              {dayInPeriod(transaction.occurredOn, transaction.period)}
+            </span>
+          )}
           {transaction.dueDate && <span>Vence em {formatIsoDate(transaction.dueDate)}</span>}
         </p>
         {transaction.notes && (
           <p className="text-muted-foreground text-sm break-words">{transaction.notes}</p>
         )}
         <span className="flex flex-wrap gap-1.5">
-          <StatusBadge transaction={transaction} today={today} />
+          <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
           <LinkBadges transaction={transaction} personName={personName} sharedWith={sharedWith} />
         </span>
       </div>
@@ -555,9 +647,20 @@ function TransactionRow(props: RowProps) {
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
-    <TableRow>
+    // Stripes instead of lines, and a stronger fill under the pointer (ADR 0036 note).
+    <TableRow className={STRIPED_ROW}>
+      {/* The day it happened (ADR 0055): a column of its own, to sort a card statement by. */}
       <TableCell className="tabular-nums">
-        {transaction.dueDate ? formatIsoDate(transaction.dueDate) : '—'}
+        {transaction.occurredOn ? dayInPeriod(transaction.occurredOn, transaction.period) : '—'}
+      </TableCell>
+      <TableCell>
+        {/* The status under the date: "Vencido" or "Pago em" only, so it has no column of its own. */}
+        <div className="grid justify-items-start gap-1">
+          <span className="tabular-nums">
+            {transaction.dueDate ? formatIsoDate(transaction.dueDate) : '—'}
+          </span>
+          <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
+        </div>
       </TableCell>
       <TableCell className="whitespace-normal">
         <div className="grid justify-items-start gap-1">
@@ -572,19 +675,17 @@ function TransactionRow(props: RowProps) {
       </TableCell>
       <TableCell className="whitespace-normal">{category?.name ?? 'Categoria'}</TableCell>
       <TableCell className="whitespace-normal">
-        {/* Where and how (ADR 0054): the method under the merchant, in the same column. */}
+        {/* Where and how (ADR 0054): the merchant, the method under it in muted text, which
+            "Onde / Meio" names; a dash only when there is neither. */}
         <span className="grid">
-          {/* Always the merchant first, a dash without one, so the method is never read as one. */}
-          <span>{merchantName ?? '—'}</span>
+          {merchantName && <span>{merchantName}</span>}
           {transaction.paymentMethod && (
             <span className="text-muted-foreground">
               {paymentMethodLabels[transaction.paymentMethod]}
             </span>
           )}
+          {!merchantName && !transaction.paymentMethod && <span>—</span>}
         </span>
-      </TableCell>
-      <TableCell>
-        <StatusBadge transaction={transaction} today={today} />
       </TableCell>
       <TableCell className="text-right">
         <Amount transaction={transaction} estimated={estimated} />
@@ -601,7 +702,7 @@ function TransactionRow(props: RowProps) {
   );
 }
 
-type SortKey = 'dueDate' | 'description' | 'category' | 'merchant' | 'amount';
+type SortKey = 'occurredOn' | 'dueDate' | 'description' | 'category' | 'merchant' | 'amount';
 
 /** A section's transactions as a table, sorted by the column clicked (by due date at first). */
 function TransactionTable({
@@ -619,6 +720,7 @@ function TransactionTable({
 }) {
   const sort = useSort<SortKey>('dueDate');
   const values: Record<SortKey, (transaction: Transaction) => SortValue> = {
+    occurredOn: (transaction) => transaction.occurredOn,
     dueDate: (transaction) => transaction.dueDate,
     description: (transaction) => transaction.description,
     category: categoryName,
@@ -635,25 +737,28 @@ function TransactionTable({
     />
   );
   return (
-    <div className="rounded-xl border px-2">
+    <div className={TABLE_BOX}>
       {/* Fixed widths: the tables of both sections line up, and the description takes the rest. */}
       <Table className="table-fixed">
         <colgroup>
-          <col className="w-28" />
+          {/* The day it happened: "28/09". */}
+          <col className="w-24" />
+          {/* The due date, with "Recebido em 05/10" under it. */}
+          <col className="w-36" />
           <col />
           <col className="w-32" />
+          <col className="w-44" />
+          {/* Room for the sign: "+ R$ 5.200,00" (ADR 0036 note). */}
           <col className="w-36" />
-          <col className="w-32" />
-          <col className="w-28" />
           {canEdit && <col className="w-32" />}
         </colgroup>
         <TableHeader>
           <TableRow>
+            {head('occurredOn', 'Data')}
             {head('dueDate', 'Vencimento')}
             {head('description', 'Descrição')}
             {head('category', 'Categoria')}
-            {head('merchant', 'Estabelecimento / Meio')}
-            <TableHead>Situação</TableHead>
+            {head('merchant', 'Onde / Meio')}
             {head('amount', 'Valor', 'right')}
             {canEdit && (
               <TableHead>
@@ -702,6 +807,13 @@ export function TransactionsPage() {
   const asTable = useShowsTable('lancamentos');
   const categoryName = (transaction: Transaction) =>
     categories.data?.find((item) => item.id === transaction.categoryId)?.name ?? null;
+  const sharesOf = (transaction: Transaction) =>
+    (transactions.data ?? [])
+      .filter((item) => item.splitOfId === transaction.id)
+      .map((item) => ({
+        name: personName(item.personId) ?? 'alguém',
+        amountCents: item.amountCents,
+      }));
   // One transaction, as a list item or a table row: the same data either way.
   const row = (transaction: Transaction, Row: typeof TransactionItem) => (
     <Row
@@ -712,9 +824,8 @@ export function TransactionsPage() {
       merchantName={merchantName(transaction.merchantId)}
       personName={personName(transaction.personId)}
       // The shares of a split debit are credits of the same competência.
-      sharedWith={(transactions.data ?? [])
-        .filter((item) => item.splitOfId === transaction.id)
-        .map((item) => personName(item.personId) ?? 'alguém')}
+      sharedWith={sharesOf(transaction).map((share) => share.name)}
+      shares={sharesOf(transaction)}
       canEdit={canEdit}
       today={today}
       onEdit={openForm}
@@ -755,6 +866,7 @@ export function TransactionsPage() {
       >
         <PeriodNav period={period} />
         <ViewModeToggle page="lancamentos" />
+        {ready && transactions.data.length > 0 && <MonthTotals transactions={transactions.data} />}
         {ready && transactions.data.length > 0 && (
           // The search on a row of its own at every width: beside the filter it was squeezed to a
           // sliver once the filter read "Pagos e recebidos" (ADR 0051).
@@ -811,7 +923,7 @@ export function TransactionsPage() {
                         {items.length} de {all.length}
                       </span>
                     )}
-                    <span>Total: {formatCents(total)}</span>
+                    <span>Total: {signedCents(type, total)}</span>
                   </span>
                 </div>
                 {items.length === 0 ? (
@@ -829,7 +941,9 @@ export function TransactionsPage() {
                     renderRow={(transaction) => row(transaction, TransactionRow)}
                   />
                 ) : (
-                  <ul className="divide-y rounded-xl border px-4">
+                  // One card per transaction, 8px apart: where one ends and the next begins
+                  // shows at a glance (ADR 0036 note). Still one column, read top to bottom.
+                  <ul className={CARD_LIST}>
                     {items.map((transaction) => row(transaction, TransactionItem))}
                   </ul>
                 )}
@@ -848,6 +962,7 @@ export function TransactionsPage() {
             merchants={merchants.data}
             hints={hints.data}
             editing={form.editing}
+            editingIsSplit={Boolean(form.editing && sharesOf(form.editing).length > 0)}
             open={form.open}
             onOpenChange={(open) => setForm((current) => ({ ...current, open }))}
             returnFocusTo={form.returnFocusTo}

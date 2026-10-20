@@ -32,9 +32,11 @@ const parsedRow = (line: number, overrides: Partial<TemplateRow> = {}): Template
   notes: null,
   categoryName: 'mercado',
   merchantName: '',
+  personName: '',
   paymentMethod: null,
   amountCents: 64_035,
   period: '2026-09',
+  occurredOn: null,
   dueDate: '2026-09-10',
   settledAt: null,
   ...overrides,
@@ -131,8 +133,15 @@ describe('toTransaction', () => {
         period: '2026-09',
         dueDate: '2026-09-10',
         settledAt: null,
+        occurredOn: null,
       },
     });
+  });
+
+  it('carries the day of the purchase (ADR 0055)', () => {
+    const result = toTransaction(reviewRow({ occurredOn: '2026-08-28' }), mercado.id);
+
+    expect(result).toMatchObject({ ok: true, transaction: { occurredOn: '2026-08-28' } });
   });
 
   it('names the merchant only when the row has one (ADR 0053)', () => {

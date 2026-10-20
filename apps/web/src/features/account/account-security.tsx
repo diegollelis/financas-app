@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
 import { useRequestPasswordReset } from '@/features/auth/use-auth-mutations';
 import { useCurrentUser } from '@/features/auth/use-me';
+import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import {
   useAccountSecurity,
   useChangeEmail,
@@ -365,7 +366,7 @@ export function ConnectedDevices() {
       <h2 id="account-devices" className="font-medium">
         Aparelhos conectados
       </h2>
-      <ul className="divide-y rounded-xl border px-4">
+      <ul className={DIVIDED_LIST}>
         {shown.map((session) => (
           <li key={session.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
             <span className="grid gap-0.5">

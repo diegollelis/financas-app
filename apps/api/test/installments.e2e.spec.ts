@@ -27,6 +27,11 @@ const installmentRoutes: WorkspaceRoute[] = [
   { method: 'get', path: (id) => `/api/workspaces/${id}/installments` },
   { method: 'post', path: (id) => `/api/workspaces/${id}/installments`, body: {} },
   {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/installments/from-transaction`,
+    body: {},
+  },
+  {
     method: 'patch',
     path: (id) => `/api/workspaces/${id}/installments/01920000-0000-7000-8000-000000000999`,
     body: { description: 'Intruso' },
@@ -231,6 +236,118 @@ describe('installments', () => {
     expect(refused.body).toMatchObject({ code: 'INVALID_PERSON' });
   });
 
+  describe('a purchase already running (ADR 0055)', () => {
+    it('creates only the installments from the first number on, numbered as the bill', async () => {
+      const { create, fridge, transactionsOf } = await setUp();
+
+      const plan = await create(
+        fridge({ installments: 10, firstNumber: 3, amountCents: 5_000, amountIs: 'INSTALLMENT' }),
+      );
+
+      // Installments 3 to 10: eight of them, from this month on.
+      expect(plan).toMatchObject({
+        installments: 10,
+        firstNumber: 3,
+        totalCents: 40_000,
+        pendingCount: 8,
+        lastPendingPeriod: month(7),
+      });
+      expect((await transactionsOf(thisMonth))[0]?.installment).toEqual({
+        planId: plan.id,
+        number: 3,
+        count: 10,
+      });
+      expect((await transactionsOf(month(7)))[0]?.installment).toMatchObject({ number: 10 });
+      expect(await transactionsOf(month(8))).toEqual([]);
+    });
+
+    it('takes a total as the total of the installments created, and names the shares as the bill', async () => {
+      const { create, fridge, transactionsOf } = await setUp();
+
+      const plan = await create(
+        fridge({
+          installments: 4,
+          firstNumber: 3,
+          amountCents: 10_001,
+          split: [{ newPersonName: 'Ana', amountCents: 5_000 }],
+        }),
+      );
+
+      expect(plan).toMatchObject({ totalCents: 10_001, pendingCount: 2 });
+      const last = await transactionsOf(month(1));
+      expect(last.find((t) => t.installment)?.amountCents).toBe(5_001);
+      expect(last.find((t) => t.splitOfId !== null)).toMatchObject({
+        description: 'Geladeira (4/4)',
+        amountCents: 2_500,
+      });
+    });
+
+    it('refuses a first number past the installments, also when editing', async () => {
+      const { create, fridge, base, browser } = await setUp();
+
+      const refused = await browser
+        .post(`${base}/installments`)
+        .send(fridge({ firstNumber: 4 }))
+        .expect(400);
+      expect(refused.body).toMatchObject({
+        message: 'A parcela inicial passa do número de parcelas.',
+      });
+      const plan = await create(fridge());
+      await browser.patch(`${base}/installments/${plan.id}`).send({ firstNumber: 4 }).expect(400);
+    });
+
+    it('remakes the installments from a new first number while none is settled', async () => {
+      const { create, fridge, base, browser, transactionsOf } = await setUp();
+      const plan = await create(fridge({ installments: 5 }));
+
+      const response = await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({ firstNumber: 4 })
+        .expect(200);
+
+      expect(installmentPlanSchema.parse(response.body)).toMatchObject({
+        firstNumber: 4,
+        totalCents: 100_000,
+        pendingCount: 2,
+      });
+      expect((await transactionsOf(thisMonth))[0]?.installment).toMatchObject({
+        number: 4,
+        count: 5,
+      });
+    });
+  });
+
+  describe('the day of the purchase (ADR 0055 note)', () => {
+    it('gives it to every installment and share, and a change reaches the pending ones', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const day = (n: number) => `${month(-1)}-${n}`;
+      const plan = await create(
+        fridge({ occurredOn: day(28), split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }),
+      );
+      expect(plan.occurredOn).toBe(day(28));
+      const days = async (offset: number) =>
+        (await transactionsOf(month(offset))).map((t) => t.occurredOn);
+      expect(await days(2)).toEqual([day(28), day(28)]);
+      // This month's installment is already paid: history, it keeps its day.
+      const paid = (await transactionsOf(thisMonth)).find((t) => t.installment)!;
+      await browser
+        .patch(`${base}/transactions/${paid.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      const response = await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({ occurredOn: day(27) })
+        .expect(200);
+
+      expect(installmentPlanSchema.parse(response.body).occurredOn).toBe(day(27));
+      expect((await transactionsOf(thisMonth)).find((t) => t.installment)?.occurredOn).toBe(
+        day(28),
+      );
+      expect(await days(1)).toEqual([day(27), day(27)]);
+    });
+  });
+
   describe('editing and deleting (ADR 0038 note)', () => {
     it('changes what it is in the pending installments, never in the settled ones', async () => {
       const { create, fridge, transactionsOf, base, browser, categoryId } = await setUp();
@@ -371,29 +488,34 @@ describe('installments', () => {
       const months = await Promise.all([0, 1, 2].map((offset) => transactionsOf(month(offset))));
       const sharesOf = (transactions: (typeof months)[number]) => {
         const installment = transactions.find((t) => t.installment !== null)!;
-        return transactions
-          .filter((t) => t.splitOfId === installment.id)
-          .map(({ type, description, amountCents, categoryId: category, settledAt }) => ({
-            type,
-            description,
-            amountCents,
-            category,
-            settledAt,
-          }))
-          .sort((a, b) => a.description.localeCompare(b.description));
+        return (
+          transactions
+            .filter((t) => t.splitOfId === installment.id)
+            .map(({ type, description, amountCents, categoryId: category, settledAt }) => ({
+              type,
+              description,
+              amountCents,
+              category,
+              settledAt,
+            }))
+            // The same description for both: the larger share (Ana's) first.
+            .sort(
+              (a, b) => a.description.localeCompare(b.description) || b.amountCents - a.amountCents,
+            )
+        );
       };
       const reembolso = categoryId('Reembolso', 'CREDIT');
       expect(sharesOf(months[0]!)).toEqual([
         {
           type: 'CREDIT',
-          description: 'Ana: parte de Geladeira (1/3)',
+          description: 'Geladeira (1/3)',
           amountCents: 11_111,
           category: reembolso,
           settledAt: null,
         },
         {
           type: 'CREDIT',
-          description: 'Bruno: parte de Geladeira (1/3)',
+          description: 'Geladeira (1/3)',
           amountCents: 3_333,
           category: reembolso,
           settledAt: null,
@@ -419,9 +541,50 @@ describe('installments', () => {
 
       const last = await transactionsOf(month(9));
       expect(last.find((t) => t.splitOfId !== null)).toMatchObject({
-        description: 'Ana: parte de Geladeira (10/10)',
+        description: 'Geladeira (10/10)',
         amountCents: 4_995,
       });
+    });
+
+    it('renames the pending shares with the plan, each with its installment (ADR 0052 note)', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const plan = await create(fridge({ split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }));
+      // This month's share is already paid back: history, it keeps its name.
+      const [paid] = (await transactionsOf(thisMonth)).filter((t) => t.splitOfId !== null);
+      await browser
+        .patch(`${base}/transactions/${paid?.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      await browser
+        .patch(`${base}/installments/${plan.id}`)
+        .send({ description: 'Geladeira nova' })
+        .expect(200);
+
+      const shareOf = async (offset: number) =>
+        (await transactionsOf(month(offset))).find((t) => t.splitOfId !== null)?.description;
+      expect(await shareOf(0)).toBe('Geladeira (1/3)');
+      expect(await shareOf(1)).toBe('Geladeira nova (2/3)');
+      expect(await shareOf(2)).toBe('Geladeira nova (3/3)');
+    });
+
+    it('makes each share due with its installment, and moves the pending ones (ADR 0052 note)', async () => {
+      const { create, fridge, transactionsOf, base, browser } = await setUp();
+      const plan = await create(fridge({ split: [{ newPersonName: 'Ana', amountCents: 30_000 }] }));
+      const shareOf = async (offset: number) =>
+        (await transactionsOf(month(offset))).find((t) => t.splitOfId !== null)!;
+      expect((await shareOf(1)).dueDate).toBe(`${month(1)}-15`);
+      const paid = await shareOf(0);
+      await browser
+        .patch(`${base}/transactions/${paid.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      await browser.patch(`${base}/installments/${plan.id}`).send({ dueDay: 20 }).expect(200);
+
+      expect((await shareOf(0)).dueDate).toBe(`${thisMonth}-15`);
+      expect((await shareOf(1)).dueDate).toBe(`${month(1)}-20`);
+      expect((await shareOf(2)).dueDate).toBe(`${month(2)}-20`);
     });
 
     it('ends it with the shares still pending of the installments removed', async () => {
@@ -451,6 +614,196 @@ describe('installments', () => {
         expect.objectContaining({ id: paidShare.id, splitOfId: null }),
       ]);
       expect(await transactionsOf(month(1))).toEqual([]);
+    });
+  });
+
+  describe('"Tornar parcelado" (ADR 0038 note)', () => {
+    async function launched(
+      browser: Browser,
+      base: string,
+      categoryId: string,
+      fields: Record<string, unknown> = {},
+    ) {
+      const response = await browser
+        .post(`${base}/transactions`)
+        .send({
+          type: 'DEBIT',
+          description: 'Notebook',
+          categoryId,
+          amountCents: 50_000,
+          period: thisMonth,
+          dueDate: `${month(1)}-10`,
+          occurredOn: `${thisMonth}-02`,
+          ...fields,
+        })
+        .expect(201);
+      return response.body as { id: string };
+    }
+
+    it('adopts the transaction as its installment and creates the next ones', async () => {
+      const { browser, base, categoryId, transactionsOf, plans } = await setUp();
+      const notebook = await launched(browser, base, categoryId('Compras', 'DEBIT'));
+
+      const response = await browser
+        .post(`${base}/installments/from-transaction`)
+        .send({
+          transactionId: notebook.id,
+          installments: 10,
+          firstNumber: 3,
+          amountIs: 'INSTALLMENT',
+        })
+        .expect(201);
+
+      expect(installmentPlanSchema.parse(response.body)).toMatchObject({
+        description: 'Notebook',
+        installments: 10,
+        firstNumber: 3,
+        totalCents: 400_000,
+        firstPeriod: thisMonth,
+        dueDay: 10,
+        dueMonthOffset: 1,
+        occurredOn: `${thisMonth}-02`,
+        pendingCount: 8,
+      });
+      // This month's is the same transaction, now 3/10; the next is 4/10, due the month after.
+      const now = await transactionsOf(thisMonth);
+      expect(now).toEqual([
+        expect.objectContaining({
+          id: notebook.id,
+          amountCents: 50_000,
+          installment: expect.objectContaining({ number: 3, count: 10 }) as unknown,
+        }),
+      ]);
+      expect((await transactionsOf(month(1)))[0]).toMatchObject({
+        amountCents: 50_000,
+        dueDate: `${month(2)}-10`,
+        occurredOn: `${thisMonth}-02`,
+        installment: { number: 4, count: 10 },
+      });
+      expect((await transactionsOf(month(7)))[0]?.installment?.number).toBe(10);
+      expect(await transactionsOf(month(8))).toEqual([]);
+      expect(await plans()).toHaveLength(1);
+    });
+
+    it('splits a total like a new plan, this transaction becoming its first installment', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const sofa = await launched(browser, base, categoryId('Compras', 'DEBIT'), {
+        description: 'Sofá',
+        amountCents: 100_000,
+      });
+
+      await browser
+        .post(`${base}/installments/from-transaction`)
+        .send({ transactionId: sofa.id, installments: 3, amountIs: 'TOTAL' })
+        .expect(201);
+
+      expect((await transactionsOf(thisMonth))[0]).toMatchObject({
+        id: sofa.id,
+        amountCents: 33_333,
+        installment: { number: 1, count: 3 },
+      });
+      expect((await transactionsOf(month(2)))[0]?.amountCents).toBe(33_334);
+    });
+
+    it('gives the adopted transaction back, with its amount, when the plan is deleted or ended', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const compras = categoryId('Compras', 'DEBIT');
+      const sofa = await launched(browser, base, compras, {
+        description: 'Sofá',
+        amountCents: 100_000,
+      });
+      const plan = installmentPlanSchema.parse(
+        (
+          await browser
+            .post(`${base}/installments/from-transaction`)
+            .send({ transactionId: sofa.id, installments: 3, amountIs: 'TOTAL' })
+            .expect(201)
+        ).body,
+      );
+
+      // Nothing settled: the plan goes, the sofa comes back as it was.
+      await browser.delete(`${base}/installments/${plan.id}`).expect(204);
+      expect(await transactionsOf(thisMonth)).toEqual([
+        expect.objectContaining({ id: sofa.id, installment: null, amountCents: 100_000 }),
+      ]);
+      expect(await transactionsOf(month(1))).toEqual([]);
+
+      // With a settled installment, ending keeps the paid one and gives this one back.
+      const tv = await launched(browser, base, compras, { description: 'TV', amountCents: 30_000 });
+      const tvPlan = installmentPlanSchema.parse(
+        (
+          await browser
+            .post(`${base}/installments/from-transaction`)
+            .send({
+              transactionId: tv.id,
+              installments: 3,
+              firstNumber: 2,
+              amountIs: 'INSTALLMENT',
+            })
+            .expect(201)
+        ).body,
+      );
+      const last = (await transactionsOf(month(1))).find((t) => t.description === 'TV')!;
+      await browser
+        .patch(`${base}/transactions/${last.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      await browser.delete(`${base}/installments/${tvPlan.id}`).expect(204);
+      expect((await transactionsOf(thisMonth)).find((t) => t.id === tv.id)).toMatchObject({
+        installment: null,
+        amountCents: 30_000,
+      });
+    });
+
+    it('refuses one in a plan or a recurrence, a share, a split one, a settled total, the last installment', async () => {
+      const { browser, base, categoryId, create, fridge, transactionsOf } = await setUp();
+      const compras = categoryId('Compras', 'DEBIT');
+      await create(fridge({ firstPeriod: month(1) }));
+      const installment = (await transactionsOf(month(1))).find((item) => item.installment)!;
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Internet',
+          categoryId: compras,
+          amountCents: 10_000,
+          startPeriod: thisMonth,
+        })
+        .expect(201);
+      const month0 = await transactionsOf(thisMonth);
+      const generated = month0.find((item) => item.recurrenceId)!;
+      const split = await launched(browser, base, compras, {
+        description: 'Jantar',
+        split: [{ newPersonName: 'Ana', amountCents: 10_000 }],
+      });
+      const share = (await transactionsOf(thisMonth)).find((item) => item.splitOfId === split.id)!;
+      const settled = await launched(browser, base, compras, { settledAt: `${thisMonth}-02` });
+      const once = await launched(browser, base, compras);
+      const make = (body: object) =>
+        browser.post(`${base}/installments/from-transaction`).send(body);
+
+      for (const id of [installment.id, generated.id, split.id, share.id]) {
+        const response = await make({
+          transactionId: id,
+          installments: 3,
+          amountIs: 'INSTALLMENT',
+        });
+        expect(response.status).toBe(409);
+        expect(response.body).toMatchObject({ code: 'NOT_INSTALLABLE' });
+      }
+      await make({ transactionId: settled.id, installments: 3, amountIs: 'TOTAL' }).expect(409);
+      // Settled, as an installment's amount it does not change: accepted.
+      await make({ transactionId: settled.id, installments: 3, amountIs: 'INSTALLMENT' }).expect(
+        201,
+      );
+      // The last installment has nothing after it.
+      await make({
+        transactionId: once.id,
+        installments: 3,
+        firstNumber: 3,
+        amountIs: 'INSTALLMENT',
+      }).expect(400);
     });
   });
 

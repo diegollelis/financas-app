@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCurrentUser } from '@/features/auth/use-me';
+import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { NewWorkspaceDialog } from '@/features/workspaces/new-workspace-dialog';
 import {
@@ -150,7 +151,7 @@ function Members({ workspace }: { workspace: Workspace }) {
       </h2>
       <QueryState queries={[members]} skeleton={<ListSkeleton rows={2} />} />
       {members.isSuccess && (
-        <ul aria-labelledby="members-title" className="divide-y rounded-xl border px-4">
+        <ul aria-labelledby="members-title" className={DIVIDED_LIST}>
           {members.data.map((member) => (
             <MemberRow key={member.userId} workspace={workspace} member={member} />
           ))}
@@ -395,7 +396,7 @@ function Invitations({ workspaceId }: { workspaceId: string }) {
       <h3 id="invitations-title" className="font-medium">
         Convites
       </h3>
-      <ul className="divide-y rounded-xl border px-4">
+      <ul className={DIVIDED_LIST}>
         {invitations.data.map((invitation) => (
           <InvitationRow key={invitation.id} workspaceId={workspaceId} invitation={invitation} />
         ))}

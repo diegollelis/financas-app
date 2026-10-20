@@ -66,7 +66,84 @@ const rowsOf = (list: HTMLElement) =>
     .getAllByRole('listitem')
     .map((item) => item.textContent);
 
+const aliasId = (n: number) => `01920000-0000-7000-8000-0000000007${String(n).padStart(2, '0')}`;
+const withAliases = {
+  ...netflix,
+  aliases: [
+    { id: aliasId(1), alias: 'Netflix.com' },
+    { id: aliasId(2), alias: 'Pg *Netflix' },
+  ],
+};
+
 describe('MerchantsPage', () => {
+  it('shows how many aliases a merchant has, and manages them in "Apelidos" (ADR 0055)', async () => {
+    const fetchMock = mockMerchants({
+      [`GET ${base}`]: { body: [acougue, banca, withAliases, padaria] },
+      [`POST ${base}/${netflix.id}/aliases`]: {
+        status: 201,
+        body: {
+          ...withAliases,
+          aliases: [...withAliases.aliases, { id: aliasId(3), alias: 'Netflix Assin' }],
+        },
+      },
+      [`DELETE ${base}/${netflix.id}/aliases/${aliasId(1)}`]: { status: 204, body: null },
+    });
+    renderApp(page);
+
+    const region = await screen.findByRole('region', { name: 'Ativos' });
+    // Only how many: the cards stay alike.
+    expect(rowsOf(within(region).getAllByRole('list')[0]!)).toContain('Netflix2 apelidos');
+    await choose('Netflix', 'Apelidos');
+    const dialog = await screen.findByRole('dialog', { name: 'Apelidos de Netflix' });
+    expect(
+      within(within(dialog).getByRole('list', { name: 'Apelidos de Netflix' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Netflix.comRemover', 'Pg *NetflixRemover']);
+
+    await userEvent.type(within(dialog).getByLabelText('Novo apelido'), 'Netflix Assin');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
+    await expectCall(fetchMock, `${base}/${netflix.id}/aliases`, {
+      method: 'POST',
+      body: JSON.stringify({ alias: 'Netflix Assin' }),
+    });
+    expect(await screen.findByText('Apelido adicionado')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Remover Netflix.com' }));
+    await expectCall(fetchMock, `${base}/${netflix.id}/aliases/${aliasId(1)}`, {
+      method: 'DELETE',
+    });
+  });
+
+  it('says whose an alias already is (ADR 0055)', async () => {
+    mockMerchants({
+      [`POST ${base}/${netflix.id}/aliases`]: {
+        status: 409,
+        body: { code: 'MERCHANT_ALIAS_EXISTS', message: 'Esse apelido já é de "Açougue Central".' },
+      },
+    });
+    renderApp(page);
+
+    await choose('Netflix', 'Apelidos');
+    const dialog = await screen.findByRole('dialog', { name: 'Apelidos de Netflix' });
+    expect(within(dialog).getByText('Nenhum apelido ainda.')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Novo apelido'), 'Acougue');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Esse apelido já é de "Açougue Central".',
+    );
+  });
+
+  it('finds a merchant by an alias too', async () => {
+    mockMerchants({ [`GET ${base}`]: { body: [acougue, banca, withAliases, padaria] } });
+    renderApp(page);
+
+    await userEvent.type(await screen.findByLabelText('Buscar estabelecimento'), 'pg *net');
+
+    const region = await screen.findByRole('region', { name: 'Ativos' });
+    expect(rowsOf(within(region).getByRole('list'))).toEqual(['Netflix2 apelidos']);
+  });
+
   it('lists the active ones and the archived apart, deleting only an archived one never used', async () => {
     mockMerchants();
     renderApp(page);
@@ -76,7 +153,7 @@ describe('MerchantsPage', () => {
     expect(rowsOf(active!)).toEqual(['Açougue Central', 'Netflix']);
     expect(within(region).getByRole('heading', { name: 'Arquivados' })).toBeInTheDocument();
     expect(rowsOf(archived!)).toEqual(['Banca do Zé', 'Padaria Pão Quente']);
-    expect(await menuOf('Netflix')).toEqual(['Renomear', 'Arquivar']);
+    expect(await menuOf('Netflix')).toEqual(['Renomear', 'Apelidos', 'Arquivar']);
     expect(await menuOf('Banca do Zé')).toEqual(['Reativar', 'Excluir']);
     // In use: it stays on the transactions that name it.
     expect(await menuOf('Padaria Pão Quente')).toEqual(['Reativar']);

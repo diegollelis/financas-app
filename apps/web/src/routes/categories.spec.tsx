@@ -121,6 +121,20 @@ describe('CategoriesPage', () => {
     expect(screen.getByRole('button', { name: 'Ações de Mercado' })).toBeInTheDocument();
   });
 
+  it('marks Reembolso and Repasse, which never change (ADR 0052 note)', async () => {
+    const reembolso = { ...category(7, 'Reembolso', 'CREDIT'), splitRole: 'REIMBURSEMENT' };
+    mockCategories({ [`GET ${base}`]: { body: [...categories, reembolso] } });
+
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    const credits = await section('Entradas');
+    const row = within(credits)
+      .getAllByRole('listitem')
+      .find((item) => item.textContent?.startsWith('Reembolso'));
+    expect(row).toHaveTextContent('Divisão');
+    expect(screen.queryByRole('button', { name: 'Ações de Reembolso' })).not.toBeInTheDocument();
+  });
+
   it('counts each section and finds a category by name, ignoring accents', async () => {
     mockCategories();
     renderApp(`/espacos/${houseId}/categorias`);

@@ -1,11 +1,13 @@
 import {
   recurrenceFieldsSchema,
   dueDaySchema,
+  MERCHANT_NAME_MAX_LENGTH,
   normalizeName,
   paymentMethodFieldLabels,
   paymentMethodSchema,
   reaisInputSchema,
   type Category,
+  type Merchant,
   type Person,
   type Recurrence,
   type UpdateRecurrenceInput,
@@ -18,6 +20,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CategorySelect } from '@/features/categories/category-picker';
+import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PersonSelect } from '@/features/people/person-picker';
 import { PaymentMethodSelect } from '@/features/transactions/payment-method-select';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -39,6 +42,11 @@ const recurrenceFormSchema = recurrenceFieldsSchema
     dueMonth: z.enum(['SAME', 'NEXT']),
     /** How it is paid or received (ADR 0054); '' for none. */
     paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
+    /** Where it is bought or who pays it (ADR 0053): a name, resolved to a merchant on save. */
+    merchant: z
+      .string()
+      .trim()
+      .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
     /** A receber de / a pagar para (ADR 0052): a name, resolved to a person on save. */
     person: z.string().trim(),
   });
@@ -82,6 +90,7 @@ export function RecurrenceForm({
   recurrence,
   categories,
   people,
+  merchants,
   userId,
   pending,
   error,
@@ -92,18 +101,27 @@ export function RecurrenceForm({
   categories: Category[];
   /** The workspace's people, for "A receber de" / "A pagar para". */
   people: Person[];
+  /** The workspace's merchants, for "Estabelecimento" (ADR 0053). */
+  merchants: Merchant[];
   /** The signed-in user, left out of the people offered. */
   userId: string;
   pending: boolean;
   error: unknown;
   /**
-   * Only what changed; empty when nothing did. `person` is the name picked when it changed
-   * ('' to unlink), undefined otherwise: a new name has to become a person first.
+   * Only what changed; empty when nothing did. `person` and `merchant` are the names picked when
+   * they changed ('' to unlink), undefined otherwise: a new name has to be created first.
    */
-  onSubmit: (changes: UpdateRecurrenceInput, person: string | undefined) => void;
+  onSubmit: (
+    changes: UpdateRecurrenceInput,
+    person: string | undefined,
+    merchant: string | undefined,
+  ) => void;
   onCancel: () => void;
 }) {
   const currentPerson = people.find((person) => person.id === recurrence.personId)?.name ?? '';
+  // Archived or not: the current one stays as it is unless another is picked.
+  const currentMerchant =
+    merchants.find((merchant) => merchant.id === recurrence.merchantId)?.name ?? '';
   const { register, handleSubmit, formState, control } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(recurrenceFormSchema),
     defaultValues: {
@@ -116,6 +134,7 @@ export function RecurrenceForm({
       dueMonth: recurrence.dueMonthOffset === 1 ? 'NEXT' : 'SAME',
       paymentMethod: recurrence.paymentMethod ?? '',
       person: currentPerson,
+      merchant: currentMerchant,
     },
   });
   const variable = useWatch({ control, name: 'amountKind' }) === 'VARIABLE';
@@ -138,6 +157,9 @@ export function RecurrenceForm({
             normalizeName(values.person) === normalizeName(currentPerson)
               ? undefined
               : values.person,
+            normalizeName(values.merchant) === normalizeName(currentMerchant)
+              ? undefined
+              : values.merchant,
           ),
         )(event)
       }
@@ -244,6 +266,19 @@ export function RecurrenceForm({
           ? 'Um valor novo substitui as estimativas pendentes; os meses cujo valor já foi informado ficam como estão. Os meses seguintes começam pela média dos 3 últimos pagos.'
           : 'Num mês sem esse dia, o vencimento é o último dia do mês.'}
       </p>
+      <Controller
+        control={control}
+        name="merchant"
+        render={({ field, fieldState }) => (
+          <FormField
+            id={id('merchant')}
+            label="Estabelecimento (opcional)"
+            error={fieldState.error?.message}
+          >
+            <MerchantSelect value={field.value} onChange={field.onChange} merchants={merchants} />
+          </FormField>
+        )}
+      />
       {recurrence.split.length > 0 ? (
         // Changing the split is not offered yet (ADR 0052): end it and create another.
         <p className="text-muted-foreground text-sm">

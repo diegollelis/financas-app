@@ -102,3 +102,42 @@ Escolhidos com o dono do projeto: **"Repasse" (opção 1)**, **tabela `recurrenc
 - **As partes nascem iguais,** você incluído, e acompanham o valor e as pessoas escolhidas até alguém digitar uma parte à mão. "Dividir igualmente" volta às partes iguais.
 - **Uma lista fixa com caixas de marcar foi descartada:** com muitos contatos, vira uma parede no celular e esconde a busca e o "Adicionar 'Nome'".
 - **Só a tela muda:** a API recebe o mesmo `split`. A mesma forma vale para a divisão no parcelamento e na recorrência, quando chegarem à tela.
+
+## Nota (a descrição das partes, 2026-10-16)
+
+Com o uso, apareceram dois problemas no formato "Ana: parte de {descrição}": mudar a descrição de uma recorrência dividida não chegava às partes (o reembolso continuava com o nome antigo), e o nome da pessoa gravado no texto envelhecia quando a pessoa era renomeada (ou o membro trocava o nome da conta).
+
+- **A parte repete a descrição do que foi dividido,** sem o nome da pessoa: "Conta de luz", e numa parcela "Geladeira (3/10)", que diz qual parcela ela reembolsa. Quem é a pessoa a linha já mostra, em "A receber de Ana" ou "A pagar para Ana", pelo `personId`, sempre com o nome atual; a categoria (Reembolso ou Repasse) separa a parte do lançamento original. `shareDescription` (em `packages/shared`) monta o texto nos três lugares que criam partes.
+- **A parte acompanha a edição:** mudar a descrição de um lançamento dividido, de uma recorrência (nos meses pendentes deste mês em diante) ou de um parcelamento (nas parcelas pendentes) muda também as **partes pendentes** ligadas a eles. Uma parte já paga ou recebida é histórico e fica como está, a mesma regra das parcelas pagas.
+- **As partes antigas** ("Ana: parte de …") ficam como estão até a próxima edição da origem, que corrige as pendentes. Não há migração que reescreva descrições, porque ela mexeria também no que já foi pago.
+- **A sugestão pelo histórico** continua deixando as partes de fora: com a mesma descrição da origem, elas sugeririam Reembolso ou Repasse.
+
+## Nota (Reembolso e Repasse fixos, 2026-10-17)
+
+A divisão encontrava Reembolso e Repasse **pelo nome**: arquivada, a categoria voltava sozinha na próxima divisão; excluída, era criada de novo; mas **renomeada** ("Reembolsos"), a divisão não a achava e criava outra "Reembolso", e os reembolsos ficavam em duas categorias.
+
+- **Uma marca no banco:** `categories.split_role` (`REIMBURSEMENT` ou `PASS_THROUGH`), única por espaço e com um CHECK que liga a marca ao tipo (Reembolso é entrada, Repasse é saída). Os espaços novos já nascem com as duas marcadas.
+- **A migração marca as que existem,** achadas pelo nome como a divisão fazia (a mais antiga de cada espaço, ignorando maiúsculas), e as reativa, se estavam arquivadas.
+- **A divisão acha a categoria pela marca.** Num espaço sem ela (que excluiu ou renomeou a sua antes da marca), a de nome "Reembolso" (ou "Repasse") é marcada; sem nenhuma, uma nova é criada, marcada. Uma renomeada antes da marca continua como categoria comum.
+- **As rotas de categorias recusam renomear, arquivar e excluir** as duas (409 `CATEGORY_OF_SPLIT`), e a cópia entre espaços ([ADR 0048](0048-copiar-categorias-entre-espacos.md)) não as copia: cada espaço tem as suas. A lista devolve `splitRole`, e a tela mostra o selo "Divisão" no lugar do menu, como o "Meta" das categorias de metas.
+
+## Nota (o vencimento das partes, 2026-10-17)
+
+As partes nasciam **sem vencimento**: copiavam a descrição, o valor e a competência, mas não a data. O reembolso aparecia sem data e nunca ficava "Vencido", mesmo com a conta já vencida.
+
+- **A parte vence com o que foi dividido:** o lançamento, o mês da recorrência ou a parcela. Os três lugares que criam partes copiam o vencimento.
+- **E acompanha a mudança, como a descrição:** mudar o vencimento de um lançamento dividido, o "Vence dia" (ou "Vence no") de uma recorrência (nos meses pendentes deste mês em diante) ou o de um parcelamento (nas parcelas pendentes) move também as **partes pendentes**. Uma parte já paga ou recebida fica como está (`followDueDate`, ao lado de `followDescription`).
+- **As partes pendentes já gravadas** ganham, pela migração, o vencimento da origem quando estão sem data. As pagas ou recebidas não mudam.
+- **O vencimento da própria parte** ainda pode ser editado à mão, como o de qualquer lançamento; a próxima mudança da origem o substitui.
+
+## Nota (dividir um lançamento já lançado, 2026-10-19)
+
+O dono importou a conta de energia pela planilha e quis dividi-la depois, mas a divisão só existia na criação. Agora um lançamento avulso também se divide na edição: `PATCH …/transactions/:id` aceita `split`, com as mesmas regras da criação, e as partes nascem pendentes, na mesma escrita, com o que o lançamento fica depois da mudança (descrição, mês, vencimento e data).
+
+- **Só um lançamento avulso que ainda não foi dividido:** uma parte de divisão, um lançamento já dividido, um mês de recorrência e uma parcela são recusados (409 `NOT_SPLITTABLE`). Para mudar uma divisão já feita, exclua as partes e divida de novo.
+- **Sem pessoa:** um lançamento com "A receber de" ou "A pagar para" é recusado, a menos que a mesma mudança tire a pessoa.
+- **As partes dos outros cabem no valor**, contando o valor novo quando ele muda junto.
+
+O "Tornar recorrente" ([ADR 0038](0038-recorrencias-e-parcelamentos.md)) também aceita um lançamento dividido: as partes dele viram a divisão da recorrência, com o valor de cada pessoa numa recorrência fixa, ou a parte do valor em % (pontos-base, arredondados) numa variável, como na criação. As partes do mês do lançamento são adotadas como estão, sem duplicar, e os meses seguintes nascem com as suas. Uma parte sem pessoa, ou a mesma pessoa em duas partes, recusa (409 `NOT_REPEATABLE`).
+
+Na tela: "Editar" de um lançamento avulso que ainda não foi dividido tem "Dividir com alguém" em "Mais opções", como o lançamento novo (o mês de uma recorrência, a parcela, a parte e o já dividido não têm). O menu oferece "Tornar recorrente" também para um lançamento dividido, e o diálogo diz como a divisão segue: "Dividido com Ana (R$ 75,00) a cada mês" numa recorrência fixa, ou "Dividido com Ana (25%), sobre o valor de cada mês" numa variável.

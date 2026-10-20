@@ -32,7 +32,7 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 ### Transaction (Lançamento)
 
 - `workspace_id`, `type` (`CREDIT` | `DEBIT`), `description`, `notes`, `category_id`
-- `amount_cents` (> 0), `period` (competência `YYYY-MM`), `due_date` (opcional), `settled_at`
+- `amount_cents` (> 0), `period` (competência `YYYY-MM`), `due_date` (opcional), `settled_at`, `occurred_on` (opcional: o dia da compra, que não muda a competência, [ADR 0055](../adr/0055-importacao-da-fatura-do-cartao.md))
 - `installment_plan_id?`, `installment_number?`, `recurrence_id?`
 - Regras:
   - a categoria pertence ao mesmo espaço e tem o mesmo `type` (garantido pelo banco, [ADR 0029](../adr/0029-lancamentos-e-integridade-no-banco.md)); categoria arquivada não pode ser escolhida;
@@ -43,11 +43,13 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 - `workspace_id`, `description`, `total_cents`, `installments`, `first_period`
 - Gera, ao ser criado, um `Transaction` por parcela (`installment_plan_id`, `installment_number`), uma por competência; o total pode ser digitado como total ou como valor da parcela, e a diferença de arredondamento vai para a última parcela ([ADR 0038](../adr/0038-recorrencias-e-parcelamentos.md)).
 - Encerrar remove as parcelas pendentes do mês atual em diante; as pagas ficam.
+- `first_number` (1 por padrão): a parcela inicial de uma compra já em andamento. Com 3 de 10, o app cria só as parcelas 3 a 10, numeradas como na fatura, e o valor (total ou da parcela) é o dessas parcelas ([ADR 0055](../adr/0055-importacao-da-fatura-do-cartao.md)).
 
 ### Recurrence (Recorrência) — fase 5 ([ADR 0038](../adr/0038-recorrencias-e-parcelamentos.md))
 
 - `workspace_id`, `type`, `description`, `notes?`, `category_id`, `amount_cents` (valor estimado), `due_day?` (1 a 31; o dia que o mês não tem vira o último), `start_period`, `end_period?` (nulo enquanto ativa).
 - Gera, ao abrir cada competência, o lançamento pendente que ainda falta ali (ex.: energia, internet, fatura do cartão).
+- `interval_months`: 1 (todo mês) ou 12 (todo ano: IPVA, IPTU, anuidade); uma anual só gera o mês do início e os mesmos meses dos anos seguintes. Não muda depois de criada.
 - Uma `RecurrenceOccurrence` (`recurrence_id`, `period`, `transaction_id?`) marca cada mês gerado. Excluir o lançamento gerado não faz o mês ser gerado de novo.
 - Mudar ou encerrar só altera os lançamentos pendentes do mês atual em diante.
 - `variable_amount`: o valor varia (energia, água); cada mês nasce com a média dos 3 últimos efetivados e fica marcado como estimado (`transactions.amount_estimated`) até o valor real ser informado ou o lançamento ser efetivado.
@@ -67,6 +69,8 @@ Pessoa (`Person`): um contato do espaço, só o nome, para quem usa ou não o ap
 
 Onde se comprou ou quem pagou: um cadastro do espaço, só o nome (único no espaço, ignorando maiúsculas e acentos), sem tipo e sem categoria fixa. Lançamentos, recorrências e parcelamentos têm um `merchant_id` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Pessoa responde "com quem", estabelecimento responde "onde", e um lançamento pode ter os dois. Arquiva-se em vez de excluir; só um arquivado sem uso é excluído (`MERCHANT_IN_USE`).
 
+Apelidos (`MerchantAlias`, [ADR 0055](../adr/0055-importacao-da-fatura-do-cartao.md)): os textos como o estabelecimento aparece no extrato do cartão. Cada apelido é de um estabelecimento só e não se repete no espaço, comparado sem maiúsculas, acentos, espaços a mais e o " - Parcela n/N" do fim (`normalizeStatementTitle`). Um título do extrato é do estabelecimento cujo apelido o começa; o mais longo vence (`findMerchantByAlias`). Excluir o estabelecimento leva os apelidos.
+
 ### PaymentMethod (Meio de pagamento) — fase 5 ([ADR 0054](../adr/0054-meio-de-pagamento.md))
 
 Como se pagou ou recebeu, numa lista fixa: Pix, Débito, Crédito, Vale-alimentação/refeição, Dinheiro, Boleto, Transferência e Débito automático. Lançamentos, recorrências e parcelamentos têm um `payment_method` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Na tela, "Meio de pagamento" numa saída e "Meio de recebimento" numa entrada. Não é uma conta nem um cartão com saldo e fatura: isso, se vier, terá um ADR próprio.
@@ -81,9 +85,9 @@ Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras
 
 **Créditos:** Salário, Bônus, Renda extra, Rendimentos, Reembolso, Outros
 
-**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Educação, Lazer, Compras, Assinaturas, Impostos e taxas, Repasse, Outros
+**Débitos:** Moradia, Contas da casa, Mercado, Restaurantes, Transporte, Saúde, Cuidados pessoais, Educação, Lazer, Compras, Presentes e doações, Pets, Assinaturas, Impostos e taxas, Repasse, Outros
 
-- **"Reembolso"** recebe as partes de uma saída dividida ([ADR 0042](../adr/0042-pessoas-e-rateio.md)), e **"Repasse"** as de uma entrada dividida ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)).
+- **"Reembolso"** recebe as partes de uma saída dividida ([ADR 0042](../adr/0042-pessoas-e-rateio.md)), e **"Repasse"** as de uma entrada dividida ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)). As duas são fixas: marcadas no banco (`split_role`), não se renomeiam, arquivam nem excluem (nota no ADR 0052).
 - **Os destinos de guardar padrão** são Reserva de emergência e Investimentos, e cada um cria a sua categoria de débito com o mesmo nome ([ADR 0047](../adr/0047-orcamento-real-por-destino.md)).
 
 **Histórico:** até a versão 1.0.0, a lista vinha da planilha pessoal de origem, com 14 categorias de crédito e 26 de débito, como PLR, Lote, Inglês e IPVA. Ela foi trocada pela atual antes da 1.0.0 (nota de 2026-10-10 no [ADR 0024](../adr/0024-espacos-membros-e-espaco-pessoal.md)). Os espaços criados antes continuam com as categorias que receberam. "Viagem" saiu junto com o destino padrão "Viagens".
