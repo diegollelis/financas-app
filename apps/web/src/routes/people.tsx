@@ -56,14 +56,46 @@ type NameInput = z.infer<typeof nameSchema>;
 
 const LIST_TITLE_ID = 'people-title';
 
+type NumericField =
+  | 'receivableCents'
+  | 'payableCents'
+  | 'overdueReceivableCents'
+  | 'overduePayableCents'
+  | 'futureInstallmentsReceivableCents'
+  | 'futureInstallmentsPayableCents';
+
 /** From this many people on, a search over the list. */
 const SEARCH_FROM = 9;
 
-const hasPending = (person: Person) => person.receivableCents > 0 || person.payableCents > 0;
+const owesNow = (person: Person) => person.receivableCents > 0 || person.payableCents > 0;
 
-/** Who has something pending first, then who is "Em dia"; each in the API's order (by name). */
+const hasFuture = (person: Person) =>
+  person.futureInstallmentsReceivableCents > 0 || person.futureInstallmentsPayableCents > 0;
+
+const hasPending = (person: Person) => owesNow(person) || hasFuture(person);
+
+/** "R$ 30,00 vencido": the overdue part of a total, only when there is one. */
+function Overdue({ cents }: { cents: number }) {
+  if (cents === 0) return null;
+  return <span className="text-destructive text-sm font-normal">{formatCents(cents)} vencido</span>;
+}
+
+/** "Mais R$ 200,00 em parcelas a receber": installments of later months (ADR 0042 note). */
+function futureText(receivableCents: number, payableCents: number) {
+  const parts = [
+    receivableCents > 0 && `${formatCents(receivableCents)} em parcelas a receber`,
+    payableCents > 0 && `${formatCents(payableCents)} em parcelas a pagar`,
+  ].filter(Boolean);
+  return parts.length > 0 ? `Mais ${parts.join(' e ')}` : null;
+}
+
+/**
+ * Who owes or is owed now first, then who has only installments to come, then who is "Em dia";
+ * each in the API's order (by name).
+ */
 const pendingFirst = (people: Person[]) => [
-  ...people.filter(hasPending),
+  ...people.filter(owesNow),
+  ...people.filter((person) => !owesNow(person) && hasFuture(person)),
   ...people.filter((person) => !hasPending(person)),
 ];
 
@@ -78,17 +110,61 @@ function confirmWith(change: Promise<unknown>, message: string) {
   );
 }
 
-/** "Te deve R$ 150,00", "Você deve R$ 400,00", both, or "Em dia": what is pending each way. */
+/**
+ * "Te deve R$ 150,00", "Você deve R$ 400,00", both, or "Em dia": what is pending up to this month
+ * each way, with its overdue part, and the installments of later months on a line of their own.
+ * Months of a recurrence ahead are not counted (ADR 0042 note).
+ */
 function Balance({ person }: { person: Person }) {
-  const { receivableCents, payableCents } = person;
-  if (receivableCents === 0 && payableCents === 0) {
-    return <span className="text-muted-foreground font-normal">Em dia</span>;
-  }
   return (
-    <span className="grid justify-items-end tabular-nums">
-      {receivableCents > 0 && <span>Te deve {formatCents(receivableCents)}</span>}
-      {payableCents > 0 && <span>Você deve {formatCents(payableCents)}</span>}
+    <span className="grid justify-items-end text-right tabular-nums">
+      {!owesNow(person) && <span className="text-muted-foreground font-normal">Em dia</span>}
+      <Side
+        label="Te deve"
+        cents={person.receivableCents}
+        overdueCents={person.overdueReceivableCents}
+        futureCents={person.futureInstallmentsReceivableCents}
+      />
+      <Side
+        label="Você deve"
+        cents={person.payableCents}
+        overdueCents={person.overduePayableCents}
+        futureCents={person.futureInstallmentsPayableCents}
+      />
     </span>
+  );
+}
+
+/**
+ * One way of a person's balance: "Te deve R$ 180,00", its overdue part and "Mais R$ 300,00 em
+ * parcelas"; with nothing for now, only "Te deve R$ 300,00 em parcelas".
+ */
+function Side({
+  label,
+  cents,
+  overdueCents,
+  futureCents,
+}: {
+  label: string;
+  cents: number;
+  overdueCents: number;
+  futureCents: number;
+}) {
+  const future = formatCents(futureCents);
+  return (
+    <>
+      {cents > 0 && (
+        <span>
+          {label} {formatCents(cents)}
+        </span>
+      )}
+      <Overdue cents={overdueCents} />
+      {futureCents > 0 && (
+        <span className="text-muted-foreground text-sm font-normal">
+          {cents > 0 ? `Mais ${future} em parcelas` : `${label} ${future} em parcelas`}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -451,8 +527,14 @@ export function PeoplePage() {
     : everyone;
   const active = pendingFirst(shown.filter((person) => !person.archived));
   const archived = shown.filter((person) => person.archived);
-  const receivable = everyone.reduce((sum, person) => sum + person.receivableCents, 0);
-  const payable = everyone.reduce((sum, person) => sum + person.payableCents, 0);
+  const total = (field: NumericField) => everyone.reduce((sum, person) => sum + person[field], 0);
+  const receivable = total('receivableCents');
+  const payable = total('payableCents');
+  const overdue = (cents: number) => (cents > 0 ? ` (${formatCents(cents)} vencido)` : '');
+  const future = futureText(
+    total('futureInstallmentsReceivableCents'),
+    total('futureInstallmentsPayableCents'),
+  );
   const row = (person: Person) => (
     <PersonRow
       key={person.id}
@@ -482,10 +564,15 @@ export function PeoplePage() {
             Pessoas
           </h2>
           {everyone.length > 0 && (
-            // Everyone at once: how much is still to come in and to go out.
-            <p className="tabular-nums">
-              A receber: {formatCents(receivable)}. A pagar: {formatCents(payable)}.
-            </p>
+            // Everyone at once: how much is to come in and to go out up to this month.
+            <div className="grid gap-0.5 tabular-nums">
+              <p>
+                A receber: {formatCents(receivable)}
+                {overdue(total('overdueReceivableCents'))}. A pagar: {formatCents(payable)}
+                {overdue(total('overduePayableCents'))}.
+              </p>
+              {future && <p className="text-muted-foreground text-sm">{future}.</p>}
+            </div>
           )}
           {searchable && (
             <FormField id="people-search" label="Buscar pessoa">
