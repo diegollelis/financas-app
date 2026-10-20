@@ -89,12 +89,20 @@ function requestedRanges(fetchMock: ReturnType<typeof mockApi>) {
   return urls.map((url) => url.search).filter((search) => !compared.has(search));
 }
 
-/** The table of the monthly values, as rows of text. */
+/**
+ * The table of the monthly values, as rows of cells read out ("maio de 2026 | 0,00 | …"): what is
+ * hidden from screen readers (the "mai/26" of the phone) is left out.
+ */
 async function monthlyTable() {
   await userEvent.click(await screen.findByRole('button', { name: 'Ver como tabela' }));
+  const readOut = (cell: Element) => {
+    const copy = cell.cloneNode(true) as Element;
+    copy.querySelectorAll('[aria-hidden="true"]').forEach((hidden) => hidden.remove());
+    return nbsp(copy.textContent);
+  };
   return within(screen.getByRole('table', { name: 'Valores por mês' }))
     .getAllByRole('row')
-    .map((tr) => nbsp(tr.textContent));
+    .map((tr) => [...tr.querySelectorAll('th, td')].map(readOut).join(' | '));
 }
 
 // Intl separates "R$" from the number with a non-breaking space.
@@ -187,13 +195,14 @@ describe('AnalysisPage', () => {
     expect(nbsp(balance.nextElementSibling?.textContent)).toBe('R$ 5.100,00');
     expect(requestedRanges(fetchMock)).toEqual(['?from=2026-05&to=2026-10']);
     expect(await monthlyTable()).toEqual([
-      'MêsEntradasSaídasSaldo do mês',
-      'maio de 2026R$ 0,00R$ 0,00R$ 0,00',
-      'junho de 2026R$ 0,00R$ 0,00R$ 0,00',
-      'julho de 2026R$ 0,00R$ 0,00R$ 0,00',
-      'agosto de 2026R$ 0,00R$ 0,00R$ 0,00',
-      'setembro de 2026R$ 5.000,00R$ 2.400,00R$ 2.600,00',
-      'outubro de 2026R$ 5.000,00R$ 2.500,00R$ 2.500,00',
+      // The currency in the titles, not in every cell: the table fits a phone.
+      'Mês | Entradas (R$) | Saídas (R$) | Saldo do mês (R$)',
+      'maio de 2026 | 0,00 | 0,00 | 0,00',
+      'junho de 2026 | 0,00 | 0,00 | 0,00',
+      'julho de 2026 | 0,00 | 0,00 | 0,00',
+      'agosto de 2026 | 0,00 | 0,00 | 0,00',
+      'setembro de 2026 | 5.000,00 | 2.400,00 | 2.600,00',
+      'outubro de 2026 | 5.000,00 | 2.500,00 | 2.500,00',
     ]);
   });
 
@@ -207,8 +216,8 @@ describe('AnalysisPage', () => {
     expect(nbsp(spent.nextElementSibling?.textContent)).toBe('R$ 2.700,00');
     expect(requestedRanges(fetchMock)).toEqual(['?from=2025-11&to=2026-10']);
     const table = await monthlyTable();
-    expect(table[0]).toBe('MêsSaídas');
-    expect(table.at(-1)).toBe('outubro de 2026R$ 300,00');
+    expect(table[0]).toBe('Mês | Saídas (R$)');
+    expect(table.at(-1)).toBe('outubro de 2026 | 300,00');
   });
 
   it('accepts a range of one’s own, and ignores an invalid one', async () => {
@@ -319,7 +328,8 @@ describe('AnalysisPage', () => {
       'R$ 216,67',
     );
     const lastMonth = within(detail).getAllByRole('row').at(-1);
-    expect(nbsp(lastMonth?.textContent)).toBe('outubro de 2026R$ 700,00');
+    // "out/26" is what the phone shows; the full name is what is read out.
+    expect(nbsp(lastMonth?.textContent)).toBe('out/26outubro de 2026700,00');
     // No merchant given yet: a hint says where to give one (ADR 0053).
     expect(within(detail).getByRole('region', { name: 'Por estabelecimento' })).toHaveTextContent(
       'Nenhum lançamento desta categoria tem estabelecimento no período.',
