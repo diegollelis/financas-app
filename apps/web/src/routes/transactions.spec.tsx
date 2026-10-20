@@ -1412,6 +1412,13 @@ describe('TransactionsPage', () => {
     const amount = within(form).getByLabelText('Valor (R$)');
     expect(amount).toHaveValue('159,90');
     expect(within(form).getByRole('combobox', { name: 'Categoria' })).toHaveTextContent('Energia');
+    // The type stays once launched: the other one is in sight, disabled, with the reason (ADR 0029 note).
+    const type = within(form).getByRole('radiogroup', { name: 'Tipo' });
+    expect(within(type).getByRole('radio', { name: 'Saída' })).toBeChecked();
+    expect(within(type).getByRole('radio', { name: 'Entrada' })).toBeDisabled();
+    expect(type).toHaveAccessibleDescription(
+      'O tipo não muda depois de lançado. Para trocar, exclua e lance de novo.',
+    );
     await userEvent.clear(amount);
     await userEvent.type(amount, '172,50');
     await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));

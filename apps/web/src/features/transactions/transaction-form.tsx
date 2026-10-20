@@ -450,22 +450,39 @@ export function TransactionForm({
           movido: é só o registro do que você guardou.
         </p>
       ) : (
-        <Controller
-          control={control}
-          name="type"
-          render={({ field }) => (
-            <SegmentedControl
-              label="Tipo"
-              options={typeOptions}
-              value={field.value}
-              onChange={(value) => {
-                field.onChange(value);
-                // The category belongs to one type: changing the type asks for a new one.
-                setValue('categoryId', '');
-              }}
-            />
+        <div className="grid gap-1.5">
+          <Controller
+            control={control}
+            name="type"
+            render={({ field }) => (
+              <SegmentedControl
+                label="Tipo"
+                // Once launched, the type stays: the other one is in sight but disabled, and the
+                // text below says why (ADR 0029 note).
+                options={
+                  initial
+                    ? typeOptions.map((option) => ({
+                        ...option,
+                        disabled: option.value !== initial.type,
+                      }))
+                    : typeOptions
+                }
+                value={field.value}
+                describedBy={initial ? `${idPrefix}-type-locked` : undefined}
+                onChange={(value) => {
+                  field.onChange(value);
+                  // The category belongs to one type: changing the type asks for a new one.
+                  setValue('categoryId', '');
+                }}
+              />
+            )}
+          />
+          {initial && (
+            <p id={`${idPrefix}-type-locked`} className="text-muted-foreground text-sm">
+              O tipo não muda depois de lançado. Para trocar, exclua e lance de novo.
+            </p>
           )}
-        />
+        </div>
       )}
       {/* From lg, in the wider dialog, the short fields that go together share a row: what it is
           and its category; how much, when and how. The order stays the one of the phone. */}
