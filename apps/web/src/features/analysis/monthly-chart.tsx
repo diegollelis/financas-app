@@ -4,10 +4,10 @@ import {
   type AnalysisFilters,
   type MonthlyPoint,
 } from '@financas/shared';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useElementWidth } from '@/lib/use-element-width';
 import { cn } from '@/lib/utils';
-import { formatCentsCompact, formatPeriodShort } from './format';
+import { formatCentsCompact, formatCentsPlain, formatPeriodShort } from './format';
 import { seriesStyles, valueOf, visibleSeries } from './series';
 
 // The plot (ADR 0037): one axis in reais, credits and debits as columns side by side, the balance
@@ -253,7 +253,12 @@ export function MonthlyChart({
   );
 }
 
-/** The same numbers as the chart, for screen readers, keyboards and anyone who prefers them. */
+/**
+ * The same numbers as the chart, for screen readers, keyboards and anyone who prefers them. It fits
+ * a 360px phone: a gap before every amount column, "(R$)" in the titles instead of in every cell,
+ * and "mai/26" for the month below md, its full name read out and shown from md. Should it still
+ * not fit, it scrolls and takes focus, with a name, for the arrow keys (as the chart does).
+ */
 export function MonthlyTable({
   series,
   type,
@@ -262,9 +267,29 @@ export function MonthlyTable({
   type: AnalysisFilters['type'];
 }) {
   const keys = visibleSeries(type);
+  const box = useRef<HTMLDivElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const element = box.current;
+    if (!element) return;
+    const measure = () => setScrolls(element.scrollWidth > element.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [series, type]);
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full tabular-nums">
+    <div
+      ref={box}
+      className="focus-visible:ring-ring/50 overflow-x-auto rounded-sm outline-none focus-visible:ring-3"
+      {...(scrolls && {
+        tabIndex: 0,
+        role: 'group',
+        'aria-label': 'Tabela mês a mês, role para o lado para ver todas as colunas',
+      })}
+    >
+      <table className="w-full text-sm tabular-nums">
         <caption className="sr-only">Valores por mês</caption>
         <thead className="text-muted-foreground">
           <tr className="border-b">
@@ -272,8 +297,8 @@ export function MonthlyTable({
               Mês
             </th>
             {keys.map((key) => (
-              <th key={key} scope="col" className="py-2 text-right font-normal">
-                {seriesStyles[key].label}
+              <th key={key} scope="col" className="py-2 pl-3 text-right font-normal">
+                {seriesStyles[key].label} (R$)
               </th>
             ))}
           </tr>
@@ -281,15 +306,23 @@ export function MonthlyTable({
         <tbody>
           {series.map((point) => (
             <tr key={point.period} className="border-b last:border-b-0">
-              <th scope="row" className="py-2 text-left font-normal first-letter:uppercase">
-                {formatPeriod(point.period)}
+              <th scope="row" className="py-2 text-left font-normal whitespace-nowrap">
+                <span aria-hidden className="md:hidden">
+                  {formatPeriodShort(point.period)}
+                </span>
+                <span className="sr-only md:not-sr-only md:first-letter:uppercase">
+                  {formatPeriod(point.period)}
+                </span>
               </th>
               {keys.map((key) => (
                 <td
                   key={key}
-                  className={cn('py-2 text-right', valueOf(point, key) < 0 && 'text-destructive')}
+                  className={cn(
+                    'py-2 pl-3 text-right whitespace-nowrap',
+                    valueOf(point, key) < 0 && 'text-destructive',
+                  )}
                 >
-                  {formatCents(valueOf(point, key))}
+                  {formatCentsPlain(valueOf(point, key))}
                 </td>
               ))}
             </tr>
