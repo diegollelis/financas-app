@@ -71,6 +71,29 @@ describe('PeoplePage', () => {
     expect(screen.queryByLabelText('Buscar pessoa')).not.toBeInTheDocument();
   });
 
+  it('shows what is overdue and the installments of later months apart (ADR 0042 note)', async () => {
+    const owing = person(1, 'Ana', {
+      receivableCents: 18_000,
+      overdueReceivableCents: 3_000,
+      futureInstallmentsReceivableCents: 20_000,
+    });
+    // Nothing for now, only installments to come: still among those with something pending.
+    const later = person(2, 'Bruno', { futureInstallmentsPayableCents: 50_000 });
+    mockPeople({ [`GET ${base}`]: { body: [carlos, later, owing] } });
+    renderApp(page);
+
+    const list = await screen.findByRole('region', { name: 'Pessoas' });
+    expect(within(list).getAllByRole('listitem').map(text)).toEqual([
+      expect.stringContaining('Te deve R$ 180,00R$ 30,00 vencidoMais R$ 200,00 em parcelas'),
+      expect.stringContaining('Em diaVocê deve R$ 500,00 em parcelas'),
+      expect.stringContaining('CarlosVer lançamentosEm dia'),
+    ]);
+    expect(text(list)).toContain('A receber: R$ 180,00 (R$ 30,00 vencido). A pagar: R$ 0,00.');
+    expect(text(list)).toContain(
+      'Mais R$ 200,00 em parcelas a receber e R$ 500,00 em parcelas a pagar.',
+    );
+  });
+
   it('offers a search once the list grows', async () => {
     const many = ['Ana', 'Bia', 'Caio', 'Davi', 'Edu', 'Fábio', 'Gil', 'Hugo', 'Íris'].map(
       (name, index) => person(10 + index, name),
