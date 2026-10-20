@@ -705,6 +705,57 @@ describe('installments', () => {
       expect((await transactionsOf(month(2)))[0]?.amountCents).toBe(33_334);
     });
 
+    it('gives the adopted transaction back, with its amount, when the plan is deleted or ended', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const compras = categoryId('Compras', 'DEBIT');
+      const sofa = await launched(browser, base, compras, {
+        description: 'Sofá',
+        amountCents: 100_000,
+      });
+      const plan = installmentPlanSchema.parse(
+        (
+          await browser
+            .post(`${base}/installments/from-transaction`)
+            .send({ transactionId: sofa.id, installments: 3, amountIs: 'TOTAL' })
+            .expect(201)
+        ).body,
+      );
+
+      // Nothing settled: the plan goes, the sofa comes back as it was.
+      await browser.delete(`${base}/installments/${plan.id}`).expect(204);
+      expect(await transactionsOf(thisMonth)).toEqual([
+        expect.objectContaining({ id: sofa.id, installment: null, amountCents: 100_000 }),
+      ]);
+      expect(await transactionsOf(month(1))).toEqual([]);
+
+      // With a settled installment, ending keeps the paid one and gives this one back.
+      const tv = await launched(browser, base, compras, { description: 'TV', amountCents: 30_000 });
+      const tvPlan = installmentPlanSchema.parse(
+        (
+          await browser
+            .post(`${base}/installments/from-transaction`)
+            .send({
+              transactionId: tv.id,
+              installments: 3,
+              firstNumber: 2,
+              amountIs: 'INSTALLMENT',
+            })
+            .expect(201)
+        ).body,
+      );
+      const last = (await transactionsOf(month(1))).find((t) => t.description === 'TV')!;
+      await browser
+        .patch(`${base}/transactions/${last.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      await browser.delete(`${base}/installments/${tvPlan.id}`).expect(204);
+      expect((await transactionsOf(thisMonth)).find((t) => t.id === tv.id)).toMatchObject({
+        installment: null,
+        amountCents: 30_000,
+      });
+    });
+
     it('refuses one in a plan or a recurrence, a share, a split one, a settled total, the last installment', async () => {
       const { browser, base, categoryId, create, fridge, transactionsOf } = await setUp();
       const compras = categoryId('Compras', 'DEBIT');

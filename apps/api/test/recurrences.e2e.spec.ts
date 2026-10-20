@@ -518,6 +518,30 @@ describe('recurrences', () => {
       ]);
     });
 
+    it('gives the adopted transaction back as launched once when ended (ADR 0038 note)', async () => {
+      const { browser, base, categoryId, transactionsOf } = await setUp();
+      const transaction = await launched(browser, base, {
+        categoryId: categoryId('Contas da casa', 'DEBIT'),
+      });
+      const recurrence = recurrenceSchema.parse(
+        (
+          await browser
+            .post(`${base}/recurrences/from-transaction`)
+            .send({ transactionId: transaction.id })
+            .expect(201)
+        ).body,
+      );
+      await transactionsOf(month(1));
+
+      await browser.delete(`${base}/recurrences/${recurrence.id}`).expect(204);
+
+      // This month's is the transaction that existed before: it stays, launched once.
+      expect(await transactionsOf(thisMonth)).toEqual([
+        expect.objectContaining({ id: transaction.id, recurrenceId: null, amountCents: 12_000 }),
+      ]);
+      expect(await transactionsOf(month(1))).toEqual([]);
+    });
+
     it('answers 404 for a transaction of another workspace', async () => {
       const { browser, base } = await setUp();
       const other = await t.signUp(joao);

@@ -63,6 +63,7 @@ function toResponse(
     paymentMethod: plan.paymentMethod,
     isSplit,
     endedAt: plan.endedAt?.toISOString() ?? null,
+    adoptedTransactionId: plan.adoptedTransactionId,
     settledCount,
     pendingCount: pending.count,
     pendingCents: pending.cents,
@@ -301,6 +302,9 @@ export class InstallmentsService {
           personId: transaction.personId,
           merchantId: transaction.merchantId,
           paymentMethod: transaction.paymentMethod,
+          // Given back as launched once, with this amount, if the plan is ended or deleted.
+          adoptedTransactionId: transaction.id,
+          adoptedAmountCents: transaction.amountCents,
           transactions: { create: next },
         },
       });
@@ -461,7 +465,8 @@ export class InstallmentsService {
           message: 'O total precisa dar ao menos um centavo por parcela.',
         });
       }
-      // Nothing is settled: the installments are made again from scratch.
+      // Nothing is settled: the installments are made again from scratch, the adopted one too
+      // (it is no longer the transaction that existed before).
       await db.transaction.deleteMany({ where: { workspaceId, installmentPlanId: planId } });
       const amounts = splitInstallments(totalCents, created);
       const updated = await db.installmentPlan.update({
@@ -472,6 +477,8 @@ export class InstallmentsService {
           installments,
           firstNumber,
           firstPeriod,
+          adoptedTransactionId: null,
+          adoptedAmountCents: null,
           transactions: {
             create: amounts.map((amountCents, index) => {
               const period = shiftPeriod(firstPeriod, index);
@@ -563,6 +570,25 @@ export class InstallmentsService {
     const settled = await db.transaction.count({
       where: { workspaceId, installmentPlanId: planId, settledAt: { not: null } },
     });
+    // The transaction it adopted ("Tornar parcelado") existed before it: still pending, it goes
+    // back to being launched once, with its amount (ADR 0038 note). Ending a plan with payments
+    // keeps its past months as history, so then only from this month on.
+    if (plan.adoptedTransactionId) {
+      await db.transaction.updateMany({
+        where: {
+          id: plan.adoptedTransactionId,
+          workspaceId,
+          installmentPlanId: planId,
+          settledAt: null,
+          ...(settled > 0 && { period: { gte: currentPeriod() } }),
+        },
+        data: {
+          installmentPlanId: null,
+          installmentNumber: null,
+          ...(plan.adoptedAmountCents !== null && { amountCents: plan.adoptedAmountCents }),
+        },
+      });
+    }
     if (settled === 0) {
       // The pending shares first (a settled one, money already received, stays unlinked); the
       // installments go with the plan, by cascade.

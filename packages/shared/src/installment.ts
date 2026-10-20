@@ -129,6 +129,8 @@ export const installmentPlanSchema = z.object({
   isSplit: z.boolean().default(false),
   /** When it was ended; null while it runs. */
   endedAt: z.iso.datetime().nullable(),
+  /** The transaction it adopted ("Tornar parcelado", ADR 0038 note), given back when ended. */
+  adoptedTransactionId: z.uuid().nullable().default(null),
   /** How many installments were already settled. */
   settledCount: z.number().int(),
   /**
