@@ -901,6 +901,66 @@ describe('people and splits', () => {
       await browser.patch(`${base}/transactions/${month.id}`).send({ split }).expect(409);
       await browser.patch(`${base}/transactions/${installment.id}`).send({ split }).expect(409);
     });
+
+    it('keeps the type of one tied to others, and changes it on one launched once (ADR 0029 note)', async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const moradia = category('Moradia', 'DEBIT').id;
+      const toCredit = { type: 'CREDIT', categoryId: category('Outros', 'CREDIT').id };
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Internet',
+          categoryId: moradia,
+          amountCents: 10_000,
+          startPeriod: period,
+        })
+        .expect(201);
+      await browser
+        .post(`${base}/installments`)
+        .send({
+          type: 'DEBIT',
+          description: 'Geladeira',
+          categoryId: moradia,
+          amountCents: 300_000,
+          amountIs: 'TOTAL',
+          installments: 3,
+          firstPeriod: period,
+        })
+        .expect(201);
+      const split = await launch(browser, base, moradia);
+      await browser
+        .patch(`${base}/transactions/${split.id}`)
+        .send({ split: [{ personId: ana.id, amountCents: 1_000 }] })
+        .expect(200);
+      const list = await transactions(browser, base);
+      const tied = {
+        month: list.find((t) => t.recurrenceId)!,
+        installment: list.find((t) => t.installment)!,
+        split,
+        share: list.find((t) => t.splitOfId === split.id)!,
+      };
+
+      for (const transaction of Object.values(tied)) {
+        const refused = await browser
+          .patch(`${base}/transactions/${transaction.id}`)
+          .send(transaction.type === 'CREDIT' ? { type: 'DEBIT', categoryId: moradia } : toCredit)
+          .expect(409);
+        expect(refused.body).toMatchObject({ code: 'TYPE_LOCKED' });
+      }
+      // The same type sent again is no change.
+      await browser
+        .patch(`${base}/transactions/${tied.month.id}`)
+        .send({ type: 'DEBIT', description: 'Internet' })
+        .expect(200);
+      const once = await launch(browser, base, moradia);
+      const changed = await browser
+        .patch(`${base}/transactions/${once.id}`)
+        .send(toCredit)
+        .expect(200);
+      expect(changed.body).toMatchObject({ type: 'CREDIT' });
+    });
   });
 
   describe('splitting a credit (ADR 0052)', () => {

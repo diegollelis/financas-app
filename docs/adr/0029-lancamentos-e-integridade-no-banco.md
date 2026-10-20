@@ -42,3 +42,14 @@ Para o status: **coluna `status` gravada** (precisa ser atualizada todo dia para
 - Trocar o tipo de um lançamento exige trocar a categoria junto. A interface deve oferecer só categorias do tipo escolhido.
 - Os `CHECK`s e a política de RLS ficam em SQL escrito à mão. O Prisma não os gerencia. A garantia de que continuam aplicáveis é o CI, que aplica todas as migrações num banco vazio a cada execução.
 - Parcelamentos e recorrências (fase 5) vão gerar lançamentos comuns e herdam essas regras.
+
+## Nota (o tipo de um lançamento ligado a outros, 2026-10-20)
+
+Trocar entrada por saída, ou o contrário, deixava a série ou a divisão incoerente. Uma parte de divisão fica do lado oposto ao lançamento dividido, e um mês de recorrência ou uma parcela tem o tipo da série. Por isso, o `PATCH …/transactions/:id` recusa a troca de tipo (409 `TYPE_LOCKED`, com o motivo) em:
+
+- **uma parte de divisão;**
+- **um lançamento dividido;**
+- **um mês de recorrência;**
+- **uma parcela.**
+
+Mandar o mesmo tipo de novo não é troca e passa. Um lançamento avulso e não dividido continua podendo trocar de tipo, com a categoria junto. A revisão da importação continua com o tipo editável, porque ali nada foi gravado ainda.
