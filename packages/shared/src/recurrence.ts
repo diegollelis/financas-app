@@ -172,6 +172,8 @@ export const recurrenceSchema = z.object({
   startPeriod: periodSchema,
   /** The last competência it generated; null while active. */
   endPeriod: periodSchema.nullable(),
+  /** The transaction it adopted ("Tornar recorrente", ADR 0038 note), given back when ended. */
+  adoptedTransactionId: z.uuid().nullable().default(null),
   /** Who shares it (ADR 0052): each person with a fixed amount or a percentage. */
   split: z
     .array(

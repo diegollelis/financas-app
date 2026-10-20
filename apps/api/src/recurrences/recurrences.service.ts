@@ -53,6 +53,7 @@ function toResponse(recurrence: RecurrenceWithShares): Recurrence {
     paymentMethod: recurrence.paymentMethod,
     startPeriod: recurrence.startPeriod,
     endPeriod: recurrence.endPeriod,
+    adoptedTransactionId: recurrence.adoptedTransactionId,
     split: recurrence.shares.map(({ personId, amountCents, basisPoints }) => ({
       personId,
       amountCents,
@@ -212,6 +213,8 @@ export class RecurrencesService {
           merchantId: transaction.merchantId,
           paymentMethod: transaction.paymentMethod,
           startPeriod: transaction.period,
+          // Given back as launched once if it is ended while this one is pending.
+          adoptedTransactionId: transaction.id,
           shares: { create: split.map((share) => ({ workspaceId, ...share })) },
           // The transaction is this month's: it keeps its amount, real even in a variable one.
           occurrences: {
@@ -364,6 +367,20 @@ export class RecurrencesService {
     const thisMonth = currentPeriod();
     if (recurrence.endPeriod !== null && recurrence.endPeriod < thisMonth) return;
     const db = this.prisma.forWorkspace(workspaceId);
+    // The transaction it adopted ("Tornar recorrente") existed before it: still pending, it goes
+    // back to being launched once, with its shares, instead of being removed (ADR 0038 note).
+    const adopted = recurrence.adoptedTransactionId;
+    if (adopted) {
+      await db.recurrenceOccurrence.updateMany({
+        where: {
+          workspaceId,
+          recurrenceId,
+          transactionId: adopted,
+          transaction: { is: { settledAt: null, period: { gte: thisMonth } } },
+        },
+        data: { transactionId: null },
+      });
+    }
     const removed = this.pendingFromThisMonth(workspaceId, recurrenceId);
     // Their pending shares first (ADR 0052): deleting a month would only unlink them (SET NULL).
     await db.transaction.deleteMany({

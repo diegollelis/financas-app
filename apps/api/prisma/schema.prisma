@@ -469,6 +469,10 @@ model InstallmentPlan {
   paymentMethod  PaymentMethod?  @map("payment_method")
   merchant       Merchant?       @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   endedAt        DateTime?       @map("ended_at") @db.Timestamptz(3)
+  // "Tornar parcelado" (ADR 0038 note): the transaction it adopted and its amount before, given
+  // back as launched once when the plan is ended or deleted while it is pending.
+  adoptedTransactionId String?       @map("adopted_transaction_id") @db.Uuid
+  adoptedAmountCents   Int?          @map("adopted_amount_cents")
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
   transactions   Transaction[]
@@ -509,6 +513,10 @@ model Recurrence {
   merchant       Merchant?              @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   startPeriod    String                 @map("start_period") @db.Char(7)
   endPeriod      String?                @map("end_period") @db.Char(7)
+  // "Tornar recorrente" (ADR 0038 note): the transaction it adopted, which existed before it.
+  // Ending it gives that one back as launched once while pending. No foreign key: a deleted
+  // transaction leaves an id that matches nothing.
+  adoptedTransactionId String?          @map("adopted_transaction_id") @db.Uuid
   createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
   occurrences    RecurrenceOccurrence[]

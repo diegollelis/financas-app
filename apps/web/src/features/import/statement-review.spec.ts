@@ -154,6 +154,7 @@ describe('startStatementReview', () => {
       paymentMethod: 'CREDIT_CARD',
       isSplit: false,
       endedAt: null,
+      adoptedTransactionId: null,
       settledCount: 3,
       pendingCount: 7,
       pendingCents: 84_000,
