@@ -2,6 +2,7 @@ import {
   installmentPlanListResponseSchema,
   installmentPlanSchema,
   type CreateInstallmentPlanInput,
+  type InstallmentsFromTransactionInput,
   type UpdateInstallmentPlanInput,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -38,6 +39,20 @@ export function useCreateInstallmentPlan(workspaceId: string) {
   return useMutation({
     mutationFn: (input: CreateInstallmentPlanInput) =>
       apiPost(`/api/workspaces/${workspaceId}/installments`, input, installmentPlanSchema),
+    onSuccess,
+  });
+}
+
+/** "Tornar parcelado" (ADR 0038 note): the transaction becomes one of its installments. */
+export function useInstallTransaction(workspaceId: string) {
+  const onSuccess = useInvalidateInstallments(workspaceId);
+  return useMutation({
+    mutationFn: (input: InstallmentsFromTransactionInput) =>
+      apiPost(
+        `/api/workspaces/${workspaceId}/installments/from-transaction`,
+        input,
+        installmentPlanSchema,
+      ),
     onSuccess,
   });
 }

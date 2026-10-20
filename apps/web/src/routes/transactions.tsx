@@ -51,9 +51,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCategories, useCategoryHints } from '@/features/categories/use-categories';
-import { useEndInstallmentPlan } from '@/features/installments/use-installments';
-import { useEndRecurrence } from '@/features/recurrences/use-recurrences';
+import {
+  useEndInstallmentPlan,
+  useInstallmentPlans,
+} from '@/features/installments/use-installments';
+import { useEndRecurrence, useRecurrences } from '@/features/recurrences/use-recurrences';
 import { useMerchants } from '@/features/merchants/use-merchants';
+import { withAdoptedNote } from '@/features/installments/adopted';
+import { InstallDialog } from '@/features/installments/install-dialog';
 import { RepeatDialog } from '@/features/recurrences/repeat-dialog';
 import { usePeople } from '@/features/people/use-people';
 import {
@@ -249,6 +254,29 @@ function DeleteDialog({
  * Asks before ending the recurrence that generated this transaction (ADR 0038): its pending
  * transactions from this month on go, the earlier and settled ones stay.
  */
+/**
+ * The end dialog's text, with the note when the series adopted a transaction that existed before
+ * (ADR 0038 note). Mounted only while the dialog is open, so the series lists are read then.
+ */
+function EndSeriesText({
+  workspaceId,
+  transaction,
+  children,
+}: {
+  workspaceId: string;
+  transaction: Transaction;
+  children: string;
+}) {
+  const recurrences = useRecurrences(workspaceId);
+  const plans = useInstallmentPlans(workspaceId);
+  const plan = transaction.installment;
+  const adopted = plan
+    ? (plans.data?.find((item) => item.id === plan.planId)?.adoptedTransactionId ?? null)
+    : (recurrences.data?.find((item) => item.id === transaction.recurrenceId)
+        ?.adoptedTransactionId ?? null);
+  return withAdoptedNote(children, adopted);
+}
+
 function EndSeriesDialog({
   workspaceId,
   transaction,
@@ -301,7 +329,11 @@ function EndSeriesDialog({
       >
         <AlertDialogHeader>
           <AlertDialogTitle>{text.title}</AlertDialogTitle>
-          <AlertDialogDescription>{text.description}</AlertDialogDescription>
+          <AlertDialogDescription>
+            <EndSeriesText workspaceId={workspaceId} transaction={transaction}>
+              {text.description}
+            </EndSeriesText>
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -391,6 +423,7 @@ function useRowActions({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [repeating, setRepeating] = useState(false);
+  const [installing, setInstalling] = useState(false);
   const [askingAmount, setAskingAmount] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const settleRef = useRef<HTMLButtonElement>(null);
@@ -403,6 +436,8 @@ function useRowActions({
   // Launched once and not a share: it can become a recurrence ("Tornar recorrente"), a split one
   // with its shares (ADR 0052 note).
   const repeatable = !inSeries && !transaction.splitOfId;
+  // Launched once, not split nor a share: it can become an installment plan (ADR 0038 note).
+  const installable = repeatable && shares.length === 0;
   const labels = settleActionLabels[transaction.type];
   const settledToast =
     transaction.type === 'CREDIT' ? 'Marcado como recebido' : 'Marcado como pago';
@@ -478,6 +513,11 @@ function useRowActions({
                 Tornar recorrente
               </DropdownMenuItem>
             )}
+            {installable && (
+              <DropdownMenuItem onSelect={() => setInstalling(true)}>
+                Tornar parcelado
+              </DropdownMenuItem>
+            )}
             {inSeries && (
               <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingEnd(true)}>
                 {transaction.installment ? 'Encerrar parcelamento' : 'Encerrar recorrência'}
@@ -507,6 +547,15 @@ function useRowActions({
             shares={shares}
             open={repeating}
             onOpenChange={setRepeating}
+            returnFocusTo={actionsRef}
+          />
+        )}
+        {installable && (
+          <InstallDialog
+            workspaceId={workspaceId}
+            transaction={transaction}
+            open={installing}
+            onOpenChange={setInstalling}
             returnFocusTo={actionsRef}
           />
         )}

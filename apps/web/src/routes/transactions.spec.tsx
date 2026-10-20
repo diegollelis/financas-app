@@ -619,6 +619,88 @@ describe('TransactionsPage', () => {
     }
   });
 
+  it('turns a transaction launched once into installments, with the preview first (ADR 0038 note)', async () => {
+    const fetchMock = mockTransactions({
+      [`POST /api/workspaces/${houseId}/installments/from-transaction`]: {
+        status: 201,
+        body: {
+          id: '01920000-0000-7000-8000-000000000404',
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          notes: null,
+          categoryId: energyCategory.id,
+          totalCents: 127_920,
+          installments: 10,
+          firstNumber: 3,
+          firstPeriod: '2026-10',
+          dueDay: 10,
+          dueMonthOffset: 0,
+          endedAt: null,
+          settledCount: 0,
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Tornar parcelado' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Tornar Conta de luz parcelado' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tornar parcelado' }));
+    expect(within(dialog).getByText('Informe de 2 a 120 parcelas.')).toBeInTheDocument();
+
+    await userEvent.type(within(dialog).getByLabelText('Parcelas'), '10');
+    await userEvent.type(
+      within(dialog).getByLabelText('Este lançamento é a parcela (opcional)'),
+      '3',
+    );
+    expect(nbsp(within(dialog).getByRole('status').textContent)).toBe(
+      'Da 3/10 à 10/10: 8 parcelas de R$ 159,90, total R$ 1.279,20. Este lançamento vira a 3/10; as próximas aparecem pendentes nos meses seguintes, com a mesma categoria e vencimento.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Tornar parcelado' }));
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/installments/from-transaction`, {
+      method: 'POST',
+      body: JSON.stringify({
+        transactionId: light.id,
+        installments: 10,
+        firstNumber: 3,
+        amountIs: 'INSTALLMENT',
+      }),
+    });
+    expect(await screen.findByText('Agora é a parcela 3/10')).toBeInTheDocument();
+  });
+
+  it('offers "Tornar parcelado" only for a transaction launched once, not split', async () => {
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Parte da luz',
+      categoryId: salaryCategory.id,
+      amountCents: 6_000,
+      splitOfId: light.id,
+    });
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [
+          light,
+          share,
+          {
+            ...shopping,
+            installment: { planId: '01920000-0000-7000-8000-000000000401', number: 2, count: 3 },
+          },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    for (const description of ['Conta de luz', 'Parte da luz', 'Compras da semana']) {
+      const menu = await openActions(description);
+      expect(
+        within(menu).queryByRole('menuitem', { name: 'Tornar parcelado' }),
+      ).not.toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+    }
+  });
+
   it('marks a transaction of a yearly recurrence as "Todo ano"', async () => {
     const recurrenceId = '01920000-0000-7000-8000-000000000309';
     mockTransactions({
