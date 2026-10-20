@@ -64,3 +64,26 @@ Do xl em diante, os blocos 1 e 2 ficam lado a lado, e a tabela ocupa a largura t
 - **A tabela usa a coluna larga** desta ADR, mas só enquanto é tabela: a rota declara `handle: { table: 'lancamentos' }` (ou `'recorrencias'`), e a `WorkspaceLayout` passa a `max-w-6xl` quando a página dessa rota mostra a tabela (`useShowsTable`). A lista continua na largura de leitura.
 - **Colunas de largura fixa** (`table-fixed`), para as tabelas de Entradas e Saídas (e as ativas e encerradas de Recorrências) se alinharem; a descrição fica com o resto. Em Recorrências, a tabela é genérica (`SeriesTable`, com as colunas declaradas pela página), e as encerradas não têm coluna de ações.
 - **Clicar no título ordena** (`sortRows`, `SortableHead` com `aria-sort`); de novo, inverte. A ordem inicial é a da lista, por vencimento, os sem data no fim.
+
+## Nota (2026-10-20): o Painel em cartões
+
+O Painel estava carregado: os mesmos números apareciam em vários blocos (o total a pagar três vezes, "Sobra para guardar" três vezes), os títulos tinham o peso dos rótulos e um espaço sem orçamento mostrava blocos vazios. No celular, a página passava de 3.000 px de altura. A versão nova foi aprovada numa prévia com o mês equilibrado, o mês no vermelho, com e sem vencidos e com e sem orçamento:
+
+- **"Orçamento do mês"** é uma linha acima dos cartões: a renda líquida, a origem do orçamento no ⓘ e "Editar orçamento".
+- **"Saldo do mês"** junta o que eram três blocos:
+  - o saldo previsto em destaque;
+  - "Entradas" e "Saídas" com o que já aconteceu embaixo ("R$ 5.200,00 recebidos");
+  - a barra de para onde vão as entradas, com a legenda só de nomes, porque os valores estão em volta;
+  - o "Saldo atual" no rodapé.
+- **"Limite de gastos":** "Gastos R$ 6.840,00 de R$ 7.200,00" num medidor, quanto sobra ou passa do limite e "Gastos pagos" / "Gastos a pagar". O rótulo não é só "A pagar" porque, ao lado, as saídas a pagar do saldo incluem os aportes pendentes nas metas, e os dois números pareciam não fechar. O rótulo "Gastos" e o ⓘ dizem por que o número difere das saídas: guardar nas metas não é gasto.
+- **"Metas":**
+  - no topo, "Sobra para guardar" e "Guardado";
+  - uma linha por meta, com "R$ 800,00 de R$ 1.582,00 (50,57%)", uma barra de progresso com a parte pendente listrada, "R$ 500,00 pendente. Falta lançar R$ 686,50." e "Guardar";
+  - "Sem meta" numa linha discreta.
+
+  A tabela de seis colunas saiu: "Pendente" e "Falta lançar" cabem na frase da meta.
+
+- **Sem orçamento,** um cartão só diz que ele não existe e oferece "Definir orçamento" a quem edita, no lugar do limite e das metas vazios.
+- **Grade:** uma coluna até xl. A partir de xl, "Saldo do mês" ao lado de "Limite de gastos" e "Metas" na largura toda. As metas ficam duas por linha só quando o próprio cartão tem 768 px ou mais (uma container query, `@3xl`), e não por um tamanho de tela: a 768 e a 1024 px, ao lado da barra lateral, o cartão é estreito e as colunas quebrariam cada valor. Em cada meta, "Guardar" fica na linha do nome, e o resto usa a largura toda.
+
+Os números não mudam: a API e `summarizePeriod` são os mesmos, e um teste de página confere o mês de referência das capturas (saldo previsto de −R$ 7.547,70). No celular, esse mês caiu de 3.255 px para 1.309 px de altura.

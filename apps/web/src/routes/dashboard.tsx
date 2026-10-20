@@ -26,7 +26,6 @@ import type { TransactionPreset } from '@/features/transactions/transaction-form
 import { ExpensesMeter } from '@/features/summary/expenses-meter';
 import { useSummary } from '@/features/summary/use-summary';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
-import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 
 /** Colored by sign, as in the spreadsheet; the minus sign keeps it readable without color. */
@@ -35,53 +34,30 @@ function SignedCents({ cents }: { cents: number }) {
 }
 
 /**
- * A secondary indicator: a row (label left, value right) on the phone, a tile from sm. Values
- * use proportional figures: they stand alone, not in a column (dataviz skill).
+ * One block of the month (ADR 0045 note): a card with its title, and what the title means behind
+ * an "ⓘ" beside it (InfoTip), out of the heading's name.
  */
-function StatTile({
-  label,
-  help,
-  children,
-}: {
-  label: string;
-  /** What the label means, behind an "ⓘ" (InfoTip). */
-  help?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b py-2 last:border-b-0 sm:grid sm:justify-start sm:gap-1 sm:rounded-xl sm:border sm:p-4 sm:last:border-b">
-      <dt className="text-muted-foreground flex items-center">
-        {label}
-        {help && <InfoTip term={label}>{help}</InfoTip>}
-      </dt>
-      <dd className="text-lg font-semibold whitespace-nowrap">{children}</dd>
-    </div>
-  );
-}
-
-function Section({
+function Card({
   title,
-  level = 2,
   help,
   className,
   children,
 }: {
   title: string;
-  /** 3 for the blocks inside "Orçamento do mês". */
-  level?: 2 | 3;
-  /** What the section shows, behind an "ⓘ" beside the title (InfoTip), out of the heading's name. */
   help?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
   const id = `dashboard-${title.toLowerCase().replace(/\W+/g, '-')}`;
-  const Heading = level === 2 ? 'h2' : 'h3';
   return (
-    <section aria-labelledby={id} className={cn('grid content-start gap-3', className)}>
+    <section
+      aria-labelledby={id}
+      className={cn('bg-card grid content-start gap-4 rounded-xl border p-4 md:p-6', className)}
+    >
       <div className="flex items-center">
-        <Heading id={id} className="font-medium">
+        <h2 id={id} className="font-semibold">
           {title}
-        </Heading>
+        </h2>
         {help && <InfoTip term={title}>{help}</InfoTip>}
       </div>
       {children}
@@ -89,24 +65,27 @@ function Section({
   );
 }
 
-/** Label left, value right, one per line. */
-function AmountRows({
-  rows,
+/** A labelled amount, with an optional line under it ("R$ 5.200,00 recebidos"). */
+function Figure({
+  label,
+  help,
+  sub,
+  children,
 }: {
-  rows: readonly (readonly [label: string, value: ReactNode, help?: ReactNode])[];
+  label: string;
+  help?: ReactNode;
+  sub?: string;
+  children: ReactNode;
 }) {
   return (
-    <dl className="grid tabular-nums">
-      {rows.map(([label, value, help]) => (
-        <div key={label} className="flex items-center justify-between gap-3 border-b py-2">
-          <dt className="text-muted-foreground flex items-center">
-            {label}
-            {help}
-          </dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="grid min-w-0 content-start gap-0.5">
+      <dt className="text-muted-foreground flex items-center text-sm">
+        {label}
+        {help && <InfoTip term={label}>{help}</InfoTip>}
+      </dt>
+      <dd className="text-lg font-semibold whitespace-nowrap tabular-nums">{children}</dd>
+      {sub && <dd className="text-muted-foreground text-sm tabular-nums">{sub}</dd>}
+    </div>
   );
 }
 
@@ -149,7 +128,7 @@ function budgetOrigin(summary: Summary) {
 
 /** Part ÷ goal, as a percentage; nothing to compare with a goal of zero. */
 function shareOfGoal(cents: number, goalCents: number) {
-  if (goalCents <= 0) return '—';
+  if (goalCents <= 0) return null;
   return formatBasisPoints(Math.round((cents / goalCents) * FULL_BASIS_POINTS));
 }
 
@@ -173,22 +152,78 @@ function ApplyButton({
 }
 
 /**
- * The spending limit (Despesas, ADRs 0047 and 0051), apart from the saving goals: a share of the
- * net income, and what counts is everything spent or still to pay, so "Usado do limite" matches
- * the meter.
+ * The month's balance, credits and debits in one card (ADR 0045 note): the planned balance leads,
+ * then what comes in and goes out with what already happened, the bar of where the credits go and
+ * the balance of what is settled.
  */
-function ExpensesBlock({ summary }: { summary: Summary }) {
+function BalanceCard({ summary }: { summary: Summary }) {
+  const { credits, debits, balance } = summary;
+  return (
+    <Card title="Saldo do mês">
+      {/* Planned: as if everything were settled. Settled: only what happened (ADR 0031). */}
+      <div className="grid justify-items-start gap-2">
+        {/* The one number the month leads with (dataviz skill: one hero per view). */}
+        <dl className="grid gap-1">
+          <dt className="text-muted-foreground flex items-center">
+            Saldo previsto
+            <InfoTip term="Saldo previsto">
+              <p>Como o mês termina se tudo o que está previsto for recebido e pago.</p>
+            </InfoTip>
+          </dt>
+          <dd className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+            <SignedCents cents={balance.plannedCents} />
+          </dd>
+        </dl>
+        {summary.estimatedCents > 0 && (
+          // The planned view counts estimates of variable bills (ADR 0038): say how much.
+          <p className="text-muted-foreground text-sm">
+            Inclui {formatCents(summary.estimatedCents)} em valores estimados, de contas que variam.
+          </p>
+        )}
+      </div>
+      <dl className="grid grid-cols-2 gap-4">
+        <Figure label="Entradas" sub={`${formatCents(credits.settledCents)} recebidos`}>
+          {formatCents(credits.totalCents)}
+        </Figure>
+        <Figure label="Saídas" sub={`${formatCents(debits.settledCents)} pagos`}>
+          {formatCents(debits.totalCents)}
+        </Figure>
+      </dl>
+      <CreditsBar summary={summary} />
+      <dl className="flex items-center justify-between gap-3 border-t pt-3">
+        <dt className="text-muted-foreground flex items-center">
+          Saldo atual
+          <InfoTip term="Saldo atual">
+            <p>Só o que já foi recebido ou pago.</p>
+          </InfoTip>
+        </dt>
+        <dd className="font-semibold tabular-nums">
+          <SignedCents cents={balance.settledCents} />
+        </dd>
+      </dl>
+    </Card>
+  );
+}
+
+/**
+ * The spending limit (Despesas, ADRs 0047 and 0051), apart from the saving goals: a share of the
+ * net income, and what counts is everything spent or still to pay. Putting money aside is not
+ * spending, so this differs from the debits of the balance card, and the "ⓘ" says why.
+ */
+function LimitCard({ summary }: { summary: Summary }) {
   const goal = summary.destinations.find((destination) => destination.kind === 'EXPENSES');
   if (!goal) return null;
   const { expenses } = summary;
   return (
-    <Section
+    <Card
       title="Limite de gastos"
-      level={3}
       help={
         <>
           <p>Quanto da renda líquida você planeja gastar no mês.</p>
-          <p>Usado do limite: o que já foi pago mais o que falta pagar.</p>
+          <p>
+            Gastos: o que já foi pago mais o que falta pagar. Guardar nas metas não conta como
+            gasto.
+          </p>
         </>
       }
     >
@@ -199,46 +234,12 @@ function ExpensesBlock({ summary }: { summary: Summary }) {
           Sem limite: defina a renda líquida e o percentual do limite de gastos no orçamento.
         </p>
       )}
-      <AmountRows
-        rows={[
-          ['Pago', formatCents(expenses.settledCents)],
-          ['A pagar', formatCents(expenses.pendingCents)],
-          ['Usado do limite', shareOfGoal(expenses.totalCents, goal.targetCents)],
-        ]}
-      />
-    </Section>
-  );
-}
-
-/** The base of the saving goals, as a sum: where "Sobra para guardar" comes from. */
-function AvailableBlock({ summary }: { summary: Summary }) {
-  return (
-    <Section
-      title="O que sobra para guardar"
-      level={3}
-      help={
-        <>
-          <p>
-            As entradas previstas menos as despesas previstas: é sobre esse valor que as metas são
-            calculadas.
-          </p>
-          <p>O que você guarda não entra na conta: guardar mais não diminui as metas.</p>
-        </>
-      }
-    >
-      <AmountRows
-        rows={[
-          ['Entradas previstas', formatCents(summary.credits.totalCents)],
-          ['Despesas previstas', `− ${formatCents(summary.expenses.totalCents)}`],
-          [
-            'Sobra para guardar',
-            <span key="available" className="font-semibold">
-              <SignedCents cents={summary.available.plannedCents} />
-            </span>,
-          ],
-        ]}
-      />
-    </Section>
+      <dl className="grid grid-cols-2 gap-4">
+        {/* "Gastos", not "Pago": the debits of the balance card count the goals too. */}
+        <Figure label="Gastos pagos">{formatCents(expenses.settledCents)}</Figure>
+        <Figure label="Gastos a pagar">{formatCents(expenses.pendingCents)}</Figure>
+      </dl>
+    </Card>
   );
 }
 
@@ -246,201 +247,87 @@ function AvailableBlock({ summary }: { summary: Summary }) {
 const missingCents = (destination: DestinationSummary) =>
   Math.max(0, destination.targetCents - destination.appliedCents - destination.pendingCents);
 
+/** Where a goal stands, in words: "R$ 500,00 pendente. Falta lançar R$ 782,00." */
+function goalNote(destination: DestinationSummary) {
+  if (destination.targetCents <= 0) return 'Sem valor este mês.';
+  if (destination.appliedCents >= destination.targetCents) return 'Meta alcançada.';
+  const missing = missingCents(destination);
+  return [
+    destination.pendingCents > 0 && `${formatCents(destination.pendingCents)} pendente.`,
+    missing > 0 ? `Falta lançar ${formatCents(missing)}.` : 'Meta toda lançada.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 /**
- * The saving goals' amounts, in the order of the table's columns. "Pendente" is launched and not
- * paid yet; "Falta" is not launched at all ("A aplicar" was read as either).
+ * How much of the goal is set aside: paid in the fill, pending (launched, not paid) striped after
+ * it. A meter, with its amounts in words for a screen reader.
  */
-const savingCells = (destination: DestinationSummary) =>
-  [
-    ['Valor da meta', formatCents(destination.targetCents)],
-    ['Guardado', formatCents(destination.appliedCents)],
-    ['Pendente', formatCents(destination.pendingCents)],
-    ['Falta', formatCents(missingCents(destination))],
-  ] as const;
-
-const realized = (destination: DestinationSummary) =>
-  shareOfGoal(destination.appliedCents, destination.targetCents);
-
-/** Each saving destination as a card on the phone: the table's columns do not fit in 360px. */
-function SavingsCards({
-  savings,
-  summary,
-  onApply,
-}: {
-  savings: DestinationSummary[];
-  summary: Summary;
-  onApply?: OnApply;
-}) {
+function GoalProgress({ destination }: { destination: DestinationSummary }) {
+  const target = destination.targetCents;
+  const paid = Math.min(destination.appliedCents / target, 1) * 100;
+  const pending = Math.min(destination.pendingCents / target, 1 - paid / 100) * 100;
   return (
-    <>
-      <ul className="grid gap-3">
-        {savings.map((destination) => (
-          <li key={destination.destinationId} className="grid gap-2 rounded-xl border p-4">
-            <p className="flex items-baseline justify-between gap-3">
-              <span className="font-medium">{destination.name}</span>
-              <span className="text-muted-foreground">
-                {formatBasisPoints(destination.basisPoints)}
-              </span>
-            </p>
-            <dl className="grid grid-cols-2 gap-2 text-sm tabular-nums">
-              {savingCells(destination).map(([label, value]) => (
-                <div key={label} className="grid gap-0.5">
-                  <dt className="text-muted-foreground">{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="text-sm tabular-nums">
-              <span className="text-muted-foreground">Progresso:</span> {realized(destination)}
-            </p>
-            <div className="empty:hidden">
-              <ApplyButton destination={destination} onApply={onApply} />
-            </div>
-          </li>
-        ))}
-      </ul>
-      {summary.unallocated.basisPoints > 0 && (
-        // Not a destination: a plain line, not a card.
-        <AmountRows
-          rows={[
-            [
-              `Sem meta (${formatBasisPoints(summary.unallocated.basisPoints)})`,
-              formatCents(summary.unallocated.targetCents),
-              unallocatedTip,
-            ],
-          ]}
-        />
-      )}
-    </>
+    <div
+      role="meter"
+      aria-label={`Progresso de ${destination.name}`}
+      aria-valuemin={0}
+      aria-valuemax={target}
+      aria-valuenow={Math.min(destination.appliedCents, target)}
+      aria-valuetext={`${formatCents(destination.appliedCents)} guardados de ${formatCents(target)}`}
+      className="bg-chart-3/20 flex h-2 overflow-hidden rounded-full"
+    >
+      <div className="bg-chart-3 h-full" style={{ width: `${paid}%` }} />
+      <div
+        className="h-full bg-[repeating-linear-gradient(135deg,var(--chart-3)_0_4px,transparent_4px_7px)]"
+        style={{ width: `${pending}%` }}
+      />
+    </div>
   );
 }
 
 /**
- * From md, where the columns fit. "Sem meta" closes the shares at 100%, so the total of the goals
- * is what is available.
+ * One goal: its name and "Guardar" on the first line, so the amounts, the progress and the note
+ * below take the whole width and do not wrap at 360px.
  */
-function SavingsTable({
-  savings,
-  summary,
-  onApply,
-}: {
-  savings: DestinationSummary[];
-  summary: Summary;
-  onApply?: OnApply;
-}) {
-  const { unallocated } = summary;
-  // What the goals are a share of: they and "Sem meta" add up to it, to the cent.
-  const totalTarget = Math.max(0, summary.available.plannedCents);
-  const totalApplied = summary.applied.settledCents;
-  const actions = onApply ? <td className="py-2 pl-4" /> : null;
+function GoalRow({ destination, onApply }: { destination: DestinationSummary; onApply?: OnApply }) {
+  const progress = shareOfGoal(destination.appliedCents, destination.targetCents);
   return (
-    <table className="w-full tabular-nums">
-      <thead className="text-muted-foreground">
-        <tr className="border-b">
-          <th scope="col" className="py-2 text-left font-normal">
-            Meta
-          </th>
-          {['%', 'Valor', 'Guardado', 'Pendente', 'Falta', 'Progresso'].map((label) => (
-            <th key={label} scope="col" className="py-2 text-right font-normal">
-              {label}
-            </th>
-          ))}
-          {onApply && (
-            <th scope="col" className="py-2 pl-4 text-right font-normal">
-              <span className="sr-only">Ações</span>
-            </th>
-          )}
-        </tr>
-      </thead>
-      <tbody>
-        {savings.map((destination) => (
-          <tr key={destination.destinationId} className="border-b">
-            <th scope="row" className="py-2 text-left font-normal">
-              {destination.name}
-            </th>
-            <td className="py-2 text-right">{formatBasisPoints(destination.basisPoints)}</td>
-            {savingCells(destination).map(([label, value]) => (
-              <td key={label} className="py-2 text-right">
-                {value}
-              </td>
-            ))}
-            <td className="py-2 text-right">{realized(destination)}</td>
-            {onApply && (
-              <td className="py-2 pl-4 text-right">
-                <ApplyButton destination={destination} onApply={onApply} />
-              </td>
-            )}
-          </tr>
-        ))}
-        {unallocated.basisPoints > 0 && (
-          <tr className="text-muted-foreground border-b">
-            <th scope="row" className="py-2 text-left font-normal">
-              <span className="flex items-center">Sem meta{unallocatedTip}</span>
-            </th>
-            <td className="py-2 text-right">{formatBasisPoints(unallocated.basisPoints)}</td>
-            <td className="py-2 text-right">{formatCents(unallocated.targetCents)}</td>
-            <td colSpan={4} />
-            {actions}
-          </tr>
-        )}
-      </tbody>
-      <tfoot className="font-medium">
-        <tr>
-          <th scope="row" className="py-2 text-left font-medium">
-            Total
-          </th>
-          <td className="py-2 text-right">
-            {formatBasisPoints(
-              savings.reduce((sum, destination) => sum + destination.basisPoints, 0) +
-                unallocated.basisPoints,
-            )}
-          </td>
-          <td className="py-2 text-right">{formatCents(totalTarget)}</td>
-          <td className="py-2 text-right">{formatCents(totalApplied)}</td>
-          <td className="py-2 text-right">
-            {formatCents(summary.applied.plannedCents - totalApplied)}
-          </td>
-          <td className="py-2 text-right">
-            {formatCents(savings.reduce((sum, destination) => sum + missingCents(destination), 0))}
-          </td>
-          <td className="py-2 text-right">{shareOfGoal(totalApplied, totalTarget)}</td>
-          {actions}
-        </tr>
-      </tfoot>
-    </table>
+    <li className="grid content-start gap-1.5 border-t py-3 first:border-t-0 first:pt-0 @3xl:nth-2:border-t-0 @3xl:nth-2:pt-0">
+      <div className="flex min-h-8 items-center justify-between gap-3">
+        <p className="font-medium">
+          {destination.name}{' '}
+          <span className="text-muted-foreground text-sm font-normal">
+            {formatBasisPoints(destination.basisPoints)}
+          </span>
+        </p>
+        <ApplyButton destination={destination} onApply={onApply} />
+      </div>
+      <p className="text-sm tabular-nums">
+        <span className="font-semibold">{formatCents(destination.appliedCents)}</span>{' '}
+        <span className="text-muted-foreground">
+          de {formatCents(destination.targetCents)}
+          {progress && ` (${progress})`}
+        </span>
+      </p>
+      {destination.targetCents > 0 && <GoalProgress destination={destination} />}
+      <p className="text-muted-foreground text-sm tabular-nums">{goalNote(destination)}</p>
+    </li>
   );
 }
 
 /**
- * What "Sem meta" is: a share of the planned "Sobra para guardar" (`unallocated` comes from
- * `available.plannedCents`). It may be spent, and it is already in the planned balance: the note
- * only keeps it from being read as a balance of its own (ADR 0051). Behind an "ⓘ" on its row.
+ * The saving destinations, each a share of what is left after expenses (ADR 0047), under what is
+ * left to set aside and what was set aside this month.
  */
-const unallocatedTip = (
-  <InfoTip term="Sem meta">
-    <p>
-      Parte do Sobra para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um
-      saldo.
-    </p>
-  </InfoTip>
-);
-
-/** The saving destinations, each a share of what is left after expenses (ADR 0047). */
-function SavingsBlock({
-  summary,
-  desktop,
-  onApply,
-}: {
-  summary: Summary;
-  desktop: boolean;
-  onApply?: OnApply;
-}) {
+function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }) {
   const savings = summary.destinations.filter((destination) => destination.kind === 'SAVINGS');
   if (savings.length === 0) return null;
+  const { unallocated } = summary;
   return (
-    <Section
+    <Card
       title="Metas"
-      level={3}
       className="xl:col-span-2"
       help={
         <>
@@ -449,30 +336,141 @@ function SavingsBlock({
             guardar, não da renda.
           </p>
           <p>
-            Guardado: já lançado e pago. Pendente: lançado, ainda não pago. Falta: o que ainda não
-            foi lançado. Progresso: quanto da meta já foi guardado.
+            Guardado: lançado e pago. Pendente: lançado, ainda não pago. Falta lançar: o que ainda
+            não foi lançado.
           </p>
         </>
       }
     >
+      <dl className="grid grid-cols-2 gap-4">
+        <Figure
+          label="Sobra para guardar"
+          help={
+            <>
+              <p>
+                As entradas previstas menos as despesas previstas: é sobre esse valor que as metas
+                são calculadas.
+              </p>
+              <p>O que você guarda não entra na conta: guardar mais não diminui as metas.</p>
+            </>
+          }
+        >
+          <SignedCents cents={summary.available.plannedCents} />
+        </Figure>
+        <Figure
+          label="Guardado"
+          help={<p>O que já foi para as metas neste mês: lançado e pago.</p>}
+        >
+          {formatCents(summary.applied.settledCents)}
+        </Figure>
+      </dl>
       {summary.available.plannedCents <= 0 && (
         <p>Nada sobrou para guardar este mês: as despesas previstas alcançaram as entradas.</p>
       )}
-      {desktop ? (
-        <SavingsTable savings={savings} summary={summary} onApply={onApply} />
-      ) : (
-        <SavingsCards savings={savings} summary={summary} onApply={onApply} />
+      {/* Two goals side by side only when the card itself is wide enough (a container query):
+          at 768 and 1024px, beside the sidebar, they would wrap every amount. */}
+      <div className="@container">
+        <ul className="grid gap-x-8 @3xl:grid-cols-2">
+          {savings.map((destination) => (
+            <GoalRow key={destination.destinationId} destination={destination} onApply={onApply} />
+          ))}
+        </ul>
+      </div>
+      {unallocated.basisPoints > 0 && (
+        // A forecast share of what is left, never money in the account (ADR 0051): a plain line,
+        // with what it is behind its "ⓘ".
+        <dl className="text-muted-foreground flex items-center justify-between gap-3 border-t pt-3 tabular-nums">
+          <dt className="flex items-center">
+            Sem meta ({formatBasisPoints(unallocated.basisPoints)})
+            <InfoTip term="Sem meta">
+              <p>
+                Parte da sobra para guardar que nenhuma meta recebeu. É uma divisão do orçamento,
+                não um saldo.
+              </p>
+            </InfoTip>
+          </dt>
+          <dd>{formatCents(unallocated.targetCents)}</dd>
+        </dl>
       )}
-    </Section>
+    </Card>
+  );
+}
+
+/**
+ * The budget in one line above the cards: the net income, where the budget comes from behind an
+ * "ⓘ", and "Editar orçamento" for whoever edits it (ADR 0046).
+ */
+function BudgetBar({
+  summary,
+  onEditBudget,
+}: {
+  summary: Summary;
+  onEditBudget?: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <section
+      aria-labelledby="dashboard-budget"
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+    >
+      <div className="flex flex-wrap items-center gap-x-3">
+        <div className="flex items-center">
+          <h2 id="dashboard-budget" className="font-semibold">
+            Orçamento do mês
+          </h2>
+          <InfoTip term="Orçamento do mês">
+            <p>{budgetOrigin(summary)}</p>
+            <p>Os meses seguintes herdam o orçamento até você salvar outro.</p>
+          </InfoTip>
+        </div>
+        <p className="text-muted-foreground">
+          Renda líquida:{' '}
+          <span className="text-foreground font-medium tabular-nums">
+            {summary.budget.netIncomeCents > 0
+              ? formatCents(summary.budget.netIncomeCents)
+              : 'não definida'}
+          </span>
+        </p>
+      </div>
+      {onEditBudget && (
+        <Button variant="outline" onClick={onEditBudget}>
+          Editar orçamento
+        </Button>
+      )}
+    </section>
+  );
+}
+
+/** No budget yet: one card that says what it brings, instead of empty blocks (ADR 0045 note). */
+function NoBudgetCard({
+  onEditBudget,
+}: {
+  onEditBudget?: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <Card title="Orçamento do mês">
+      <div className="grid justify-items-start gap-3">
+        <p>Nenhum orçamento definido até aqui.</p>
+        {onEditBudget && (
+          <>
+            <p className="text-muted-foreground">
+              Defina a renda líquida e quanto dela vai para gastos e para cada meta. Assim o painel
+              mostra o limite de gastos e quanto guardar.
+            </p>
+            {/* Highlighted until the workspace has a budget (ADR 0047). */}
+            <Button onClick={onEditBudget}>Definir orçamento</Button>
+          </>
+        )}
+      </div>
+    </Card>
   );
 }
 
 type PageLinks = { transactions: string };
 
 /**
- * The month on one screen (ADRs 0031, 0045, 0046). One column up to xl; from there, two: the
- * balance across the top, credits and debits beside where the credits go, and the budget (with
- * the expenses goal) across the bottom, so a wide screen is used without stretching any row.
+ * The month on one screen (ADRs 0031, 0045, 0046), in cards: the balance first, then the limit
+ * of spending and the goals. One column up to xl; from there, the balance beside the limit and
+ * the goals across, so a wide screen is used without stretching any row.
  */
 function Dashboard({
   summary,
@@ -486,122 +484,35 @@ function Dashboard({
   onEditBudget?: (event: MouseEvent<HTMLButtonElement>) => void;
   onApply?: OnApply;
 }) {
-  const { credits, debits } = summary;
-  const desktop = useMediaQuery(DESKTOP_QUERY);
+  const hasBudget = summary.budget.source !== 'NONE';
   return (
-    <div className="grid gap-6 xl:grid-cols-2 xl:gap-x-10 xl:gap-y-8">
-      <div className="empty:hidden xl:col-span-2">
+    <div className="grid gap-4 xl:gap-6">
+      <div className="empty:hidden">
         <OverdueNotice summary={summary} transactionsLink={links.transactions} />
       </div>
-      <Section title="Saldo do mês" className="xl:col-span-2">
-        {/* Planned: as if everything were settled. Settled: only what happened (ADR 0031). */}
-        <div className="grid gap-4">
-          {/* The one number the month leads with (dataviz skill: one hero per view). */}
-          <div className="grid gap-1">
-            <dl className="grid gap-1">
-              <dt className="text-muted-foreground flex items-center">
-                Saldo previsto
-                <InfoTip term="Saldo previsto">
-                  <p>Como o mês termina se tudo o que está previsto for recebido e pago.</p>
-                </InfoTip>
-              </dt>
-              <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
-                <SignedCents cents={summary.balance.plannedCents} />
-              </dd>
-            </dl>
-          </div>
-          <dl className="grid sm:grid-cols-3 sm:gap-3">
-            <StatTile label="Saldo atual" help={<p>Só o que já foi recebido ou pago.</p>}>
-              <SignedCents cents={summary.balance.settledCents} />
-            </StatTile>
-            <StatTile
-              label="Sobra para guardar"
-              help={<p>As entradas menos as despesas: a base das metas.</p>}
-            >
-              <SignedCents cents={summary.available.plannedCents} />
-            </StatTile>
-            <StatTile label="Guardado" help={<p>O que já foi para as metas neste mês.</p>}>
-              <SignedCents cents={summary.applied.settledCents} />
-            </StatTile>
-          </dl>
-        </div>
-        {summary.estimatedCents > 0 && (
-          // The planned view counts estimates of variable bills (ADR 0038): say how much.
-          <p>
-            Inclui {formatCents(summary.estimatedCents)} em valores estimados, de contas que variam.
-          </p>
+      {hasBudget && <BudgetBar summary={summary} onEditBudget={onEditBudget} />}
+      <div className="grid items-start gap-4 xl:grid-cols-2 xl:gap-6">
+        <BalanceCard summary={summary} />
+        {hasBudget ? (
+          <>
+            <LimitCard summary={summary} />
+            <GoalsCard summary={summary} onApply={onApply} />
+          </>
+        ) : (
+          <NoBudgetCard onEditBudget={onEditBudget} />
         )}
-      </Section>
-      <Section title="Entradas e saídas">
-        <dl className="grid tabular-nums sm:grid-cols-2 sm:gap-x-8">
-          {(
-            [
-              ['Recebidos', credits.settledCents],
-              ['A receber', credits.pendingCents],
-              ['Pagos', debits.settledCents],
-              ['A pagar', debits.pendingCents],
-            ] as const
-          ).map(([label, cents]) => (
-            <div key={label} className="flex justify-between gap-3 border-b py-2">
-              <dt className="text-muted-foreground">{label}</dt>
-              <dd>{formatCents(cents)}</dd>
-            </div>
-          ))}
-        </dl>
-      </Section>
-      <Section title="Para onde vão as entradas">
-        <CreditsBar summary={summary} />
-      </Section>
-      <Section title="Orçamento do mês" className="xl:col-span-2">
-        <div className="grid justify-items-start gap-2">
-          {/* The net income the goals are a share of: shown here now that the budget has no
-              page of its own (ADR 0046). */}
-          <p>
-            Renda líquida:{' '}
-            <span className="font-medium tabular-nums">
-              {summary.budget.netIncomeCents > 0
-                ? formatCents(summary.budget.netIncomeCents)
-                : 'não definida'}
-            </span>
-          </p>
-          <p className="text-muted-foreground">{budgetOrigin(summary)}</p>
-          {onEditBudget &&
-            // Highlighted until the workspace has a budget (ADR 0047), plain after.
-            (summary.budget.source === 'NONE' ? (
-              <Button onClick={onEditBudget}>Definir orçamento</Button>
-            ) : (
-              <Button variant="outline" onClick={onEditBudget}>
-                Editar orçamento
-              </Button>
-            ))}
-        </div>
-        {/* Two bases (ADR 0047): Despesas on the income, then what is left, split among the
-            saving destinations. Side by side from xl, the destinations across. */}
-        <div className="grid gap-6 xl:grid-cols-2 xl:gap-x-10">
-          <ExpensesBlock summary={summary} />
-          <AvailableBlock summary={summary} />
-          <SavingsBlock summary={summary} desktop={desktop} onApply={onApply} />
-        </div>
-      </Section>
+      </div>
     </div>
   );
 }
 
 function DashboardSkeleton() {
   return (
-    <>
-      <div className="grid gap-2">
-        <Skeleton className="h-5 w-28" />
-        <Skeleton className="h-12 w-56" />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {Array.from({ length: 3 }, (_, index) => (
-          <Skeleton key={index} className="h-12 sm:h-20" />
-        ))}
-      </div>
-      <Skeleton className="h-24" />
-      <Skeleton className="h-40" />
-    </>
+    <div className="grid gap-4 xl:grid-cols-2 xl:gap-6">
+      <Skeleton className="h-80 rounded-xl" />
+      <Skeleton className="h-56 rounded-xl" />
+      <Skeleton className="h-48 rounded-xl xl:col-span-2" />
+    </div>
   );
 }
 
