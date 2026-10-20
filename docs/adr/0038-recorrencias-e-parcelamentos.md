@@ -161,6 +161,8 @@ O dono importou pela planilha uma compra que era parcelada e não tinha como tra
 - **Recusas (409 `NOT_INSTALLABLE`):** um lançamento que já é parcela ou de uma recorrência, uma parte de divisão, um lançamento dividido e um já pago informado como total (o valor dele mudaria). A última parcela não tem outras depois e é recusada como entrada inválida.
 - **Uma só escrita:** o parcelamento com as parcelas seguintes e a adoção do lançamento ficam numa transação interativa com o contexto do RLS ([ADR 0028](0028-row-level-security.md)), porque o Prisma não cria o parcelamento pelo lado da parcela já existente.
 
+Na tela: o menu de um lançamento avulso, não dividido e que não é parte, oferece "Tornar parcelado" (`features/installments/install-dialog.tsx`). O diálogo pede as parcelas, "Este lançamento é a parcela (opcional)" e se o valor é "Da parcela" ou "Total" (um lançamento já pago fica só como valor da parcela, com a explicação). Antes de confirmar, ele mostra a prévia do formulário ("Da 3/10 à 10/10: 8 parcelas de R$ 50,00, total R$ 400,00"), que passou para `features/installments/preview.ts` e serve aos dois.
+
 ## Nota (o lançamento adotado volta a ser avulso, 2026-10-19)
 
 Um teste do dono mostrou que encerrar uma recorrência criada pelo "Tornar recorrente" excluía também o lançamento que ela tinha adotado: ele era deste mês e estava pendente, e a recorrência não sabia que ele existia antes dela. O mesmo valia para o "Tornar parcelado" ao excluir ou encerrar o parcelamento.
@@ -169,4 +171,4 @@ Um teste do dono mostrou que encerrar uma recorrência criada pelo "Tornar recor
 - **Encerrar a recorrência** devolve o adotado como avulso, com as partes dele, se ainda estiver pendente e for deste mês em diante (o vínculo da ocorrência é desfeito). **Excluir ou encerrar o parcelamento** o devolve como avulso, com o valor de antes; ao excluir um sem nada pago, mesmo que seja de um mês passado, porque tudo some; ao encerrar um com parcelas pagas, só deste mês em diante, porque o passado fica como histórico. Um adotado já pago continua no histórico, como antes.
 - **Refazer as parcelas** (mudar valor, quantidade ou parcela inicial com nada pago) recria todas, inclusive a adotada, que deixa de ser o lançamento de antes: a marca é apagada.
 - **O que já existia:** a migração marca as recorrências do "Tornar recorrente" anteriores à coluna. O adotado é o lançamento do primeiro mês criado antes da recorrência; um mês gerado é sempre criado depois dela.
-- As respostas trazem `adoptedTransactionId`, para a tela avisar no encerramento.
+- As respostas trazem `adoptedTransactionId`, e os diálogos de encerrar e excluir (em Lançamentos e em Recorrências) acrescentam: "O lançamento que já existia antes continua, como avulso, se ainda estiver pendente."

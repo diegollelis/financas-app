@@ -465,6 +465,23 @@ describe('RecurrencesPage', () => {
     expect(await screen.findByText('Recorrência encerrada')).toBeInTheDocument();
   });
 
+  it('says the transaction that existed before stays, when ending one made from it (ADR 0038 note)', async () => {
+    mockRecurrences({
+      [`GET ${base}/recurrences`]: {
+        body: [{ ...energia, adoptedTransactionId: '01920000-0000-7000-8000-000000000501' }],
+      },
+    });
+    renderApp(page);
+
+    await choose('Conta de luz', 'Encerrar recorrência');
+    const confirm = await screen.findByRole('alertdialog', {
+      name: 'Encerrar a recorrência Conta de luz?',
+    });
+    expect(confirm).toHaveTextContent(
+      'O lançamento que já existia antes continua, como avulso, se ainda estiver pendente.',
+    );
+  });
+
   it('ends an installment plan after confirming', async () => {
     const fetchMock = mockRecurrences({
       [`DELETE ${base}/installments/${geladeira.id}`]: { status: 204, body: null },

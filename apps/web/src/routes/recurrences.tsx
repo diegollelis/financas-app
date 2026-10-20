@@ -56,6 +56,7 @@ import {
 import { useCurrentUser } from '@/features/auth/use-me';
 import { useResolveCategory } from '@/features/categories/new-category';
 import { useCategories } from '@/features/categories/use-categories';
+import { withAdoptedNote } from '@/features/installments/adopted';
 import { PlanForm } from '@/features/installments/plan-form';
 import {
   useEndInstallmentPlan,
@@ -571,7 +572,10 @@ function RecurrenceItem({
         onOpenChange={setConfirmingEnd}
         returnFocusTo={actionsRef}
         title={`Encerrar a recorrência ${description}?`}
-        description="Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já pagos ou recebidos ficam."
+        description={withAdoptedNote(
+          'Deixa de repetir. Os lançamentos pendentes deste mês em diante saem; os anteriores e os já pagos ou recebidos ficam.',
+          recurrence.adoptedTransactionId,
+        )}
         action="Encerrar recorrência"
         onConfirm={confirmEnd}
       />
@@ -733,11 +737,12 @@ function PlanItem({
             ? `Excluir o parcelamento ${description}?`
             : `Encerrar o parcelamento ${description}?`
         }
-        description={
+        description={withAdoptedNote(
           nothingPaid
             ? `Nenhuma parcela foi paga: o parcelamento sai com ${pendingText}, também as de meses anteriores. Não é possível desfazer.`
-            : 'As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada.'
-        }
+            : 'As parcelas pendentes deste mês em diante saem; as já pagas e as anteriores ficam. Use para uma quitação antecipada.',
+          plan.adoptedTransactionId,
+        )}
         action={nothingPaid ? 'Excluir parcelamento' : 'Encerrar parcelamento'}
         onConfirm={confirmEnd}
       />
