@@ -160,6 +160,9 @@ export class TransactionsService {
     if (input.merchantId && input.merchantId !== current.merchantId) {
       await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     }
+    if (input.type !== undefined && input.type !== current.type) {
+      await this.ensureTypeMayChange(workspaceId, current);
+    }
     const type = input.type ?? current.type;
     const categoryId = input.categoryId ?? current.categoryId;
     // Only a change is checked: a transaction may keep a category archived after it was made.
@@ -309,6 +312,38 @@ export class TransactionsService {
       },
       split,
     );
+  }
+
+  /**
+   * The type of a transaction tied to others stays (ADR 0029 note): a split one and its shares are
+   * on opposite sides, and a month of a recurrence or an installment is the series' type.
+   */
+  private async ensureTypeMayChange(
+    workspaceId: string,
+    current: Awaited<ReturnType<TransactionsService['find']>>,
+  ) {
+    const refuse = (message: string) => new ConflictException({ code: 'TYPE_LOCKED', message });
+    if (current.splitOfId) {
+      throw refuse('Esta é a parte de uma divisão: o tipo segue o do lançamento dividido.');
+    }
+    if (current.installmentPlanId) {
+      throw refuse('Esta é uma parcela: o tipo é o do parcelamento.');
+    }
+    const origin = await this.prisma.forWorkspace(workspaceId).transaction.findFirstOrThrow({
+      where: { id: current.id, workspaceId },
+      select: {
+        occurrence: { select: { recurrenceId: true } },
+        _count: { select: { shares: true } },
+      },
+    });
+    if (origin.occurrence) {
+      throw refuse('Este é um mês de uma recorrência: o tipo é o da recorrência.');
+    }
+    if (origin._count.shares > 0) {
+      throw refuse(
+        'Este lançamento está dividido: o tipo não muda, porque as partes ficam do outro lado.',
+      );
+    }
   }
 
   private async find(workspaceId: string, transactionId: string) {
