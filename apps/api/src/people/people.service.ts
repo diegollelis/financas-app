@@ -141,12 +141,21 @@ export class PeopleService {
 
   /**
    * Everything linked to this person, of any competência, newest first (ADR 0042): what they
-   * owe and are owed, pending or settled, and the shares of the debits split with them.
+   * owe and are owed, pending or settled, and the shares of the debits split with them. The
+   * months of a recurrence ahead (and their shares) wait for their month, like the totals: they
+   * exist only because someone opened that competência (ADR 0042 note).
    */
   async transactions(workspaceId: string, personId: string): Promise<Transaction[]> {
     await this.find(workspaceId, personId);
     const transactions = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
-      where: { workspaceId, personId },
+      where: {
+        workspaceId,
+        personId,
+        NOT: {
+          period: { gt: currentPeriod() },
+          OR: [{ occurrence: { isNot: null } }, { splitOf: { occurrence: { isNot: null } } }],
+        },
+      },
       include: withOrigin,
       orderBy: [{ period: 'desc' }, { id: 'desc' }],
       take: PERSON_TRANSACTIONS_LIMIT,

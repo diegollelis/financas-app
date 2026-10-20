@@ -262,6 +262,67 @@ describe('people and splits', () => {
       await browser.get(`${base}/people/${SOME_ID}/transactions`).expect(404);
     });
 
+    it("leaves the months of a recurrence ahead out of a person's list, never the installments", async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const moradia = category('Moradia', 'DEBIT').id;
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Internet',
+          categoryId: moradia,
+          amountCents: 10_000,
+          startPeriod: period,
+          personId: ana.id,
+        })
+        .expect(201);
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Condomínio',
+          categoryId: moradia,
+          amountCents: 40_000,
+          startPeriod: period,
+          split: [{ personId: ana.id, amountCents: 20_000 }],
+        })
+        .expect(201);
+      await browser
+        .post(`${base}/installments`)
+        .send({
+          type: 'DEBIT',
+          description: 'Geladeira',
+          categoryId: moradia,
+          amountCents: 20_000,
+          amountIs: 'TOTAL',
+          installments: 2,
+          firstPeriod: period,
+          personId: ana.id,
+        })
+        .expect(201);
+      // Opening the next two months creates their months of both recurrences.
+      for (const ahead of [1, 2]) {
+        await browser.get(`${base}/transactions?period=${shiftPeriod(period, ahead)}`).expect(200);
+      }
+
+      const response = await browser.get(`${base}/people/${ana.id}/transactions`).expect(200);
+
+      expect(
+        transactionListResponseSchema
+          .parse(response.body)
+          .map((item) => `${item.description} ${item.period}`)
+          .sort(),
+      ).toEqual(
+        [
+          `Condomínio ${period}`,
+          `Geladeira ${period}`,
+          `Geladeira ${shiftPeriod(period, 1)}`,
+          `Internet ${period}`,
+        ].sort(),
+      );
+    });
+
     it('hides the routes from outsiders', async () => {
       const { personalWorkspaceId } = await setup();
 
