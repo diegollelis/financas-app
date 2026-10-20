@@ -85,3 +85,28 @@ Depois da avaliação externa da tela e do [ADR 0047](0047-orcamento-real-por-de
 - **Comparação com o período anterior.** A página busca também o intervalo de mesmo tamanho imediatamente antes (`previousRange`) e diz, sob Recebido e Gasto, quanto subiu ou desceu, com os mesmos filtros. Sem lançamentos no intervalo anterior, não diz nada.
 - **O mês tocado** no gráfico mostra a diferença para o mês anterior; a linha de saldo é o saldo de cada mês, na mesma escala das barras (são reais também), e a legenda passa a dizer "Saldo do mês".
 - **No celular**, o botão mostra quantos filtros estão fora do padrão: "Filtros (2)".
+
+## Nota (2026-10-20): filtros por meio de pagamento e estabelecimento, e a página em cartões
+
+**Dois filtros novos, sem mudar a API.** As linhas da Análise já trazem o meio de pagamento e o estabelecimento (ADRs 0053 e 0054), e os filtros são aplicados no aparelho. `AnalysisFilters` ganha:
+
+- **`paymentMethods`:** vários meios ao mesmo tempo, com `null` para "Sem meio".
+- **`merchantIds`:** vários estabelecimentos. O que não tem estabelecimento fica de fora quando o filtro está ativo.
+
+A mesma função `matches` aplica os dois a tudo: os totais, o mês a mês e os rankings. Entradas também passam pelo filtro de meio, pelo meio de recebimento.
+
+**No endereço:** `?meios=PIX,CREDIT_CARD,sem` ("sem" é "Sem meio"; um valor fora da lista é descartado) e `?estabelecimentos=id,id`. Os dois contam no botão "Filtros" do celular.
+
+**Na tela:**
+
+- **No computador,** Período, Visão, Tipo e Categorias ficam numa linha a partir de xl. Os meios (botões de seleção múltipla, com o rótulo "Meio de recebimento" quando o tipo é Entradas) e os estabelecimentos ficam em "Mais filtros", que mostra quantos estão ativos e já abre aberto quando há algum. **No celular,** tudo fica na folha "Filtros".
+- **O subtítulo diz todos os filtros ativos** ("Últimos 6 meses, previsto, Crédito, Mercado Bom Preço"). Ao lado, "Limpar filtros" desfaz tipo, categorias, meios e estabelecimentos, e mantém o período e a visão.
+- **Com um meio só escolhido,** o ranking por meio sai, porque seria uma barra só, e o de categorias ocupa a largura toda.
+
+**A página em cartões**, como o Painel (ADR 0045):
+
+- **Totais:** o saldo do período, e Entradas, Gastos e Para guardar com a comparação numa linha curta ("+ R$ 900,00 sobre o período anterior"). O que é o período anterior fica no ⓘ do saldo.
+- **"Mês a mês"** na largura toda, para o gráfico ter espaço para os meses.
+- **Os dois rankings** lado a lado a partir de xl, em vez de empilhados ao lado de um gráfico curto.
+- **As definições e instruções** ("Saídas: gastos e o que foi guardado", "Toque numa categoria…") vão para o ⓘ de cada cartão (`InfoTip`, ADR 0036).
+- **O gráfico no celular** vai até as bordas do cartão, porque o eixo é a própria margem, e a largura mínima por mês caiu de 44 para 42 px. Assim, 6 meses cabem sem rolar a 360 px. Com mais meses, ele rola e recebe foco, com nome, para as setas do teclado rolarem.

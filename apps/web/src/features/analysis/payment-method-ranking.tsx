@@ -1,4 +1,5 @@
 import { paymentMethodLabels, paymentMethodRanking, type Analysis } from '@financas/shared';
+import { SectionCard } from '@/components/section-card';
 import { RankingRow } from './category-ranking';
 import type { AnalysisSettings } from './filters';
 
@@ -21,16 +22,21 @@ export function PaymentMethodRanking({
   const ranking = paymentMethodRanking(analysis, settings, saving);
   const named = ranking.filter((share) => share.paymentMethod !== null);
   const largest = ranking.reduce((max, share) => Math.max(max, share.totalCents), 1);
-  const title = credit ? 'Entradas por meio de recebimento' : 'Despesas por meio de pagamento';
+  const title = credit ? 'Entradas por meio de recebimento' : 'Gastos por meio de pagamento';
 
   return (
-    <section aria-labelledby="analysis-methods-title" className="grid content-start gap-3">
-      <h2 id="analysis-methods-title" className="font-medium">
-        {title}
-      </h2>
+    <SectionCard
+      title={title}
+      help={
+        <p>
+          Como o dinheiro {credit ? 'entrou' : 'saiu'} no período. "Sem meio" é o que foi lançado
+          sem meio de {credit ? 'recebimento' : 'pagamento'}.
+        </p>
+      }
+    >
       {ranking.length === 0 ? (
         <p className="text-muted-foreground">
-          {credit ? 'Nenhuma entrada' : 'Nenhuma despesa'} no período.
+          {credit ? 'Nenhuma entrada' : 'Nenhum gasto'} no período.
         </p>
       ) : named.length === 0 ? (
         <p className="text-muted-foreground text-sm">
@@ -53,6 +59,6 @@ export function PaymentMethodRanking({
           ))}
         </ul>
       )}
-    </section>
+    </SectionCard>
   );
 }

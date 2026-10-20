@@ -15,7 +15,7 @@ import { seriesStyles, valueOf, visibleSeries } from './series';
 const HEIGHT = 240;
 const MARGIN = { top: 12, right: 8, bottom: 28, left: 64 };
 /** Below this, a month's columns get too thin to tap: the chart scrolls inside its box instead. */
-const MIN_BAND = 44;
+const MIN_BAND = 42;
 
 /** A round step for about 4 gridlines: 1, 2, 2.5 or 5 times a power of ten. */
 function niceStep(range: number) {
@@ -80,7 +80,16 @@ export function MonthlyChart({
       : null;
 
   return (
-    <div ref={ref} className="overflow-x-auto">
+    <div
+      ref={ref}
+      className="focus-visible:ring-ring/50 overflow-x-auto rounded-sm outline-none focus-visible:ring-3"
+      // When the months do not fit, the arrow keys scroll it: it takes focus, with a name.
+      {...(width > boxWidth && {
+        tabIndex: 0,
+        role: 'group',
+        'aria-label': 'Gráfico mês a mês, role para o lado para ver todos os meses',
+      })}
+    >
       <div className="relative" style={{ width }}>
         <svg
           width={width}

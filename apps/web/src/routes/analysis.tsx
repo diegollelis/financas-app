@@ -2,6 +2,7 @@ import {
   formatCents,
   formatPeriod,
   monthlySeries,
+  paymentMethodLabels,
   periodsBetween,
   previousRange,
   seriesTotals,
@@ -12,14 +13,18 @@ import {
 } from '@financas/shared';
 import { SlidersHorizontal } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
+import { InfoTip } from '@/components/info-tip';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { CARD_CLASS, SectionCard } from '@/components/section-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   activeFilterCount,
+  clearedFilters,
   describeRange,
+  narrowsDown,
   useAnalysisSettings,
   type AnalysisSettings,
 } from '@/features/analysis/filters';
@@ -35,15 +40,40 @@ import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 
-/** "Últimos 6 meses, previsto, só saídas, 2 categorias": what the numbers below are about. */
-function describeFilters(settings: AnalysisSettings, categories: Category[]) {
+/** One name, or how many: "Crédito", "2 categorias". */
+function oneOrCount(names: string[], plural: string) {
+  return names.length === 1 ? (names[0] ?? '') : `${names.length} ${plural}`;
+}
+
+/**
+ * "Últimos 6 meses, previsto, só saídas, Crédito, Mercado Bom Preço": what the numbers below are
+ * about, every filter on included (ADR 0037 note).
+ */
+function describeFilters(
+  settings: AnalysisSettings,
+  categories: Category[],
+  merchants: Merchant[],
+) {
   const parts = [describeRange(settings), settings.view === 'SETTLED' ? 'realizado' : 'previsto'];
   if (settings.type !== 'BOTH')
     parts.push(settings.type === 'CREDIT' ? 'só entradas' : 'só saídas');
-  if (settings.categoryIds.length === 1) {
-    parts.push(categories.find((category) => category.id === settings.categoryIds[0])?.name ?? '');
-  } else if (settings.categoryIds.length > 1) {
-    parts.push(`${settings.categoryIds.length} categorias`);
+  if (settings.categoryIds.length > 0) {
+    const names = settings.categoryIds.map(
+      (id) => categories.find((category) => category.id === id)?.name ?? '',
+    );
+    parts.push(oneOrCount(names, 'categorias'));
+  }
+  if (settings.paymentMethods.length > 0) {
+    const names = settings.paymentMethods.map((method) =>
+      method === null ? 'sem meio' : paymentMethodLabels[method],
+    );
+    parts.push(oneOrCount(names, 'meios'));
+  }
+  if (settings.merchantIds.length > 0) {
+    const names = settings.merchantIds.map(
+      (id) => merchants.find((merchant) => merchant.id === id)?.name ?? '',
+    );
+    parts.push(oneOrCount(names, 'estabelecimentos'));
   }
   return parts.filter(Boolean).join(', ');
 }
@@ -53,39 +83,58 @@ function SignedCents({ cents }: { cents: number }) {
   return <span className={cn(cents < 0 && 'text-destructive')}>{formatCents(cents)}</span>;
 }
 
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b py-2 sm:grid sm:justify-start sm:gap-1 sm:rounded-xl sm:border sm:p-4">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="grid justify-items-end gap-0.5 text-lg font-semibold sm:justify-items-start">
-        {children}
-      </dd>
-    </div>
-  );
-}
-
 type Totals = ReturnType<typeof seriesTotals>;
 
 /**
- * "R$ 1.240,00 a mais que nos 6 meses anteriores": the same total over the range right before,
- * with the same filters. Nothing when that range had no transactions at all.
+ * "+ R$ 1.240,00 sobre o período anterior": the same total over the range right before, with the
+ * same filters, in one short line (ADR 0037 note). Nothing when that range had no transactions.
  */
-function Versus({ cents, before, months }: { cents: number; before?: number; months: number }) {
+function Versus({ cents, before }: { cents: number; before?: number }) {
   if (before === undefined) return null;
-  const span = months === 1 ? 'no mês anterior' : `nos ${months} meses anteriores`;
   const diff = cents - before;
   return (
     <span className="text-muted-foreground text-sm font-normal">
       {diff === 0
-        ? `O mesmo que ${span}.`
-        : `${formatCents(Math.abs(diff))} a ${diff > 0 ? 'mais' : 'menos'} que ${span}.`}
+        ? 'Igual ao período anterior'
+        : `${diff > 0 ? '+' : '−'} ${formatCents(Math.abs(diff))} sobre o período anterior`}
     </span>
   );
 }
 
+/** A labelled total with its comparison under it. */
+function Figure({
+  label,
+  help,
+  children,
+}: {
+  label: string;
+  help?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid min-w-0 content-start gap-0.5">
+      <dt className="text-muted-foreground flex items-center text-sm">
+        {label}
+        {help && <InfoTip term={label}>{help}</InfoTip>}
+      </dt>
+      <dd className="grid gap-0.5 text-lg font-semibold tabular-nums">{children}</dd>
+    </div>
+  );
+}
+
+/** What the comparison is: the same filters, the months right before. */
+const comparisonHelp = (months: number) =>
+  months === 1
+    ? 'As comparações usam os mesmos filtros no mês anterior.'
+    : `As comparações usam os mesmos filtros nos ${months} meses logo antes deste período.`;
+
+const spendingHelp = (
+  <p>As saídas fora das metas, pagas ou não. Guardar nas metas não é gasto e fica à parte.</p>
+);
+
 /**
- * The range's totals; the balance leads when both types are on screen (one hero per view).
- * Spending leaves out applications, shown apart, as on the dashboard (ADR 0047).
+ * The range's totals, in a card; the balance leads when both types are on screen (one hero per
+ * view). Spending leaves out applications, shown apart, as on the dashboard (ADR 0047).
  */
 function Totals({
   totals,
@@ -104,53 +153,75 @@ function Totals({
   if (type !== 'BOTH') {
     const credit = type === 'CREDIT';
     const cents = credit ? totals.creditsCents : totals.expensesCents;
+    const label = credit ? 'Entradas no período' : 'Gastos no período';
     return (
-      <dl className="grid gap-1">
-        <dt className="text-muted-foreground">
-          {credit ? 'Entradas no período' : 'Despesas no período'}
-        </dt>
-        <dd className="grid gap-1">
-          <span className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            {formatCents(cents)}
-          </span>
-          <Versus
-            cents={cents}
-            before={
-              previous ? (credit ? previous.creditsCents : previous.expensesCents) : undefined
-            }
-            months={months}
-          />
-          {!credit && totals.appliedCents > 0 && (
-            <span className="text-muted-foreground">
-              Além disso, {formatCents(totals.appliedCents)} foram para as metas.
+      <div className={CARD_CLASS}>
+        <dl className="grid gap-1">
+          <dt className="text-muted-foreground flex items-center">
+            {label}
+            <InfoTip term={label}>
+              {!credit && spendingHelp}
+              <p>{comparisonHelp(months)}</p>
+            </InfoTip>
+          </dt>
+          <dd className="grid gap-1">
+            <span className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+              {formatCents(cents)}
             </span>
-          )}
-        </dd>
-      </dl>
+            <Versus
+              cents={cents}
+              before={
+                previous ? (credit ? previous.creditsCents : previous.expensesCents) : undefined
+              }
+            />
+            {!credit && totals.appliedCents > 0 && (
+              <span className="text-muted-foreground">
+                Além disso, {formatCents(totals.appliedCents)} foram para as metas.
+              </span>
+            )}
+          </dd>
+        </dl>
+      </div>
     );
   }
-  // Two lists, not one: a <dl> holds only <dt>/<dd> groups, each in at most one <div>.
+  // Planned counts what is still to be put aside too: not "guardado" yet (ADR 0051).
+  const applied = view === 'SETTLED' ? 'Guardado' : 'Para guardar';
   return (
-    <div className="grid gap-4">
+    <div className={CARD_CLASS}>
       <dl className="grid gap-1">
-        <dt className="text-muted-foreground">Saldo do período</dt>
-        <dd className="text-4xl font-semibold tracking-tight sm:text-5xl">
+        <dt className="text-muted-foreground flex items-center">
+          Saldo do período
+          <InfoTip term="Saldo do período">
+            <p>Entradas menos tudo o que saiu no período: gastos e o que foi para as metas.</p>
+            <p>{comparisonHelp(months)}</p>
+          </InfoTip>
+        </dt>
+        <dd className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
           <SignedCents cents={totals.balanceCents} />
         </dd>
       </dl>
-      <dl className="grid sm:grid-cols-3 sm:gap-3">
-        <Stat label="Entradas">
+      <dl className="grid gap-4 sm:grid-cols-3">
+        <Figure label="Entradas">
           {formatCents(totals.creditsCents)}
-          <Versus cents={totals.creditsCents} before={previous?.creditsCents} months={months} />
-        </Stat>
-        <Stat label="Despesas">
+          <Versus cents={totals.creditsCents} before={previous?.creditsCents} />
+        </Figure>
+        <Figure label="Gastos" help={spendingHelp}>
           {formatCents(totals.expensesCents)}
-          <Versus cents={totals.expensesCents} before={previous?.expensesCents} months={months} />
-        </Stat>
-        {/* Planned counts what is still to be put aside too: not "guardado" yet (ADR 0051). */}
-        <Stat label={view === 'SETTLED' ? 'Guardado' : 'Para guardar'}>
+          <Versus cents={totals.expensesCents} before={previous?.expensesCents} />
+        </Figure>
+        <Figure
+          label={applied}
+          help={
+            <p>
+              {view === 'SETTLED'
+                ? 'O que já foi pago nas metas no período.'
+                : 'O que foi lançado para as metas no período, pago ou não.'}
+            </p>
+          }
+        >
           {formatCents(totals.appliedCents)}
-        </Stat>
+          <Versus cents={totals.appliedCents} before={previous?.appliedCents} />
+        </Figure>
       </dl>
     </div>
   );
@@ -178,13 +249,10 @@ function Legend({ type }: { type: AnalysisFilters['type'] }) {
 
 function AnalysisSkeleton() {
   return (
-    <>
-      <div className="grid gap-2">
-        <Skeleton className="h-5 w-32" />
-        <Skeleton className="h-12 w-56" />
-      </div>
-      <Skeleton className="h-60" />
-    </>
+    <div className="grid gap-4">
+      <Skeleton className="h-44 rounded-xl" />
+      <Skeleton className="h-72 rounded-xl" />
+    </div>
   );
 }
 
@@ -196,22 +264,45 @@ export function AnalysisPage() {
   const previous = previousRange(settings.from, settings.to);
   const before = useAnalysis(workspace.id, previous.from, previous.to);
   const categories = useCategories(workspace.id);
-  // Only to name the merchants of a category: the page does not wait for them.
+  // To name the merchants of a category and to filter by them: the page does not wait for them.
   const merchants = useMerchants(workspace.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [asTable, setAsTable] = useState(false);
   const filtersButton = useRef<HTMLButtonElement>(null);
   const ready = analysis.isSuccess && categories.isSuccess;
-  const panel = categories.isSuccess && (
-    <FiltersPanel settings={settings} categories={categories.data} onChange={update} />
-  );
+  const panel = (layout: 'bar' | 'sheet') =>
+    categories.isSuccess && (
+      <FiltersPanel
+        settings={settings}
+        categories={categories.data}
+        merchants={merchants.data ?? []}
+        layout={layout}
+        onChange={update}
+      />
+    );
 
   return (
     <>
       <PageHeader
         title="Análise"
-        description={describeFilters(settings, categories.data ?? [])}
+        description={
+          <>
+            {describeFilters(settings, categories.data ?? [], merchants.data ?? [])}
+            {narrowsDown(settings) && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="text-primary focus-visible:ring-ring/50 min-h-11 rounded-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3 md:min-h-0"
+                  onClick={() => update(clearedFilters)}
+                >
+                  Limpar filtros
+                </button>
+              </>
+            )}
+          </>
+        }
         action={
           !desktop && (
             <Button
@@ -229,8 +320,8 @@ export function AnalysisPage() {
         }
       />
       {desktop ? (
-        <section aria-label="Filtros" className="rounded-xl border p-4">
-          {panel}
+        <section aria-label="Filtros" className="bg-card rounded-xl border p-4">
+          {panel('bar')}
         </section>
       ) : (
         <ResponsiveDialog
@@ -241,7 +332,7 @@ export function AnalysisPage() {
           description="Os números mudam assim que você escolhe."
         >
           <div className="grid gap-6">
-            {panel}
+            {panel('sheet')}
             <Button onClick={() => setFiltersOpen(false)}>Ver resultado</Button>
           </div>
         </ResponsiveDialog>
@@ -293,43 +384,52 @@ function Results({
   const saving = savingCategoryIds(categories);
   const series = monthlySeries(analysis, settings, saving);
   const previousTotals = before ? seriesTotals(monthlySeries(before, settings, saving)) : null;
-  // One column up to xl; from there, month by month beside the categories (ADR 0045).
+  // One payment method chosen: its ranking would be a single bar (ADR 0037 note).
+  const byMethod = settings.paymentMethods.length !== 1;
+  // In cards (ADR 0037 note): the totals, month by month across, and the two rankings side by
+  // side from xl, so the chart has the width for its months and no column is left half empty.
   return (
-    <div className="grid gap-6 xl:grid-cols-2 xl:gap-x-10 xl:gap-y-8">
-      <div className="xl:col-span-2">
-        <Totals
-          totals={seriesTotals(series)}
-          previous={previousTotals}
-          months={periodsBetween(analysis.from, analysis.to).length}
-          type={settings.type}
-          view={settings.view}
-        />
-      </div>
-      <section aria-labelledby="analysis-monthly" className="grid content-start gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="analysis-monthly" className="font-medium">
-            Mês a mês
-          </h2>
+    <div className="grid gap-4 xl:gap-6">
+      <Totals
+        totals={seriesTotals(series)}
+        previous={previousTotals}
+        months={periodsBetween(analysis.from, analysis.to).length}
+        type={settings.type}
+        view={settings.view}
+      />
+      <SectionCard
+        title="Mês a mês"
+        help={
+          <>
+            {settings.type === 'BOTH' && (
+              <p>
+                Saídas: gastos e o que foi guardado. Saldo do mês: entradas menos saídas de cada
+                mês.
+              </p>
+            )}
+            <p>Toque num mês para ver os valores e a diferença para o mês anterior.</p>
+          </>
+        }
+        action={
           <Button variant="ghost" size="sm" onClick={onToggle}>
             {asTable ? 'Ver como gráfico' : 'Ver como tabela'}
           </Button>
-        </div>
+        }
+      >
         {asTable ? (
           <MonthlyTable series={series} type={settings.type} />
         ) : (
           <>
             <Legend type={settings.type} />
-            <MonthlyChart series={series} type={settings.type} />
-            <p className="text-muted-foreground text-sm">
-              {settings.type === 'BOTH' &&
-                'Saídas: despesas e o que foi guardado. Saldo do mês: entradas menos saídas de cada mês. '}
-              Toque num mês para ver os valores e a diferença para o mês anterior.
-            </p>
+            {/* On the phone, to the card's edges: its axis is its own margin, and six months fit. */}
+            <div className="-mx-4 min-w-0 md:mx-0">
+              <MonthlyChart series={series} type={settings.type} />
+            </div>
           </>
         )}
-      </section>
-      {/* The categories and, under them, how the money went out (ADR 0054). */}
-      <div className="grid content-start gap-8">
+      </SectionCard>
+      {/* The categories and how the money went out (ADR 0054). */}
+      <div className={cn('grid items-start gap-4 xl:gap-6', byMethod && 'xl:grid-cols-2')}>
         <CategoryRanking
           analysis={analysis}
           settings={settings}
@@ -337,7 +437,9 @@ function Results({
           merchants={merchants}
           onChange={onChange}
         />
-        <PaymentMethodRanking analysis={analysis} settings={settings} saving={saving} />
+        {byMethod && (
+          <PaymentMethodRanking analysis={analysis} settings={settings} saving={saving} />
+        )}
       </div>
     </div>
   );

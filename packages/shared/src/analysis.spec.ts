@@ -11,6 +11,7 @@ import {
   previousRange,
   seriesTotals,
   type Analysis,
+  type AnalysisFilters,
   type AnalysisRow,
 } from './analysis.ts';
 
@@ -271,5 +272,47 @@ describe('paymentMethodRanking (ADR 0054)', () => {
         (share) => share.paymentMethod,
       ),
     ).toEqual(['MEAL_VOUCHER', null]);
+  });
+});
+
+describe('payment method and merchant filters (ADR 0037 note)', () => {
+  const shop = '01920000-0000-7000-8000-00000000a001';
+  const fair = '01920000-0000-7000-8000-00000000a002';
+  const analysis: Analysis = {
+    from: '2026-10',
+    to: '2026-10',
+    rows: [
+      row('2026-10', 'DEBIT', market, 40_000, 40_000, shop, 'CREDIT_CARD'),
+      row('2026-10', 'DEBIT', market, 10_000, 10_000, fair, 'PIX'),
+      row('2026-10', 'DEBIT', rent, 180_000, 180_000, null, 'PIX'),
+      row('2026-10', 'DEBIT', fuel, 5_000),
+      row('2026-10', 'CREDIT', salary, 500_000, 500_000, null, 'TRANSFER'),
+    ],
+  };
+  const totals = (filters: Partial<AnalysisFilters>) =>
+    seriesTotals(monthlySeries(analysis, { ...defaultAnalysisFilters, ...filters }));
+
+  it('keeps only the chosen methods, "Sem meio" as null, credits included', () => {
+    expect(totals({ paymentMethods: ['PIX'] })).toMatchObject({
+      creditsCents: 0,
+      expensesCents: 190_000,
+    });
+    expect(totals({ paymentMethods: [null, 'TRANSFER'] })).toMatchObject({
+      creditsCents: 500_000,
+      expensesCents: 5_000,
+    });
+  });
+
+  it('keeps only the chosen merchants, never what had none, and adds to the other filters', () => {
+    expect(totals({ merchantIds: [shop, fair] })).toMatchObject({ expensesCents: 50_000 });
+    expect(totals({ merchantIds: [shop, fair], paymentMethods: ['PIX'] })).toMatchObject({
+      expensesCents: 10_000,
+    });
+    expect(
+      categoryRanking(analysis, { ...defaultAnalysisFilters, merchantIds: [shop] }).map((share) => [
+        share.categoryId,
+        share.totalCents,
+      ]),
+    ).toEqual([[market, 40_000]]);
   });
 });
