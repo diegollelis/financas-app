@@ -398,7 +398,10 @@ describe('ImportPage', () => {
     renderApp(page);
 
     const previous = await screen.findByRole('region', { name: 'Importações anteriores' });
-    expect(previous).toHaveTextContent('12 lançamentos, junho de 2026 a julho de 2026');
+    // Without a due date, it came from the template.
+    expect(within(previous).getByRole('listitem')).toHaveTextContent(
+      /^Planilha12 lançamentos, junho de 2026 a julho de 2026/,
+    );
     expect(previous).toHaveTextContent('por Maria Exemplo');
     await userEvent.click(within(previous).getByRole('button', { name: /^Desfazer a importação/ }));
     const confirm = await screen.findByRole('alertdialog');
@@ -653,8 +656,9 @@ describe('ImportPage', () => {
       renderApp(page);
 
       const previous = await screen.findByRole('region', { name: 'Importações anteriores' });
+      // The badge first: a statement, since it has a due date.
       expect(within(previous).getByRole('listitem')).toHaveTextContent(
-        /^Fatura Nubank · vence 04\/11\/202612 lançamentos e 1 parcelamento, junho de 2026 a julho de 2026 · /,
+        /^FaturaFatura Nubank · vence 04\/11\/202612 lançamentos e 1 parcelamento, junho de 2026 a julho de 2026 · /,
       );
     });
   });

@@ -23,7 +23,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { InfoTip } from '@/components/info-tip';
+import { CARD_CLASS, SectionCard } from '@/components/section-card';
 import { SegmentedControl } from '@/components/segmented-control';
+import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useCategories, useCategoryHints } from '@/features/categories/use-categories';
 import { ImportReview } from '@/features/import/import-review';
@@ -38,7 +41,6 @@ import { useMerchants } from '@/features/merchants/use-merchants';
 import { useTransactions } from '@/features/transactions/use-transactions';
 import { useImports, useUndoImport } from '@/features/import/use-imports';
 import { downloadTemplate, readTemplate, TemplateReadError } from '@/features/import/workbook';
-import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { apiErrorMessage } from '@/lib/error-message';
 import { cn } from '@/lib/utils';
@@ -94,7 +96,13 @@ function PreviousImport({
   return (
     <li className="flex items-center justify-between gap-3 py-3">
       <div className="grid min-w-0 gap-1">
-        <p className="font-medium break-words">{name ?? counts}</p>
+        {/* Where it came from: only a statement records a due date (ADR 0055 note). */}
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium break-words">
+          <Badge variant={item.statementDueDate ? 'secondary' : 'outline'}>
+            {item.statementDueDate ? 'Fatura' : 'Planilha'}
+          </Badge>
+          {name ?? counts}
+        </p>
         <p className="text-muted-foreground text-sm">
           {name && `${counts} · `}
           {when}
@@ -331,135 +339,143 @@ export function ImportPage() {
     <>
       <PageHeader
         title="Importar"
-        description="Traga lançamentos de uma planilha ou da fatura do cartão. O arquivo é lido aqui, no seu aparelho: só os lançamentos que você confirmar são enviados."
+        description="Traga lançamentos de uma planilha ou da fatura do cartão."
       />
       <QueryState queries={[categories, imports]} />
-      {/* The steps, numbered: choosing the file only opens the review, nothing is imported. */}
+      {/* The steps, numbered, in a card of their own: the origin changes only this card, never the
+          history below (ADR 0040 note). Choosing the file only opens the review. How to do each
+          step is behind its "ⓘ"; the privacy promise stays in sight. */}
       {ready && canEdit && !reviewing && (
-        <div className="grid gap-2">
-          <p aria-hidden className="text-sm font-medium">
-            De onde vêm os lançamentos?
+        <SectionCard title="Nova importação">
+          <div className="grid gap-2">
+            <p aria-hidden className="text-sm font-medium">
+              De onde vêm os lançamentos?
+            </p>
+            <SegmentedControl
+              label="De onde vêm os lançamentos?"
+              options={originOptions}
+              value={origin}
+              onChange={(value) => {
+                setOrigin(value);
+                setReadError(null);
+                setStatement(null);
+              }}
+              className="sm:justify-self-start"
+            />
+          </div>
+          {origin === 'NUBANK' ? (
+            <>
+              <section aria-labelledby="import-step-statement" className="grid gap-2">
+                <div className="flex items-center">
+                  <h3 id="import-step-statement" className="font-medium">
+                    1. Baixe a fatura em CSV
+                  </h3>
+                  <InfoTip term="Baixe a fatura em CSV">
+                    No app ou no site do Nubank, abra a fatura do cartão e exporte em CSV. Na
+                    revisão, você confirma o mês da fatura e o vencimento, e as compras parceladas
+                    viram parcelamentos.
+                  </InfoTip>
+                </div>
+              </section>
+              <section aria-labelledby="import-step-statement-file" className="grid gap-2">
+                <h3 id="import-step-statement-file" className="font-medium">
+                  2. Escolha o arquivo da fatura
+                </h3>
+                <input
+                  id="import-statement-input"
+                  type="file"
+                  accept=".csv,text/csv"
+                  disabled={reading}
+                  className="peer sr-only"
+                  aria-describedby={readError ? 'import-file-error' : undefined}
+                  onChange={(event) => {
+                    void chooseStatement(event.currentTarget.files?.[0]);
+                    event.currentTarget.value = '';
+                  }}
+                />
+                <label
+                  htmlFor="import-statement-input"
+                  className={cn(
+                    buttonVariants({ variant: 'outline' }),
+                    'peer-focus-visible:border-ring peer-focus-visible:ring-ring/50 cursor-pointer justify-self-start peer-focus-visible:ring-3 peer-disabled:cursor-default peer-disabled:opacity-50',
+                  )}
+                >
+                  <FileUp aria-hidden />
+                  Escolher fatura (.csv)
+                </label>
+                {readError && (
+                  <p id="import-file-error" role="alert" className="text-destructive">
+                    {readError}
+                  </p>
+                )}
+                {reading && <p role="status">Lendo a fatura…</p>}
+              </section>
+            </>
+          ) : (
+            <>
+              <section aria-labelledby="import-step-template" className="grid gap-2">
+                <div className="flex items-center">
+                  <h3 id="import-step-template" className="font-medium">
+                    1. Baixe o modelo
+                  </h3>
+                  <InfoTip term="Baixe o modelo">
+                    Uma linha por lançamento, com mês de referência, tipo, descrição, categoria e
+                    valor. O estabelecimento é opcional, e um nome novo vira estabelecimento ao
+                    importar. A planilha já vem com um exemplo e as categorias deste espaço.
+                  </InfoTip>
+                </div>
+                <Button variant="outline" className="justify-self-start" onClick={download}>
+                  <Download aria-hidden />
+                  Baixar planilha modelo
+                </Button>
+                {fileError && (
+                  <p role="alert" className="text-destructive">
+                    {fileError}
+                  </p>
+                )}
+              </section>
+              <section aria-labelledby="import-step-file" className="grid gap-2">
+                <h3 id="import-step-file" className="font-medium">
+                  2. Escolha a planilha preenchida
+                </h3>
+                {/* The native picker, hidden, behind a button in the app's style: the label opens
+                    it, and keyboard focus on it shows on the button. */}
+                <input
+                  id="import-file-input"
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  disabled={reading}
+                  className="peer sr-only"
+                  aria-describedby={readError ? 'import-file-error' : undefined}
+                  onChange={(event) => {
+                    void chooseFile(event.currentTarget.files?.[0]);
+                    // The same file can be chosen again after fixing it.
+                    event.currentTarget.value = '';
+                  }}
+                />
+                <label
+                  htmlFor="import-file-input"
+                  className={cn(
+                    buttonVariants({ variant: 'outline' }),
+                    'peer-focus-visible:border-ring peer-focus-visible:ring-ring/50 cursor-pointer justify-self-start peer-focus-visible:ring-3 peer-disabled:cursor-default peer-disabled:opacity-50',
+                  )}
+                >
+                  <FileUp aria-hidden />
+                  Escolher planilha (.xlsx)
+                </label>
+                {readError && (
+                  <p id="import-file-error" role="alert" className="text-destructive">
+                    {readError}
+                  </p>
+                )}
+                {reading && <p role="status">Lendo a planilha…</p>}
+              </section>
+            </>
+          )}
+          <p className="text-muted-foreground text-sm">
+            O arquivo é lido no seu aparelho: só os lançamentos que você confirmar são enviados.
           </p>
-          <SegmentedControl
-            label="De onde vêm os lançamentos?"
-            options={originOptions}
-            value={origin}
-            onChange={(value) => {
-              setOrigin(value);
-              setReadError(null);
-              setStatement(null);
-            }}
-            className="sm:justify-self-start"
-          />
-        </div>
-      )}
-      {ready && canEdit && !reviewing && origin === 'NUBANK' && (
-        <>
-          <section aria-labelledby="import-step-statement" className="grid gap-2">
-            <h2 id="import-step-statement" className="font-medium">
-              1. Baixe a fatura em CSV
-            </h2>
-            <p>
-              No app ou no site do Nubank, abra a fatura do cartão e exporte em CSV. Na revisão,
-              você confirma o mês da fatura e informa o vencimento; as parcelas viram parcelamentos.
-            </p>
-          </section>
-          <section aria-labelledby="import-step-statement-file" className="grid gap-2">
-            <h2 id="import-step-statement-file" className="font-medium">
-              2. Escolha o arquivo da fatura
-            </h2>
-            <input
-              id="import-statement-input"
-              type="file"
-              accept=".csv,text/csv"
-              disabled={reading}
-              className="peer sr-only"
-              aria-describedby={readError ? 'import-file-error' : undefined}
-              onChange={(event) => {
-                void chooseStatement(event.currentTarget.files?.[0]);
-                event.currentTarget.value = '';
-              }}
-            />
-            <label
-              htmlFor="import-statement-input"
-              className={cn(
-                buttonVariants({ variant: 'outline' }),
-                'peer-focus-visible:border-ring peer-focus-visible:ring-ring/50 cursor-pointer justify-self-start peer-focus-visible:ring-3 peer-disabled:cursor-default peer-disabled:opacity-50',
-              )}
-            >
-              <FileUp aria-hidden />
-              Escolher fatura (.csv)
-            </label>
-            {readError && (
-              <p id="import-file-error" role="alert" className="text-destructive">
-                {readError}
-              </p>
-            )}
-            {reading && <p role="status">Lendo a fatura…</p>}
-          </section>
-        </>
-      )}
-      {ready && canEdit && !reviewing && origin === 'TEMPLATE' && (
-        <>
-          <section aria-labelledby="import-step-template" className="grid gap-2">
-            <h2 id="import-step-template" className="font-medium">
-              1. Baixe o modelo
-            </h2>
-            <p>
-              Uma linha por lançamento, com mês de referência, tipo, descrição, categoria e valor; o
-              estabelecimento é opcional, e um nome novo vira estabelecimento ao importar. A
-              planilha já vem com um exemplo e a lista das categorias deste espaço.
-            </p>
-            <Button variant="outline" className="justify-self-start" onClick={download}>
-              <Download aria-hidden />
-              Baixar planilha modelo
-            </Button>
-            {fileError && (
-              <p role="alert" className="text-destructive">
-                {fileError}
-              </p>
-            )}
-          </section>
-          <section aria-labelledby="import-step-file" className="grid gap-2">
-            <h2 id="import-step-file" className="font-medium">
-              2. Escolha a planilha preenchida
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              O arquivo não é enviado: só os lançamentos que você confirmar na revisão.
-            </p>
-            {/* The native picker, hidden, behind a button in the app's style: the label opens it,
-                and keyboard focus on it shows on the button. */}
-            <input
-              id="import-file-input"
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              disabled={reading}
-              className="peer sr-only"
-              aria-describedby={readError ? 'import-file-error' : undefined}
-              onChange={(event) => {
-                void chooseFile(event.currentTarget.files?.[0]);
-                // The same file can be chosen again after fixing it.
-                event.currentTarget.value = '';
-              }}
-            />
-            <label
-              htmlFor="import-file-input"
-              className={cn(
-                buttonVariants({ variant: 'outline' }),
-                'peer-focus-visible:border-ring peer-focus-visible:ring-ring/50 cursor-pointer justify-self-start peer-focus-visible:ring-3 peer-disabled:cursor-default peer-disabled:opacity-50',
-              )}
-            >
-              <FileUp aria-hidden />
-              Escolher planilha (.xlsx)
-            </label>
-            {readError && (
-              <p id="import-file-error" role="alert" className="text-destructive">
-                {readError}
-              </p>
-            )}
-            {reading && <p role="status">Lendo a planilha…</p>}
-          </section>
-        </>
+        </SectionCard>
       )}
       {ready && !canEdit && (
         <p className="text-muted-foreground">Quem só visualiza o espaço não importa arquivos.</p>
@@ -487,12 +503,19 @@ export function ImportPage() {
         />
       )}
       {ready && !reviewing && imports.data.length > 0 && (
-        <section aria-labelledby={PREVIOUS_TITLE_ID} className="grid gap-2">
-          {/* Focusable from script: where focus goes after undoing one. */}
-          <h2 id={PREVIOUS_TITLE_ID} tabIndex={-1} className="font-medium outline-none">
-            Importações anteriores
-          </h2>
-          <ul className={DIVIDED_LIST}>
+        // Its own card, apart from the new import: the history is of the whole workspace.
+        <section aria-labelledby={PREVIOUS_TITLE_ID} className={CARD_CLASS}>
+          <div className="flex items-center">
+            {/* Focusable from script: where focus goes after undoing one. */}
+            <h2 id={PREVIOUS_TITLE_ID} tabIndex={-1} className="font-semibold outline-none">
+              Importações anteriores
+            </h2>
+            <InfoTip term="Importações anteriores">
+              Todas as importações deste espaço, de planilha e de fatura. Desfazer tira os
+              lançamentos e os parcelamentos que ela criou; estabelecimentos e apelidos ficam.
+            </InfoTip>
+          </div>
+          <ul className="divide-y">
             {imports.data.map((item) => (
               <PreviousImport
                 key={item.id}
