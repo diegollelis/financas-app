@@ -46,3 +46,12 @@ Opção 3.
 - **Comparar e voltar ficam fáceis:** `git diff v1.0.0 v1.1.0` mostra o que mudou entre duas versões, e o GitHub tem a mesma comparação na página da release.
 - **O deploy não muda:** cada merge continua indo para o ar. A versão é um nome dado depois, não uma etapa de publicação. Por isso, entre duas tags o app no ar pode ter mudanças ainda sem versão.
 - **Um passo manual a mais por versão:** a tag e a release. Se ficar repetitivo, um workflow pode criar a release a partir da tag. Rever a decisão se o app passar a ter um app instalado nas lojas, que exige número de versão em cada envio.
+
+## Nota (a versão no rodapé, 2026-10-21)
+
+A melhoria futura acima chegou: o rodapé (`AppFooter`) mostra "Versão 1.24.4", com um link para a release no GitHub, para saber se um deploy já chegou e relacionar um problema a uma versão.
+
+- **De onde vem o número:** do campo `version` do `package.json` da raiz, lido pelo Vite no build (`define: { __APP_VERSION__ }` em `apps/web/vite.config.ts`, exposto como `APP_VERSION` em `apps/web/src/lib/app-version.ts`). A tag não serve, porque é criada depois do deploy.
+- **Um passo a mais no PR de versão:** o `docs/version-X` muda o `version` do `package.json` junto com a linha do roadmap. O merge dele vai para o ar mostrando a versão nova, e é nesse mesmo commit que a tag é criada: a tag, o roadmap e o rodapé dizem o mesmo número.
+- **Entre um merge e o PR de versão,** o rodapé mostra a versão anterior. É o certo: a versão nova só existe depois de conferida em produção.
+- **Ficam de fora:** o código do commit no rodapé (só ajuda quem programa, e a release leva ao código) e a versão nos relatórios do Sentry, que mexeria no ADR 0034.
