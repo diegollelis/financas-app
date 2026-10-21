@@ -5,18 +5,29 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* The CL symbol while a whole page loads (BrandLoader): a slow breath, not a spinner. */
+/* While the API wakes up (ServerWait, ADR 0036 note): rings leave the CL symbol at the pace of a
+   breath, not an alarm, and a bar creeps to about 90% in a minute, never finishing on its own. */
 @theme {
-  --animate-breathe: breathe 1.6s ease-in-out infinite alternate;
+  --animate-ring: ring 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+  --animate-wait-bar: wait-bar 57s cubic-bezier(0.1, 0.6, 0.3, 1) forwards;
 
-  @keyframes breathe {
+  @keyframes ring {
     from {
-      opacity: 0.6;
-      transform: scale(0.96);
+      opacity: 0.7;
+      transform: scale(0.7);
     }
     to {
-      opacity: 1;
-      transform: scale(1);
+      opacity: 0;
+      transform: scale(2);
+    }
+  }
+
+  @keyframes wait-bar {
+    from {
+      width: 0;
+    }
+    to {
+      width: 90%;
     }
   }
 }

@@ -239,3 +239,13 @@ A busca de Lançamentos procura em tudo o que o cartão mostra: descrição, cat
 - **O valor é comparado por trecho, como a página o escreve,** sem o "R$" e com ou sem o ponto do milhar: "159", "1.159" e "159,9" acham R$ 1.159,90. Comparar com o valor exato exigiria digitar os centavos.
 - **Só um texto com cara de número** (dígitos, ponto e vírgula, um "R$" e espaços) é comparado com os valores: "água" nunca é.
 - Um número curto ("10") acha muitos lançamentos, o que se espera de uma busca por trecho. A contagem ("1 de 5") e o total da seção mostram o que ficou, e servem para conferir uma fatura.
+
+## Nota (a espera pelo servidor, 2026-10-21)
+
+Quando a API dorme (Render free, ADR 0033), a mensagem "Aguardando o servidor… isso pode levar até um minuto." aparecia em três lugares, cada um de um jeito, e o símbolo só "respirava" na página inteira. Agora a espera é uma só (`components/server-wait.tsx` e `lib/use-server-wait.ts`):
+
+- **Ondas saindo do símbolo** (`ServerWaitMark`): anéis finos em `--primary` e `--brand-secondary` crescem até o dobro do símbolo e somem, a cada 2,4 s (`animate-ring`, em `src/index.css`), como um sinal chamando o servidor. O símbolo é a arte oficial (ADR 0043), parado e legível: só os anéis se movem. Foi escolhida entre quatro numa prévia (ondas, um brilho que passa, uma órbita e um símbolo que pula) porque diz o que acontece, mantém a marca parada durante uma espera de até um minuto e continua visível com 36 px. Quem coloca o símbolo deixa folga em volta para os anéis.
+- **A mensagem em etapas** (`useServerWaitMessage`): nada nos primeiros 3 s; "Aguardando o servidor…" aos 3 s, "Acordando o servidor, só mais um pouco…" aos 15 s e "Está demorando mais que o normal." aos 45 s. Se der erro, o "Tentar de novo" de sempre.
+- **Uma barra fina** que chega perto de 90% em um minuto e nunca termina sozinha (`animate-wait-bar`): mostra que o tempo passa, sem fingir que sabe quando o servidor responde.
+- **Onde:** na página inteira (`BrandLoader`), o símbolo grande e, depois de 3 s, a mensagem e a barra; dentro das páginas (`LoadingState`), só os esqueletos até 3 s e, depois, um bloco com o símbolo pequeno, a mensagem e a barra acima deles; no botão de envio (`SubmitButton`), a roda girando continua, e embaixo só a mensagem, sem barra.
+- **Com "reduzir movimento",** o símbolo fica parado, a barra some e só as palavras mudam.

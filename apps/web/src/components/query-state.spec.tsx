@@ -13,13 +13,15 @@ describe('LoadingState', () => {
 
     expect(screen.getByText('Carregando…')).toBeInTheDocument();
     expect(screen.queryByText(/Aguardando o servidor/)).not.toBeInTheDocument();
+    // Only the skeleton at first: the symbol comes with the words.
+    expect(document.querySelector('img')).toBeNull();
 
     act(() => {
       vi.advanceTimersByTime(SLOW_LOADING_MS);
     });
 
-    expect(
-      screen.getByText('Aguardando o servidor… isso pode levar até um minuto.'),
-    ).toBeInTheDocument();
+    // The symbol with its rings and the first step's words, above the skeleton.
+    expect(screen.getByText('Aguardando o servidor…')).toBeInTheDocument();
+    expect(document.querySelector('img')).toHaveAttribute('src', '/brand/cl-symbol.png');
   });
 });

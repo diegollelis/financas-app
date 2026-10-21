@@ -1,17 +1,13 @@
 import { Loader2 } from 'lucide-react';
-import { SLOW_LOADING_MS } from '@/components/query-state';
+import { useServerWaitMessage } from '@/lib/use-server-wait';
 import { Button } from '@/components/ui/button';
-import { useElapsed } from '@/lib/use-elapsed';
 
-/** Mounted only while the request runs, so the clock starts with it. */
+/** Mounted only while the request runs, so the clock starts with it. The words only: the
+ * button already turns. */
 function SlowServerNotice() {
-  const slow = useElapsed(SLOW_LOADING_MS);
-  if (!slow) return null;
-  return (
-    <p className="text-muted-foreground text-center text-sm">
-      Aguardando o servidor… isso pode levar até um minuto.
-    </p>
-  );
+  const message = useServerWaitMessage();
+  if (!message) return null;
+  return <p className="text-muted-foreground text-center text-sm">{message}</p>;
 }
 
 /**

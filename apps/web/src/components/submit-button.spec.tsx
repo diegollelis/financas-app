@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SLOW_LOADING_MS } from './query-state';
 import { SubmitButton } from './submit-button';
 
-const wake = 'Aguardando o servidor… isso pode levar até um minuto.';
+const wake = 'Aguardando o servidor…';
 
 describe('SubmitButton', () => {
   afterEach(() => {
