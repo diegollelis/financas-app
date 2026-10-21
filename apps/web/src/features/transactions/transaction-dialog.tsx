@@ -144,6 +144,8 @@ export function TransactionDialog({
     // The day it happened (ADR 0055), on a new one only when there is one; also on an
     // installment purchase (ADR 0055 note), never on a recurrence.
     const withDay = values.occurredOn ? { occurredOn: values.occurredOn } : {};
+    // Launched once and already paid or received (ADR 0029 note): on a new one only when given.
+    const withSettled = values.settledAt ? { settledAt: values.settledAt } : {};
     if (editing) {
       update.mutate(
         {
@@ -151,6 +153,8 @@ export function TransactionDialog({
           ...fields,
           dueDate: values.dueDate,
           occurredOn: values.occurredOn,
+          // The day it was settled, given or fixed here; blank takes it back to pending.
+          settledAt: values.settledAt,
           personId,
           merchantId,
           paymentMethod,
@@ -211,13 +215,29 @@ export function TransactionDialog({
       // The transaction and one share per person on the other side, at once (ADRs 0042, 0052).
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, ...withDay, period, ...withMerchant, split },
+        {
+          ...fields,
+          dueDate: values.dueDate,
+          ...withDay,
+          ...withSettled,
+          period,
+          ...withMerchant,
+          split,
+        },
         { onSuccess: done(withPeople('Lançamento adicionado')) },
       );
     } else {
       setRepeat('NONE');
       create.mutate(
-        { ...fields, dueDate: values.dueDate, ...withDay, period, personId, ...withMerchant },
+        {
+          ...fields,
+          dueDate: values.dueDate,
+          ...withDay,
+          ...withSettled,
+          period,
+          personId,
+          ...withMerchant,
+        },
         { onSuccess: done('Lançamento adicionado') },
       );
     }
