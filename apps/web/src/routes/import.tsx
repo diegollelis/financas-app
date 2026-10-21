@@ -480,7 +480,6 @@ export function ImportPage() {
       {ready && !canEdit && (
         <p className="text-muted-foreground">Quem só visualiza o espaço não importa arquivos.</p>
       )}
-      {ready && reviewing && <h2 className="font-medium">3. Revise e importe</h2>}
       {ready && review && (
         <ImportReview
           key={review.openings}

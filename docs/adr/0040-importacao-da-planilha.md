@@ -121,3 +121,17 @@ A página Importar tinha cinco parágrafos antes do botão de escolher o arquivo
 - **Um selo em cada importação anterior:** "Fatura" ou "Planilha". Não muda a API: só a fatura grava o vencimento (`statementDueDate`), e é ele que diz qual é qual. Quando vier um segundo banco, vale uma coluna de origem na tabela.
 - **Como fazer cada passo vai para o ⓘ** (`InfoTip`) ao lado do título do passo: exportar a fatura em CSV, o que vai na planilha modelo, e o que a revisão pede. A garantia de privacidade ("O arquivo é lido no seu aparelho…") fica à vista, uma vez só, no fim do cartão. O histórico também ganha um ⓘ, que diz o que desfazer tira e o que fica.
 - A revisão (o passo 3) não muda nesta nota.
+
+## Nota (a revisão em cartões e "Marcar todas", 2026-10-21)
+
+A revisão (o passo 3) tinha uma frase longa de situação, uma dica embaixo de cada campo, os avisos em caixas cinzas iguais às dicas e até quatro frases soltas antes do botão. Agora:
+
+- **O cartão "3. Revise e importe"** (`SectionCard`) traz os números lado a lado, como os totais de Lançamentos: Prontas, Saídas, Entradas e, na fatura, Parcelamentos novos (na planilha, Com problema). "Escolher outro arquivo" fica no canto do cartão. As dicas de Mês de referência, Vencimento e Origem vão para o ⓘ ao lado de cada rótulo (`FormField` ganha `help`).
+- **O que pode contar duas vezes ou ficar de fora fica à vista, com as cores de aviso** (`warning` e `warning-muted`): a fatura que parece já lançada inteira, as linhas que não puderam ser lidas e os meses já importados. Eram caixas cinzas iguais às dicas.
+- **"Categorias novas"** é um cartão, com a explicação no ⓘ.
+- **O que impede "Importar" fica junto, num "Antes de importar",** perto do botão: o vencimento que falta, ou nenhuma linha marcada. "Tudo ou nada" vai para o ⓘ do rodapé, e as saídas sem estabelecimento viram uma contagem ("1 saída sem estabelecimento (opcional)"). Na linha, a mesma explicação, repetida em cada compra, vira um selo discreto, "Sem estabelecimento".
+- **"Marcar todas"**, acima da lista, com o estado parcial (um traço) e "N de M marcadas":
+  - Marca as linhas à vista, menos as que o app desmarcou por um motivo (`skipped`, dado por `startStatementReview`): o pagamento da fatura anterior, uma compra ou uma parcela já lançada. Marcar tudo traria de volta, sem ninguém notar, o que conta duas vezes; essas linhas continuam com o motivo à vista e podem ser marcadas uma a uma. Uma linha da planilha com erro nunca entra, como antes.
+  - Desmarcar desmarca todas as linhas à vista.
+  - Com o filtro "Com problemas", vale para as que ele mostra.
+  - Cada linha mudada fica como escolha da pessoa (`touched`): um novo mês ou vencimento da fatura não desfaz o que foi marcado.

@@ -120,7 +120,12 @@ export function startStatementReview(
       merchantByAlias: Boolean(merchant),
       rememberAlias: null,
     };
-    const skip = (reason: string): ReviewRow => ({ ...row, included: false, warnings: [reason] });
+    const skip = (reason: string): ReviewRow => ({
+      ...row,
+      included: false,
+      skipped: true,
+      warnings: [reason],
+    });
 
     if (line.kind === 'PAYMENT') {
       return skip('Pagamento da fatura anterior: não é uma entrada.');

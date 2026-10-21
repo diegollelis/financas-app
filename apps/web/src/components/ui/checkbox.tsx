@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { cn } from 'cn';
 import { Checkbox as CheckboxPrimitive } from 'radix-ui';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, MinusIcon } from 'lucide-react';
 
 function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
   return (
@@ -17,7 +17,8 @@ function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxP
         data-slot="checkbox-indicator"
         className="grid place-content-center text-current transition-none [&>svg]:size-3.5"
       >
-        <CheckIcon />
+        {/* The mixed state ("Marcar todas" with part of the rows) draws a dash, not a check. */}
+        {props.checked === 'indeterminate' ? <MinusIcon /> : <CheckIcon />}
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );
