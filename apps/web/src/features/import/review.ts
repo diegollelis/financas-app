@@ -53,6 +53,9 @@ export type ReviewRow = {
   plan?: { installments: number; firstNumber: number };
   /** A statement's row the person changed: a new reference month keeps their choices. */
   touched?: boolean;
+  /** A statement's line the app unchecked for a reason (the bill payment, one already in):
+   * "Marcar todas" leaves it out, so it is only checked on purpose, one by one. */
+  skipped?: boolean;
 };
 
 /**

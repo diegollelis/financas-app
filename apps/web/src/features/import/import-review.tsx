@@ -16,8 +16,11 @@ import { TriangleAlert } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { FormField } from '@/components/form-field';
+import { InfoTip } from '@/components/info-tip';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { SectionCard } from '@/components/section-card';
 import { SegmentedControl } from '@/components/segmented-control';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -61,6 +64,9 @@ export type StatementReviewProps = {
 import { useCreateImport } from './use-imports';
 
 const typeLabel = { CREDIT: 'entrada', DEBIT: 'saída' } as const;
+
+/** A notice of what could count twice or stay out: the warning colors (ADR 0036 tokens). */
+const NOTICE_CLASS = 'border-warning/40 bg-warning-muted rounded-lg border p-3';
 
 /** "2026-08 a 2026-09" of a previous import overlaps what is about to be imported. */
 function overlapsPrevious(imports: Import[], rows: ReviewRow[]) {
@@ -163,10 +169,10 @@ function RowItem({
           categoryName &&
           !row.merchantName &&
           row.type === 'DEBIT' && (
-            <p className="text-muted-foreground text-sm">
-              Sem estabelecimento (opcional). Escolha um em "Editar" para a próxima fatura já vir
-              com ele.
-            </p>
+            // A quiet mark: why it matters is in "Editar" ("Lembrar como apelido").
+            <Badge variant="outline" className="justify-self-start">
+              Sem estabelecimento
+            </Badge>
           )}
         {[...visibleProblems, ...row.warnings].map((message) => (
           <p
@@ -334,82 +340,126 @@ export function ImportReview({
     );
   };
 
+  // "Marcar todas" (ADR 0040 note): over the rows in sight, leaving out what the app unchecked
+  // for a reason (`skipped`) and a template row with errors, which never goes; unchecking takes
+  // every row in sight.
+  const blockedRow = (row: ReviewRow) => !row.statementTitle && check(row).problems.length > 0;
+  const selectable = visible.filter((row) => !row.skipped && !blockedRow(row));
+  const allOn = selectable.length > 0 && selectable.every((row) => row.included);
+  const someOn = visible.some((row) => row.included && !blockedRow(row));
+  const marked = rows.filter((row) => row.included && !blockedRow(row)).length;
+  const toggleAll = () => {
+    const inSight = new Set(visible.map((row) => row.line));
+    const toCheck = new Set(selectable.map((row) => row.line));
+    setRows((current) =>
+      current.map((row) => {
+        if (!inSight.has(row.line)) return row;
+        if (allOn) return row.included ? { ...row, included: false, touched: true } : row;
+        return toCheck.has(row.line) && !row.included
+          ? { ...row, included: true, touched: true }
+          : row;
+      }),
+    );
+  };
+  // What keeps "Importar" off, together beside it.
+  const blockers = [
+    ...(missingDueDate ? ['Informe o vencimento da fatura.'] : []),
+    ...(marked === 0 ? ['Marque ao menos uma linha.'] : []),
+  ];
+  const stats: [string, string, string?][] = [
+    ['Prontas', `${readyCount} de ${rows.length}`],
+    ['Saídas', formatCents(debits)],
+    [
+      'Entradas',
+      credits > 0 ? `+ ${formatCents(credits)}` : formatCents(0),
+      credits > 0 ? 'text-credit-foreground' : undefined,
+    ],
+    statement
+      ? ['Parcelamentos novos', String(ready.plans.length)]
+      : ['Com problema', String(withProblems.length)],
+  ];
+
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p role="status" className="tabular-nums">
-          {readyCount} de {rows.length} {rows.length === 1 ? 'linha pronta' : 'linhas prontas'} para
-          importar: entradas {formatCents(credits)}, saídas {formatCents(debits)}
-          {ready.plans.length > 0 &&
-            `, ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento novo' : 'parcelamentos novos'}`}
-          .
-          {withProblems.length > 0 &&
-            ` ${withProblems.length} ${withProblems.length === 1 ? 'linha com problema' : 'linhas com problema'}.`}
-          {waitingForCategory > 0 &&
-            ` ${waitingForCategory} ${waitingForCategory === 1 ? 'linha espera' : 'linhas esperam'} a associação de uma categoria.`}
-        </p>
-        <Button variant="outline" onClick={onChooseAnother}>
-          Escolher outro arquivo
-        </Button>
-      </div>
-
-      {/* The statement's month and due date (ADR 0055 note), and what tells this import apart
-          later, in "Importações anteriores". */}
-      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {statement && (
-          <>
-            <FormField
-              id="import-period"
-              label="Mês de referência"
-              hint="O mês da fatura: todas as linhas entram nele."
-            >
-              <Input
-                type="month"
-                value={statement.period}
-                onChange={(event) => {
-                  if (/^\d{4}-\d{2}$/.test(event.target.value)) {
-                    statement.onPeriodChange(event.target.value);
-                  }
-                }}
-              />
-            </FormField>
-            <FormField
-              id="import-due-date"
-              label="Vencimento da fatura"
-              hint="Todas as linhas vencem nesse dia."
-              error={missingDueDate ? 'Informe o vencimento da fatura.' : undefined}
-            >
-              <Input
-                type="date"
-                value={statement.dueDate ?? ''}
-                onChange={(event) => statement.onDueDateChange(event.target.value || null)}
-              />
-            </FormField>
-          </>
-        )}
-        <FormField
-          id="import-label"
-          label="Origem (opcional)"
-          hint="Como esta importação aparece depois. Ex.: Cartão Nubank do Diego."
-        >
-          <Input
-            autoComplete="off"
-            maxLength={100}
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-        </FormField>
-      </div>
+      {/* The check before importing (ADR 0040 note): the numbers side by side, as the month's
+          totals in Lançamentos, then the statement's month and due date (ADR 0055 note) and what
+          tells this import apart later, each explained behind its "ⓘ". */}
+      <SectionCard
+        title="3. Revise e importe"
+        action={
+          <Button variant="outline" size="sm" onClick={onChooseAnother}>
+            Escolher outro arquivo
+          </Button>
+        }
+      >
+        {/* The live region wraps the list: on the <dl> itself it would stop being one (axe). */}
+        <div role="status">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-4">
+            {stats.map(([term, value, className]) => (
+              <div key={term} className="grid gap-0.5">
+                <dt className="text-muted-foreground text-sm">{term}</dt>
+                <dd className={cn('text-lg font-semibold tabular-nums', className)}>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {statement && (
+            <>
+              <FormField
+                id="import-period"
+                label="Mês de referência"
+                help="O mês da fatura: todas as linhas entram nele, inclusive as parcelas."
+              >
+                <Input
+                  type="month"
+                  value={statement.period}
+                  onChange={(event) => {
+                    if (/^\d{4}-\d{2}$/.test(event.target.value)) {
+                      statement.onPeriodChange(event.target.value);
+                    }
+                  }}
+                />
+              </FormField>
+              <FormField
+                id="import-due-date"
+                label="Vencimento da fatura"
+                help="Todas as linhas vencem nesse dia, como na fatura."
+                error={missingDueDate ? 'Informe o vencimento da fatura.' : undefined}
+              >
+                <Input
+                  type="date"
+                  value={statement.dueDate ?? ''}
+                  onChange={(event) => statement.onDueDateChange(event.target.value || null)}
+                />
+              </FormField>
+            </>
+          )}
+          <FormField
+            id="import-label"
+            label="Origem (opcional)"
+            help='Como esta importação aparece em "Importações anteriores". Ex.: Cartão Nubank do Diego.'
+          >
+            <Input
+              autoComplete="off"
+              maxLength={100}
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+            />
+          </FormField>
+        </div>
+      </SectionCard>
 
       {statement && !statement.baseRows && <p role="status">Atualizando a revisão…</p>}
+      {/* What could count twice or stay out, in the warning colors: never behind an "ⓘ". */}
       {statement?.notices.map((notice) => (
-        <p key={notice} role="note" className="bg-muted rounded-lg p-3">
+        <p key={notice} role="note" className={NOTICE_CLASS}>
           {notice}
         </p>
       ))}
 
       {overlapping.length > 0 && (
-        <p role="note" className="bg-muted rounded-lg p-3">
+        <p role="note" className={NOTICE_CLASS}>
           Você já importou lançamentos desses meses (
           {overlapping
             .map((previous) =>
@@ -424,14 +474,10 @@ export function ImportReview({
       )}
 
       {unmatched.length > 0 && (
-        <section aria-labelledby="import-categories" className="grid gap-3">
-          <h2 id="import-categories" className="font-medium">
-            Categorias
-          </h2>
-          <p className="text-muted-foreground">
-            Estas categorias da planilha não existem no espaço. Escolha a correspondente de cada
-            uma, ou adicione uma nova: ela é criada ao importar.
-          </p>
+        <SectionCard
+          title="Categorias novas"
+          help="Categorias da planilha que não existem neste espaço. Escolha a correspondente de cada uma, ou crie com o nome da planilha: ela só é criada ao importar."
+        >
           <Button
             type="button"
             variant="outline"
@@ -468,21 +514,50 @@ export function ImportReview({
               </FormField>
             ))}
           </div>
-        </section>
+        </SectionCard>
       )}
 
-      {withProblems.length > 0 && (
-        <SegmentedControl
-          label="Mostrar"
-          options={[
-            { value: 'all', label: 'Todas' },
-            { value: 'problems', label: 'Com problemas' },
-          ]}
-          value={onlyProblems ? 'problems' : 'all'}
-          onChange={(value) => setOnlyProblems(value === 'problems')}
-          className="sm:justify-self-start"
-        />
-      )}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        {withProblems.length > 0 && (
+          <SegmentedControl
+            label="Mostrar"
+            options={[
+              { value: 'all', label: 'Todas' },
+              { value: 'problems', label: 'Com problemas' },
+            ]}
+            value={onlyProblems ? 'problems' : 'all'}
+            onChange={(value) => setOnlyProblems(value === 'problems')}
+          />
+        )}
+        <div className="flex items-center">
+          {/* A 44px target on the phone, like each row's box (ADR 0036). */}
+          <label
+            htmlFor="import-all"
+            className="flex size-11 shrink-0 cursor-pointer items-center justify-center md:size-8"
+          >
+            <Checkbox
+              id="import-all"
+              checked={allOn ? true : someOn ? 'indeterminate' : false}
+              disabled={visible.length === 0}
+              onCheckedChange={toggleAll}
+              aria-describedby="import-all-count"
+            />
+          </label>
+          <label htmlFor="import-all" className="cursor-pointer font-medium">
+            Marcar todas
+          </label>
+          <span id="import-all-count" className="text-muted-foreground ml-3 text-sm tabular-nums">
+            {marked} de {rows.length} {rows.length === 1 ? 'marcada' : 'marcadas'}
+          </span>
+          {statement && (
+            <InfoTip term="Marcar todas">
+              Marca as linhas à vista, menos as que o app desmarcou por um motivo, como o pagamento
+              da fatura ou uma compra já lançada: essas você marca uma a uma. Desmarcar todas
+              desmarca qualquer linha.
+            </InfoTip>
+          )}
+        </div>
+      </div>
 
       {groupByPeriod(visible).map(({ period, rows: grouped }) => {
         const totals = groupTotals(grouped);
@@ -536,28 +611,36 @@ export function ImportReview({
           {apiErrorMessage(category.error ?? create.error)}
         </p>
       )}
-      <div className="grid gap-1 md:justify-items-start">
+      <div className="grid gap-2 md:justify-items-start">
+        {/* Why "Importar" is off, together beside it; a state, so in sight. */}
+        {blockers.length > 0 && (
+          <div className="grid gap-1 rounded-lg border p-3">
+            <p className="font-medium">Antes de importar:</p>
+            <ul className="list-disc pl-5">
+              {blockers.map((blocker) => (
+                <li key={blocker}>{blocker}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {unmatched.length > 0 && (
           <p className="text-muted-foreground text-sm">
-            As linhas das categorias sem correspondência só entram depois de escolher uma.
+            {waitingForCategory === 1
+              ? '1 linha espera a categoria correspondente e só entra depois de escolher uma.'
+              : `${waitingForCategory} linhas esperam a categoria correspondente e só entram depois de escolher uma.`}
           </p>
         )}
-        {missingDueDate && (
+        <div className="flex items-center">
           <p className="text-muted-foreground text-sm">
-            Informe o vencimento da fatura, no topo, para importar.
+            {withoutMerchant > 0
+              ? `${withoutMerchant} ${withoutMerchant === 1 ? 'saída' : 'saídas'} sem estabelecimento (opcional).`
+              : 'Nada é enviado antes de "Importar".'}
           </p>
-        )}
-        {withoutMerchant > 0 && (
-          <p className="text-muted-foreground text-sm">
-            {withoutMerchant === 1
-              ? '1 saída vai sem estabelecimento. É opcional: dá para escolher em "Editar".'
-              : `${withoutMerchant} saídas vão sem estabelecimento. É opcional: dá para escolher em "Editar".`}
-          </p>
-        )}
-        <p className="text-muted-foreground text-sm">
-          Tudo ou nada: se algum lançamento falhar, nenhum entra. Dá para desfazer a importação
-          depois.
-        </p>
+          <InfoTip term="Importar">
+            Tudo ou nada: se algum lançamento falhar, nenhum entra. Depois, dá para desfazer a
+            importação em "Importações anteriores".
+          </InfoTip>
+        </div>
         {/* Fixed above the tab bar on the phone, within reach of the thumb (ADR 0036). */}
         <Button
           // The layout keeps room for it below the footer (data-fab).

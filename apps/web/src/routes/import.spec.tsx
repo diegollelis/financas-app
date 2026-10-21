@@ -274,7 +274,7 @@ describe('ImportPage', () => {
       ]),
     );
 
-    const matching = await screen.findByRole('region', { name: 'Categorias' });
+    const matching = await screen.findByRole('region', { name: 'Categorias novas' });
     expect(screen.getByRole('button', { name: 'Importar 1 lançamento' })).toBeInTheDocument();
     await userEvent.click(
       within(matching).getByRole('combobox', { name: /^Feira \(saída, 1 linha\)/ }),
@@ -284,7 +284,7 @@ describe('ImportPage', () => {
     expect(
       await screen.findByRole('button', { name: 'Importar 2 lançamentos' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Categorias' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Categorias novas' })).not.toBeInTheDocument();
   });
 
   it('creates a category the workspace does not have, on import', async () => {
@@ -304,7 +304,7 @@ describe('ImportPage', () => {
       ]),
     );
 
-    const matching = await screen.findByRole('region', { name: 'Categorias' });
+    const matching = await screen.findByRole('region', { name: 'Categorias novas' });
     await userEvent.click(within(matching).getByRole('button', { name: 'Criar “Feira”' }));
 
     // Not created yet: the row says so, and it is ready.
@@ -342,7 +342,7 @@ describe('ImportPage', () => {
     expect(screen.getByRole('button', { name: 'Importar 1 lançamento' })).toBeInTheDocument();
     // The check before importing: what goes in, adding up, and what does not.
     expect(screen.getByRole('status').textContent?.replaceAll(' ', ' ')).toBe(
-      '1 de 2 linhas prontas para importar: entradas R$ 5.200,00, saídas R$ 0,00. 1 linha com problema.',
+      'Prontas1 de 2SaídasR$ 0,00Entradas+ R$ 5.200,00Com problema1',
     );
     // Only the rows with a problem on screen; the others stay in the import.
     await userEvent.click(screen.getByRole('radio', { name: 'Com problemas' }));
@@ -495,12 +495,13 @@ describe('ImportPage', () => {
         within(unknown!).getByRole('combobox', { name: 'Categoria de Spaceship.Com* Gypcbz' }),
       );
       await userEvent.click(await screen.findByRole('option', { name: 'Moradia' }));
-      // Ready without a merchant: only a hint says it is optional. The due date is still missing.
-      expect(unknown).toHaveTextContent('Sem estabelecimento (opcional).');
+      // Ready without a merchant: only a quiet mark. The due date is still missing.
+      expect(unknown).toHaveTextContent('Sem estabelecimento');
       expect(screen.getByRole('button', { name: 'Importar 2 lançamentos' })).toBeDisabled();
-      expect(
-        screen.getByText('Informe o vencimento da fatura, no topo, para importar.'),
-      ).toBeInTheDocument();
+      // Why "Importar" is off, beside it.
+      expect(screen.getByText('Antes de importar:').parentElement).toHaveTextContent(
+        'Informe o vencimento da fatura.',
+      );
       await typeDueDate();
       expect(screen.getByRole('button', { name: 'Importar 2 lançamentos' })).toBeEnabled();
       await userEvent.click(within(unknown!).getByRole('button', { name: /^(Editar|Corrigir)/ }));
@@ -600,11 +601,37 @@ describe('ImportPage', () => {
         within(fruits!).getByRole('combobox', { name: 'Categoria de Varejao de Frutas' }),
       );
       await userEvent.click(await screen.findByRole('option', { name: 'Moradia' }));
-      expect(
-        screen.getByText(
-          '1 saída vai sem estabelecimento. É opcional: dá para escolher em "Editar".',
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText('1 saída sem estabelecimento (opcional).')).toBeInTheDocument();
+    });
+
+    it('checks and unchecks every line at once, leaving out what the app unchecked on purpose', async () => {
+      mockStatement();
+      renderApp(page);
+      await chooseStatement();
+
+      const all = await screen.findByRole('checkbox', { name: 'Marcar todas' });
+      const payment = screen.getByRole('checkbox', { name: 'Importar Pagamento recebido' });
+      // The bill payment comes unchecked; the other two are all there is to check.
+      expect(all).toBeChecked();
+      expect(all).toHaveAccessibleDescription('2 de 3 marcadas');
+
+      await userEvent.click(all);
+      expect(all).not.toBeChecked();
+      expect(all).toHaveAccessibleDescription('0 de 3 marcadas');
+      expect(screen.getByText('Antes de importar:').parentElement).toHaveTextContent(
+        'Marque ao menos uma linha.',
+      );
+
+      await userEvent.click(all);
+      expect(all).toBeChecked();
+      expect(payment).not.toBeChecked();
+
+      // Part of them: the mixed state.
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Importar Pizzaria Exemplo' }));
+      expect(all).toHaveAttribute('aria-checked', 'mixed');
+      // The payment still checks on purpose, one by one.
+      await userEvent.click(payment);
+      expect(payment).toBeChecked();
     });
 
     it('takes the due date typed, whatever the file name says, and another reference month', async () => {
@@ -614,7 +641,8 @@ describe('ImportPage', () => {
       await chooseStatement();
       // The name carries a date, and the field still comes empty.
       expect(await dueDateField()).toHaveValue('');
-      expect(screen.getByText('Informe o vencimento da fatura.')).toBeInTheDocument();
+      // On the field, and among what keeps "Importar" off.
+      expect(screen.getAllByText('Informe o vencimento da fatura.')).toHaveLength(2);
       await typeDueDate('2026-11-10');
       const october = await screen.findByRole('region', { name: 'outubro de 2026' });
       expect(within(october).getAllByRole('listitem')[0]).toHaveTextContent('Vence em 10/11/2026');
