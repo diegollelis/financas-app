@@ -19,6 +19,17 @@ describe('PrivacyPage', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('describes what came since: statements read in the browser, aliases, suggestions', async () => {
+    mockApi({});
+    renderApp('/privacidade');
+
+    expect(
+      await screen.findByText(/fatura do cartão \(o arquivo CSV do Nubank\)/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/apelidos dos estabelecimentos/)).toBeInTheDocument();
+    expect(screen.getByText(/calculadas no próprio serviço/)).toBeInTheDocument();
+  });
+
   it('is linked from the sign-in page, as Google requires', async () => {
     mockApi({ 'GET /api/me': noSession });
     const { router } = renderApp('/entrar');

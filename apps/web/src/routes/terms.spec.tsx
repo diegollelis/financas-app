@@ -17,6 +17,15 @@ describe('TermsPage', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('warns that suggestions are proposals and that the server may take a minute (2026-10-21)', async () => {
+    mockApi({});
+    renderApp('/termos');
+
+    expect(await screen.findByText(/sugestões automáticas .* são propostas/)).toBeInTheDocument();
+    expect(screen.getByText(/o primeiro acesso pode levar até um minuto/)).toBeInTheDocument();
+    expect(screen.getByText(/Importe apenas arquivos seus ou do espaço/)).toBeInTheDocument();
+  });
+
   it('is linked from the sign-in page, next to the privacy policy', async () => {
     mockApi({ 'GET /api/me': noSession });
     const { router } = renderApp('/entrar');

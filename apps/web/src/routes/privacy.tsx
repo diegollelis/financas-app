@@ -12,7 +12,7 @@ export function PrivacyPage() {
   const contact = <ContactLink />;
 
   return (
-    <LegalPage title="Política de privacidade" updated="10 de outubro de 2026">
+    <LegalPage title="Política de privacidade" updated="21 de outubro de 2026">
       <Section title="Quem somos">
         <p>
           O CodeLélis Finanças é um projeto pessoal de estudo, sem fins lucrativos, para controle
@@ -38,8 +38,10 @@ export function PrivacyPage() {
           </li>
           <li>
             <strong>Dados financeiros:</strong> o que você mesmo cadastra: lançamentos (com as
-            descrições), categorias, estabelecimentos, orçamentos e metas, recorrências e
-            parcelamentos.
+            descrições, o meio de pagamento, a data da compra e as observações), categorias,
+            estabelecimentos, orçamentos e metas, recorrências, parcelamentos e as divisões com
+            outras pessoas. Também os apelidos dos estabelecimentos: o texto como ele aparece na
+            fatura do cartão, que você escolhe guardar para reconhecer a próxima fatura.
           </li>
           <li>
             <strong>Pessoas:</strong> o nome das pessoas que você cadastra para dividir contas ou
@@ -47,10 +49,11 @@ export function PrivacyPage() {
             apenas o necessário para identificar a pessoa.
           </li>
           <li>
-            <strong>Importações:</strong> a planilha que você importa é lida no seu próprio
-            navegador e nunca chega ao servidor. Guardamos só os lançamentos que você confirmar e um
-            registro da importação (quantos lançamentos e de quais meses), para você poder
-            desfazê-la.
+            <strong>Importações:</strong> a planilha e a fatura do cartão (o arquivo CSV do Nubank)
+            que você importa são lidas no seu próprio navegador e nunca chegam ao servidor.
+            Guardamos só o que você confirmar (os lançamentos e os parcelamentos criados) e um
+            registro da importação, para você poder desfazê-la: quantos lançamentos, de quais meses,
+            a "Origem" que você digitou, o vencimento da fatura e quem importou.
           </li>
           <li>
             <strong>Espaços e convites:</strong> quem participa de cada espaço, com o papel de cada
@@ -64,8 +67,8 @@ export function PrivacyPage() {
         <p>
           No seu navegador, usamos o cookie da sessão, indispensável para manter você conectado, e,
           no login com o Google, um cookie temporário que protege esse login. O app também guarda no
-          navegador o tema que você escolheu e o último espaço aberto. Não há cookies de publicidade
-          nem de análise de uso.
+          navegador o tema que você escolheu, o último espaço aberto e se prefere ver as listas como
+          lista ou tabela. Não há cookies de publicidade nem de análise de uso.
         </p>
       </Section>
 
@@ -74,8 +77,9 @@ export function PrivacyPage() {
           Só para oferecer o serviço: guardar as suas informações financeiras, mostrar os painéis,
           enviar os e-mails da conta (confirmação do e-mail, aviso de cadastro repetido, redefinição
           de senha, troca de e-mail, com um aviso ao endereço antigo, exclusão da conta e convites)
-          e proteger o acesso. Não vendemos dados, não exibimos anúncios e não usamos os seus dados
-          para outros fins.
+          e proteger o acesso. As sugestões de categoria e de meio de pagamento vêm dos seus
+          próprios lançamentos e são calculadas no próprio serviço, sem enviar nada a terceiros. Não
+          vendemos dados, não exibimos anúncios e não usamos os seus dados para outros fins.
         </p>
         <p>
           A base legal é a execução do serviço que você contratou ao criar a conta (LGPD, art. 7º,
@@ -87,7 +91,8 @@ export function PrivacyPage() {
       <Section title="Quem mais tem acesso">
         <p>
           Os membros de um espaço veem os dados financeiros daquele espaço, conforme o papel de cada
-          um, e o nome e o e-mail dos outros membros. O seu espaço pessoal é só seu.
+          um, o nome e o e-mail dos outros membros, as pessoas cadastradas nele e quem fez cada
+          importação. O seu espaço pessoal é só seu.
         </p>
         <p>
           Para funcionar, o app usa estes fornecedores, que processam dados apenas em nosso nome:

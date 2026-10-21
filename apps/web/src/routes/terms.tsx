@@ -55,6 +55,7 @@ export function TermsPage() {
         <p>
           Ao convidar alguém ou cadastrar uma pessoa para dividir contas, use o nome e o e-mail dela
           só para organizar as finanças no app, e cadastre apenas o necessário para identificá-la.
+          Importe apenas arquivos seus ou do espaço, como a sua fatura e a sua planilha.
         </p>
       </Section>
 
@@ -80,14 +81,19 @@ export function TermsPage() {
         <p>
           O CodeLélis Finanças mostra os números que você lança; ele não é consultoria financeira,
           contábil nem de investimentos. Confira as informações antes de tomar decisões importantes.
+          As sugestões automáticas (categoria e meio de pagamento pelo histórico, o valor estimado
+          de uma conta variável e a leitura de uma fatura) são propostas: confira antes de salvar ou
+          importar.
         </p>
       </Section>
 
       <Section title="Disponibilidade">
         <p>
-          O app é oferecido como está, sem garantia de funcionar sem interrupções. Fazemos cópias de
-          segurança diárias, mas recomendamos guardar uma cópia própria dos dados importantes. Se o
-          serviço for encerrado, você será avisado com antecedência para baixar os seus dados.
+          O app é oferecido como está, sem garantia de funcionar sem interrupções. Por usar um plano
+          gratuito, o servidor dorme quando ninguém usa, e o primeiro acesso pode levar até um
+          minuto. Fazemos cópias de segurança diárias, mas recomendamos guardar uma cópia própria
+          dos dados importantes. Se o serviço for encerrado, você será avisado com antecedência para
+          baixar os seus dados.
         </p>
       </Section>
 
