@@ -42,6 +42,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.24.1** (2026-10-20): na Análise, a tabela "Mês a mês" cabe no celular: espaço entre as colunas, "(R$)" no título em vez de em cada valor e o mês abreviado ("mai/26"), também na tabela do detalhe de uma categoria ([ADR 0037](adr/0037-analise-de-periodos.md)).
 - **1.24.2** (2026-10-20): as buscas de Lançamentos, Categorias, Pessoas e Estabelecimentos parecem buscas: lupa e um texto de exemplo dentro do campo, dizendo onde procura, e um "×" para limpar ([ADR 0036](adr/0036-design-mobile-first.md)).
 - **1.24.3** (2026-10-21): a busca de Lançamentos também acha a observação e parte do valor ("159" acha R$ 1.159,90), com "Buscar lançamento" no campo; Importar e Minha conta em cartões, com as explicações no ⓘ: o histórico de importações à parte, cada uma com o selo "Fatura" ou "Planilha", e o tema escolhido também em "Aparência", na Minha conta ([ADR 0036](adr/0036-design-mobile-first.md), [ADR 0040](adr/0040-importacao-da-planilha.md), [ADR 0049](adr/0049-gerenciar-a-conta.md)).
+- **1.24.4** (2026-10-21): a revisão da importação em cartões: os números lado a lado, as dicas dos campos no ⓘ, os avisos de duplicidade nas cores de aviso, "Antes de importar" junto ao botão, e "Marcar todas", que não marca de volta o que o app desmarcou de propósito, como o pagamento da fatura ([ADR 0040](adr/0040-importacao-da-planilha.md)).
 
 ## Fase 0 — Planejamento ✅
 
