@@ -43,7 +43,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 
 - Use shadcn components before writing new ones. Add with `pnpm dlx shadcn@latest add <name>` from `apps/web`, then `pnpm format`.
 - **Forms:** React Hook Form + `zodResolver` with the shared schema, and `FormField` (`components/form-field.tsx`). Inside `ResponsiveDialog` (`components/responsive-dialog.tsx`): a bottom `Sheet` below `md`, a `Dialog` from `md`. A dialog opened from a menu item or an outside button passes `returnFocusTo`, and is remounted (`key`) on each opening so no old error remains. Use shadcn `Select` and `RadioGroup`, not native ones.
-- **Project components** (`components/`): `PageHeader`, `QueryState`/`ListSkeleton`, `ResponsiveDialog`, `SegmentedControl` (a choice among 2 or 3 options, instead of radio dots; an option may be disabled, with the reason tied by `describedBy`), `TextLink` (a text link that is 44px tall on the phone) and `InfoTip` (what a term means, behind an "ⓘ" beside it, opened by a tap; definitions only, never a state of the data, which stays in sight; ADR 0036 note). Reuse them before writing new markup.
+- **Project components** (`components/`): `PageHeader`, `QueryState`/`ListSkeleton`, `ResponsiveDialog`, `SegmentedControl` (a choice among 2 or 3 options, instead of radio dots; an option may be disabled, with the reason tied by `describedBy`), `TextLink` (a text link that is 44px tall on the phone), `SearchInput` (the search over a page's list: a magnifier, a hint of where it looks and "Limpar busca") and `InfoTip` (what a term means, behind an "ⓘ" beside it, opened by a tap; definitions only, never a state of the data, which stays in sight; ADR 0036 note). Reuse them before writing new markup.
 - **Quick choices:** a `Popover` (`components/ui/popover.tsx`) from md and a bottom sheet (`ResponsiveDialog`) on the phone, as the competência picker does (`features/periods/period-picker.tsx`).
 - **Destructive actions:** `AlertDialog` with the item named ("Excluir Aluguel?"). Never one-click delete.
 - **Row actions:** at most one inline action, an outlined button that says what to do ("○ Pagar", whose accessible name starts with its visible text: "Pagar: Aluguel"); the rest in a `DropdownMenu` (`⋯`) with an `aria-label` that names the item, the inline action included in full (ADR 0036 note).
@@ -66,7 +66,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 
 ## Accessibility
 
-- Every control has an accessible name; icon-only buttons have `aria-label`. Inputs have a visible `Label`.
+- Every control has an accessible name; icon-only buttons have `aria-label`. Inputs have a visible `Label`, except the search over a list (`SearchInput`: a magnifier and a hint inside, the label for screen readers only; ADR 0036 note).
 - Visible focus (`focus-visible` ring). Dialogs and sheets trap focus and return it to the trigger. After an inline action changes a list, move focus somewhere sensible.
 - Text contrast of 4.5:1 or more (3:1 for large text and UI parts), in light and dark.
 - A "Pular para o conteúdo" skip link in the shell. Landmarks: `header`, `nav` (with `aria-label`), `main`.

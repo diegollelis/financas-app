@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/search-input';
 import {
   useCreatePerson,
   useDeletePerson,
@@ -575,14 +576,13 @@ export function PeoplePage() {
             </div>
           )}
           {searchable && (
-            <FormField id="people-search" label="Buscar pessoa">
-              <Input
-                type="search"
-                autoComplete="off"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </FormField>
+            <SearchInput
+              id="people-search"
+              label="Buscar pessoa"
+              placeholder="Buscar pessoa"
+              value={search}
+              onChange={setSearch}
+            />
           )}
           {active.length === 0 && search.trim() !== '' ? (
             <p className="text-muted-foreground">Nenhuma pessoa com “{search.trim()}”.</p>

@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/search-input';
 import {
   useCreateMerchant,
   useDeleteMerchant,
@@ -370,14 +371,13 @@ export function MerchantsPage() {
           </div>
         )}
         {merchants.isSuccess && all.length > 0 && (
-          <FormField id="merchant-search" label="Buscar estabelecimento">
-            <Input
-              type="search"
-              autoComplete="off"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </FormField>
+          <SearchInput
+            id="merchant-search"
+            label="Buscar estabelecimento"
+            placeholder="Nome ou apelido"
+            value={search}
+            onChange={setSearch}
+          />
         )}
       </PageHeader>
       {canEdit && (

@@ -19,7 +19,6 @@ import {
 import { Circle, CreditCard, Ellipsis, Plus, Repeat, Users } from 'lucide-react';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { toast } from 'sonner';
-import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { SegmentedControl } from '@/components/segmented-control';
@@ -35,7 +34,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/search-input';
 import {
   Table,
   TableBody,
@@ -920,14 +919,13 @@ export function TransactionsPage() {
           // The search on a row of its own at every width: beside the filter it was squeezed to a
           // sliver once the filter read "Pagos e recebidos" (ADR 0051).
           <div className="grid gap-3">
-            <FormField id="transactions-search" label="Buscar lançamento">
-              <Input
-                type="search"
-                autoComplete="off"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </FormField>
+            <SearchInput
+              id="transactions-search"
+              label="Buscar lançamento"
+              placeholder="Descrição, categoria, pessoa…"
+              value={search}
+              onChange={setSearch}
+            />
             <SegmentedControl
               label="Situação"
               options={statusFilterOptions}
