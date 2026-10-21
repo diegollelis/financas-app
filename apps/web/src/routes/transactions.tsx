@@ -61,6 +61,7 @@ import { InstallDialog } from '@/features/installments/install-dialog';
 import { RepeatDialog } from '@/features/recurrences/repeat-dialog';
 import { usePeople } from '@/features/people/use-people';
 import {
+  matchesAmount,
   matchesSearch,
   matchesStatus,
   statusFilterOptions,
@@ -882,14 +883,16 @@ export function TransactionsPage() {
   const filtering = statusFilter !== 'todos' || search.trim() !== '';
   const shown = (transaction: Transaction) =>
     matchesStatus(transaction, statusFilter, today) &&
-    matchesSearch(
+    (matchesSearch(
       search,
       transaction.description,
       categories.data?.find((item) => item.id === transaction.categoryId)?.name,
       personName(transaction.personId),
       merchantName(transaction.merchantId),
       transaction.paymentMethod && paymentMethodLabels[transaction.paymentMethod],
-    );
+      transaction.notes,
+    ) ||
+      matchesAmount(search, transaction.amountCents));
 
   return (
     <>
@@ -922,7 +925,7 @@ export function TransactionsPage() {
             <SearchInput
               id="transactions-search"
               label="Buscar lançamento"
-              placeholder="Descrição, categoria, pessoa…"
+              placeholder="Buscar lançamento"
               value={search}
               onChange={setSearch}
             />

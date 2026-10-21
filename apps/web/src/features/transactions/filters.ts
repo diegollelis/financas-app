@@ -45,11 +45,25 @@ export function matchesStatus(transaction: Transaction, filter: StatusFilter, to
 }
 
 /**
- * Whether what was typed is in the description, the category or the person, ignoring case and
- * accents ("agua" finds "Água").
+ * Whether what was typed is in one of the texts (description, category, person, merchant, method,
+ * notes), ignoring case and accents ("agua" finds "Água").
  */
 export function matchesSearch(search: string, ...texts: (string | null | undefined)[]) {
   const wanted = normalizeName(search);
   if (wanted === '') return true;
   return texts.some((text) => text && normalizeName(text).includes(wanted));
+}
+
+/**
+ * Whether what was typed is part of the amount as the page writes it, without "R$" and with or
+ * without the thousands dot: "159", "1.159" and "159,9" all find R$ 1.159,90. Only text that
+ * looks like a number counts, so "água" is never compared with amounts.
+ */
+export function matchesAmount(search: string, cents: number) {
+  const typed = search.replace(/R\$/i, '').replace(/\s/g, '');
+  if (!/^[\d.,]*\d[\d.,]*$/.test(typed)) return false;
+  const reais = String(Math.floor(cents / 100));
+  const decimals = String(cents % 100).padStart(2, '0');
+  const grouped = reais.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return [`${grouped},${decimals}`, `${reais},${decimals}`].some((text) => text.includes(typed));
 }
