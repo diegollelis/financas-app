@@ -229,6 +229,27 @@ describe('TransactionsPage', () => {
     expect(router.state.location.search).toBe('?competencia=2026-11&situacao=pendentes');
   });
 
+  it('finds a transaction by its notes and by part of its amount', async () => {
+    mockTransactions({
+      [`GET ${base}`]: { body: [salary, light, { ...shopping, notes: 'Feira do bairro' }] },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const debits = await section('Saídas');
+    const search = screen.getByRole('searchbox', { name: 'Buscar lançamento' });
+    expect(search).toHaveAttribute('placeholder', 'Buscar lançamento');
+    await userEvent.type(search, 'feira');
+    expect(row(debits, 'Compras da semana')).toBeInTheDocument();
+    expect(within(debits).queryByText('Conta de luz')).not.toBeInTheDocument();
+
+    // Part of the amount as written, with or without "R$": R$ 159,90.
+    await userEvent.clear(search);
+    await userEvent.type(search, 'R$ 159,9');
+    expect(row(debits, 'Conta de luz')).toBeInTheDocument();
+    expect(within(debits).queryByText('Compras da semana')).not.toBeInTheDocument();
+    expect(debits).toHaveTextContent('Total: − R$ 159,90');
+  });
+
   it('says "Pago" or "Recebido", with the year only when it is not the competência\'s', async () => {
     const paid = { ...light, settledAt: '2026-10-08' };
     const lateDecember = transaction(6, {

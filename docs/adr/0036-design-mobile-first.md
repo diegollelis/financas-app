@@ -228,6 +228,14 @@ O mesmo componente serve às outras telas com explicações longas, como Recorr�
 
 A busca de Lançamentos, Categorias, Pessoas e Estabelecimentos era um campo de formulário comum, com o rótulo em cima e a caixa vazia: não parecia um lugar para digitar uma busca. Agora as quatro usam o mesmo componente (`SearchInput`, `components/search-input.tsx`), com a mesma cara dos seletores de categoria, pessoa e estabelecimento:
 
-- **Lupa à esquerda, dentro do campo,** e um texto de exemplo que diz onde a busca procura: "Descrição, categoria, pessoa…" em Lançamentos e "Nome ou apelido" em Estabelecimentos.
+- **Lupa à esquerda, dentro do campo,** e um texto de exemplo: "Buscar lançamento", "Buscar categoria" e "Buscar pessoa". Só Estabelecimentos diz onde procura, "Nome ou apelido", porque o apelido não aparece no cartão. Em Lançamentos, a lista do que a busca procura não caberia: ela procura em tudo o que o cartão mostra.
 - **O rótulo continua, só para leitores de tela** ("Buscar lançamento"). É a única exceção à regra do rótulo visível: a lupa e o texto de exemplo dizem o que o campo é, e o texto de exemplo não serve de rótulo porque some quando se digita.
 - **Com texto, um "×" limpa a busca** e devolve o foco ao campo. É um alvo de 44 px no celular, nomeado "Limpar busca". O "×" nativo de `type="search"` fica escondido, porque só aparece no Chrome e é pequeno.
+
+## Nota (a busca de Lançamentos acha a observação e o valor, 2026-10-21)
+
+A busca de Lançamentos procura em tudo o que o cartão mostra: descrição, categoria, pessoa, estabelecimento, meio de pagamento, **observação** e **valor** (`matchesSearch` e `matchesAmount`, `features/transactions/filters.ts`).
+
+- **O valor é comparado por trecho, como a página o escreve,** sem o "R$" e com ou sem o ponto do milhar: "159", "1.159" e "159,9" acham R$ 1.159,90. Comparar com o valor exato exigiria digitar os centavos.
+- **Só um texto com cara de número** (dígitos, ponto e vírgula, um "R$" e espaços) é comparado com os valores: "água" nunca é.
+- Um número curto ("10") acha muitos lançamentos, o que se espera de uma busca por trecho. A contagem ("1 de 5") e o total da seção mostram o que ficou, e servem para conferir uma fatura.

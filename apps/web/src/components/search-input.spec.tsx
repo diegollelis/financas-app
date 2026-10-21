@@ -10,7 +10,7 @@ function Search() {
     <SearchInput
       id="busca"
       label="Buscar lançamento"
-      placeholder="Descrição, categoria, pessoa…"
+      placeholder="Nome ou apelido"
       value={value}
       onChange={setValue}
     />
@@ -21,7 +21,7 @@ describe('SearchInput', () => {
   it('is named by its label, hints what it looks in and clears what was typed', async () => {
     render(<Search />);
     const field = screen.getByRole('searchbox', { name: 'Buscar lançamento' });
-    expect(field).toHaveAttribute('placeholder', 'Descrição, categoria, pessoa…');
+    expect(field).toHaveAttribute('placeholder', 'Nome ou apelido');
     expect(screen.queryByRole('button', { name: 'Limpar busca' })).not.toBeInTheDocument();
 
     await userEvent.type(field, 'mercado');
