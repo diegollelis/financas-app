@@ -4,10 +4,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { WorkspaceGone } from '@/features/workspaces/workspace-gone';
 import { ApiError } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/error-message';
-import { useElapsed } from '@/lib/use-elapsed';
+import { ServerWait } from '@/components/server-wait';
+import { useServerWaitMessage } from '@/lib/use-server-wait';
 
-/** After this long, a pending request is most likely the API waking up (ADR 0033). */
-export const SLOW_LOADING_MS = 3000;
+export { SLOW_LOADING_MS } from '@/lib/use-server-wait';
 
 /** The part of a TanStack query this component reads. */
 type QueryLike = {
@@ -19,20 +19,17 @@ type QueryLike = {
 };
 
 /**
- * A skeleton shaped like the content, plus a word about the cold start when it takes a while: on
- * Render's free plan the API sleeps when idle and takes up to a minute to answer (ADR 0033).
+ * A skeleton shaped like the content and, when it takes a while, the CL symbol with its rings
+ * and the wait's words in steps above it: on Render's free plan the API sleeps when idle and
+ * takes up to a minute to answer (ADR 0033, ADR 0036 note).
  */
 export function LoadingState({ children }: { children: ReactNode }) {
-  const slow = useElapsed(SLOW_LOADING_MS);
+  const message = useServerWaitMessage();
   return (
     <div aria-busy="true" className="grid gap-4">
       <div aria-live="polite">
         <span className="sr-only">Carregando…</span>
-        {slow && (
-          <p className="text-muted-foreground">
-            Aguardando o servidor… isso pode levar até um minuto.
-          </p>
-        )}
+        {message && <ServerWait message={message} layout="inline" />}
       </div>
       <div aria-hidden className="grid gap-4">
         {children}
