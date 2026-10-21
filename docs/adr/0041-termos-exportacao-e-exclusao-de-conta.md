@@ -174,3 +174,13 @@ Antes de começar a usar o app de verdade, os textos legais e a segurança foram
 - **A API deixa de se anunciar:** o cabeçalho `X-Powered-By: Express` foi desligado.
 - **`shadcn` virou dependência de desenvolvimento:** é uma ferramenta de linha de comando. Os alertas do `pnpm audit` que restam vêm do `mysql2` e do `deepmerge-ts`, puxados pelo Prisma e pelo Better Auth, e nenhum deles roda no app: o banco é Postgres, e o `deepmerge-ts` só lê a configuração do Prisma. Eles somem quando essas bibliotecas atualizarem.
 - **Fica para depois:** a verificação em duas etapas e o bloqueio de senhas vazadas. São melhorias, não falhas encontradas.
+
+## Nota (termos de 2026-10-21)
+
+`TERMS_VERSION` passa a 2026-10-21, e todos aceitam os termos de novo ao entrar. Os termos ganharam três avisos, pelo que entrou desde 2026-10-10:
+
+- **As sugestões automáticas são propostas:** a categoria e o meio de pagamento pelo histórico, o valor estimado de uma conta variável e a leitura de uma fatura, que já decide o que vem marcado. Confira antes de salvar ou importar.
+- **O servidor dorme** no plano gratuito, e o primeiro acesso pode levar até um minuto (ADR 0033).
+- **Importe apenas arquivos seus ou do espaço.**
+
+A Política de privacidade (sem novo aceite) passa a citar o meio de pagamento, a data da compra, as observações, as divisões e os apelidos dos estabelecimentos; a fatura do cartão lida no navegador e o que o registro da importação guarda; as sugestões calculadas no próprio serviço; a escolha de lista ou tabela guardada no navegador; e que os membros de um espaço veem as pessoas dele e quem importou.
