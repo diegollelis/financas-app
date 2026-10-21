@@ -3,21 +3,26 @@ import { Download } from 'lucide-react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
+import { SectionCard } from '@/components/section-card';
+import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { AccountDetails, ConnectedDevices } from '@/features/account/account-security';
 import { DeleteAccountSection } from '@/features/account/delete-account-section';
 import { useDataExport } from '@/features/account/use-data-export';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { apiErrorMessage } from '@/lib/error-message';
+import { themeOptions, useTheme } from '@/lib/theme';
 
 /**
  * Minha conta (ADRs 0041 and 0049): who is signed in, the name and the password, the devices
- * connected, the terms accepted, the LGPD data export and the deletion. Not a workspace's page,
+ * connected, the theme, the terms accepted, the LGPD data export and the deletion, each in a card
+ * (ADR 0049 note). Not a workspace's page,
  * but shown in the frame of the last workspace used, with no section marked (AccountLayout).
  */
 export function AccountPage() {
   const user = useCurrentUser();
   const dataExport = useDataExport();
+  const theme = useTheme();
   const download = () =>
     dataExport.mutate(undefined, {
       onSuccess: () => toast.success('Dados baixados'),
@@ -29,10 +34,7 @@ export function AccountPage() {
     <>
       <PageHeader title="Minha conta" />
 
-      <section aria-labelledby="account-data" className="grid gap-3">
-        <h2 id="account-data" className="font-medium">
-          Conta
-        </h2>
+      <SectionCard title="Conta">
         {/* The name and the password can change here (ADR 0049). */}
         <AccountDetails>
           {user.termsVersion && (
@@ -47,25 +49,40 @@ export function AccountPage() {
             </div>
           )}
         </AccountDetails>
-      </section>
+      </SectionCard>
+
+      {/* Where people look for settings; the account menu keeps the shortcut. A choice of this
+          browser only (lib/theme.ts), and the line under it says so. */}
+      <SectionCard title="Aparência">
+        <SegmentedControl
+          label="Tema"
+          options={themeOptions}
+          value={theme.preference}
+          onChange={theme.setPreference}
+          className="sm:justify-self-start"
+        />
+        <p className="text-muted-foreground text-sm">
+          {theme.preference === 'system'
+            ? 'Segue o tema claro ou escuro do aparelho.'
+            : 'Vale só neste aparelho.'}
+        </p>
+      </SectionCard>
 
       <ConnectedDevices />
 
-      <section aria-labelledby="account-export" className="grid gap-3">
-        <h2 id="account-export" className="font-medium">
-          Seus dados
-        </h2>
-        {/* What it is for first; the format, for whoever needs it, after. */}
-        <p>
-          Baixe uma cópia dos seus dados, para guardar ou usar em outro programa. Vem tudo o que o
-          Finanças guarda sobre você: a conta e, dos espaços de que você é dono, os lançamentos,
-          categorias, orçamentos, recorrências, parcelamentos, importações, membros e convites. Dos
-          espaços de outras pessoas, vêm só o nome e o seu papel.
-        </p>
-        <p className="text-muted-foreground text-sm">
-          O arquivo é JSON, um formato de texto que outros programas leem; os valores estão em
-          centavos.
-        </p>
+      {/* What it is for in sight; what comes in the file, and its format, behind the "ⓘ". */}
+      <SectionCard
+        title="Seus dados"
+        help={
+          <>
+            Vem a conta e, dos espaços de que você é dono, os lançamentos, categorias, orçamentos,
+            recorrências, parcelamentos, importações, membros e convites. Dos espaços de outras
+            pessoas, só o nome e o seu papel. O arquivo é JSON, um formato de texto que outros
+            programas leem, com os valores em centavos.
+          </>
+        }
+      >
+        <p>Baixe uma cópia de tudo o que o Finanças guarda sobre você.</p>
         <Button
           variant="outline"
           className="justify-self-start"
@@ -75,7 +92,7 @@ export function AccountPage() {
           <Download aria-hidden />
           {dataExport.isPending ? 'Preparando o arquivo…' : 'Baixar meus dados'}
         </Button>
-      </section>
+      </SectionCard>
 
       <DeleteAccountSection />
     </>

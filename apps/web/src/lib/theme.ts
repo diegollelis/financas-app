@@ -12,6 +12,13 @@ export type ResolvedTheme = 'light' | 'dark';
 
 export const THEME_STORAGE_KEY = 'financas-tema';
 
+/** The choices, in the account menu and in "Aparência" on Minha conta. */
+export const themeOptions: readonly { value: ThemePreference; label: string }[] = [
+  { value: 'system', label: 'Sistema' },
+  { value: 'light', label: 'Claro' },
+  { value: 'dark', label: 'Escuro' },
+];
+
 /** The `--background` of each theme, for the browser bar (`<meta name="theme-color">`). */
 const themeColors: Record<ResolvedTheme, string> = { light: '#f8fafc', dark: '#0a1f3d' };
 

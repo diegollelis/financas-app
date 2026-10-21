@@ -15,13 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { useSignOut } from '@/features/auth/use-auth-mutations';
 import { useCurrentUser } from '@/features/auth/use-me';
-import { useTheme, type ThemePreference } from '@/lib/theme';
-
-const themeOptions: { value: ThemePreference; label: string }[] = [
-  { value: 'system', label: 'Sistema' },
-  { value: 'light', label: 'Claro' },
-  { value: 'dark', label: 'Escuro' },
-];
+import { themeOptions, useTheme, type ThemePreference } from '@/lib/theme';
 
 function isThemePreference(value: string): value is ThemePreference {
   return themeOptions.some((option) => option.value === value);

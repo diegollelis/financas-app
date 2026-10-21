@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { FormField } from '@/components/form-field';
 import { PasswordInput } from '@/components/password-input';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { SectionCard } from '@/components/section-card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +30,6 @@ import { Input } from '@/components/ui/input';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
 import { useRequestPasswordReset } from '@/features/auth/use-auth-mutations';
 import { useCurrentUser } from '@/features/auth/use-me';
-import { DIVIDED_LIST } from '@/features/view-mode/row-styles';
 import {
   useAccountSecurity,
   useChangeEmail,
@@ -244,7 +244,7 @@ export function AccountDetails({ children }: { children?: ReactNode }) {
 
   return (
     <>
-      <dl className="grid gap-4 rounded-xl border p-4">
+      <dl className="grid gap-4">
         <AccountRow
           label="Nome"
           action={
@@ -362,11 +362,8 @@ export function ConnectedDevices() {
   const shown = showAll ? sessions : sessions.slice(0, DEVICES_SHOWN);
 
   return (
-    <section aria-labelledby="account-devices" className="grid gap-3">
-      <h2 id="account-devices" className="font-medium">
-        Aparelhos conectados
-      </h2>
-      <ul className={DIVIDED_LIST}>
+    <SectionCard title="Aparelhos conectados">
+      <ul className="divide-y">
         {shown.map((session) => (
           <li key={session.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
             <span className="grid gap-0.5">
@@ -419,6 +416,6 @@ export function ConnectedDevices() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-    </section>
+    </SectionCard>
   );
 }
