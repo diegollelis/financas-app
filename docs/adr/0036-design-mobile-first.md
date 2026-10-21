@@ -223,3 +223,11 @@ O Painel ficou carregado de explicações: eram nove parágrafos de definição 
 - **Só definições.** O que é verdade sobre o mês continua como texto à vista: os vencidos, os valores estimados, "As saídas passam das entradas", "Nada sobrou para guardar" e a origem do orçamento.
 
 O mesmo componente serve às outras telas com explicações longas, como Recorrências, Pessoas e a revisão da importação, quando forem revistas.
+
+## Nota (a busca com lupa, 2026-10-20)
+
+A busca de Lançamentos, Categorias, Pessoas e Estabelecimentos era um campo de formulário comum, com o rótulo em cima e a caixa vazia: não parecia um lugar para digitar uma busca. Agora as quatro usam o mesmo componente (`SearchInput`, `components/search-input.tsx`), com a mesma cara dos seletores de categoria, pessoa e estabelecimento:
+
+- **Lupa à esquerda, dentro do campo,** e um texto de exemplo que diz onde a busca procura: "Descrição, categoria, pessoa…" em Lançamentos e "Nome ou apelido" em Estabelecimentos.
+- **O rótulo continua, só para leitores de tela** ("Buscar lançamento"). É a única exceção à regra do rótulo visível: a lupa e o texto de exemplo dizem o que o campo é, e o texto de exemplo não serve de rótulo porque some quando se digita.
+- **Com texto, um "×" limpa a busca** e devolve o foco ao campo. É um alvo de 44 px no celular, nomeado "Limpar busca". O "×" nativo de `type="search"` fica escondido, porque só aparece no Chrome e é pequeno.

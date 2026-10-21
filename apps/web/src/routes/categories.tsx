@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/search-input';
 import { CopyCategoriesDialog } from '@/features/categories/copy-categories-dialog';
 import {
   useCategories,
@@ -422,14 +423,13 @@ export function CategoriesPage() {
           </div>
         )}
         {categories.isSuccess && (
-          <FormField id="category-search" label="Buscar categoria">
-            <Input
-              type="search"
-              autoComplete="off"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </FormField>
+          <SearchInput
+            id="category-search"
+            label="Buscar categoria"
+            placeholder="Buscar categoria"
+            value={search}
+            onChange={setSearch}
+          />
         )}
       </PageHeader>
       {canEdit && (
