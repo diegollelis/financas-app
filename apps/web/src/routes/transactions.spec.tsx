@@ -1454,12 +1454,64 @@ describe('TransactionsPage', () => {
         amountCents: 17_250,
         dueDate: '2026-10-10',
         occurredOn: null,
+        settledAt: null,
         personId: null,
         merchantId: null,
         paymentMethod: null,
       }),
     });
     expect(await screen.findByText('Lançamento salvo')).toBeInTheDocument();
+  });
+
+  it('gives the day it was paid: fixed when editing, cleared back to pending, never ahead (ADR 0029 note)', async () => {
+    const paid = { ...light, settledAt: '2026-10-08' };
+    const fetchMock = mockTransactions({
+      [`GET ${base}`]: { body: [salary, paid, shopping] },
+      [`PATCH ${base}/${light.id}`]: { body: { ...paid, settledAt: '2026-10-06' } },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    const settled = within(form).getByLabelText('Pago em (opcional)');
+    expect(settled).toHaveValue('2026-10-08');
+
+    // A day ahead is refused: settled is something that happened.
+    await userEvent.clear(settled);
+    await userEvent.type(settled, '2026-10-20');
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));
+    expect(
+      await within(form).findByText('O pagamento não pode ser numa data futura.'),
+    ).toBeInTheDocument();
+
+    await userEvent.clear(settled);
+    await userEvent.type(settled, '2026-10-06');
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));
+    await expectCall(fetchMock, `${base}/${light.id}`, {
+      method: 'PATCH',
+      body: expect.stringContaining('"settledAt":"2026-10-06"') as unknown,
+    });
+  });
+
+  it('launches one already paid on the day given, and pending when left blank', async () => {
+    const fetchMock = mockTransactions({
+      [`POST ${base}`]: { status: 201, body: { ...shopping, settledAt: '2026-10-12' } },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    expect(within(form).getByText('Em branco enquanto não for pago.')).toBeInTheDocument();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Padaria');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '25,00');
+    await userEvent.type(within(form).getByLabelText('Pago em (opcional)'), '2026-10-12');
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: expect.stringContaining('"settledAt":"2026-10-12"') as unknown,
+    });
   });
 
   it('edits a month of a recurrence without a day, unless it has one (ADR 0055 note)', async () => {

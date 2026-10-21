@@ -16,6 +16,12 @@ export const settledLabels = {
   DEBIT: 'Pago',
 } as const satisfies Record<TransactionType, string>;
 
+/** The form field of the day it was settled (ADR 0029 note): blank while pending. */
+export const settledOnLabels = {
+  CREDIT: 'Recebido em',
+  DEBIT: 'Pago em',
+} as const satisfies Record<TransactionType, string>;
+
 /** The day it happened (ADR 0055): an outflow's is the purchase's, an inflow's just its day. */
 export const occurredOnLabels = {
   CREDIT: 'Data',

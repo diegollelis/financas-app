@@ -6,6 +6,7 @@ import {
   parseReais,
   isoDateSchema,
   occurredOnLabels,
+  settledOnLabels,
   PERSON_NAME_MAX_LENGTH,
   reaisInputSchema,
   MERCHANT_NAME_MAX_LENGTH,
@@ -64,6 +65,14 @@ const transactionFormSchema = plainTransactionInputSchema
       .string()
       .transform((date) => date || null)
       .pipe(isoDateSchema.nullable()),
+    /**
+     * The day it was paid or received (ADR 0029 note); '' while pending. The row's button settles
+     * today; this field gives another day, also to fix one. Never in the future.
+     */
+    settledAt: z
+      .string()
+      .transform((date) => date || null)
+      .pipe(isoDateSchema.nullable()),
     /** The competência it is launched in: how far a repeated one's due date may fall. Never sent. */
     period: z.string(),
     /**
@@ -99,6 +108,17 @@ const transactionFormSchema = plainTransactionInputSchema
     shares: z.array(z.object({ name: z.string(), value: z.string() })),
   })
   .superRefine((values, ctx) => {
+    // Settled is something that happened: a day ahead is what the due date is for.
+    if (values.settledAt && values.settledAt > todayIso()) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['settledAt'],
+        message:
+          values.type === 'CREDIT'
+            ? 'O recebimento não pode ser numa data futura.'
+            : 'O pagamento não pode ser numa data futura.',
+      });
+    }
     if (values.splitOn) {
       // A share of an installment plan's total is divided among its installments (ADR 0052).
       const installments =
@@ -291,6 +311,7 @@ export function TransactionForm({
         : period && period === currentPeriod()
           ? todayIso()
           : '',
+      settledAt: initial?.settledAt ?? '',
       period: initial?.period ?? period ?? '',
       repeat: 'NONE',
       amountKind: 'FIXED',
@@ -339,6 +360,9 @@ export function TransactionForm({
   const withDay =
     (repeat === 'NONE' || repeat === 'INSTALLMENTS') &&
     !(initial?.recurrenceId && !initial.occurredOn);
+  // The day it was settled: a transaction launched once or any one edited; a new recurrence or
+  // plan starts pending (its months are settled one by one).
+  const withSettled = Boolean(initial) || repeat === 'NONE';
   const amountLabel = variable
     ? 'Valor estimado (R$)'
     : installments
@@ -517,14 +541,9 @@ export function TransactionForm({
           />
         )}
       </div>
-      {/* One column on the phone, two from sm: the amount and its day, then when it is due and how.
-          Without the day, three from lg (the method, with the longest label, a little wider). */}
-      <div
-        className={cn(
-          'grid items-start gap-4 sm:grid-cols-2',
-          !withDay && 'lg:grid-cols-[1fr_1fr_1.4fr]',
-        )}
-      >
+      {/* One column on the phone, two from sm: the amount and its day, when it is due and when it
+          was paid, then how; a field left alone in its row takes both columns. */}
+      <div className="grid items-start gap-4 sm:grid-cols-2">
         <FormField id={id('amount')} label={amountLabel} error={formState.errors.amount?.message}>
           <Input
             inputMode="decimal"
@@ -550,12 +569,32 @@ export function TransactionForm({
         >
           <Input type="date" {...register('dueDate')} />
         </FormField>
+        {withSettled && (
+          <FormField
+            id={id('settled-at')}
+            label={`${settledOnLabels[type]} (opcional)`}
+            hint={
+              initial?.settledAt
+                ? undefined
+                : `Em branco enquanto não for ${type === 'CREDIT' ? 'recebido' : 'pago'}.`
+            }
+            error={formState.errors.settledAt?.message}
+          >
+            <Input type="date" max={todayIso()} {...register('settledAt')} />
+          </FormField>
+        )}
         {/* Right after the due date, not in "Mais opções": the history's suggestion is seen (ADR 0054). */}
         <Controller
           control={control}
           name="paymentMethod"
           render={({ field, fieldState }) => (
-            <div className={cn('grid gap-1', !withDay && 'sm:col-span-2 lg:col-span-1')}>
+            <div
+              className={cn(
+                'grid gap-1',
+                // The odd one out in its row takes both columns.
+                (Number(withDay) + Number(withSettled)) % 2 === 0 && 'sm:col-span-2',
+              )}
+            >
               <FormField
                 id={id('payment-method')}
                 label={`${paymentMethodFieldLabels[type]} (opcional)`}

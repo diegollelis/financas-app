@@ -55,3 +55,13 @@ Trocar entrada por saída, ou o contrário, deixava a série ou a divisão incoe
 Mandar o mesmo tipo de novo não é troca e passa. Um lançamento avulso e não dividido continua podendo trocar de tipo, com a categoria junto. A revisão da importação continua com o tipo editável, porque ali nada foi gravado ainda.
 
 **Na tela:** ao editar um lançamento, "Saída | Entrada" continua no lugar de sempre. O tipo dele fica marcado, o outro aparece desativado, e uma frase embaixo diz o motivo: "O tipo não muda depois de lançado. Para trocar, exclua e lance de novo." A tela trava o tipo em toda edição, também num lançamento avulso que a API ainda aceitaria trocar, para a regra ser uma só para quem usa. O leitor de tela anuncia a frase com o grupo, e as setas do teclado pulam a opção desativada.
+
+## Nota (o dia do pagamento no formulário, 2026-10-21)
+
+A API sempre aceitou qualquer dia em `settledAt`, ao criar e ao editar, mas a tela só gravava o de hoje: "○ Pagar" / "○ Receber" e "Marcar como pago" marcam hoje, e o formulário não tinha o campo. Uma conta paga na sexta e marcada na segunda ficava com a data de segunda, sem como corrigir.
+
+- **O formulário ganha "Pago em" / "Recebido em"** (`settledOnLabels`, em `packages/shared/src/labels.ts`), logo depois do vencimento: em branco enquanto pendente; preenchido, pago ou recebido naquele dia. Aparece num lançamento novo feito uma vez e em qualquer lançamento editado. Uma recorrência ou um parcelamento novo começa pendente, e seus meses são pagos um a um.
+- **Ao editar, vem o dia gravado,** e dá para corrigir. Apagar o dia volta a deixar pendente, como "Desmarcar pagamento".
+- **Nunca no futuro:** pago é o que já aconteceu ("O pagamento não pode ser numa data futura."); o que ainda vai acontecer é o vencimento. A regra fica no formulário.
+- **O botão da linha continua marcando hoje com um toque,** o caso mais comum. Um item "Pago em outra data…" no menu ficou de fora: o formulário resolve os três casos (corrigir, pagar com data passada, lançar já pago) num lugar só, e o item pode vir depois, se fizer falta.
+- O dia do pagamento não muda a competência nem os números do Painel e da Análise, que dependem só de estar pago ou não.
