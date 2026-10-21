@@ -1490,7 +1490,7 @@ describe('TransactionsPage', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));
     await expectCall(fetchMock, `${base}/${light.id}`, {
       method: 'PATCH',
-      body: expect.stringContaining('"settledAt":"2026-10-06"'),
+      body: expect.stringContaining('"settledAt":"2026-10-06"') as unknown,
     });
   });
 
@@ -1510,7 +1510,7 @@ describe('TransactionsPage', () => {
 
     await expectCall(fetchMock, base, {
       method: 'POST',
-      body: expect.stringContaining('"settledAt":"2026-10-12"'),
+      body: expect.stringContaining('"settledAt":"2026-10-12"') as unknown,
     });
   });
 
