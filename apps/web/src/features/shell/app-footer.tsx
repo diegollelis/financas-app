@@ -1,5 +1,6 @@
 import { currentPeriod, PRIVACY_PATH, TERMS_PATH } from '@financas/shared';
 import { TextLink } from '@/components/text-link';
+import { APP_VERSION, releaseUrl } from '@/lib/app-version';
 import { cn } from '@/lib/utils';
 
 export const SOURCE_CODE_URL = 'https://github.com/diegollelis/financas-app';
@@ -43,6 +44,17 @@ export function AppFooter({ className, center = false }: { className?: string; c
           className="focus-visible:ring-ring/50 inline-flex min-h-11 items-center rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3 md:min-h-0"
         >
           Código-fonte<span className="sr-only"> (abre em outra aba)</span>
+        </a>
+        {/* The version in production, to know whether a deploy arrived; its release says what
+            changed (ADR 0050 note). */}
+        <a
+          href={releaseUrl(APP_VERSION)}
+          target="_blank"
+          rel="noreferrer"
+          className="focus-visible:ring-ring/50 inline-flex min-h-11 items-center rounded-sm tabular-nums underline-offset-4 outline-none hover:underline focus-visible:ring-3 md:min-h-0"
+        >
+          Versão {APP_VERSION}
+          <span className="sr-only"> (abre em outra aba)</span>
         </a>
       </nav>
     </footer>
