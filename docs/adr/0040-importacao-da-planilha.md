@@ -112,3 +112,12 @@ O dono importou a conta de energia pela planilha e quis ligá-la a uma pessoa. A
 - **"Pessoa" na tela:** a planilha modelo ganha a coluna opcional "Pessoa", logo depois de "Estabelecimento". A revisão mostra "A pagar para Ana" ou "A receber de Ana" na linha, e o "Editar" da linha tem o campo. Uma planilha sem a coluna é lida como antes, porque as colunas são achadas pelo título.
 - **A categoria que falta pode ser criada:** em "Categorias", o seletor de cada nome desconhecido também oferece "Adicionar 'Nome'", e o botão "Criar 'Nome'" (ou "Criar as N com o nome da planilha") escolhe criar todas as que ainda faltam. O mesmo "Adicionar" vale no "Editar" da linha e no seletor de categoria de cada linha da fatura do cartão.
 - **Criada só ao importar:** até lá a linha diz "Feira (nova)". Ao clicar em "Importar", cada categoria nova é criada (ou a arquivada de mesmo nome é reativada) antes de os lançamentos serem enviados, com o `useResolveCategory` do formulário de lançamento. Se a importação falhar depois disso, as categorias criadas ficam, como os estabelecimentos.
+
+## Nota (a página em cartões, 2026-10-21)
+
+A página Importar tinha cinco parágrafos antes do botão de escolher o arquivo. O histórico ficava logo abaixo do seletor "Planilha modelo | Fatura Nubank", como se fosse da aba escolhida, e por isso parecia misturado: ele não muda quando se troca de aba.
+
+- **Dois cartões** (`SectionCard` e `CARD_CLASS`, os mesmos do Painel e da Análise). "Nova importação" tem o seletor e os passos, e a origem escolhida muda só esse cartão. "Importações anteriores" fica à parte, porque é o histórico do espaço inteiro: desfazer uma importação não depende de onde ela veio, e por isso a lista não é filtrada pela aba.
+- **Um selo em cada importação anterior:** "Fatura" ou "Planilha". Não muda a API: só a fatura grava o vencimento (`statementDueDate`), e é ele que diz qual é qual. Quando vier um segundo banco, vale uma coluna de origem na tabela.
+- **Como fazer cada passo vai para o ⓘ** (`InfoTip`) ao lado do título do passo: exportar a fatura em CSV, o que vai na planilha modelo, e o que a revisão pede. A garantia de privacidade ("O arquivo é lido no seu aparelho…") fica à vista, uma vez só, no fim do cartão. O histórico também ganha um ⓘ, que diz o que desfazer tira e o que fica.
+- A revisão (o passo 3) não muda nesta nota.
