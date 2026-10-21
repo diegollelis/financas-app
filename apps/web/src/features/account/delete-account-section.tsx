@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { SectionCard } from '@/components/section-card';
 import { Button } from '@/components/ui/button';
 import { authErrorMessage } from '@/features/auth/auth-error-message';
 import { useCurrentUser } from '@/features/auth/use-me';
@@ -29,14 +30,11 @@ export function DeleteAccountSection() {
   const blockers = check.data?.blockers ?? [];
 
   return (
-    <section aria-labelledby="account-delete" className="grid gap-3">
-      <h2 id="account-delete" className="font-medium">
-        Excluir conta
-      </h2>
+    // The consequences stay in sight, not behind an "ⓘ": they are read before acting.
+    <SectionCard title="Excluir conta">
       <p>
-        Exclui a sua conta, o seu espaço pessoal e os espaços em que só você participa, com todos os
-        lançamentos. Dos espaços de outras pessoas, você sai. Não é possível desfazer; baixe os seus
-        dados antes, se quiser guardar uma cópia.
+        Apaga a conta, o seu espaço pessoal e os espaços em que só você participa, com todos os
+        lançamentos. Dos espaços de outras pessoas, você sai. Não é possível desfazer.
       </p>
       {/* Its own error, not QueryState's: a 404 there means a workspace is gone. */}
       {check.isError && (
@@ -126,6 +124,6 @@ export function DeleteAccountSection() {
           </AlertDialog>
         </>
       )}
-    </section>
+    </SectionCard>
   );
 }

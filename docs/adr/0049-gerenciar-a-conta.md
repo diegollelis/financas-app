@@ -30,3 +30,15 @@ O Better Auth ([ADR 0007](0007-autenticacao-better-auth.md)) já traz essas oper
 - **As regras de segurança ficam no servidor:** encerrar os outros aparelhos ao trocar a senha não depende da tela.
 - **Uma rota a mais na API** (`/me/sessions`), coberta por testes, com o cuidado de nunca devolver o token de sessão.
 - **Atualizações do Better Auth** precisam conferir que a redefinição continua criando a senha de quem não tem uma; um teste cobre isso.
+
+## Nota (a página em cartões e a aparência, 2026-10-21)
+
+Minha conta tinha quatro blocos, cada um de um jeito: uma caixa com borda, uma lista com divisórias e dois blocos de texto solto. Agora são cinco cartões (`SectionCard`, os mesmos do Painel, da Análise e da importação), numa coluna em todas as larguras, porque é uma página de configurações, para ler de cima para baixo:
+
+- **Conta:** nome, e-mail, senha e termos, como antes.
+- **Aparência** (novo): "Sistema | Claro | Escuro" (`SegmentedControl`, com as opções de `themeOptions` em `lib/theme.ts`, as mesmas do menu da conta). Quem procura configurações procura nesta página, e o menu continua com o atalho. A linha abaixo diz o que a escolha faz: "Segue o tema claro ou escuro do aparelho" ou "Vale só neste aparelho", porque o tema fica no navegador e nunca vai para a API (ADR 0036).
+- **Aparelhos conectados:** como antes.
+- **Seus dados:** uma linha ("Baixe uma cópia de tudo o que o Finanças guarda sobre você") e o botão. O que vem no arquivo, o formato JSON e os valores em centavos vão para o ⓘ do título.
+- **Excluir conta:** o aviso continua à vista, mais curto, porque é uma consequência que se lê antes de agir, e não uma definição.
+
+Os diálogos (alterar nome, trocar e-mail, trocar senha, sair dos outros aparelhos e excluir a conta) não mudam.

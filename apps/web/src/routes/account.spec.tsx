@@ -53,6 +53,28 @@ describe('AccountPage', () => {
     expect(JSON.parse(await blob.text())).toEqual(exportFile);
   });
 
+  it('picks the theme in "Aparência" and explains the export behind its "ⓘ"', async () => {
+    mockApi({
+      'GET /api/me': { body: verifiedUser },
+      'GET /api/me/deletion': { body: { blockers: [] } },
+    });
+    renderApp('/conta');
+
+    const appearance = await screen.findByRole('region', { name: 'Aparência' });
+    expect(within(appearance).getByRole('radio', { name: 'Sistema' })).toBeChecked();
+    expect(appearance).toHaveTextContent('Segue o tema claro ou escuro do aparelho.');
+    await userEvent.click(within(appearance).getByRole('radio', { name: 'Escuro' }));
+    expect(document.documentElement).toHaveClass('dark');
+    expect(appearance).toHaveTextContent('Vale só neste aparelho.');
+    await userEvent.click(within(appearance).getByRole('radio', { name: 'Sistema' }));
+
+    const data = screen.getByRole('region', { name: 'Seus dados' });
+    expect(data).toHaveTextContent('Baixe uma cópia de tudo o que o Finanças guarda sobre você.');
+    expect(data).not.toHaveTextContent('JSON');
+    await userEvent.click(within(data).getByRole('button', { name: 'Sobre Seus dados' }));
+    expect(await screen.findByText(/O arquivo é JSON/)).toBeInTheDocument();
+  });
+
   it('says so when the export fails, and saves nothing', async () => {
     vi.mocked(saveFile).mockClear();
     mockApi({
