@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { SearchInput } from '@/components/search-input';
+import { PageActionButton } from '@/components/page-action-button';
 import { CopyCategoriesDialog } from '@/features/categories/copy-categories-dialog';
 import {
   useCategories,
@@ -405,22 +406,28 @@ export function CategoriesPage() {
     <>
       <PageHeader
         title="Categorias"
-        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada. As das metas mudam junto com a meta, no orçamento do Painel. Reembolso e Repasse recebem as partes das divisões entre pessoas e não mudam."
-      >
-        {/* At the top, so adding never needs scrolling past a long list. */}
-        {canEdit && categories.isSuccess && (
-          <div className="flex flex-wrap gap-2">
-            <Button ref={newButton} onClick={() => setCreating(true)}>
+        action={
+          canEdit &&
+          categories.isSuccess && (
+            <PageActionButton ref={newButton} onClick={() => setCreating(true)}>
               <Plus aria-hidden />
               Nova categoria
-            </Button>
-            {sources.length > 0 && (
-              <Button ref={copyButton} variant="outline" onClick={() => setCopyOpen(true)}>
-                <Copy aria-hidden />
-                Copiar de outro espaço
-              </Button>
-            )}
-          </div>
+            </PageActionButton>
+          )
+        }
+        description="Classificam os lançamentos. Uma categoria em uso não é excluída, só arquivada. As das metas mudam junto com a meta, no orçamento do Painel. Reembolso e Repasse recebem as partes das divisões entre pessoas e não mudam."
+      >
+        {/* Occasional, so not floating: one floating button per page (ADR 0036 note). */}
+        {canEdit && categories.isSuccess && sources.length > 0 && (
+          <Button
+            ref={copyButton}
+            variant="outline"
+            className="justify-self-start"
+            onClick={() => setCopyOpen(true)}
+          >
+            <Copy aria-hidden />
+            Copiar de outro espaço
+          </Button>
         )}
         {categories.isSuccess && (
           <SearchInput

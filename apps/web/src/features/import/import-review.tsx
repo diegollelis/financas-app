@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { PageActionButton } from '@/components/page-action-button';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { CARD_LIST, CARD_ROW } from '@/features/view-mode/row-styles';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -642,9 +643,8 @@ export function ImportReview({
           </InfoTip>
         </div>
         {/* Fixed above the tab bar on the phone, within reach of the thumb (ADR 0036). */}
-        <Button
-          // The layout keeps room for it below the footer (data-fab).
-          data-fab
+        <PageActionButton
+          wide
           onClick={() => void submit()}
           disabled={
             readyCount === 0 ||
@@ -653,7 +653,6 @@ export function ImportReview({
             category.isPending ||
             create.isPending
           }
-          className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-20 shadow-lg md:static md:shadow-none"
         >
           {category.isPending || create.isPending
             ? 'Importando…'
@@ -662,7 +661,7 @@ export function ImportReview({
                   ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`
                   : ''
               }`}
-        </Button>
+        </PageActionButton>
       </div>
 
       <ResponsiveDialog

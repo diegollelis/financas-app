@@ -249,3 +249,13 @@ Quando a API dorme (Render free, ADR 0033), a mensagem "Aguardando o servidor…
 - **Uma barra fina** que chega perto de 90% em um minuto e nunca termina sozinha (`animate-wait-bar`): mostra que o tempo passa, sem fingir que sabe quando o servidor responde.
 - **Onde:** na página inteira (`BrandLoader`), o símbolo grande e, depois de 3 s, a mensagem e a barra; dentro das páginas (`LoadingState`), só os esqueletos até 3 s e, depois, um bloco com o símbolo pequeno, a mensagem e a barra acima deles; no botão de envio (`SubmitButton`), a roda girando continua, e embaixo só a mensagem, sem barra.
 - **Com "reduzir movimento",** o símbolo fica parado, a barra some e só as palavras mudam.
+
+## Nota (o mesmo "incluir" em Categorias, Estabelecimentos e Pessoas, 2026-10-22)
+
+Cada tela incluía de um jeito: Lançamentos com o botão flutuante; Categorias e Estabelecimentos com um botão no topo da página, que sumia ao rolar a lista; Pessoas com um campo solto ("Nova pessoa" e "Adicionar") no meio da página, sem janela. Agora as quatro seguem o padrão de Lançamentos:
+
+- **O botão principal da página é um componente só** (`PageActionButton`, `components/page-action-button.tsx`): flutuante acima da barra no celular, ao alcance do polegar mesmo numa lista longa, e um botão comum ao lado do título a partir de md (no `action` do `PageHeader`). Ele marca `data-fab`, e o layout reserva espaço no fim da página para nada ficar embaixo dele. A revisão da importação usa o mesmo componente, ocupando a largura do celular (`wide`).
+- **"Nova categoria", "Novo estabelecimento" e "Nova pessoa"** abrem a janela de sempre (`ResponsiveDialog`, folha de baixo no celular), e o foco volta ao botão ao fechar. Pessoas ganhou a janela, com o campo "Nome", e perdeu o campo solto: um toque a mais, mas as pessoas costumam nascer no próprio lançamento ("Adicionar 'Nome'").
+- **Um botão flutuante por página:** "Copiar de outro espaço", em Categorias, é ocasional e continua como botão secundário no topo.
+- Quem só visualiza o espaço não vê o botão, como antes.
+- **A busca de Pessoas também fica no topo,** logo abaixo do título, e aparece sempre que há alguém na lista, como em Categorias e Estabelecimentos. Antes, só aparecia a partir de 9 pessoas e ficava no meio da página, abaixo dos totais.

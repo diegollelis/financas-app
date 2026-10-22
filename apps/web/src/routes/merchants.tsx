@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { SearchInput } from '@/components/search-input';
+import { PageActionButton } from '@/components/page-action-button';
 import {
   useCreateMerchant,
   useDeleteMerchant,
@@ -359,17 +360,17 @@ export function MerchantsPage() {
     <>
       <PageHeader
         title="Estabelecimentos"
-        description="Onde você compra ou quem paga você. Escolha um no lançamento, em Mais opções. Um estabelecimento em uso não é excluído, só arquivado."
-      >
-        {/* At the top, so adding never needs scrolling past a long list. */}
-        {canEdit && merchants.isSuccess && (
-          <div className="flex flex-wrap gap-2">
-            <Button ref={newButton} onClick={() => setCreating(true)}>
+        action={
+          canEdit &&
+          merchants.isSuccess && (
+            <PageActionButton ref={newButton} onClick={() => setCreating(true)}>
               <Plus aria-hidden />
               Novo estabelecimento
-            </Button>
-          </div>
-        )}
+            </PageActionButton>
+          )
+        }
+        description="Onde você compra ou quem paga você. Escolha um no lançamento, em Mais opções. Um estabelecimento em uso não é excluído, só arquivado."
+      >
         {merchants.isSuccess && all.length > 0 && (
           <SearchInput
             id="merchant-search"
