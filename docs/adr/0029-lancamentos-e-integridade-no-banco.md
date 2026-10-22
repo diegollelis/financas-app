@@ -73,3 +73,12 @@ O banco sempre guardou até 1.000 caracteres nas observações (`transactions.no
 - **Para escrever** (`NotesTextarea`, `components/notes-textarea.tsx`): começa com 2 linhas e cresce com o texto até umas 8, depois rola; Enter quebra a linha. Um contador aparece só perto do limite ("950 de 1.000"), que o campo não deixa passar. Vale no formulário de lançamento, na edição de recorrência e de parcelamento e no "Editar" da linha da importação.
 - **Para ler** (`NotesText`, `components/notes-text.tsx`): com as quebras de linha, até 2 linhas no cartão de Lançamentos e 1 na tabela, com "…". Só quando há mais aparece "Ver tudo", que abre o texto inteiro no próprio lugar ("Ver menos" fecha), sem abrir o formulário: ler não é editar. O botão tem a cor do texto, sublinhado (o azul não tinha contraste nas listras da tabela no tema escuro), e 44 px de toque no celular.
 - Sem mudança na API nem no banco: os 1.000 caracteres continuam, e a busca já procurava nas observações.
+
+## Nota (a janela de leitura das observações, 2026-10-22)
+
+O "Ver tudo" das observações abria o texto no próprio cartão ("Ver menos" fechava), e uma observação longa aumentava o cartão ou a linha da tabela, empurrando a lista. Agora ele abre uma **janela só de leitura** (`ResponsiveDialog`: folha de baixo no celular, diálogo no computador), com o título "Observações", a descrição do lançamento embaixo e o texto inteiro, com as quebras de linha, rolando dentro dela quando passa da altura. "Ver menos" deixou de existir.
+
+- **A lista nunca cresce nem pula:** o cartão continua com 2 linhas, e a tabela, com 1.
+- **O botão diz de qual lançamento é** ("Ver tudo: observações de Compra do mês"), porque uma lista tem vários; começa pelo texto que aparece (WCAG 2.5.3). Ao fechar, o foco volta a ele.
+- **Fecha pelo X da janela** (chamado "Fechar"), por Esc ou por um toque fora. Não há um segundo botão "Fechar", que repetiria o nome.
+- **Só leitura:** a janela não edita; o menu ⋯ do lançamento continua ao lado.

@@ -670,7 +670,12 @@ function TransactionItem(props: RowProps) {
           {transaction.dueDate && <span>Vence em {formatIsoDate(transaction.dueDate)}</span>}
         </p>
         {transaction.notes && (
-          <NotesText text={transaction.notes} lines={2} className="text-muted-foreground text-sm" />
+          <NotesText
+            text={transaction.notes}
+            about={transaction.description}
+            lines={2}
+            className="text-muted-foreground text-sm"
+          />
         )}
         <span className="flex flex-wrap gap-1.5">
           <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
@@ -717,7 +722,12 @@ function TransactionRow(props: RowProps) {
         <div className="grid justify-items-start gap-1">
           <span className="font-medium break-words">{transaction.description}</span>
           {transaction.notes && (
-            <NotesText text={transaction.notes} lines={1} className="text-muted-foreground" />
+            <NotesText
+              text={transaction.notes}
+              about={transaction.description}
+              lines={1}
+              className="text-muted-foreground"
+            />
           )}
           <span className="flex flex-wrap gap-1.5 empty:hidden">
             <LinkBadges transaction={transaction} personName={personName} sharedWith={sharedWith} />
