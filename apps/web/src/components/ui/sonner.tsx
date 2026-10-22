@@ -14,7 +14,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       // The theme chosen in the account menu (ADR 0036); the colors come from the tokens below.
       theme={resolved}
-      className="toaster group"
+      // Clickable over an open dialog, which turns pointer events off for the rest of the page.
+      className="toaster group pointer-events-auto"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,

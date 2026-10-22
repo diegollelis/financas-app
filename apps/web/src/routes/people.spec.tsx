@@ -176,15 +176,19 @@ describe('PeoplePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Ver lançamentos com Ana' }));
 
     const history = await screen.findByRole('dialog', { name: 'Lançamentos com Ana' });
-    const items = within(history).getAllByRole('listitem');
-    expect(text(items[0]!)).toContain('Ana: parte de Jantaroutubro de 2026A receberPendente');
-    expect(text(items[1]!)).toContain('Casa de praiajulho de 2026A pagarPago');
-    // Only the pending one can be marked, with the same settling as in Lançamentos.
-    expect(within(items[1]!).queryByRole('button')).not.toBeInTheDocument();
+    // As in Lançamentos: one card per transaction, grouped by month, newest first.
+    const october = within(history).getByRole('region', { name: 'outubro de 2026' });
+    const july = within(history).getByRole('region', { name: 'julho de 2026' });
+    expect(text(within(october).getByRole('listitem'))).toMatch(
+      /^Ana: parte de Jantar\+ R\$\s150,00Receber$/,
+    );
+    expect(text(within(july).getByRole('listitem'))).toMatch(
+      /^Casa de praiaPago em 20\/07− R\$\s400,00$/,
+    );
+    // Only the pending one can be marked, with the same button as in Lançamentos.
+    expect(within(july).queryByRole('button')).not.toBeInTheDocument();
     await userEvent.click(
-      within(items[0]!).getByRole('button', {
-        name: 'Marcar como recebido (Ana: parte de Jantar)',
-      }),
+      within(october).getByRole('button', { name: 'Receber: Ana: parte de Jantar' }),
     );
 
     await vi.waitFor(() =>
@@ -200,6 +204,23 @@ describe('PeoplePage', () => {
       ),
     );
     expect(await screen.findByText('Marcado como recebido')).toBeInTheDocument();
+
+    // One tap marks it, so one tap takes it back, with the dialog still open. The open dialog
+    // turns pointer events off outside it and the toaster turns them back on with a class, which
+    // jsdom does not apply: the check is left to the browser (screenshots).
+    await userEvent
+      .setup({ pointerEventsCheck: 0 })
+      .click(screen.getByRole('button', { name: 'Desfazer' }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        new URL(
+          `/api/workspaces/${houseId}/transactions/01920000-0000-7000-8000-000000000401`,
+          'http://api.test',
+        ),
+        expect.objectContaining({ method: 'PATCH', body: '{"settledAt":null}' }),
+      ),
+    );
+    expect(await screen.findByText('Recebimento desmarcado')).toBeInTheDocument();
   });
 
   it('says so when the history cannot load, without the workspace "not found" notice', async () => {

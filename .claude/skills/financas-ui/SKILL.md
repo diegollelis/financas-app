@@ -29,6 +29,20 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 - Charts use the validated `--chart-1..3` palette (ADR 0032); never add series colors ad hoc.
 - **Avoid template tells** (see `frontend-design`): no `→` appended to links or buttons, no `A · B · C` middle-dot strings, no all-caps eyebrow labels, no identical-card-everything layouts, no decorative gradients, no motion that is not a response to the user.
 - **Amounts:** `tabular-nums`, right-aligned in lists, the largest text in their block. Debits and credits are told apart by sign and label, never by color alone: a credit is "+ R$ …" in `text-credit-foreground`, a debit "− R$ …" (a real minus sign) in the normal text color. Red is for overdue and a negative balance only, never for every expense.
+- **Type scale** (keep to it; a new level needs a reason):
+
+  | Level                                  | Classes                              | Where                     |
+  | -------------------------------------- | ------------------------------------ | ------------------------- |
+  | Page title                             | `text-2xl font-semibold`             | `PageHeader`              |
+  | Card title                             | `font-semibold`                      | `SectionCard`             |
+  | Group title in a list (month, section) | `font-medium` (archived: muted)      | lists, dialogs            |
+  | Main number of a page                  | `text-4xl sm:text-5xl font-semibold` | "Saldo do mês"            |
+  | Meter reading                          | `text-2xl font-semibold`             | `ExpensesMeter`           |
+  | Highlighted number in a card           | `text-lg font-semibold`              | `Figure` (dashboard)      |
+  | Value in a row                         | base `font-semibold`                 | transaction cards, tables |
+  | Label, line under a value, help        | `text-sm text-muted-foreground`      | everywhere                |
+
+  A labelled amount on the dashboard is a `Figure`, never a new `dl` with its own sizes.
 
 ## Mobile first layout
 
@@ -46,7 +60,7 @@ A personal and family monthly finance app in pt-BR, mostly used **on a phone**, 
 - **Project components** (`components/`): `PageHeader`, `QueryState`/`ListSkeleton`, `ResponsiveDialog`, `SegmentedControl` (a choice among 2 or 3 options, instead of radio dots; an option may be disabled, with the reason tied by `describedBy`), `TextLink` (a text link that is 44px tall on the phone), `SearchInput` (the search over a page's list: a magnifier, a hint of where it looks and "Limpar busca") and `InfoTip` (what a term means, behind an "ⓘ" beside it, opened by a tap; definitions only, never a state of the data, which stays in sight; ADR 0036 note). Reuse them before writing new markup.
 - **Quick choices:** a `Popover` (`components/ui/popover.tsx`) from md and a bottom sheet (`ResponsiveDialog`) on the phone, as the competência picker does (`features/periods/period-picker.tsx`).
 - **Destructive actions:** `AlertDialog` with the item named ("Excluir Aluguel?"). Never one-click delete.
-- **Row actions:** at most one inline action, an outlined button that says what to do ("○ Pagar", whose accessible name starts with its visible text: "Pagar: Aluguel"); the rest in a `DropdownMenu` (`⋯`) with an `aria-label` that names the item, the inline action included in full (ADR 0036 note).
+- **Row actions:** at most one inline action, a button that says what to do (settling is `SettleButton`, `features/transactions/settle-button.tsx`: a soft "↓ Receber" in the credit green or "↑ Pagar" in a light blue, red only when overdue; its accessible name starts with its visible text, "Pagar: Aluguel"; its toast has "Desfazer"); the rest in a `DropdownMenu` (`⋯`) with an `aria-label` that names the item, the inline action included in full (ADR 0036 note).
 - **Feedback:** a `sonner` toast after every mutation, worded with the same verb as the button ("Lançamento excluído"). The `Toaster` is mounted once in `components/root-layout.tsx`. When the component may unmount on success (a deleted row), use `mutateAsync().then(...)`: `mutate`'s per-call callbacks are skipped after unmount.
 - **Class merging:** `cn` from `lib/utils.ts`. Pass conflicting Tailwind classes only if `cn` resolves them (tailwind-merge).
 

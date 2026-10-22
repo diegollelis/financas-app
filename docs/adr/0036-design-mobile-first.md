@@ -259,3 +259,12 @@ Cada tela incluía de um jeito: Lançamentos com o botão flutuante; Categorias 
 - **Um botão flutuante por página:** "Copiar de outro espaço", em Categorias, é ocasional e continua como botão secundário no topo.
 - Quem só visualiza o espaço não vê o botão, como antes.
 - **A busca de Pessoas também fica no topo,** logo abaixo do título, e aparece sempre que há alguém na lista, como em Categorias e Estabelecimentos. Antes, só aparecia a partir de 9 pessoas e ficava no meio da página, abaixo dos totais.
+
+## Nota (os botões de pagar e receber, e a escala de texto, 2026-10-22)
+
+O "○ Pagar" / "○ Receber" com contorno parecia um campo desabilitado e não dizia para que lado ia o dinheiro. O dono escolheu numa prévia:
+
+- **"↓ Receber" e "↑ Pagar"**, um botão de fundo suave com a seta do sentido do dinheiro (`SettleButton`, `features/transactions/settle-button.tsx`). Receber usa o verde das entradas; Pagar, um azul claro (o `primary` a 10%, com o texto na cor normal e a seta em azul, porque texto azul sobre azul claro não chega a 4,5:1). **Vermelho só quando vencido**, o único caso que pede atenção; um vermelho em toda conta a pagar repetiria o erro da planilha de pintar toda despesa. A seta e a palavra distinguem os dois, nunca a cor sozinha. O nome acessível continua começando pelo texto visível ("Pagar: Aluguel").
+- **"Desfazer" no aviso:** um toque marca, então um toque desfaz. O aviso "Marcado como pago" traz a ação, que volta o lançamento a pendente ("Pagamento desmarcado"). O menu ⋯ continua com "Desmarcar pagamento".
+- **"Ver lançamentos" de Pessoas** passa a seguir Lançamentos: um cartão por lançamento, agrupado por competência (a mais recente primeiro), o valor com sinal, os mesmos selos e o mesmo botão de pagar e receber. Antes, cada linha tinha o mês por escrito e um "Marcar como recebido" por extenso.
+- **A escala de texto** fica escrita na skill do projeto (`.claude/skills/financas-ui/SKILL.md`), com o nível de cada título e número. O cartão "Orçamento do mês" usava números maiores (`text-xl`) que os outros cartões do painel e agora usa o mesmo `Figure` (`text-lg`); a diferença para a renda fica em texto suave, sem verde.

@@ -402,43 +402,29 @@ function BudgetCard({
       {/* One above the other on the phone, where "Entradas do mês" would wrap and push its value
           off the line of the other; side by side from sm, aligned at the top. */}
       <dl className="grid items-start gap-x-4 gap-y-3 sm:grid-cols-2">
-        <div className="grid gap-0.5">
-          <dt className="text-muted-foreground flex items-center text-sm">
-            Renda líquida
-            <InfoTip term="Renda líquida">
-              A renda que você prevê para o mês, definida no orçamento. É a base do limite de gastos
-              e das metas.
-            </InfoTip>
-          </dt>
-          <dd className="text-xl font-semibold tabular-nums">
-            {net > 0 ? formatCents(net) : 'Não definida'}
-          </dd>
-        </div>
-        <div className="grid gap-0.5">
-          <dt className="text-muted-foreground flex items-center text-sm">
-            Entradas do mês
-            <InfoTip term="Entradas do mês">
-              Tudo o que entra neste mês, recebido ou a receber, sem as partes das divisões
-              (Reembolso), que não são renda. Para usar este valor como renda líquida, use "Usar as
-              entradas do mês" em "Editar orçamento".
-            </InfoTip>
-          </dt>
-          <dd className="text-xl font-semibold tabular-nums">{formatCents(income)}</dd>
-          {net > 0 && (
-            <dd className="text-muted-foreground text-sm tabular-nums">
-              {gap === 0 ? (
-                'Igual à renda'
-              ) : (
-                <>
-                  <span className={cn(gap > 0 && 'text-credit-foreground')}>
-                    {formatCents(Math.abs(gap))} {gap > 0 ? 'acima' : 'abaixo'}
-                  </span>{' '}
-                  da renda
-                </>
-              )}
-            </dd>
-          )}
-        </div>
+        <Figure
+          label="Renda líquida"
+          help="A renda que você prevê para o mês, definida no orçamento. É a base do limite de gastos e das metas."
+        >
+          {net > 0 ? formatCents(net) : 'Não definida'}
+        </Figure>
+        <Figure
+          label="Entradas do mês"
+          help={
+            'Tudo o que entra neste mês, recebido ou a receber, sem as partes das divisões ' +
+            '(Reembolso), que não são renda. Para usar este valor como renda líquida, use ' +
+            '"Usar as entradas do mês" em "Editar orçamento".'
+          }
+          sub={
+            net > 0
+              ? gap === 0
+                ? 'Igual à renda'
+                : `${formatCents(Math.abs(gap))} ${gap > 0 ? 'acima' : 'abaixo'} da renda`
+              : undefined
+          }
+        >
+          {formatCents(income)}
+        </Figure>
       </dl>
     </Card>
   );

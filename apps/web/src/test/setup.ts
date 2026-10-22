@@ -13,11 +13,13 @@ configure({ asyncUtilTimeout: 3000 });
 // The edge proxy tests (apps/web/edge) run in Node: no window there.
 const inBrowser = typeof window !== 'undefined';
 
-// Radix Select and menus call these pointer and scroll APIs, which jsdom lacks.
+// Radix Select and menus, and the toasts (sonner, to swipe them away), call these pointer and
+// scroll APIs, which jsdom lacks.
 if (inBrowser) {
   Object.assign(Element.prototype, {
     hasPointerCapture: () => false,
     releasePointerCapture: () => undefined,
+    setPointerCapture: () => undefined,
     scrollIntoView: () => undefined,
   });
   // Radix measures popovers with it; there is no layout in jsdom to observe.
