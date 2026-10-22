@@ -31,7 +31,7 @@ export const createCategoryInputSchema = z.object({
 export type CreateCategoryInput = z.infer<typeof createCategoryInputSchema>;
 
 /**
- * Renames and/or archives a category. The type never changes: a transaction's category must
+ * Renames, archives and/or marks a category as neither income nor expense. The type never changes: a transaction's category must
  * have the transaction's type. An archived category stays on old transactions but is no longer
  * offered for new ones.
  */
@@ -39,10 +39,16 @@ export const updateCategoryInputSchema = z
   .object({
     name: categoryNameSchema.optional(),
     archived: z.boolean().optional(),
+    /** "Nem renda nem gasto" (ADR 0056). */
+    neutral: z.boolean().optional(),
   })
-  .refine((input) => input.name !== undefined || input.archived !== undefined, {
-    message: 'Nada para alterar.',
-  });
+  .refine(
+    (input) =>
+      input.name !== undefined || input.archived !== undefined || input.neutral !== undefined,
+    {
+      message: 'Nada para alterar.',
+    },
+  );
 
 export type UpdateCategoryInput = z.infer<typeof updateCategoryInputSchema>;
 
@@ -63,6 +69,11 @@ export const categorySchema = z.object({
   destinationId: z.uuid().nullable().optional(),
   /** Reembolso or Repasse, the categories of the shares of a split (ADR 0052 note); fixed. */
   splitRole: splitRoleSchema.nullable().optional(),
+  /**
+   * "Nem renda nem gasto" (ADR 0056): its transactions count in the balance and in what is left
+   * to save, but never in "Entradas do mês", the expenses limit or the expenses of the analysis.
+   */
+  neutral: z.boolean().optional(),
   /**
    * Whether anything uses it, in any competência: transactions, recurrences or installment plans.
    * Only one never used can be deleted. Sent by the list only.

@@ -55,11 +55,14 @@ export const summarySchema = z.object({
   debits: sideSchema,
   /** Credits − debits: the money really free, after expenses and applications. */
   balance: twoViewsSchema,
-  /** The debits outside the saving destinations' categories. */
+  /** The debits outside the saving destinations' categories and the neutral ones (ADR 0056). */
   expenses: sideSchema,
   /** The debits in the saving destinations' categories: money put aside. */
   applied: twoViewsSchema,
-  /** Credits − expenses: the base of the saving destinations' goals (never minus applications). */
+  /**
+   * Credits − expenses − neutral debits: the base of the saving destinations' goals (never minus
+   * applications). A loan lent leaves less to save; its repayment, more (ADR 0056).
+   */
   available: twoViewsSchema,
   budget: budgetSchema,
   destinations: z.array(destinationSummarySchema),
@@ -83,6 +86,11 @@ export const summarySchema = z.object({
    * it ("Usar as entradas do mês", ADR 0046 note).
    */
   incomeCents: z.number().int().default(0),
+  /**
+   * The month's credits, planned, in the categories marked "Nem renda nem gasto" (ADR 0056):
+   * left out of `incomeCents`, so the dashboard says how much was left out.
+   */
+  neutralIncomeCents: z.number().int().default(0),
 });
 
 export type Summary = z.infer<typeof summarySchema>;
@@ -122,17 +130,23 @@ function side(transactions: SummaryTransaction[], today: string): Summary['credi
  * A debit in a saving destination's category is an application; every other debit is an
  * expense. The saving goals are a share of credits − expenses, so applying never lowers its own
  * goal; Despesas is a share of the net income set in the budget.
+ *
+ * `neutralCategoryIds`: the categories marked "Nem renda nem gasto" (ADR 0056). Their debits are
+ * not expenses and their credits are not income, but both still change what is left to save.
  */
 export function summarizePeriod(
   transactions: SummaryTransaction[],
   budget: Budget,
   today: string,
+  neutralCategoryIds: ReadonlySet<string> = new Set(),
 ): Summary {
   const savingCategories = new Set(
     budget.shares.flatMap((share) => (share.categoryId ? [share.categoryId] : [])),
   );
   const isApplication = (transaction: SummaryTransaction) =>
     transaction.type === 'DEBIT' && savingCategories.has(transaction.categoryId);
+  const isNeutral = (transaction: SummaryTransaction) =>
+    neutralCategoryIds.has(transaction.categoryId);
 
   const credits = side(
     transactions.filter((transaction) => transaction.type === 'CREDIT'),
@@ -144,14 +158,19 @@ export function summarizePeriod(
   );
   const expenses = side(
     transactions.filter(
-      (transaction) => transaction.type === 'DEBIT' && !isApplication(transaction),
+      (transaction) =>
+        transaction.type === 'DEBIT' && !isApplication(transaction) && !isNeutral(transaction),
     ),
+    today,
+  );
+  const neutralDebits = side(
+    transactions.filter((transaction) => transaction.type === 'DEBIT' && isNeutral(transaction)),
     today,
   );
   const applications = transactions.filter(isApplication);
   const available = {
-    plannedCents: credits.totalCents - expenses.totalCents,
-    settledCents: credits.settledCents - expenses.settledCents,
+    plannedCents: credits.totalCents - expenses.totalCents - neutralDebits.totalCents,
+    settledCents: credits.settledCents - expenses.settledCents - neutralDebits.settledCents,
   };
   // Nothing to set aside when expenses pass the credits: the goals are zero, not negative.
   const savingBase = Math.max(0, available.plannedCents);
@@ -200,13 +219,16 @@ export function summarizePeriod(
     FULL_BASIS_POINTS - savings.reduce((sum, destination) => sum + destination.basisPoints, 0),
   );
 
-  const incomeCents = transactions
-    .filter((transaction) => transaction.type === 'CREDIT' && !transaction.splitOfId)
-    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+  const ownCredits = transactions.filter(
+    (transaction) => transaction.type === 'CREDIT' && !transaction.splitOfId,
+  );
+  const sum = (list: SummaryTransaction[]) =>
+    list.reduce((total, transaction) => total + transaction.amountCents, 0);
 
   return {
     period: budget.period,
-    incomeCents,
+    incomeCents: sum(ownCredits.filter((transaction) => !isNeutral(transaction))),
+    neutralIncomeCents: sum(ownCredits.filter(isNeutral)),
     credits,
     debits,
     balance: {

@@ -1,6 +1,7 @@
 import {
   budgetDestinationListResponseSchema,
   categoryListResponseSchema,
+  categorySchema,
   summarySchema,
   workspaceSchema,
   type CreateTransactionInput,
@@ -130,6 +131,57 @@ describe('summary', () => {
       targetCents: 242_005, // 50% of 484.010
       appliedCents: 100_000,
     });
+  });
+
+  it('reads the categories marked "Nem renda nem gasto", archived ones too (ADR 0056)', async () => {
+    const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+    const categoryId = await categoryIds(browser, id);
+    const marked = async (name: string, type: TransactionType) => {
+      const created = categorySchema.parse(
+        (await browser.post(`/api/workspaces/${id}/categories`).send({ name, type }).expect(201))
+          .body,
+      );
+      await browser
+        .patch(`/api/workspaces/${id}/categories/${created.id}`)
+        .send({ neutral: true })
+        .expect(200);
+      return created.id;
+    };
+    const lent = await marked('Empréstimo feito', 'DEBIT');
+    const repaid = await marked('Empréstimo recebido', 'CREDIT');
+    await create(browser, id, {
+      type: 'CREDIT',
+      description: 'Salário',
+      categoryId: categoryId('Salário', 'CREDIT'),
+      amountCents: 500_000,
+      period: '2026-10',
+    });
+    await create(browser, id, {
+      type: 'DEBIT',
+      description: 'Empréstimo a um amigo',
+      categoryId: lent,
+      amountCents: 100_000,
+      period: '2026-10',
+    });
+    await create(browser, id, {
+      type: 'CREDIT',
+      description: 'Devolução de empréstimo antigo',
+      categoryId: repaid,
+      amountCents: 300_000,
+      period: '2026-10',
+    });
+    // Archiving keeps the mark: old transactions stay out of income.
+    await browser
+      .patch(`/api/workspaces/${id}/categories/${repaid}`)
+      .send({ archived: true })
+      .expect(200);
+
+    const october = await summary(browser, id, '2026-10');
+
+    expect(october.incomeCents).toBe(500_000);
+    expect(october.neutralIncomeCents).toBe(300_000);
+    expect(october.expenses.totalCents).toBe(0);
+    expect(october.available.plannedCents).toBe(800_000 - 100_000);
   });
 
   it('an empty competência is all zeros, with no budget yet', async () => {

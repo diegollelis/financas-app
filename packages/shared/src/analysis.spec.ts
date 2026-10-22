@@ -100,6 +100,7 @@ describe('monthlySeries', () => {
       creditsCents: 0,
       debitsCents: 0,
       appliedCents: 0,
+      neutralCents: 0,
       balanceCents: 0,
     });
     expect(series[3]).toEqual({
@@ -107,6 +108,7 @@ describe('monthlySeries', () => {
       creditsCents: 520_000,
       debitsCents: 260_000,
       appliedCents: 0,
+      neutralCents: 0,
       balanceCents: 260_000,
     });
   });
@@ -119,6 +121,7 @@ describe('monthlySeries', () => {
       creditsCents: 0,
       debitsCents: 40_000,
       appliedCents: 0,
+      neutralCents: 0,
       balanceCents: -40_000,
     });
   });
@@ -140,6 +143,7 @@ describe('monthlySeries', () => {
       debitsCents: 760_000,
       expensesCents: 760_000,
       appliedCents: 0,
+      neutralCents: 0,
       balanceCents: 760_000,
     });
   });
@@ -158,6 +162,24 @@ describe('monthlySeries', () => {
     });
     expect(
       categoryRanking(analysis, defaultAnalysisFilters, saving).map((s) => s.categoryId),
+    ).toEqual([rent, market]);
+  });
+
+  it('keeps a "Nem renda nem gasto" category out of spending, not of the balance (ADR 0056)', () => {
+    // Fuel stands in for a loan lent here.
+    const neutral = new Set([fuel]);
+    const totals = seriesTotals(
+      monthlySeries(analysis, defaultAnalysisFilters, undefined, neutral),
+    );
+
+    expect(totals).toMatchObject({
+      debitsCents: 760_000,
+      expensesCents: 750_000,
+      appliedCents: 0,
+      balanceCents: 760_000,
+    });
+    expect(
+      categoryRanking(analysis, defaultAnalysisFilters, neutral).map((s) => s.categoryId),
     ).toEqual([rent, market]);
   });
 });

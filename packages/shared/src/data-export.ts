@@ -23,6 +23,8 @@ const exportCategorySchema = z.object({
   archivedAt: instant.nullable(),
   /** Reembolso or Repasse (ADR 0052 note); null for the others. */
   splitRole: splitRoleSchema.nullable(),
+  /** "Nem renda nem gasto" (ADR 0056). */
+  neutral: z.boolean(),
   createdAt: instant,
 });
 
