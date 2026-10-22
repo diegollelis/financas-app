@@ -366,46 +366,81 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
 }
 
 /**
- * The budget in one line above the cards: the net income, where the budget comes from behind an
- * "ⓘ", and "Editar orçamento" for whoever edits it (ADR 0046).
+ * "Orçamento do mês" in a card like the others (ADR 0046 note): the net income, the plan, beside
+ * the month's credits without the shares of a split, what came in, and how far apart they are.
+ * What each one means is behind its "ⓘ"; the difference, a fact of the month, stays in sight.
+ * Where the budget comes from is behind the title's "ⓘ", and "Editar orçamento" sits in the
+ * corner for whoever edits it.
  */
-function BudgetBar({
+function BudgetCard({
   summary,
   onEditBudget,
 }: {
   summary: Summary;
   onEditBudget?: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
+  const net = summary.budget.netIncomeCents;
+  const income = summary.incomeCents;
+  const gap = income - net;
   return (
-    <section
-      aria-labelledby="dashboard-budget"
-      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+    <Card
+      title="Orçamento do mês"
+      help={
+        <>
+          <p>{budgetOrigin(summary)}</p>
+          <p>Os meses seguintes herdam o orçamento até você salvar outro.</p>
+        </>
+      }
+      action={
+        onEditBudget && (
+          <Button variant="outline" size="sm" onClick={onEditBudget}>
+            Editar orçamento
+          </Button>
+        )
+      }
     >
-      <div className="flex flex-wrap items-center gap-x-3">
-        <div className="flex items-center">
-          <h2 id="dashboard-budget" className="font-semibold">
-            Orçamento do mês
-          </h2>
-          <InfoTip term="Orçamento do mês">
-            <p>{budgetOrigin(summary)}</p>
-            <p>Os meses seguintes herdam o orçamento até você salvar outro.</p>
-          </InfoTip>
+      {/* One above the other on the phone, where "Entradas do mês" would wrap and push its value
+          off the line of the other; side by side from sm, aligned at the top. */}
+      <dl className="grid items-start gap-x-4 gap-y-3 sm:grid-cols-2">
+        <div className="grid gap-0.5">
+          <dt className="text-muted-foreground flex items-center text-sm">
+            Renda líquida
+            <InfoTip term="Renda líquida">
+              A renda que você prevê para o mês, definida no orçamento. É a base do limite de gastos
+              e das metas.
+            </InfoTip>
+          </dt>
+          <dd className="text-xl font-semibold tabular-nums">
+            {net > 0 ? formatCents(net) : 'Não definida'}
+          </dd>
         </div>
-        <p className="text-muted-foreground">
-          Renda líquida:{' '}
-          <span className="text-foreground font-medium tabular-nums">
-            {summary.budget.netIncomeCents > 0
-              ? formatCents(summary.budget.netIncomeCents)
-              : 'não definida'}
-          </span>
-        </p>
-      </div>
-      {onEditBudget && (
-        <Button variant="outline" onClick={onEditBudget}>
-          Editar orçamento
-        </Button>
-      )}
-    </section>
+        <div className="grid gap-0.5">
+          <dt className="text-muted-foreground flex items-center text-sm">
+            Entradas do mês
+            <InfoTip term="Entradas do mês">
+              Tudo o que entra neste mês, recebido ou a receber, sem as partes das divisões
+              (Reembolso), que não são renda. Para usar este valor como renda líquida, use "Usar as
+              entradas do mês" em "Editar orçamento".
+            </InfoTip>
+          </dt>
+          <dd className="text-xl font-semibold tabular-nums">{formatCents(income)}</dd>
+          {net > 0 && (
+            <dd className="text-muted-foreground text-sm tabular-nums">
+              {gap === 0 ? (
+                'Igual à renda'
+              ) : (
+                <>
+                  <span className={cn(gap > 0 && 'text-credit-foreground')}>
+                    {formatCents(Math.abs(gap))} {gap > 0 ? 'acima' : 'abaixo'}
+                  </span>{' '}
+                  da renda
+                </>
+              )}
+            </dd>
+          )}
+        </div>
+      </dl>
+    </Card>
   );
 }
 
@@ -459,7 +494,7 @@ function Dashboard({
       <div className="empty:hidden">
         <OverdueNotice summary={summary} transactionsLink={links.transactions} />
       </div>
-      {hasBudget && <BudgetBar summary={summary} onEditBudget={onEditBudget} />}
+      {hasBudget && <BudgetCard summary={summary} onEditBudget={onEditBudget} />}
       <div className="grid items-start gap-4 xl:grid-cols-2 xl:gap-6">
         <BalanceCard summary={summary} />
         {hasBudget ? (
@@ -586,6 +621,7 @@ export function DashboardPage() {
         <BudgetDialog
           workspaceId={workspace.id}
           period={period}
+          incomeCents={summary.data?.incomeCents}
           open={budgetOpen}
           onOpenChange={setBudgetOpen}
           returnFocusTo={budgetOpener}

@@ -20,10 +20,12 @@ function budgetSourceText(budget: Budget) {
 function BudgetDialogBody({
   workspaceId,
   period,
+  incomeCents,
   onDone,
 }: {
   workspaceId: string;
   period: string;
+  incomeCents?: number;
   onDone: () => void;
 }) {
   const budget = useBudget(workspaceId, period);
@@ -39,6 +41,7 @@ function BudgetDialogBody({
             // A destination added, renamed or archived changes the fields: start again.
             key={budget.data.shares.map((share) => `${share.destinationId}:${share.name}`).join()}
             initial={budget.data}
+            monthIncomeCents={incomeCents}
             submitLabel={save.isPending ? 'Salvando…' : 'Salvar orçamento'}
             pending={save.isPending}
             error={save.error}
@@ -68,9 +71,12 @@ export function BudgetDialog({
   open,
   onOpenChange,
   returnFocusTo,
+  incomeCents,
 }: {
   workspaceId: string;
   period: string;
+  /** The month's credits without the shares of a split, offered to fill the net income. */
+  incomeCents?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The button that opened it, which gets the focus back on close. */
@@ -90,6 +96,7 @@ export function BudgetDialog({
         key={period}
         workspaceId={workspaceId}
         period={period}
+        incomeCents={incomeCents}
         onDone={() => onOpenChange(false)}
       />
     </ResponsiveDialog>
