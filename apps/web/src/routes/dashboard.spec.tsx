@@ -124,9 +124,11 @@ describe('DashboardPage', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['Saídas pagas', 'Saídas a pagar', 'Saldo previsto']);
-    // The budget in a line above the cards, where it comes from behind its "ⓘ".
+    // The budget in a card (ADR 0046 note): the net income beside the month's credits.
     const budgetBar = await section('Orçamento do mês');
-    expect(nbsp(budgetBar.textContent)).toContain('Renda líquida: R$ 5.000,00');
+    expect(nbsp(budgetBar.textContent)).toContain(
+      'Renda líquidaR$ 5.000,00Entradas do mêsR$ 6.000,00R$ 1.000,00 acima da renda',
+    );
     await userEvent.click(
       within(budgetBar).getByRole('button', { name: 'Sobre Orçamento do mês' }),
     );
@@ -265,7 +267,7 @@ describe('DashboardPage', () => {
 
     expect(await screen.findByText('Nenhum lançamento neste mês.')).toBeInTheDocument();
     // No net income, so no goal; a VIEWER cannot set it.
-    expect(await section('Orçamento do mês')).toHaveTextContent('Renda líquida: não definida');
+    expect(await section('Orçamento do mês')).toHaveTextContent('Renda líquidaNão definida');
     expect(screen.queryByRole('meter')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     // Nothing that changes the budget (ADR 0046).

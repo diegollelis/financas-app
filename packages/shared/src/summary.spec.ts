@@ -73,6 +73,14 @@ const month = [
 ];
 
 describe('summarizePeriod', () => {
+  it("gives the month's income: every credit, received or not, but the shares of a split", () => {
+    // Someone paying back their part of a dinner is not income (ADR 0046 note).
+    const share = { ...credit(4_500), splitOfId: id(300) };
+    const summary = summarizePeriod([...month, share], budget, today);
+    expect(summary.incomeCents).toBe(600_000);
+    expect(summary.credits.totalCents).toBe(604_500);
+  });
+
   it('splits the debits into expenses and applications, by category', () => {
     const summary = summarizePeriod(month, budget, today);
 

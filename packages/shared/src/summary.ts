@@ -77,6 +77,12 @@ export const summarySchema = z.object({
    * the planned view counts it, so the dashboard says so.
    */
   estimatedCents: z.number().int().default(0),
+  /**
+   * The month's credits, planned, without the shares of a split (`splitOfId`: what someone pays
+   * back is not income): set beside the budget's net income on the dashboard, and offered to fill
+   * it ("Usar as entradas do mês", ADR 0046 note).
+   */
+  incomeCents: z.number().int().default(0),
 });
 
 export type Summary = z.infer<typeof summarySchema>;
@@ -86,6 +92,7 @@ type SummaryTransaction = Pick<
   'type' | 'amountCents' | 'dueDate' | 'settledAt' | 'categoryId'
 > & {
   amountEstimated?: boolean;
+  splitOfId?: string | null;
 };
 
 function side(transactions: SummaryTransaction[], today: string): Summary['credits'] {
@@ -193,8 +200,13 @@ export function summarizePeriod(
     FULL_BASIS_POINTS - savings.reduce((sum, destination) => sum + destination.basisPoints, 0),
   );
 
+  const incomeCents = transactions
+    .filter((transaction) => transaction.type === 'CREDIT' && !transaction.splitOfId)
+    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+
   return {
     period: budget.period,
+    incomeCents,
     credits,
     debits,
     balance: {

@@ -77,8 +77,14 @@ export function BudgetForm({
   error,
   onSubmit,
   onCancel,
+  monthIncomeCents,
 }: {
   initial: Budget;
+  /**
+   * The month's credits without the shares of a split (ADR 0046 note): "Usar as entradas do mês"
+   * fills the net income with them, when the plan should follow what came in.
+   */
+  monthIncomeCents?: number;
   submitLabel: string;
   pending: boolean;
   error: unknown;
@@ -87,7 +93,7 @@ export function BudgetForm({
   /** In a dialog: closes it without saving. */
   onCancel?: () => void;
 }) {
-  const { register, handleSubmit, formState, control, reset, getValues } = useForm<
+  const { register, handleSubmit, formState, control, reset, getValues, setValue } = useForm<
     FormInput,
     unknown,
     BudgetInput
@@ -172,6 +178,23 @@ export function BudgetForm({
           {...register('netIncomeCents')}
         />
       </FormField>
+      {/* Offered only when it would change something: the month's credits, typed for you. */}
+      {monthIncomeCents !== undefined && monthIncomeCents > 0 && netIncome !== monthIncomeCents && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="-mt-2 justify-self-start"
+          onClick={() =>
+            setValue('netIncomeCents', amountText.format(monthIncomeCents / 100), {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }
+        >
+          Usar as entradas do mês ({formatCents(monthIncomeCents)})
+        </Button>
+      )}
       <fieldset className="grid gap-3">
         <legend className="mb-1 font-medium">Limite de gastos</legend>
         <p className="text-muted-foreground text-sm">Percentual da renda líquida.</p>

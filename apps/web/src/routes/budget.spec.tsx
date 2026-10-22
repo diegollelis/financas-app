@@ -62,7 +62,7 @@ describe('Budget dialog (on the dashboard)', () => {
     renderApp(`/espacos/${houseId}/painel`);
 
     const budget = await screen.findByRole('region', { name: 'Orçamento do mês' });
-    expect(budget).toHaveTextContent('Renda líquida: R$');
+    expect(budget).toHaveTextContent('Renda líquidaR$');
     const dialog = await openDialog();
     expect(
       await within(dialog).findByText(
@@ -76,6 +76,35 @@ describe('Budget dialog (on the dashboard)', () => {
     // The saving destinations: shares of what is left after expenses.
     expect(within(dialog).getByLabelText('Investimentos (%)')).toHaveValue('50');
     expect(within(dialog).getByText('Soma: 100%')).toBeInTheDocument();
+  });
+
+  it('fills the net income with the month\'s credits on "Usar as entradas do mês"', async () => {
+    // A salary of R$ 6.500,00 this month, against a planned income of R$ 5.000,00.
+    const salary = {
+      type: 'CREDIT' as const,
+      amountCents: 650_000,
+      dueDate: null,
+      settledAt: '2026-10-05',
+      categoryId: '01920000-0000-7000-8000-000000000101',
+    };
+    mockBudget({
+      [`GET /api/workspaces/${houseId}/summary/2026-10`]: {
+        body: summarizePeriod([salary], inherited, today),
+      },
+    });
+    renderApp(`/espacos/${houseId}/painel`);
+
+    const dialog = await openDialog();
+    const income = await within(dialog).findByLabelText('Renda líquida (R$)');
+    await userEvent.click(
+      // The amount is formatted with a no-break space after "R$".
+      within(dialog).getByRole('button', { name: /^Usar as entradas do mês \(R\$\s6\.500,00\)$/ }),
+    );
+    expect(income).toHaveValue('6.500,00');
+    // Nothing left to offer once the field holds it; saving is still up to the person.
+    expect(
+      within(dialog).queryByRole('button', { name: /^Usar as entradas do mês/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('highlights "Definir orçamento" while there is none, and starts empty', async () => {
