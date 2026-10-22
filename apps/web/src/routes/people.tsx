@@ -10,7 +10,7 @@ import {
   type Person,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Ellipsis } from 'lucide-react';
+import { Ellipsis, Plus } from 'lucide-react';
 import { useRef, useState, type RefObject } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { SearchInput } from '@/components/search-input';
+import { PageActionButton } from '@/components/page-action-button';
 import {
   useCreatePerson,
   useDeletePerson,
@@ -64,9 +65,6 @@ type NumericField =
   | 'overduePayableCents'
   | 'futureInstallmentsReceivableCents'
   | 'futureInstallmentsPayableCents';
-
-/** From this many people on, a search over the list. */
-const SEARCH_FROM = 9;
 
 const owesNow = (person: Person) => person.receivableCents > 0 || person.payableCents > 0;
 
@@ -169,7 +167,8 @@ function Side({
   );
 }
 
-function AddPersonForm({ workspaceId }: { workspaceId: string }) {
+/** "Nova pessoa", in its dialog (ADR 0036 note): a name, then back to the list. */
+function NewPersonForm({ workspaceId, onDone }: { workspaceId: string; onDone: () => void }) {
   const create = useCreatePerson(workspaceId);
   const { register, handleSubmit, formState, reset } = useForm<NameInput>({
     resolver: zodResolver(nameSchema),
@@ -182,19 +181,16 @@ function AddPersonForm({ workspaceId }: { workspaceId: string }) {
         onSuccess: (person) => {
           reset();
           toast.success(`${person.name} adicionada`);
+          onDone();
         },
       },
     );
 
   return (
-    <form
-      noValidate
-      className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
-      onSubmit={(event) => void handleSubmit(submit)(event)}
-    >
+    <form noValidate className="grid gap-4" onSubmit={(event) => void handleSubmit(submit)(event)}>
       <FormField
         id="new-person"
-        label="Nova pessoa"
+        label="Nome"
         error={
           formState.errors.name?.message ??
           (create.isError ? apiErrorMessage(create.error) : undefined)
@@ -202,9 +198,14 @@ function AddPersonForm({ workspaceId }: { workspaceId: string }) {
       >
         <Input autoComplete="off" placeholder="Nome" {...register('name')} />
       </FormField>
-      <Button type="submit" disabled={create.isPending}>
-        {create.isPending ? 'Adicionando…' : 'Adicionar'}
-      </Button>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button type="button" variant="outline" onClick={onDone}>
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={create.isPending}>
+          {create.isPending ? 'Adicionando…' : 'Adicionar'}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -521,11 +522,12 @@ export function PeoplePage() {
   const canEdit = hasRole(workspace.role, 'EDITOR');
   const [history, setHistory] = useState<{ person: Person; trigger: HTMLElement } | null>(null);
   const [search, setSearch] = useState('');
+  const [creating, setCreating] = useState(false);
+  const newButton = useRef<HTMLButtonElement>(null);
   const everyone = people.data ?? [];
-  const searchable = everyone.length >= SEARCH_FROM;
-  const shown = searchable
-    ? everyone.filter((person) => normalizeName(person.name).includes(normalizeName(search)))
-    : everyone;
+  const shown = everyone.filter((person) =>
+    normalizeName(person.name).includes(normalizeName(search)),
+  );
   const active = pendingFirst(shown.filter((person) => !person.archived));
   const archived = shown.filter((person) => person.archived);
   const total = (field: NumericField) => everyone.reduce((sum, person) => sum + person[field], 0);
@@ -555,8 +557,38 @@ export function PeoplePage() {
             ? 'Quem te deve e a quem você deve. Os nomes valem só neste espaço, e a pessoa não precisa usar o app.'
             : 'Quem te deve e a quem você deve. Os membros do espaço já estão aqui; os outros nomes valem só neste espaço, e a pessoa não precisa usar o app.'
         }
-      />
-      {canEdit && <AddPersonForm workspaceId={workspace.id} />}
+        action={
+          canEdit &&
+          people.isSuccess && (
+            <PageActionButton ref={newButton} onClick={() => setCreating(true)}>
+              <Plus aria-hidden />
+              Nova pessoa
+            </PageActionButton>
+          )
+        }
+      >
+        {/* At the top, as in Categorias and Estabelecimentos (ADR 0036 note). */}
+        {people.isSuccess && everyone.length > 0 && (
+          <SearchInput
+            id="people-search"
+            label="Buscar pessoa"
+            placeholder="Buscar pessoa"
+            value={search}
+            onChange={setSearch}
+          />
+        )}
+      </PageHeader>
+      {canEdit && (
+        <ResponsiveDialog
+          open={creating}
+          onOpenChange={setCreating}
+          returnFocusTo={newButton}
+          title="Nova pessoa"
+          description="Alguém com quem você divide contas ou tem algo a receber ou a pagar. Não precisa usar o app."
+        >
+          <NewPersonForm workspaceId={workspace.id} onDone={() => setCreating(false)} />
+        </ResponsiveDialog>
+      )}
       <QueryState queries={[people]} />
       {people.isSuccess && (
         <section aria-labelledby={LIST_TITLE_ID} className="grid gap-2">
@@ -575,21 +607,11 @@ export function PeoplePage() {
               {future && <p className="text-muted-foreground text-sm">{future}.</p>}
             </div>
           )}
-          {searchable && (
-            <SearchInput
-              id="people-search"
-              label="Buscar pessoa"
-              placeholder="Buscar pessoa"
-              value={search}
-              onChange={setSearch}
-            />
-          )}
           {active.length === 0 && search.trim() !== '' ? (
             <p className="text-muted-foreground">Nenhuma pessoa com “{search.trim()}”.</p>
           ) : active.length === 0 ? (
             <p className="text-muted-foreground rounded-xl border border-dashed p-5">
-              Ninguém ainda. Adicione uma pessoa aqui, ou use "A receber de" e "Dividir com alguém"
-              ao lançar.
+              Ninguém ainda. Use "Nova pessoa", ou "A receber de" e "Dividir com alguém" ao lançar.
             </p>
           ) : (
             <ul className={CARD_LIST}>{active.map(row)}</ul>

@@ -67,8 +67,8 @@ describe('PeoplePage', () => {
           ['Ana', 'Bruno', 'Carlos'].find((name) => item.textContent?.startsWith(name)),
         ),
     ).toEqual(['Ana', 'Bruno', 'Carlos']);
-    // Few people: no search.
-    expect(screen.queryByLabelText('Buscar pessoa')).not.toBeInTheDocument();
+    // The search at the top whenever there is someone, as in Categorias (ADR 0036 note).
+    expect(screen.getByRole('searchbox', { name: 'Buscar pessoa' })).toBeInTheDocument();
   });
 
   it('shows what is overdue and the installments of later months apart (ADR 0042 note)', async () => {
@@ -94,10 +94,8 @@ describe('PeoplePage', () => {
     );
   });
 
-  it('offers a search once the list grows', async () => {
-    const many = ['Ana', 'Bia', 'Caio', 'Davi', 'Edu', 'Fábio', 'Gil', 'Hugo', 'Íris'].map(
-      (name, index) => person(10 + index, name),
-    );
+  it('finds a person by name, ignoring accents', async () => {
+    const many = ['Ana', 'Fábio', 'Íris'].map((name, index) => person(10 + index, name));
     mockPeople({ [`GET ${base}`]: { body: many } });
     renderApp(page);
 
@@ -108,14 +106,20 @@ describe('PeoplePage', () => {
     expect(list).toHaveTextContent('Fábio');
   });
 
-  it('adds a person by name', async () => {
+  it('adds a person by name, in a dialog opened by "Nova pessoa"', async () => {
     const fetchMock = mockPeople({ [`POST ${base}`]: { status: 201, body: person(5, 'Edu') } });
     renderApp(page);
 
-    await userEvent.type(await screen.findByLabelText('Nova pessoa'), 'Edu');
-    await userEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    // The page's main action, as in Lançamentos (ADR 0036 note).
+    await userEvent.click(await screen.findByRole('button', { name: 'Nova pessoa' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nova pessoa' });
+    await userEvent.type(within(dialog).getByLabelText('Nome'), 'Edu');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
 
     expect(await screen.findByText('Edu adicionada')).toBeInTheDocument();
+    // Back to the list, with the focus on the button that opened it.
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Nova pessoa' })).toHaveFocus();
     expect(fetchMock).toHaveBeenCalledWith(
       new URL(base, 'http://api.test'),
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'Edu' }) }),

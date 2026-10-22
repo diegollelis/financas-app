@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/search-input';
 import { NotesText } from '@/components/notes-text';
+import { PageActionButton } from '@/components/page-action-button';
 import {
   Table,
   TableBody,
@@ -904,15 +905,10 @@ export function TransactionsPage() {
           ready && (
             // Fixed above the tab bar on the phone, within reach of the thumb; in the header
             // from md (ADR 0036).
-            <Button
-              // The layout keeps room for it below the footer (data-fab).
-              data-fab
-              onClick={(event) => openForm(null, event.currentTarget)}
-              className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 shadow-lg md:static md:shadow-none"
-            >
+            <PageActionButton onClick={(event) => openForm(null, event.currentTarget)}>
               <Plus aria-hidden />
               Novo lançamento
-            </Button>
+            </PageActionButton>
           )
         }
       >
