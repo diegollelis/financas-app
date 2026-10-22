@@ -4,11 +4,8 @@ import {
   formatPeriod,
   hasRole,
   occurredOnRowLabels,
-  OVERDUE_LABEL,
   paymentMethodLabels,
-  PENDING_LABEL,
   settleActionLabels,
-  settledLabels,
   todayIso,
   transactionTypeLabels,
   transactionStatus,
@@ -16,7 +13,7 @@ import {
   type Transaction,
   type TransactionType,
 } from '@financas/shared';
-import { Circle, CreditCard, Ellipsis, Plus, Repeat, Users } from 'lucide-react';
+import { CreditCard, Ellipsis, Plus, Repeat, Users } from 'lucide-react';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
@@ -73,6 +70,9 @@ import { SettleWithAmount } from '@/features/transactions/settle-with-amount';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
 import { TransactionDialog } from '@/features/transactions/transaction-dialog';
+import { SettleButton } from '@/features/transactions/settle-button';
+import { dayInPeriod, signedCents } from '@/features/transactions/row-format';
+import { StatusBadge } from '@/features/transactions/status-badge';
 import {
   useDeleteTransaction,
   useTransactions,
@@ -95,48 +95,6 @@ const sections = (['CREDIT', 'DEBIT'] as const).map((type) => ({
 const sectionTitleId = (type: TransactionType) => `transactions-${type}`;
 
 const showError = (error: unknown) => toast.error(apiErrorMessage(error));
-
-/** Colors as in the spreadsheet: red while pending past the due date, green once settled. */
-/**
- * "+ R$ 45,00" for money in, "− R$ 69,90" (a real minus sign) for money out: the sign always,
- * the color only on top of it (ADR 0036 note).
- */
-function signedCents(type: Transaction['type'], cents: number) {
-  return `${type === 'CREDIT' ? '+' : '−'} ${formatCents(cents)}`;
-}
-
-/**
- * Settled and overdue always show; pending only to whoever cannot act on it, since the
- * "○ Pagar / Receber" button already says it to an EDITOR (ADR 0036 note).
- */
-/** "28/09": a day of the competência's year needs no year; another one keeps it. */
-function dayInPeriod(iso: string, period: string) {
-  const date = formatIsoDate(iso);
-  return iso.slice(0, 4) === period.slice(0, 4) ? date.slice(0, 5) : date;
-}
-
-function StatusBadge({
-  transaction,
-  today,
-  canEdit,
-}: {
-  transaction: Transaction;
-  today: string;
-  canEdit: boolean;
-}) {
-  const status = transactionStatus(transaction, today);
-  if (status === 'SETTLED') {
-    // What happened, in its own word.
-    return (
-      <Badge variant="success">
-        {settledLabels[transaction.type]} em{' '}
-        {dayInPeriod(transaction.settledAt ?? '', transaction.period)}
-      </Badge>
-    );
-  }
-  if (status === 'OVERDUE') return <Badge variant="destructive">{OVERDUE_LABEL}</Badge>;
-  return canEdit ? null : <Badge variant="outline">{PENDING_LABEL}</Badge>;
-}
 
 /**
  * What the month adds up to, whatever the search or the filter: what comes in, what goes out
@@ -448,27 +406,51 @@ function useRowActions({
       { id: transaction.id, settledAt },
       { onSuccess: () => toast.success(message), onError: showError },
     );
+  // Marked in one tap, so undone in one too: the toast's "Desfazer" takes it back to pending.
+  const undoSettle = {
+    label: 'Desfazer',
+    onClick: () =>
+      update.mutate(
+        { id: transaction.id, settledAt: null },
+        {
+          onSuccess: () =>
+            toast.success(
+              transaction.type === 'CREDIT' ? 'Recebimento desmarcado' : 'Pagamento desmarcado',
+            ),
+          onError: showError,
+        },
+      ),
+  };
   const settleWithAmount = (amountCents: number) =>
     update.mutate(
       { id: transaction.id, amountCents, settledAt: today },
       {
         onSuccess: () => {
           setAskingAmount(false);
-          toast.success(settledToast);
+          toast.success(settledToast, { action: undoSettle });
         },
       },
     );
 
   // Settles today in one tap; an estimate first asks for the bill's amount.
-  const settleNow = () => (estimated ? setAskingAmount(true) : settle(today, settledToast));
+  const settleNow = () =>
+    estimated
+      ? setAskingAmount(true)
+      : update.mutate(
+          { id: transaction.id, settledAt: today },
+          {
+            onSuccess: () => toast.success(settledToast, { action: undoSettle }),
+            onError: showError,
+          },
+        );
 
   return {
     estimated,
     settleRef,
     settleButton: {
-      short: labels.short,
-      // Starts with the visible text, so a voice command finds it (WCAG 2.5.3).
-      ariaLabel: `${labels.short}: ${description}`,
+      type: transaction.type,
+      overdue: transactionStatus(transaction, today) === 'OVERDUE',
+      description,
       disabled: update.isPending,
       onClick: settleNow,
     },
@@ -590,36 +572,6 @@ function useRowActions({
  * "Pagar" / "Receber" on the row, beside the menu (ADR 0036 note): an empty circle, as a to-do
  * not yet ticked; one tap, the same in the list and the table; named with the transaction for screen readers.
  */
-function SettleButton({
-  settleRef,
-  short,
-  ariaLabel,
-  disabled,
-  onClick,
-}: {
-  settleRef: RefObject<HTMLButtonElement | null>;
-  short: string;
-  ariaLabel: string;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      ref={settleRef}
-      // Outlined: plainly a button beside the status badges, without the brand color of the
-      // page's main action.
-      variant="outline"
-      size="sm"
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <Circle aria-hidden />
-      {short}
-    </Button>
-  );
-}
-
 /**
  * The amount with its sign, money in in green (ADR 0036 note), and "Estimado" under it while a
  * variable bill's month is an estimate.
@@ -688,7 +640,7 @@ function TransactionItem(props: RowProps) {
           // The date can be fixed later by editing.
           // Stacked on the phone, so the description keeps its width; side by side from md.
           <div className="flex flex-col items-end gap-2 md:flex-row md:items-center md:gap-1">
-            {!transaction.settledAt && <SettleButton settleRef={settleRef} {...settleButton} />}
+            {!transaction.settledAt && <SettleButton ref={settleRef} {...settleButton} />}
             {menu}
           </div>
         )}
@@ -754,7 +706,7 @@ function TransactionRow(props: RowProps) {
       {canEdit && (
         <TableCell>
           <div className="flex items-center justify-end gap-1">
-            {!transaction.settledAt && <SettleButton settleRef={settleRef} {...settleButton} />}
+            {!transaction.settledAt && <SettleButton ref={settleRef} {...settleButton} />}
             {menu}
           </div>
         </TableCell>
@@ -811,7 +763,8 @@ function TransactionTable({
           <col className="w-44" />
           {/* Room for the sign: "+ R$ 5.200,00" (ADR 0036 note). */}
           <col className="w-36" />
-          {canEdit && <col className="w-32" />}
+          {/* "↓ Receber", the widest settle button, and the ⋯. */}
+          {canEdit && <col className="w-40" />}
         </colgroup>
         <TableHeader>
           <TableRow>

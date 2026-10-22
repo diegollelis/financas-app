@@ -63,6 +63,12 @@ export function ResponsiveDialog({
     event.preventDefault();
     target.focus();
   };
+  // A toast's action ("Desfazer") is outside the dialog: using it must not close the dialog.
+  const onInteractOutside = (event: Event) => {
+    if (event.target instanceof Element && event.target.closest('[data-sonner-toaster]')) {
+      event.preventDefault();
+    }
+  };
 
   if (desktop) {
     return (
@@ -70,6 +76,7 @@ export function ResponsiveDialog({
         <DialogContent
           className={cn('max-h-[90svh] overflow-y-auto sm:max-w-lg', wide && 'lg:max-w-2xl')}
           onCloseAutoFocus={onCloseAutoFocus}
+          onInteractOutside={onInteractOutside}
         >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
@@ -86,6 +93,7 @@ export function ResponsiveDialog({
         ref={sheetRef}
         side="bottom"
         onCloseAutoFocus={onCloseAutoFocus}
+        onInteractOutside={onInteractOutside}
         className="max-h-[92svh] overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
         // Above the keyboard, and no taller than what it leaves visible (see useKeyboardInset).
         style={

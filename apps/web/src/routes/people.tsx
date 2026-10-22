@@ -4,10 +4,11 @@ import {
   formatPeriod,
   hasRole,
   normalizeName,
-  settledLabels,
+  formatIsoDate,
   todayIso,
   transactionStatus,
   type Person,
+  type Transaction,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Ellipsis, Plus } from 'lucide-react';
@@ -48,6 +49,9 @@ import {
   useUpdatePerson,
 } from '@/features/people/use-people';
 import { useCurrentUser } from '@/features/auth/use-me';
+import { signedCents } from '@/features/transactions/row-format';
+import { StatusBadge } from '@/features/transactions/status-badge';
+import { SettleButton } from '@/features/transactions/settle-button';
 import { useUpdateTransaction } from '@/features/transactions/use-transactions';
 import { CARD_LIST, CARD_ROW } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
@@ -210,7 +214,17 @@ function NewPersonForm({ workspaceId, onDone }: { workspaceId: string; onDone: (
   );
 }
 
-/** A person's transactions of any month, read-only: settle and edit them in Lançamentos. */
+/** The person's transactions by competência, in the order they come (newest first). */
+function byPeriod(transactions: Transaction[]) {
+  const groups: { period: string; items: Transaction[] }[] = [];
+  for (const transaction of transactions) {
+    const last = groups.at(-1);
+    if (last?.period === transaction.period) last.items.push(transaction);
+    else groups.push({ period: transaction.period, items: [transaction] });
+  }
+  return groups;
+}
+
 /**
  * Every transaction with one person, of any month. A pending one can be marked as received or
  * paid right here: the same settling as "Marcar como pago" in Lançamentos, with today's date, where the
@@ -232,6 +246,35 @@ function PersonHistory({
   const transactions = usePersonTransactions(workspaceId, person?.id ?? null);
   const settle = useUpdateTransaction(workspaceId);
   const today = todayIso();
+  const settleNow = (transaction: Transaction) =>
+    settle.mutate(
+      { id: transaction.id, settledAt: today },
+      {
+        onSuccess: () =>
+          toast.success(
+            transaction.type === 'CREDIT' ? 'Marcado como recebido' : 'Marcado como pago',
+            {
+              action: {
+                label: 'Desfazer',
+                onClick: () =>
+                  settle.mutate(
+                    { id: transaction.id, settledAt: null },
+                    {
+                      onSuccess: () =>
+                        toast.success(
+                          transaction.type === 'CREDIT'
+                            ? 'Recebimento desmarcado'
+                            : 'Pagamento desmarcado',
+                        ),
+                      onError: (error) => toast.error(apiErrorMessage(error)),
+                    },
+                  ),
+              },
+            },
+          ),
+        onError: (error) => toast.error(apiErrorMessage(error)),
+      },
+    );
 
   return (
     <ResponsiveDialog
@@ -261,69 +304,66 @@ function PersonHistory({
         (transactions.data.length === 0 ? (
           <p className="text-muted-foreground">Nenhum lançamento com esta pessoa ainda.</p>
         ) : (
-          <ul className="divide-y">
-            {transactions.data.map((transaction) => {
-              const status = transactionStatus(transaction, today);
-              return (
-                <li key={transaction.id} className="flex items-start gap-3 py-3">
-                  <span className="grid min-w-0 flex-1 gap-1">
-                    <span className="font-medium break-words">{transaction.description}</span>
-                    <span className="text-muted-foreground text-sm first-letter:uppercase">
-                      {formatPeriod(transaction.period)}
-                    </span>
-                    <span className="flex flex-wrap gap-1.5">
-                      <Badge variant="secondary">
-                        {transaction.type === 'CREDIT' ? 'A receber' : 'A pagar'}
-                      </Badge>
-                      {status === 'SETTLED' ? (
-                        <Badge variant="success">{settledLabels[transaction.type]}</Badge>
-                      ) : status === 'OVERDUE' ? (
-                        <Badge variant="destructive">Vencido</Badge>
-                      ) : (
-                        <Badge variant="outline">Pendente</Badge>
-                      )}
-                    </span>
-                    {canEdit &&
-                      status !== 'SETTLED' &&
-                      (transaction.amountEstimated ? (
-                        <span className="text-muted-foreground text-sm">
-                          Valor estimado: marque como pago em Lançamentos, informando o valor real.
-                        </span>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="justify-self-start"
-                          disabled={settle.isPending}
-                          onClick={() =>
-                            settle.mutate(
-                              { id: transaction.id, settledAt: today },
-                              {
-                                onSuccess: () =>
-                                  toast.success(
-                                    transaction.type === 'CREDIT'
-                                      ? 'Marcado como recebido'
-                                      : 'Marcado como pago',
-                                  ),
-                                onError: (error) => toast.error(apiErrorMessage(error)),
-                              },
-                            )
-                          }
-                        >
-                          {transaction.type === 'CREDIT'
-                            ? 'Marcar como recebido'
-                            : 'Marcar como pago'}{' '}
-                          <span className="sr-only">({transaction.description})</span>
-                        </Button>
-                      ))}
-                  </span>
-                  <span className="shrink-0 font-semibold tabular-nums">
-                    {formatCents(transaction.amountCents)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          // As in Lançamentos (ADR 0036 notes): one card per transaction, the amount with its
+          // sign, the status in the same words and the same settle button, here grouped by month
+          // since every month shows.
+          <div className="grid gap-4">
+            {byPeriod(transactions.data).map(({ period, items }) => (
+              <section key={period} aria-label={formatPeriod(period)} className="grid gap-2">
+                <h3 className="font-medium first-letter:uppercase">{formatPeriod(period)}</h3>
+                <ul className={CARD_LIST}>
+                  {items.map((transaction) => {
+                    const status = transactionStatus(transaction, today);
+                    return (
+                      <li key={transaction.id} className={`${CARD_ROW} flex items-start gap-3`}>
+                        <div className="grid min-w-0 flex-1 gap-1">
+                          <p className="font-medium break-words">{transaction.description}</p>
+                          {transaction.dueDate && status !== 'SETTLED' && (
+                            <p className="text-muted-foreground text-sm">
+                              Vence em {formatIsoDate(transaction.dueDate)}
+                            </p>
+                          )}
+                          <span className="flex flex-wrap gap-1.5">
+                            <StatusBadge
+                              transaction={transaction}
+                              today={today}
+                              canEdit={canEdit}
+                            />
+                          </span>
+                          {canEdit && status !== 'SETTLED' && transaction.amountEstimated && (
+                            <p className="text-muted-foreground text-sm">
+                              Valor estimado: marque como pago em Lançamentos, informando o valor
+                              real.
+                            </p>
+                          )}
+                        </div>
+                        <div className="grid shrink-0 justify-items-end gap-2">
+                          <span
+                            className={
+                              transaction.type === 'CREDIT'
+                                ? 'text-credit-foreground font-semibold whitespace-nowrap tabular-nums'
+                                : 'font-semibold whitespace-nowrap tabular-nums'
+                            }
+                          >
+                            {signedCents(transaction.type, transaction.amountCents)}
+                          </span>
+                          {canEdit && status !== 'SETTLED' && !transaction.amountEstimated && (
+                            <SettleButton
+                              type={transaction.type}
+                              overdue={status === 'OVERDUE'}
+                              description={transaction.description}
+                              disabled={settle.isPending}
+                              onClick={() => settleNow(transaction)}
+                            />
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
         ))}
     </ResponsiveDialog>
   );

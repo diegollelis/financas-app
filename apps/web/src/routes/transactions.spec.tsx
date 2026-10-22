@@ -185,7 +185,7 @@ describe('TransactionsPage', () => {
     expect(lightItem).toHaveTextContent('− R$ 159,90');
     expect(lightItem).toHaveTextContent('Vencido');
     expect(within(credits).getByText('+ R$ 5.000,00')).toHaveClass('text-credit-foreground');
-    // Pending is what "○ Pagar" already says: no badge for whoever can pay it.
+    // Pending is what "↑ Pagar" already says: no badge for whoever can pay it.
     expect(row(debits, 'Compras da semana')).not.toHaveTextContent('Pendente');
   });
 
@@ -1442,6 +1442,23 @@ describe('TransactionsPage', () => {
     expect(await screen.findByText('Recebimento desmarcado')).toBeInTheDocument();
   });
 
+  it('undoes a one-tap settle from the toast', async () => {
+    const fetchMock = mockTransactions({
+      [`PATCH ${base}/${light.id}`]: { body: { ...light, settledAt: '2026-10-15' } },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Pagar: Conta de luz' }));
+    expect(await screen.findByText('Marcado como pago')).toBeInTheDocument();
+    // Marked in one tap, so undone in one: the toast's "Desfazer" takes it back to pending.
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer' }));
+    await expectCall(fetchMock, `${base}/${light.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ settledAt: null }),
+    });
+    expect(await screen.findByText('Pagamento desmarcado')).toBeInTheDocument();
+  });
+
   it('tells when a change fails', async () => {
     mockTransactions({ [`PATCH ${base}/${light.id}`]: { status: 500, body: {} } });
     renderApp(`/espacos/${houseId}/lancamentos`);
@@ -2190,7 +2207,7 @@ describe('TransactionsPage', () => {
 
     const debits = await section('Saídas');
     expect(debits).toHaveTextContent('Conta de luz');
-    // No "○ Pagar" to say it: pending is written out.
+    // No "↑ Pagar" to say it: pending is written out.
     expect(row(debits, 'Compras da semana')).toHaveTextContent('Pendente');
     // Only the competência picker, which navigates; nothing that edits.
     expect(
