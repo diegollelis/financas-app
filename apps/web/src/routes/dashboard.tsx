@@ -34,7 +34,10 @@ function SignedCents({ cents }: { cents: number }) {
   return <span className={cn(cents < 0 && 'text-destructive')}>{formatCents(cents)}</span>;
 }
 
-/** A labelled amount, with an optional line under it ("R$ 5.200,00 recebidos"). */
+/**
+ * A labelled amount, with optional lines under it ("R$ 5.200,00 recebidos"): one per fact, each
+ * starting with its amount, never two facts joined in one line.
+ */
 function Figure({
   label,
   help,
@@ -43,7 +46,7 @@ function Figure({
 }: {
   label: string;
   help?: ReactNode;
-  sub?: string;
+  sub?: string | (string | null)[];
   children: ReactNode;
 }) {
   return (
@@ -53,7 +56,14 @@ function Figure({
         {help && <InfoTip term={label}>{help}</InfoTip>}
       </dt>
       <dd className="text-lg font-semibold whitespace-nowrap tabular-nums">{children}</dd>
-      {sub && <dd className="text-muted-foreground text-sm tabular-nums">{sub}</dd>}
+      {[sub ?? []].flat().map(
+        (line) =>
+          line && (
+            <dd key={line} className="text-muted-foreground text-sm tabular-nums">
+              {line}
+            </dd>
+          ),
+      )}
     </div>
   );
 }
@@ -392,7 +402,7 @@ function BudgetCard({
   // A loan repaid entered, but is not income (ADR 0056): said, so the total does not look short.
   const leftOut =
     summary.neutralIncomeCents > 0
-      ? `Mais ${formatCents(summary.neutralIncomeCents)} que não contam como renda`
+      ? `Mais ${formatCents(summary.neutralIncomeCents)} fora da renda`
       : null;
   return (
     <Card
@@ -428,7 +438,7 @@ function BudgetCard({
             'Para usar este valor como renda líquida, use "Usar as entradas do mês" em ' +
             '"Editar orçamento".'
           }
-          sub={[versusNet, leftOut].filter(Boolean).join('. ') || undefined}
+          sub={[versusNet, leftOut]}
         >
           {formatCents(income)}
         </Figure>

@@ -116,9 +116,16 @@ describe('DashboardPage', () => {
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
     const budgetBar = await section('Orçamento do mês');
-    expect(nbsp(budgetBar.textContent)).toContain(
-      'Entradas do mêsR$ 6.000,00R$ 1.000,00 acima da renda. Mais R$ 3.000,00 que não contam como renda',
-    );
+    // One line per fact, each starting with its amount.
+    const lines = within(budgetBar)
+      .getAllByRole('definition')
+      .map((line) => nbsp(line.textContent));
+    expect(lines).toEqual([
+      'R$ 5.000,00',
+      'R$ 6.000,00',
+      'R$ 1.000,00 acima da renda',
+      'Mais R$ 3.000,00 fora da renda',
+    ]);
   });
 
   it('shows where the credits go, the spending limit and each goal', async () => {
