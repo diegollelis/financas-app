@@ -238,9 +238,13 @@ describe('TransactionsPage', () => {
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     const item = row(await section('Saídas'), 'Compras da semana');
-    const more = within(item).getByRole('button', { name: 'Ver tudo' });
-    await userEvent.click(more);
-    expect(within(item).getByRole('button', { name: 'Ver menos' })).toBeInTheDocument();
+    await userEvent.click(
+      within(item).getByRole('button', { name: 'Ver tudo: observações de Compras da semana' }),
+    );
+    // A dialog of its own, read-only: the list does not grow.
+    const reading = await screen.findByRole('dialog', { name: 'Observações' });
+    expect(within(reading).getByText(/Trocar o leite na sexta\./)).toBeInTheDocument();
+    await userEvent.click(within(reading).getByRole('button', { name: 'Fechar' }));
 
     const menu = await openActions('Conta de luz');
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
