@@ -32,7 +32,13 @@ import { CategoryRanking } from '@/features/analysis/category-ranking';
 import { PaymentMethodRanking } from '@/features/analysis/payment-method-ranking';
 import { FiltersPanel } from '@/features/analysis/filters-panel';
 import { MonthlyChart, MonthlyTable } from '@/features/analysis/monthly-chart';
-import { savingCategoryIds, seriesStyles, visibleSeries } from '@/features/analysis/series';
+import {
+  neutralCategoryIds,
+  notSpendingCategoryIds,
+  savingCategoryIds,
+  seriesStyles,
+  visibleSeries,
+} from '@/features/analysis/series';
 import { useAnalysis } from '@/features/analysis/use-analysis';
 import { useCategories } from '@/features/categories/use-categories';
 import { useMerchants } from '@/features/merchants/use-merchants';
@@ -129,7 +135,10 @@ const comparisonHelp = (months: number) =>
     : `As comparações usam os mesmos filtros nos ${months} meses logo antes deste período.`;
 
 const spendingHelp = (
-  <p>As saídas fora das metas, pagas ou não. Guardar nas metas não é gasto e fica à parte.</p>
+  <p>
+    As saídas fora das metas e das categorias "Nem renda nem gasto", pagas ou não. Guardar nas metas
+    não é gasto e fica à parte.
+  </p>
 );
 
 /**
@@ -382,8 +391,11 @@ function Results({
   onToggle: () => void;
 }) {
   const saving = savingCategoryIds(categories);
-  const series = monthlySeries(analysis, settings, saving);
-  const previousTotals = before ? seriesTotals(monthlySeries(before, settings, saving)) : null;
+  const neutral = neutralCategoryIds(categories);
+  const series = monthlySeries(analysis, settings, saving, neutral);
+  const previousTotals = before
+    ? seriesTotals(monthlySeries(before, settings, saving, neutral))
+    : null;
   // One payment method chosen: its ranking would be a single bar (ADR 0037 note).
   const byMethod = settings.paymentMethods.length !== 1;
   // In cards (ADR 0037 note): the totals, month by month across, and the two rankings side by
@@ -438,7 +450,11 @@ function Results({
           onChange={onChange}
         />
         {byMethod && (
-          <PaymentMethodRanking analysis={analysis} settings={settings} saving={saving} />
+          <PaymentMethodRanking
+            analysis={analysis}
+            settings={settings}
+            notSpending={notSpendingCategoryIds(categories)}
+          />
         )}
       </div>
     </div>

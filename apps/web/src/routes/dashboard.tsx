@@ -191,7 +191,7 @@ function LimitCard({ summary }: { summary: Summary }) {
           <p>Quanto da renda líquida você planeja gastar no mês.</p>
           <p>
             Gastos: o que já foi pago mais o que falta pagar. Guardar nas metas não conta como
-            gasto.
+            gasto, nem as categorias marcadas "Nem renda nem gasto", como um empréstimo.
           </p>
         </>
       }
@@ -317,8 +317,9 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
           help={
             <>
               <p>
-                As entradas previstas menos as despesas previstas: é sobre esse valor que as metas
-                são calculadas.
+                As entradas previstas menos as despesas previstas e as saídas das categorias "Nem
+                renda nem gasto", como um empréstimo: é sobre esse valor que as metas são
+                calculadas.
               </p>
               <p>O que você guarda não entra na conta: guardar mais não diminui as metas.</p>
             </>
@@ -382,6 +383,17 @@ function BudgetCard({
   const net = summary.budget.netIncomeCents;
   const income = summary.incomeCents;
   const gap = income - net;
+  const versusNet =
+    net > 0
+      ? gap === 0
+        ? 'Igual à renda'
+        : `${formatCents(Math.abs(gap))} ${gap > 0 ? 'acima' : 'abaixo'} da renda`
+      : null;
+  // A loan repaid entered, but is not income (ADR 0056): said, so the total does not look short.
+  const leftOut =
+    summary.neutralIncomeCents > 0
+      ? `Mais ${formatCents(summary.neutralIncomeCents)} que não contam como renda`
+      : null;
   return (
     <Card
       title="Orçamento do mês"
@@ -412,16 +424,11 @@ function BudgetCard({
           label="Entradas do mês"
           help={
             'Tudo o que entra neste mês, recebido ou a receber, sem as partes das divisões ' +
-            '(Reembolso), que não são renda. Para usar este valor como renda líquida, use ' +
-            '"Usar as entradas do mês" em "Editar orçamento".'
+            '(Reembolso) e sem as categorias marcadas "Nem renda nem gasto", que não são renda. ' +
+            'Para usar este valor como renda líquida, use "Usar as entradas do mês" em ' +
+            '"Editar orçamento".'
           }
-          sub={
-            net > 0
-              ? gap === 0
-                ? 'Igual à renda'
-                : `${formatCents(Math.abs(gap))} ${gap > 0 ? 'acima' : 'abaixo'} da renda`
-              : undefined
-          }
+          sub={[versusNet, leftOut].filter(Boolean).join('. ') || undefined}
         >
           {formatCents(income)}
         </Figure>

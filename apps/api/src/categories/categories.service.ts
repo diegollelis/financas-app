@@ -33,6 +33,7 @@ function toResponse(
     recentUses,
     destinationId,
     splitRole: category.splitRole,
+    neutral: category.neutral,
     ...(inUse !== undefined && { inUse }),
   };
 }
@@ -258,7 +259,7 @@ export class CategoriesService {
           // Every workspace has its own Reembolso and Repasse (ADR 0052 note).
           splitRole: null,
         },
-        select: { name: true, type: true },
+        select: { name: true, type: true, neutral: true },
       }),
       this.prisma
         .forWorkspace(workspaceId)
@@ -270,7 +271,7 @@ export class CategoriesService {
     const data = source.flatMap((category) => {
       if (taken.has(key(category))) return [];
       taken.add(key(category));
-      return [{ workspaceId, name: category.name, type: category.type }];
+      return [{ workspaceId, name: category.name, type: category.type, neutral: category.neutral }];
     });
     // Someone creating the same name meanwhile: the unique index skips it.
     const { count } = data.length
@@ -299,7 +300,7 @@ export class CategoriesService {
     try {
       const category = await this.prisma.forWorkspace(workspaceId).category.update({
         where: { id: categoryId, workspaceId },
-        data: { name: input.name, archivedAt },
+        data: { name: input.name, archivedAt, neutral: input.neutral },
       });
       const db = this.prisma.forWorkspace(workspaceId);
       return toResponse(category, 0, null, await categoryInUse(db, workspaceId, categoryId));

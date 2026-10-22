@@ -89,6 +89,7 @@ Copiadas para cada novo espaço; o usuário pode editar, arquivar e criar outras
 
 - **"Reembolso"** recebe as partes de uma saída dividida ([ADR 0042](../adr/0042-pessoas-e-rateio.md)), e **"Repasse"** as de uma entrada dividida ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)). As duas são fixas: marcadas no banco (`split_role`), não se renomeiam, arquivam nem excluem (nota no ADR 0052).
 - **Os destinos de guardar padrão** são Reserva de emergência e Investimentos, e cada um cria a sua categoria de débito com o mesmo nome ([ADR 0047](../adr/0047-orcamento-real-por-destino.md)).
+- **"Nem renda nem gasto"** é uma marca que a pessoa põe numa categoria sua, como "Empréstimo pessoal": os lançamentos dela contam no saldo e na sobra para guardar, mas não como renda (entradas do mês) nem como gasto (limite de gastos e Análise) ([ADR 0056](../adr/0056-categoria-nem-renda-nem-gasto.md)). Nenhuma categoria padrão vem marcada.
 
 **Histórico:** até a versão 1.0.0, a lista vinha da planilha pessoal de origem, com 14 categorias de crédito e 26 de débito, como PLR, Lote, Inglês e IPVA. Ela foi trocada pela atual antes da 1.0.0 (nota de 2026-10-10 no [ADR 0024](../adr/0024-espacos-membros-e-espaco-pessoal.md)). Os espaços criados antes continuam com as categorias que receberam. "Viagem" saiu junto com o destino padrão "Viagens".
 

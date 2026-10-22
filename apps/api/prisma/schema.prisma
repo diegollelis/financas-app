@@ -225,6 +225,9 @@ model Category {
   // Reembolso or Repasse, the categories of the shares of a split (ADR 0052 note): found by
   // this mark, never by the name, and never renamed, archived or deleted.
   splitRole        SplitRole?         @map("split_role")
+  // "Nem renda nem gasto" (ADR 0056): its transactions count in the balance and in what is left
+  // to save, never as income or as an expense (a loan and its repayment).
+  neutral          Boolean            @default(false)
 
   @@unique([workspaceId, type, name])
   // One Reembolso and one Repasse per workspace.

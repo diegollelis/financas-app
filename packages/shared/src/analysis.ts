@@ -124,6 +124,8 @@ export interface MonthlyPoint {
   debitsCents: number;
   /** The debits in a saving destination's category: money put aside, not spent. */
   appliedCents: number;
+  /** The debits in a category marked "Nem renda nem gasto" (ADR 0056): a loan, not spending. */
+  neutralCents: number;
   /** Credits minus debits of the competência. */
   balanceCents: number;
 }
@@ -134,16 +136,26 @@ const NONE: ReadonlySet<string> = new Set();
 /**
  * One point per competência of the range, months without transactions included as zeros.
  * `savingCategoryIds`: the saving destinations' categories, whose debits are applications.
+ * `neutralCategoryIds`: the ones marked "Nem renda nem gasto" (ADR 0056), whose debits are not
+ * spending either.
  */
 export function monthlySeries(
   analysis: Analysis,
   filters: AnalysisFilters,
   savingCategoryIds: ReadonlySet<string> = NONE,
+  neutralCategoryIds: ReadonlySet<string> = NONE,
 ): MonthlyPoint[] {
   const points = new Map(
     periodsBetween(analysis.from, analysis.to).map((period) => [
       period,
-      { period, creditsCents: 0, debitsCents: 0, appliedCents: 0, balanceCents: 0 },
+      {
+        period,
+        creditsCents: 0,
+        debitsCents: 0,
+        appliedCents: 0,
+        neutralCents: 0,
+        balanceCents: 0,
+      },
     ]),
   );
   for (const row of analysis.rows) {
@@ -153,24 +165,27 @@ export function monthlySeries(
     if (row.type === 'CREDIT') point.creditsCents += cents;
     else point.debitsCents += cents;
     if (row.type === 'DEBIT' && savingCategoryIds.has(row.categoryId)) point.appliedCents += cents;
+    if (row.type === 'DEBIT' && neutralCategoryIds.has(row.categoryId)) point.neutralCents += cents;
     point.balanceCents = point.creditsCents - point.debitsCents;
   }
   return [...points.values()];
 }
 
 /**
- * The whole range: received, spent (expenses only), applied, and what was left after every
- * debit, as on the dashboard (ADR 0047).
+ * The whole range: received, spent (expenses only: no applications, nothing neutral), applied,
+ * and what was left after every debit, as on the dashboard (ADRs 0047, 0056).
  */
 export function seriesTotals(series: MonthlyPoint[]) {
   const creditsCents = series.reduce((sum, point) => sum + point.creditsCents, 0);
   const debitsCents = series.reduce((sum, point) => sum + point.debitsCents, 0);
   const appliedCents = series.reduce((sum, point) => sum + point.appliedCents, 0);
+  const neutralCents = series.reduce((sum, point) => sum + point.neutralCents, 0);
   return {
     creditsCents,
     debitsCents,
-    expensesCents: debitsCents - appliedCents,
+    expensesCents: debitsCents - appliedCents - neutralCents,
     appliedCents,
+    neutralCents,
     balanceCents: creditsCents - debitsCents,
   };
 }

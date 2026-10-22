@@ -9,6 +9,7 @@ import {
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { summaryKey } from '@/features/summary/use-summary';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
 /** Under ['workspaces', id, ...], like everything else of one workspace. */
@@ -60,11 +61,18 @@ export function useCopyCategories(workspaceId: string) {
 }
 
 export function useUpdateCategory(workspaceId: string) {
-  const onSuccess = useInvalidateCategories(workspaceId);
+  const queryClient = useQueryClient();
+  const invalidateCategories = useInvalidateCategories(workspaceId);
   return useMutation({
     mutationFn: ({ id, ...input }: UpdateCategoryInput & { id: string }) =>
       apiPatch(`/api/workspaces/${workspaceId}/categories/${id}`, input, categorySchema),
-    onSuccess,
+    // "Nem renda nem gasto" changes the dashboard of every month (ADR 0056); the analysis reads
+    // the mark from the categories list.
+    onSuccess: () =>
+      Promise.all([
+        invalidateCategories(),
+        queryClient.invalidateQueries({ queryKey: summaryKey(workspaceId) }),
+      ]),
   });
 }
 

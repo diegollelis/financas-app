@@ -11,15 +11,15 @@ import type { AnalysisSettings } from './filters';
 export function PaymentMethodRanking({
   analysis,
   settings,
-  saving,
+  notSpending,
 }: {
   analysis: Analysis;
   settings: AnalysisSettings;
-  /** The saving destinations' categories: applications are not spending (ADR 0047). */
-  saving: ReadonlySet<string>;
+  /** Applications and the neutral categories: not spending (ADRs 0047, 0056). */
+  notSpending: ReadonlySet<string>;
 }) {
   const credit = settings.type === 'CREDIT';
-  const ranking = paymentMethodRanking(analysis, settings, saving);
+  const ranking = paymentMethodRanking(analysis, settings, notSpending);
   const named = ranking.filter((share) => share.paymentMethod !== null);
   const largest = ranking.reduce((max, share) => Math.max(max, share.totalCents), 1);
   const title = credit ? 'Entradas por meio de recebimento' : 'Gastos por meio de pagamento';

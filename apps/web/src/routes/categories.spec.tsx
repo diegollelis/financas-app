@@ -77,7 +77,11 @@ describe('CategoriesPage', () => {
     const debits = await section('Saídas');
     expect(within(debits).getByRole('heading', { name: 'Arquivadas' })).toBeInTheDocument();
     // Each category has its actions in a menu: active ones are renamed or archived...
-    expect(await menuOf('Mercado')).toEqual(['Renomear', 'Arquivar']);
+    expect(await menuOf('Mercado')).toEqual([
+      'Renomear',
+      'Não contar como renda nem gasto',
+      'Arquivar',
+    ]);
     // ...archived ones are reactivated or deleted.
     expect(await menuOf('IPVA')).toEqual(['Reativar', 'Excluir']);
   });
@@ -95,8 +99,17 @@ describe('CategoriesPage', () => {
 
     renderApp(`/espacos/${houseId}/categorias`);
 
-    expect(await menuOf('Consórcio')).toEqual(['Renomear', 'Arquivar', 'Excluir']);
-    expect(await menuOf('Mercado')).toEqual(['Renomear', 'Arquivar']);
+    expect(await menuOf('Consórcio')).toEqual([
+      'Renomear',
+      'Não contar como renda nem gasto',
+      'Arquivar',
+      'Excluir',
+    ]);
+    expect(await menuOf('Mercado')).toEqual([
+      'Renomear',
+      'Não contar como renda nem gasto',
+      'Arquivar',
+    ]);
     // Archived but in use: the API would refuse, so it is not offered.
     expect(await menuOf('IPVA')).toEqual(['Reativar']);
   });
@@ -258,6 +271,51 @@ describe('CategoriesPage', () => {
       body: JSON.stringify({ archived: false }),
     });
     expect(await screen.findByText('Categoria reativada')).toBeInTheDocument();
+  });
+
+  it('marks a category "Nem renda nem gasto" after asking, and unmarks it (ADR 0056)', async () => {
+    const loans = category(6, 'Empréstimo pessoal', 'DEBIT');
+    const fetchMock = mockCategories({
+      [`GET ${base}`]: { body: [...categories, loans] },
+      [`PATCH ${base}/${loans.id}`]: { body: { ...loans, neutral: true } },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    await choose('Empréstimo pessoal', 'Não contar como renda nem gasto');
+    // It changes every month's dashboard, so it says what changes before doing it.
+    const confirm = await screen.findByRole('alertdialog', {
+      name: 'Não contar Empréstimo pessoal como gasto?',
+    });
+    expect(confirm).toHaveTextContent('do limite de gastos e dos gastos da Análise');
+    expect(confirm).toHaveTextContent('inclusive os que já passaram');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Não contar' }));
+    await expectCall(fetchMock, `${base}/${loans.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ neutral: true }),
+    });
+    expect(
+      await screen.findByText('Empréstimo pessoal não conta mais como gasto'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the mark and offers to count the category again', async () => {
+    const loans = { ...category(6, 'Empréstimo recebido', 'CREDIT'), neutral: true };
+    const fetchMock = mockCategories({
+      [`GET ${base}`]: { body: [...categories, loans] },
+      [`PATCH ${base}/${loans.id}`]: { body: { ...loans, neutral: false } },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    const credits = await section('Entradas');
+    expect(within(credits).getByText('Nem renda nem gasto')).toBeInTheDocument();
+    await choose('Empréstimo recebido', 'Contar como renda');
+    await expectCall(fetchMock, `${base}/${loans.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ neutral: false }),
+    });
+    expect(
+      await screen.findByText('Empréstimo recebido volta a contar como renda'),
+    ).toBeInTheDocument();
   });
 
   it('asks for confirmation, naming the category, before deleting an archived one', async () => {

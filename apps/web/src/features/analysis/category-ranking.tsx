@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { describeRange, type AnalysisSettings } from './filters';
 import { MonthlyChart, MonthlyTable } from './monthly-chart';
-import { savingCategoryIds } from './series';
+import { notSpendingCategoryIds } from './series';
 
 /** Past this many, the smallest categories fold into one "Outras" line (dataviz: ≤ 8 classes). */
 const VISIBLE = 8;
@@ -169,6 +169,7 @@ function CategoryDetail({
     creditsCents: credit ? cents : 0,
     debitsCents: credit ? 0 : cents,
     appliedCents: 0,
+    neutralCents: 0,
     balanceCents: 0,
   }));
   const type = credit ? 'CREDIT' : 'DEBIT';
@@ -223,8 +224,9 @@ export function CategoryRanking({
   const [showAll, setShowAll] = useState(false);
   const opener = useRef<HTMLElement | null>(null);
   const credit = settings.type === 'CREDIT';
-  // Applications are not spending: the saving destinations' categories stay out (ADR 0047).
-  const ranking = categoryRanking(analysis, settings, savingCategoryIds(categories));
+  // Applications are not spending, nor is a loan: the saving destinations' categories and the
+  // ones marked "Nem renda nem gasto" stay out (ADRs 0047, 0056).
+  const ranking = categoryRanking(analysis, settings, notSpendingCategoryIds(categories));
   const folded = !showAll && ranking.length > VISIBLE;
   const shown = folded ? ranking.slice(0, VISIBLE - 1) : ranking;
   const largest = ranking[0]?.totalCents ?? 1;

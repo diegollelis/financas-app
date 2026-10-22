@@ -4,6 +4,14 @@ import type { AnalysisFilters, Category, MonthlyPoint } from '@financas/shared';
 export const savingCategoryIds = (categories: Category[]): ReadonlySet<string> =>
   new Set(categories.filter((category) => category.destinationId).map((category) => category.id));
 
+/** The categories marked "Nem renda nem gasto" (ADR 0056): a loan is not spending. */
+export const neutralCategoryIds = (categories: Category[]): ReadonlySet<string> =>
+  new Set(categories.filter((category) => category.neutral).map((category) => category.id));
+
+/** What the rankings of spending leave out: applications and the neutral categories. */
+export const notSpendingCategoryIds = (categories: Category[]): ReadonlySet<string> =>
+  new Set([...savingCategoryIds(categories), ...neutralCategoryIds(categories)]);
+
 /** Colors in the validated order of ADR 0032 (ADR 0037): credits, debits, balance. */
 export const seriesStyles = {
   credits: { label: 'Entradas', fill: 'fill-chart-1', swatch: 'bg-chart-1' },

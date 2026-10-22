@@ -144,7 +144,7 @@ describe('categories', () => {
       )!;
       const url = `/api/workspaces/${personalWorkspaceId}/categories/${reembolso.id}`;
 
-      for (const body of [{ name: 'Reembolsos' }, { archived: true }]) {
+      for (const body of [{ name: 'Reembolsos' }, { archived: true }, { neutral: true }]) {
         const response = await browser.patch(url).send(body).expect(409);
         expect(response.body).toMatchObject({ code: 'CATEGORY_OF_SPLIT' });
       }
@@ -382,6 +382,38 @@ describe('categories', () => {
       expect(reactivated.body).toEqual({ ...pet, name: 'Animais' });
     });
 
+    it('marks and unmarks "Nem renda nem gasto" (ADR 0056)', async () => {
+      const { browser, personalWorkspaceId } = await t.signUp(maria);
+      const loans = await create(browser, personalWorkspaceId, {
+        name: 'Empréstimo pessoal',
+        type: 'DEBIT',
+      });
+      expect(loans).toMatchObject({ neutral: false });
+      const path = `/api/workspaces/${personalWorkspaceId}/categories/${loans.id}`;
+
+      const marked = await browser.patch(path).send({ neutral: true }).expect(200);
+      expect(marked.body).toEqual({ ...loans, neutral: true });
+      expect(await list(browser, personalWorkspaceId)).toContainEqual(
+        expect.objectContaining({ id: loans.id, neutral: true }),
+      );
+
+      const unmarked = await browser.patch(path).send({ neutral: false }).expect(200);
+      expect(unmarked.body).toEqual({ ...loans, neutral: false });
+    });
+
+    it("never marks a saving destination's category", async () => {
+      const { browser, personalWorkspaceId } = await t.signUp(maria);
+      const investimentos = (await list(browser, personalWorkspaceId)).find(
+        (category) => category.destinationId,
+      )!;
+
+      const response = await browser
+        .patch(`/api/workspaces/${personalWorkspaceId}/categories/${investimentos.id}`)
+        .send({ neutral: true })
+        .expect(409);
+      expect(response.body).toMatchObject({ code: 'CATEGORY_OF_DESTINATION' });
+    });
+
     it('never changes the type', async () => {
       const { browser, personalWorkspaceId } = await t.signUp(maria);
       const pet = await create(browser, personalWorkspaceId, { name: 'Pet', type: 'DEBIT' });
@@ -481,15 +513,29 @@ describe('categories', () => {
         name: 'Aluguel recebido',
         type: 'CREDIT',
       });
+      const loans = await create(browser, personalWorkspaceId, {
+        name: 'Empréstimo pessoal',
+        type: 'DEBIT',
+      });
+      await browser
+        .patch(`/api/workspaces/${personalWorkspaceId}/categories/${loans.id}`)
+        .send({ neutral: true })
+        .expect(200);
 
       const response = await copy(browser, houseId, {
         sourceWorkspaceId: personalWorkspaceId,
-        categoryIds: [pet.id, aluguel.id],
+        categoryIds: [pet.id, aluguel.id, loans.id],
       }).expect(201);
 
-      expect(response.body).toEqual({ copied: 2, skipped: 0 });
+      expect(response.body).toEqual({ copied: 3, skipped: 0 });
       const house = await list(browser, houseId);
-      expect(house).toContainEqual(expect.objectContaining({ name: 'Pet', type: 'DEBIT' }));
+      expect(house).toContainEqual(
+        expect.objectContaining({ name: 'Pet', type: 'DEBIT', neutral: false }),
+      );
+      // The mark goes along (ADR 0056).
+      expect(house).toContainEqual(
+        expect.objectContaining({ name: 'Empréstimo pessoal', neutral: true }),
+      );
       expect(house).toContainEqual(
         expect.objectContaining({ name: 'Aluguel recebido', type: 'CREDIT', archived: false }),
       );

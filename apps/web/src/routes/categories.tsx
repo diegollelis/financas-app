@@ -183,7 +183,8 @@ function RenameForm({
  * One category and, for EDITORs, what can be done with it in a menu (ADR 0036). One never used
  * can be deleted right away: the defaults are a starting point, not a must. One in use can only
  * be archived, and is never offered for deletion. A saving destination's category is marked and
- * has no menu: it changes with its destination, in the budget (ADR 0047).
+ * has no menu: it changes with its destination, in the budget (ADR 0047). One may be marked
+ * "Nem renda nem gasto" (ADR 0056), asked first since it changes every month's dashboard.
  */
 function CategoryItem({
   workspaceId,
@@ -196,6 +197,7 @@ function CategoryItem({
 }) {
   const [renaming, setRenaming] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingNeutral, setConfirmingNeutral] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateCategory(workspaceId);
   const remove = useDeleteCategory(workspaceId);
@@ -206,6 +208,15 @@ function CategoryItem({
     void confirmWith(
       update.mutateAsync({ id: category.id, archived }),
       archived ? 'Categoria arquivada' : 'Categoria reativada',
+    );
+  // A credit category stops being income; a debit one, an expense (ADR 0056).
+  const countsAs = category.type === 'CREDIT' ? 'renda' : 'gasto';
+  const setNeutral = (neutral: boolean) =>
+    void confirmWith(
+      update.mutateAsync({ id: category.id, neutral }),
+      neutral
+        ? `${name} não conta mais como ${countsAs}`
+        : `${name} volta a contar como ${countsAs}`,
     );
   const confirmDelete = () =>
     void confirmWith(remove.mutateAsync(category.id), 'Categoria excluída').then(() =>
@@ -220,6 +231,7 @@ function CategoryItem({
         {category.destinationId && <Badge variant="secondary">Meta</Badge>}
         {/* Reembolso and Repasse receive the shares of a split and never change (ADR 0052 note). */}
         {category.splitRole && <Badge variant="secondary">Divisão</Badge>}
+        {category.neutral && <Badge variant="secondary">Nem renda nem gasto</Badge>}
       </span>
       {canEdit && !category.destinationId && !category.splitRole && (
         <>
@@ -252,6 +264,18 @@ function CategoryItem({
               ) : (
                 <>
                   <DropdownMenuItem onSelect={() => setRenaming(true)}>Renomear</DropdownMenuItem>
+                  {category.neutral ? (
+                    <DropdownMenuItem
+                      disabled={update.isPending}
+                      onSelect={() => setNeutral(false)}
+                    >
+                      Contar como {countsAs}
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onSelect={() => setConfirmingNeutral(true)}>
+                      Não contar como renda nem gasto
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(true)}>
                     Arquivar
                   </DropdownMenuItem>
@@ -280,6 +304,39 @@ function CategoryItem({
               onDone={() => setRenaming(false)}
             />
           </ResponsiveDialog>
+          <AlertDialog open={confirmingNeutral} onOpenChange={setConfirmingNeutral}>
+            <AlertDialogContent
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                actionsRef.current?.focus();
+              }}
+            >
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Não contar {name} como {countsAs}?
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="grid gap-2">
+                    <p>
+                      Para empréstimos e devoluções: os lançamentos desta categoria continuam no
+                      saldo e na sobra para guardar, mas saem{' '}
+                      {category.type === 'CREDIT'
+                        ? 'das entradas do mês, comparadas com a renda líquida.'
+                        : 'do limite de gastos e dos gastos da Análise.'}
+                    </p>
+                    <p>
+                      Vale para todos os meses, inclusive os que já passaram. Dá para desfazer no
+                      mesmo menu.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => setNeutral(true)}>Não contar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
             <AlertDialogContent
               onCloseAutoFocus={(event) => {

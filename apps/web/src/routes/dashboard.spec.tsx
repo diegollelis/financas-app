@@ -109,6 +109,18 @@ describe('DashboardPage', () => {
     );
   });
 
+  it('says how much came in without counting as income (ADR 0056)', async () => {
+    // An old loan paid back, in a category marked "Nem renda nem gasto".
+    mockDashboard({ ...summarizePeriod(october, budget, today), neutralIncomeCents: 300_000 });
+
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    const budgetBar = await section('Orçamento do mês');
+    expect(nbsp(budgetBar.textContent)).toContain(
+      'Entradas do mêsR$ 6.000,00R$ 1.000,00 acima da renda. Mais R$ 3.000,00 que não contam como renda',
+    );
+  });
+
   it('shows where the credits go, the spending limit and each goal', async () => {
     mockDashboard(summarizePeriod(october, budget, today));
 
