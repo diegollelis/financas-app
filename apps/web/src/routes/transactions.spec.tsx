@@ -229,6 +229,34 @@ describe('TransactionsPage', () => {
     expect(router.state.location.search).toBe('?competencia=2026-11&situacao=pendentes');
   });
 
+  it('keeps notes in several lines: written with breaks, shown in two with "Ver tudo"', async () => {
+    const notes = 'Compra do mês.\nFaltou o azeite.\nTrocar o leite na sexta.';
+    const fetchMock = mockTransactions({
+      [`GET ${base}`]: { body: [salary, light, { ...shopping, notes }] },
+      [`PATCH ${base}/${light.id}`]: { body: light },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const item = row(await section('Saídas'), 'Compras da semana');
+    const more = within(item).getByRole('button', { name: 'Ver tudo' });
+    await userEvent.click(more);
+    expect(within(item).getByRole('button', { name: 'Ver menos' })).toBeInTheDocument();
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    const form = await screen.findByRole('dialog', { name: 'Editar lançamento' });
+    await userEvent.click(within(form).getByText(/^Mais opções/));
+    await userEvent.type(
+      within(form).getByLabelText('Observações (opcional)'),
+      'Leitura de 120 kWh{Enter}Bandeira amarela',
+    );
+    await userEvent.click(within(form).getByRole('button', { name: 'Salvar' }));
+    await expectCall(fetchMock, `${base}/${light.id}`, {
+      method: 'PATCH',
+      body: expect.stringContaining('"notes":"Leitura de 120 kWh\\nBandeira amarela"') as unknown,
+    });
+  });
+
   it('finds a transaction by its notes and by part of its amount', async () => {
     mockTransactions({
       [`GET ${base}`]: { body: [salary, light, { ...shopping, notes: 'Feira do bairro' }] },

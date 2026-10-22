@@ -19,6 +19,7 @@ import { FormField } from '@/components/form-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NotesTextarea } from '@/components/notes-textarea';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PersonSelect } from '@/features/people/person-picker';
@@ -314,7 +315,7 @@ export function RecurrenceForm({
         label="Observações (opcional)"
         error={formState.errors.notes?.message}
       >
-        <Input autoComplete="off" {...register('notes')} />
+        <NotesTextarea {...register('notes')} />
       </FormField>
       {Boolean(error) && (
         <p role="alert" className="text-destructive">

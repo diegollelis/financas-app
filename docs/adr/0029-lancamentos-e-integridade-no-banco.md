@@ -65,3 +65,11 @@ A API sempre aceitou qualquer dia em `settledAt`, ao criar e ao editar, mas a te
 - **Nunca no futuro:** pago é o que já aconteceu ("O pagamento não pode ser numa data futura."); o que ainda vai acontecer é o vencimento. A regra fica no formulário.
 - **O botão da linha continua marcando hoje com um toque,** o caso mais comum. Um item "Pago em outra data…" no menu ficou de fora: o formulário resolve os três casos (corrigir, pagar com data passada, lançar já pago) num lugar só, e o item pode vir depois, se fizer falta.
 - O dia do pagamento não muda a competência nem os números do Painel e da Análise, que dependem só de estar pago ou não.
+
+## Nota (observações em várias linhas, 2026-10-22)
+
+O banco sempre guardou até 1.000 caracteres nas observações (`transactions.notes`), mas o campo era de uma linha só, e uma observação mais longa não cabia de forma legível. Em vez de um campo "Notas" a mais, que teria o mesmo papel e faria a pessoa escolher onde escrever, o próprio campo "Observações" passa a ter várias linhas:
+
+- **Para escrever** (`NotesTextarea`, `components/notes-textarea.tsx`): começa com 2 linhas e cresce com o texto até umas 8, depois rola; Enter quebra a linha. Um contador aparece só perto do limite ("950 de 1.000"), que o campo não deixa passar. Vale no formulário de lançamento, na edição de recorrência e de parcelamento e no "Editar" da linha da importação.
+- **Para ler** (`NotesText`, `components/notes-text.tsx`): com as quebras de linha, até 2 linhas no cartão de Lançamentos e 1 na tabela, com "…". Só quando há mais aparece "Ver tudo", que abre o texto inteiro no próprio lugar ("Ver menos" fecha), sem abrir o formulário: ler não é editar. O botão tem a cor do texto, sublinhado (o azul não tinha contraste nas listras da tabela no tema escuro), e 44 px de toque no celular.
+- Sem mudança na API nem no banco: os 1.000 caracteres continuam, e a busca já procurava nas observações.

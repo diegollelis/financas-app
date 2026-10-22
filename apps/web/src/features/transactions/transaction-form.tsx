@@ -32,6 +32,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { NotesTextarea } from '@/components/notes-textarea';
 import { useCurrentUser } from '@/features/auth/use-me';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
@@ -735,7 +736,7 @@ export function TransactionForm({
             label="Observações (opcional)"
             error={formState.errors.notes?.message}
           >
-            <Input autoComplete="off" {...register('notes')} />
+            <NotesTextarea {...register('notes')} />
           </FormField>
           {/* Side by side from lg; the merchant takes the row when there is no person (a split). */}
           {!application && (

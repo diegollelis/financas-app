@@ -35,6 +35,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/search-input';
+import { NotesText } from '@/components/notes-text';
 import {
   Table,
   TableBody,
@@ -668,7 +669,7 @@ function TransactionItem(props: RowProps) {
           {transaction.dueDate && <span>Vence em {formatIsoDate(transaction.dueDate)}</span>}
         </p>
         {transaction.notes && (
-          <p className="text-muted-foreground text-sm break-words">{transaction.notes}</p>
+          <NotesText text={transaction.notes} lines={2} className="text-muted-foreground text-sm" />
         )}
         <span className="flex flex-wrap gap-1.5">
           <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
@@ -715,7 +716,7 @@ function TransactionRow(props: RowProps) {
         <div className="grid justify-items-start gap-1">
           <span className="font-medium break-words">{transaction.description}</span>
           {transaction.notes && (
-            <span className="text-muted-foreground break-words">{transaction.notes}</span>
+            <NotesText text={transaction.notes} lines={1} className="text-muted-foreground" />
           )}
           <span className="flex flex-wrap gap-1.5 empty:hidden">
             <LinkBadges transaction={transaction} personName={personName} sharedWith={sharedWith} />
