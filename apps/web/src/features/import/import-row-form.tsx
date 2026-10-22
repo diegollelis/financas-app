@@ -22,6 +22,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { NotesTextarea } from '@/components/notes-textarea';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PaymentMethodSelect } from '@/features/transactions/payment-method-select';
@@ -356,7 +357,7 @@ export function ImportRowForm({
         label="Observações (opcional)"
         error={formState.errors.notes?.message}
       >
-        <Input autoComplete="off" {...register('notes')} />
+        <NotesTextarea {...register('notes')} />
       </FormField>
       <div className="grid gap-2 sm:flex sm:flex-row-reverse sm:justify-start">
         <Button type="submit">Salvar na prévia</Button>
