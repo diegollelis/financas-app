@@ -31,7 +31,7 @@ Opção 4, com o nome **"Nem renda nem gasto"**, escolhido numa prévia entre "F
 - **No banco:** `categories.neutral` (booleano, falso por padrão). `PATCH …/categories/:id { neutral }` marca e desmarca. Uma categoria de meta (`CATEGORY_OF_DESTINATION`) e Reembolso/Repasse (`CATEGORY_OF_SPLIT`) não aceitam a marca. A lista devolve `neutral`, a cópia entre espaços (ADR 0048) leva a marca junto, e a exportação de dados (ADR 0041) também.
 - **No painel** (`summarizePeriod`, que recebe as categorias marcadas, arquivadas inclusive):
   - uma saída marcada não é gasto (`expenses`, limite de gastos);
-  - uma entrada marcada não entra em `incomeCents` e é somada à parte em `neutralIncomeCents`, que o cartão do orçamento mostra ("Mais R$ 3.000,00 que não contam como renda");
+  - uma entrada marcada não entra em `incomeCents` e é somada à parte em `neutralIncomeCents`, que o cartão do orçamento mostra ("Mais R$ 3.000,00 fora da renda", numa linha própria embaixo da comparação com a renda);
   - a sobra para guardar (`available`) continua sendo o que entrou menos o que saiu: a saída marcada é descontada dela, e a entrada marcada, somada;
   - o saldo do mês e o saldo atual não mudam.
 - **Na Análise:** as saídas marcadas saem dos gastos (`neutralCents` em `MonthlyPoint` e em `seriesTotals`) e dos rankings de gastos por categoria e por meio de pagamento, como as aplicações nas metas (ADR 0047). As entradas marcadas continuam em "Entradas", que na Análise é o dinheiro que entrou.
