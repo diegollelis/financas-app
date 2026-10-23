@@ -327,9 +327,12 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
           help={
             <>
               <p>
-                As entradas previstas menos as despesas previstas e as saídas das categorias "Nem
-                renda nem gasto", como um empréstimo: é sobre esse valor que as metas são
-                calculadas.
+                As entradas previstas menos as despesas previstas: é sobre esse valor que as metas
+                são calculadas.
+              </p>
+              <p>
+                Nas categorias "Nem renda nem gasto", um empréstimo feito diminui a sobra, e o
+                dinheiro que volta ou que você pegou emprestado fica só no saldo.
               </p>
               <p>O que você guarda não entra na conta: guardar mais não diminui as metas.</p>
             </>

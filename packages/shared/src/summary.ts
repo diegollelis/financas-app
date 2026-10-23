@@ -60,8 +60,9 @@ export const summarySchema = z.object({
   /** The debits in the saving destinations' categories: money put aside. */
   applied: twoViewsSchema,
   /**
-   * Credits − expenses − neutral debits: the base of the saving destinations' goals (never minus
-   * applications). A loan lent leaves less to save; its repayment, more (ADR 0056).
+   * Credits − expenses, without the neutral credits and minus the neutral debits: the base of the
+   * saving destinations' goals (never minus applications). A loan lent leaves less to save; money
+   * coming back, or borrowed, is no new goal and stays in the balance only (ADR 0056 note).
    */
   available: twoViewsSchema,
   budget: budgetSchema,
@@ -132,7 +133,8 @@ function side(transactions: SummaryTransaction[], today: string): Summary['credi
  * goal; Despesas is a share of the net income set in the budget.
  *
  * `neutralCategoryIds`: the categories marked "Nem renda nem gasto" (ADR 0056). Their debits are
- * not expenses and their credits are not income, but both still change what is left to save.
+ * not expenses and their credits are not income; the debits still lower what is left to save, the
+ * credits stay in the balance only (ADR 0056 note).
  */
 export function summarizePeriod(
   transactions: SummaryTransaction[],
@@ -167,10 +169,22 @@ export function summarizePeriod(
     transactions.filter((transaction) => transaction.type === 'DEBIT' && isNeutral(transaction)),
     today,
   );
+  const neutralCredits = side(
+    transactions.filter((transaction) => transaction.type === 'CREDIT' && isNeutral(transaction)),
+    today,
+  );
   const applications = transactions.filter(isApplication);
   const available = {
-    plannedCents: credits.totalCents - expenses.totalCents - neutralDebits.totalCents,
-    settledCents: credits.settledCents - expenses.settledCents - neutralDebits.settledCents,
+    plannedCents:
+      credits.totalCents -
+      neutralCredits.totalCents -
+      expenses.totalCents -
+      neutralDebits.totalCents,
+    settledCents:
+      credits.settledCents -
+      neutralCredits.settledCents -
+      expenses.settledCents -
+      neutralDebits.settledCents,
   };
   // Nothing to set aside when expenses pass the credits: the goals are zero, not negative.
   const savingBase = Math.max(0, available.plannedCents);
