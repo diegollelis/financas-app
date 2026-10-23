@@ -199,6 +199,118 @@ describe('TransactionsPage', () => {
     expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
   });
 
+  // Money lent, in a "Nem renda nem gasto" category, to come back some day (ADRs 0056, 0057).
+  const loansCategory = {
+    id: '01920000-0000-7000-8000-000000000104',
+    name: 'Empréstimos',
+    type: 'CREDIT',
+    archived: false,
+    neutral: true,
+  };
+  const loan = transaction(6, {
+    type: 'CREDIT',
+    description: 'Empréstimo ao Bruno',
+    categoryId: loansCategory.id,
+    amountCents: 300_000,
+  });
+  const withLoan = (
+    body: unknown[] = [salary, light, shopping, loan],
+    routes: Record<string, { status?: number; body: unknown }> = {},
+  ) =>
+    mockTransactions({
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [salaryCategory, energyCategory, marketCategory, loansCategory],
+      },
+      [`GET ${base}`]: { body },
+      ...routes,
+    });
+
+  it('leaves money lent with no due date out of "Saldo previsto" (ADR 0057)', async () => {
+    withLoan();
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const totals = await screen.findByLabelText('Resumo do mês');
+    expect(totals).toHaveTextContent('Entradas+ R$ 8.000,00');
+    expect(nbsp(totals.textContent)).toContain('R$ 3.000,00 sem data, fora do previsto');
+    expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
+  });
+
+  it('receives part of a pending transaction, never more than is pending (ADR 0057)', async () => {
+    const fetchMock = withLoan(undefined, {
+      [`POST ${base}/${loan.id}/settle-part`]: {
+        status: 201,
+        body: {
+          settled: {
+            ...loan,
+            id: transaction(7, {}).id,
+            amountCents: 100_000,
+            settledAt: '2026-10-15',
+          },
+          remaining: { ...loan, amountCents: 200_000 },
+        },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Empréstimo ao Bruno');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Receber parte' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Receber parte: Empréstimo ao Bruno',
+    });
+    expect(within(dialog).getByLabelText('Recebido em')).toHaveValue('2026-10-15');
+    const amount = within(dialog).getByLabelText('Valor recebido (R$)');
+    await userEvent.type(amount, '4.000,00');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Receber parte' }));
+    expect(nbsp(dialog.textContent)).toContain('O valor passa do que está pendente (R$ 3.000,00).');
+
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '1.000,00');
+    expect(nbsp(dialog.textContent)).toContain('Fica pendente R$ 2.000,00.');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '3.000,00');
+    expect(dialog).toHaveTextContent('Quita o que falta: o pendente sai da lista.');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '1.000,00');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Receber parte' }));
+
+    await expectCall(fetchMock, `${base}/${loan.id}/settle-part`, {
+      method: 'POST',
+      body: JSON.stringify({ amountCents: 100_000, settledAt: '2026-10-15' }),
+    });
+    expect(
+      await screen.findByText(
+        (text) => nbsp(text) === 'R$ 1.000,00 recebido de Empréstimo ao Bruno',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('offers "Receber parte" only for a pending one launched once, not split', async () => {
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Parte da luz',
+      categoryId: salaryCategory.id,
+      amountCents: 6_000,
+      splitOfId: light.id,
+    });
+    const installment = {
+      ...shopping,
+      installment: { planId: '01920000-0000-7000-8000-000000000401', number: 2, count: 3 },
+    };
+    withLoan([salary, light, share, installment]);
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    for (const description of [
+      'Salário de outubro',
+      'Conta de luz',
+      'Parte da luz',
+      'Compras da semana',
+    ]) {
+      const menu = await openActions(description);
+      expect(within(menu).queryByRole('menuitem', { name: /parte$/ })).not.toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+    }
+  });
+
   it('finds a transaction by status or by what is typed; the status stays in the address', async () => {
     mockTransactions();
     // As the dashboard's overdue notice opens it.

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { amountCentsSchema, periodSchema } from './money-and-dates.ts';
 import {
   createTransactionInputSchema,
+  partiallySettleable,
+  settlePartInputSchema,
   transactionStatus,
+  undatedReceivable,
   updateTransactionInputSchema,
 } from './transaction.ts';
 
@@ -93,5 +96,57 @@ describe('transactionStatus', () => {
 
   it('without a due date, a pending transaction is never overdue', () => {
     expect(transactionStatus({ dueDate: null, settledAt: null }, today)).toBe('PENDING');
+  });
+});
+
+describe('settlePartInputSchema', () => {
+  it('takes a positive amount and a day', () => {
+    expect(settlePartInputSchema.parse({ amountCents: 150_000, settledAt: '2026-10-23' })).toEqual({
+      amountCents: 150_000,
+      settledAt: '2026-10-23',
+    });
+  });
+
+  it('refuses a zero amount and a missing day', () => {
+    expect(
+      settlePartInputSchema.safeParse({ amountCents: 0, settledAt: '2026-10-23' }).success,
+    ).toBe(false);
+    expect(settlePartInputSchema.safeParse({ amountCents: 100 }).success).toBe(false);
+  });
+});
+
+describe('partiallySettleable', () => {
+  const once = { settledAt: null, splitOfId: null, recurrenceId: null, installment: null };
+  const someId = '01920000-0000-7000-8000-000000000201';
+
+  it('is a pending transaction launched once and not split', () => {
+    expect(partiallySettleable(once, false)).toBe(true);
+  });
+
+  it('is not one settled, split, a share, a month of a recurrence or an installment', () => {
+    expect(partiallySettleable({ ...once, settledAt: '2026-10-02' }, false)).toBe(false);
+    expect(partiallySettleable(once, true)).toBe(false);
+    expect(partiallySettleable({ ...once, splitOfId: someId }, false)).toBe(false);
+    expect(partiallySettleable({ ...once, recurrenceId: someId }, false)).toBe(false);
+    expect(
+      partiallySettleable({ ...once, installment: { planId: someId, number: 1, count: 3 } }, false),
+    ).toBe(false);
+  });
+});
+
+describe('undatedReceivable', () => {
+  const loans = '01920000-0000-7000-8000-000000000105';
+  const neutral = new Set([loans]);
+  const lentBack = { type: 'CREDIT' as const, dueDate: null, settledAt: null, categoryId: loans };
+
+  it('is a pending credit with no due date in a "Nem renda nem gasto" category', () => {
+    expect(undatedReceivable(lentBack, neutral)).toBe(true);
+  });
+
+  it('is not one with a due date, received, a debit or of another category', () => {
+    expect(undatedReceivable({ ...lentBack, dueDate: '2026-10-30' }, neutral)).toBe(false);
+    expect(undatedReceivable({ ...lentBack, settledAt: '2026-10-03' }, neutral)).toBe(false);
+    expect(undatedReceivable({ ...lentBack, type: 'DEBIT' }, neutral)).toBe(false);
+    expect(undatedReceivable(lentBack, new Set())).toBe(false);
   });
 });

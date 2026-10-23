@@ -155,6 +155,8 @@ describe('PeoplePage', () => {
             dueDate: null,
             settledAt: null,
             personId: ana.id,
+            // A share of a split dinner (ADR 0042): paid back whole, never in parts.
+            splitOfId: '01920000-0000-7000-8000-000000000409',
           },
           {
             id: '01920000-0000-7000-8000-000000000402',
@@ -221,6 +223,70 @@ describe('PeoplePage', () => {
       ),
     );
     expect(await screen.findByText('Recebimento desmarcado')).toBeInTheDocument();
+  });
+
+  it('receives part of a loan in the history, where the debt is seen (ADR 0057)', async () => {
+    const loan = {
+      id: '01920000-0000-7000-8000-000000000403',
+      type: 'CREDIT',
+      description: 'Empréstimo ao Bruno',
+      notes: null,
+      categoryId: '01920000-0000-7000-8000-000000000101',
+      amountCents: 600_000,
+      period: '2026-08',
+      dueDate: null,
+      settledAt: null,
+      personId: bruno.id,
+    };
+    const fetchMock = mockPeople({
+      [`GET ${base}/${bruno.id}/transactions`]: { body: [loan] },
+      [`POST /api/workspaces/${houseId}/transactions/${loan.id}/settle-part`]: {
+        status: 201,
+        body: {
+          settled: {
+            ...loan,
+            id: '01920000-0000-7000-8000-000000000404',
+            amountCents: 150_000,
+            period: '2026-10',
+            settledAt: '2026-10-03',
+          },
+          remaining: { ...loan, amountCents: 450_000 },
+        },
+      },
+    });
+    renderApp(page);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver lançamentos com Bruno' }));
+    const history = await screen.findByRole('dialog', { name: 'Lançamentos com Bruno' });
+    await userEvent.click(
+      within(history).getByRole('button', { name: 'Receber parte: Empréstimo ao Bruno' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Receber parte: Empréstimo ao Bruno',
+    });
+    await userEvent.type(within(dialog).getByLabelText('Valor recebido (R$)'), '1.500,00');
+    const day = within(dialog).getByLabelText('Recebido em');
+    await userEvent.clear(day);
+    await userEvent.type(day, '2026-10-03');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Receber parte' }));
+
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        new URL(
+          `/api/workspaces/${houseId}/transactions/${loan.id}/settle-part`,
+          'http://api.test',
+        ),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ amountCents: 150_000, settledAt: '2026-10-03' }),
+        }),
+      ),
+    );
+    // Back to the history, still open.
+    await vi.waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: /^Receber parte/ })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('dialog', { name: 'Lançamentos com Bruno' })).toBeInTheDocument();
   });
 
   it('says so when the history cannot load, without the workspace "not found" notice', async () => {

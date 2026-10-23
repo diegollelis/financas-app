@@ -212,6 +212,8 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Meio "Vale-alimentação/refeição" (o vale do empregador, também o de um só estabelecimento) e "Bônus" entre as categorias padrão de entrada dos espaços novos (nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
   - [x] Análise "Despesas por meio de pagamento" (ou "Entradas por meio de recebimento"), com os mesmos filtros das categorias e "Sem meio" por último
   - [x] Coluna opcional "Meio de pagamento" na planilha modelo (lida pelo rótulo ou por sinônimos comuns, um valor fora da lista vira aviso; a aba "Meios de pagamento" na planilha baixada)
+- [x] **Empréstimo devolvido aos poucos** ([ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md)): "Receber parte" / "Pagar parte" de um lançamento pendente, em Lançamentos e em Pessoas, e o que está a receber sem data numa categoria "Nem renda nem gasto" fora do Saldo previsto
+- [ ] Empréstimo pelo "Dividir com": a categoria de saída marcada aponta para uma categoria de entrada marcada, escolhida pela pessoa, e a divisão vira "Emprestado para" (próximo passo do ADR 0057)
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês

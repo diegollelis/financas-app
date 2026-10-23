@@ -1,5 +1,7 @@
 import {
   categoryListResponseSchema,
+  formatCents,
+  settlePartResponseSchema,
   transactionListResponseSchema,
   transactionSchema,
   workspaceSchema,
@@ -35,6 +37,11 @@ const transactionRoutes: WorkspaceRoute[] = [
     method: 'patch',
     path: (id) => `/api/workspaces/${id}/transactions/${SOME_ID}`,
     body: { settledAt: '2026-10-02' },
+  },
+  {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/transactions/${SOME_ID}/settle-part`,
+    body: { amountCents: 100, settledAt: '2026-10-02' },
   },
   { method: 'delete', path: (id) => `/api/workspaces/${id}/transactions/${SOME_ID}` },
 ];
@@ -422,6 +429,120 @@ describe('transactions', () => {
       await browser.patch(`${base}/${SOME_ID}`).send({ settledAt: null }).expect(404);
       await browser.patch(`${base}/not-a-uuid`).send({ settledAt: null }).expect(404);
       await browser.delete(`${base}/${SOME_ID}`).expect(404);
+    });
+  });
+
+  describe('settling part (ADR 0057)', () => {
+    /** Money lent to Bruno in August, to come back some day. */
+    async function lent() {
+      const ready = await mariaReady();
+      const base = `/api/workspaces/${ready.workspaceId}`;
+      const bruno = (await ready.browser.post(`${base}/people`).send({ name: 'Bruno' }).expect(201))
+        .body as { id: string };
+      const loan = await create(ready.browser, ready.workspaceId, {
+        type: 'CREDIT',
+        description: 'Empréstimo ao Bruno',
+        notes: 'Combinado sem data',
+        categoryId: ready.categoryId('Outros', 'CREDIT'),
+        amountCents: 600_000,
+        period: '2026-08',
+        occurredOn: '2026-08-18',
+        personId: bruno.id,
+        paymentMethod: 'PIX',
+      });
+      const settlePart = (id: string, body: object) =>
+        ready.browser.post(`${base}/transactions/${id}/settle-part`).send(body);
+      return { ...ready, bruno, loan, settlePart };
+    }
+
+    it('launches the part, settled in the month of its day, and keeps the rest pending', async () => {
+      const { browser, workspaceId, bruno, loan, settlePart } = await lent();
+
+      const response = await settlePart(loan.id, {
+        amountCents: 150_000,
+        settledAt: '2026-10-03',
+      }).expect(201);
+
+      const { settled, remaining } = settlePartResponseSchema.parse(response.body);
+      expect(settled).toMatchObject({
+        type: 'CREDIT',
+        description: 'Empréstimo ao Bruno',
+        notes: null,
+        categoryId: loan.categoryId,
+        amountCents: 150_000,
+        period: '2026-10',
+        dueDate: null,
+        settledAt: '2026-10-03',
+        occurredOn: '2026-10-03',
+        personId: bruno.id,
+        paymentMethod: 'PIX',
+      });
+      expect(remaining).toMatchObject({ id: loan.id, amountCents: 450_000, settledAt: null });
+      expect((await list(browser, workspaceId, '2026-08')).map((t) => t.amountCents)).toEqual([
+        450_000,
+      ]);
+      expect((await list(browser, workspaceId, '2026-10')).map((t) => t.id)).toEqual([settled.id]);
+    });
+
+    it('deletes the pending one when the part is all that is left', async () => {
+      const { browser, workspaceId, loan, settlePart } = await lent();
+
+      const response = await settlePart(loan.id, {
+        amountCents: 600_000,
+        settledAt: '2026-10-03',
+      }).expect(201);
+
+      expect(settlePartResponseSchema.parse(response.body).remaining).toBeNull();
+      expect(await list(browser, workspaceId, '2026-08')).toEqual([]);
+    });
+
+    it('refuses more than is pending and a day in the future, changing nothing', async () => {
+      const { browser, workspaceId, loan, settlePart } = await lent();
+
+      const tooMuch = await settlePart(loan.id, {
+        amountCents: 600_001,
+        settledAt: '2026-10-03',
+      }).expect(400);
+      expect(tooMuch.body).toMatchObject({
+        code: 'INVALID_INPUT',
+        message: `O valor passa do que está pendente (${formatCents(600_000)}).`,
+      });
+      await settlePart(loan.id, { amountCents: 100, settledAt: '2999-01-01' }).expect(400);
+
+      expect((await list(browser, workspaceId, '2026-08'))[0]?.amountCents).toBe(600_000);
+    });
+
+    it('refuses one settled, split, a share and a month of a recurrence', async () => {
+      const { browser, workspaceId, categoryId, bruno, loan, settlePart } = await lent();
+      const base = `/api/workspaces/${workspaceId}`;
+      const part = { amountCents: 100, settledAt: '2026-10-03' };
+      await browser.patch(`${base}/transactions/${loan.id}`).send({ settledAt: '2026-10-02' });
+      const dinner = await create(browser, workspaceId, {
+        type: 'DEBIT',
+        description: 'Jantar',
+        categoryId: categoryId('Restaurantes', 'DEBIT'),
+        amountCents: 20_000,
+        period: '2026-10',
+        split: [{ personId: bruno.id, amountCents: 10_000 }],
+      });
+      const share = (await list(browser, workspaceId, '2026-10')).find((t) => t.splitOfId)!;
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Conta de luz',
+          categoryId: categoryId('Contas da casa', 'DEBIT'),
+          amountCents: 18_000,
+          dueDay: 10,
+          startPeriod: '2026-11',
+        })
+        .expect(201);
+      const month = (await list(browser, workspaceId, '2026-11'))[0]!;
+
+      for (const id of [loan.id, dinner.id, share.id, month.id]) {
+        const response = await settlePart(id, part).expect(409);
+        expect(response.body).toMatchObject({ code: 'NOT_PARTIALLY_SETTLEABLE' });
+      }
     });
   });
 

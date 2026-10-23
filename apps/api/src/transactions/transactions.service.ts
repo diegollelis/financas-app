@@ -1,6 +1,10 @@
 import {
+  formatCents,
   shareDescription,
+  todayIso,
   type CreateTransactionInput,
+  type SettlePartInput,
+  type SettlePartResponse,
   type SplitShareInput,
   type Transaction,
   type UpdateTransactionInput,
@@ -17,9 +21,9 @@ import { shareCategoryId } from '../categories/share-category.js';
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
 import { Prisma } from '../generated/prisma/client.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
-import { optionalDate, toIsoDate } from './dates.js';
+import { optionalDate, toDate, toIsoDate } from './dates.js';
 import { followDescription, followShares } from './share-description.js';
 
 /** Every read brings what generated the transaction, if anything: a recurrence or a plan (ADR 0038). */
@@ -255,6 +259,81 @@ export class TransactionsService {
       },
     });
     if (count === 0) throw new NotFoundException();
+  }
+
+  /**
+   * Part of a pending transaction received or paid (ADR 0057): the part is launched, settled on
+   * that day and in its competência, like the transaction in all else; the pending one keeps the
+   * rest. When the part is all that is left, the pending one is deleted instead of settled, so the
+   * money counts in the month it came, not in the competência of the debt. One interactive
+   * transaction with the RLS context (ADR 0028): both or neither.
+   */
+  async settlePart(
+    workspaceId: string,
+    transactionId: string,
+    input: SettlePartInput,
+  ): Promise<SettlePartResponse> {
+    const current = await this.find(workspaceId, transactionId);
+    const origin = await this.prisma.forWorkspace(workspaceId).transaction.findFirstOrThrow({
+      where: { id: current.id, workspaceId },
+      select: {
+        occurrence: { select: { recurrenceId: true } },
+        _count: { select: { shares: true } },
+      },
+    });
+    const refuse = (message: string) =>
+      new ConflictException({ code: 'NOT_PARTIALLY_SETTLEABLE', message });
+    if (current.settledAt) throw refuse('Este lançamento já foi quitado.');
+    if (current.splitOfId) {
+      throw refuse('Esta é a parte de uma divisão: receba ou pague o valor todo.');
+    }
+    if (origin._count.shares > 0) {
+      throw refuse('Este lançamento está dividido: receba ou pague o valor todo.');
+    }
+    if (origin.occurrence || current.installmentPlanId) {
+      throw refuse('Um mês de recorrência ou uma parcela se quita pelo valor todo.');
+    }
+    const invalid = (message: string) =>
+      new BadRequestException({ code: 'INVALID_INPUT', message });
+    if (input.settledAt > todayIso()) throw invalid('A data não pode ser no futuro.');
+    if (input.amountCents > current.amountCents) {
+      throw invalid(`O valor passa do que está pendente (${formatCents(current.amountCents)}).`);
+    }
+
+    const all = input.amountCents === current.amountCents;
+    const result = await this.prisma.$transaction(async (tx) => {
+      await setWorkspaceContext(tx, workspaceId);
+      const settled = await tx.transaction.create({
+        data: {
+          workspaceId,
+          type: current.type,
+          description: current.description,
+          categoryId: current.categoryId,
+          amountCents: input.amountCents,
+          period: input.settledAt.slice(0, 7),
+          settledAt: toDate(input.settledAt),
+          occurredOn: toDate(input.settledAt),
+          personId: current.personId,
+          merchantId: current.merchantId,
+          paymentMethod: current.paymentMethod,
+        },
+        include: withOrigin,
+      });
+      if (all) {
+        await tx.transaction.delete({ where: { id: current.id, workspaceId } });
+        return { settled, remaining: null };
+      }
+      const remaining = await tx.transaction.update({
+        where: { id: current.id, workspaceId },
+        data: { amountCents: current.amountCents - input.amountCents },
+        include: withOrigin,
+      });
+      return { settled, remaining };
+    });
+    return {
+      settled: toTransactionResponse(result.settled),
+      remaining: result.remaining && toTransactionResponse(result.remaining),
+    };
   }
 
   /** An id that is not a uuid, or that belongs to another workspace, is simply not found. */
