@@ -1,7 +1,9 @@
 import {
+  settlePartResponseSchema,
   transactionListResponseSchema,
   transactionSchema,
   type CreateTransactionInput,
+  type SettlePartInput,
   type UpdateTransactionInput,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -65,6 +67,20 @@ export function useDeleteTransaction(workspaceId: string) {
     mutationFn: ({ id, withShares = false }: { id: string; withShares?: boolean }) =>
       apiDelete(
         `/api/workspaces/${workspaceId}/transactions/${id}${withShares ? '?withShares=true' : ''}`,
+      ),
+    onSuccess,
+  });
+}
+
+/** Part of a pending transaction received or paid (ADR 0057): the part lands in another month. */
+export function useSettlePart(workspaceId: string) {
+  const onSuccess = useInvalidateTransactions(workspaceId);
+  return useMutation({
+    mutationFn: ({ id, ...input }: SettlePartInput & { id: string }) =>
+      apiPost(
+        `/api/workspaces/${workspaceId}/transactions/${id}/settle-part`,
+        input,
+        settlePartResponseSchema,
       ),
     onSuccess,
   });

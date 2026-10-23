@@ -97,7 +97,24 @@ describe('summarizePeriod', () => {
       plannedCents: 600_000 - 250_990 - 100_000,
       settledCents: 500_000 - 35_000 - 100_000,
     });
-    expect(summary.balance.plannedCents).toBe(900_000 - 420_990);
+    // Still to receive with no due date: in the credits, not in the planned balance (ADR 0057).
+    expect(summary.credits.totalCents).toBe(900_000);
+    expect(summary.undatedCents).toBe(300_000);
+    expect(summary.balance.plannedCents).toBe(600_000 - 420_990);
+  });
+
+  it('keeps in the planned balance what comes back on a due date, or has come (ADR 0057)', () => {
+    const loans = id(105);
+    const dated = { ...credit(300_000), categoryId: loans, dueDate: '2026-10-28' };
+    const received = { ...credit(100_000, '2026-10-03'), categoryId: loans };
+    const summary = summarizePeriod([...month, dated, received], budget, today, new Set([loans]));
+
+    expect(summary.undatedCents).toBe(0);
+    expect(summary.balance.plannedCents).toBe(1_000_000 - 320_990);
+  });
+
+  it('leaves in the planned balance a pending credit with no due date in any other category', () => {
+    expect(summarizePeriod(month, budget, today).undatedCents).toBe(0);
   });
 
   it('splits the debits into expenses and applications, by category', () => {

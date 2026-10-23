@@ -4,11 +4,14 @@ import {
   formatPeriod,
   hasRole,
   occurredOnRowLabels,
+  partiallySettleable,
   paymentMethodLabels,
   settleActionLabels,
+  settlePartLabels,
   todayIso,
   transactionTypeLabels,
   transactionStatus,
+  undatedReceivable,
   type Category,
   type Transaction,
   type TransactionType,
@@ -66,6 +69,7 @@ import {
   statusFilterOptions,
   useStatusFilter,
 } from '@/features/transactions/filters';
+import { SettlePartDialog } from '@/features/transactions/settle-part-dialog';
 import { SettleWithAmount } from '@/features/transactions/settle-with-amount';
 import { PeriodNav } from '@/features/periods/period-nav';
 import { usePeriod } from '@/features/periods/use-period';
@@ -99,18 +103,31 @@ const showError = (error: unknown) => toast.error(apiErrorMessage(error));
 /**
  * What the month adds up to, whatever the search or the filter: what comes in, what goes out
  * and how it ends if everything is paid and received, the Painel's "Saldo previsto" (ADR 0036
- * note).
+ * note). Money lent coming back with no due date stays in the credits but out of the balance
+ * (ADR 0057), and a line under the credits says so.
  */
-function MonthTotals({ transactions }: { transactions: Transaction[] }) {
-  const sum = (type: Transaction['type']) =>
-    transactions
-      .filter((transaction) => transaction.type === type)
-      .reduce((total, transaction) => total + transaction.amountCents, 0);
-  const credits = sum('CREDIT');
-  const debits = sum('DEBIT');
-  const balance = credits - debits;
+function MonthTotals({
+  transactions,
+  neutralCategoryIds,
+}: {
+  transactions: Transaction[];
+  neutralCategoryIds: ReadonlySet<string>;
+}) {
+  const sum = (list: Transaction[]) =>
+    list.reduce((total, transaction) => total + transaction.amountCents, 0);
+  const credits = sum(transactions.filter((transaction) => transaction.type === 'CREDIT'));
+  const debits = sum(transactions.filter((transaction) => transaction.type === 'DEBIT'));
+  const undated = sum(
+    transactions.filter((transaction) => undatedReceivable(transaction, neutralCategoryIds)),
+  );
+  const balance = credits - undated - debits;
   const items = [
-    { label: 'Entradas', value: signedCents('CREDIT', credits), tone: 'text-credit-foreground' },
+    {
+      label: 'Entradas',
+      value: signedCents('CREDIT', credits),
+      tone: 'text-credit-foreground',
+      sub: undated > 0 ? `${formatCents(undated)} sem data, fora do previsto` : null,
+    },
     { label: 'Saídas', value: signedCents('DEBIT', debits), tone: '' },
     {
       label: 'Saldo previsto',
@@ -128,12 +145,17 @@ function MonthTotals({ transactions }: { transactions: Transaction[] }) {
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex items-baseline justify-between gap-3 sm:grid sm:justify-start sm:gap-0.5"
+          className="flex flex-wrap items-baseline justify-between gap-x-3 sm:grid sm:content-start sm:justify-start sm:gap-0.5"
         >
           <dt className="text-muted-foreground text-sm">{item.label}</dt>
           <dd className={`font-semibold whitespace-nowrap tabular-nums ${item.tone}`}>
             {item.value}
           </dd>
+          {item.sub && (
+            <dd className="text-muted-foreground basis-full text-right text-xs sm:text-left">
+              {item.sub}
+            </dd>
+          )}
         </div>
       ))}
     </dl>
@@ -385,6 +407,7 @@ function useRowActions({
   const [repeating, setRepeating] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [askingAmount, setAskingAmount] = useState(false);
+  const [settlingPart, setSettlingPart] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const settleRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateTransaction(workspaceId);
@@ -398,6 +421,8 @@ function useRowActions({
   const repeatable = !inSeries && !transaction.splitOfId;
   // Launched once, not split nor a share: it can become an installment plan (ADR 0038 note).
   const installable = repeatable && shares.length === 0;
+  // Pending, launched once and not split: part of it can be received or paid (ADR 0057).
+  const partable = partiallySettleable(transaction, shares.length > 0);
   const labels = settleActionLabels[transaction.type];
   const settledToast =
     transaction.type === 'CREDIT' ? 'Marcado como recebido' : 'Marcado como pago';
@@ -477,6 +502,11 @@ function useRowActions({
                 {labels.settle}
               </DropdownMenuItem>
             )}
+            {partable && (
+              <DropdownMenuItem onSelect={() => setSettlingPart(true)}>
+                {settlePartLabels[transaction.type].action}
+              </DropdownMenuItem>
+            )}
             {transaction.settledAt && (
               <DropdownMenuItem
                 disabled={update.isPending}
@@ -549,6 +579,15 @@ function useRowActions({
             transaction={transaction}
             open={confirmingEnd}
             onOpenChange={setConfirmingEnd}
+            returnFocusTo={actionsRef}
+          />
+        )}
+        {partable && (
+          <SettlePartDialog
+            workspaceId={workspaceId}
+            transaction={transaction}
+            open={settlingPart}
+            onOpenChange={setSettlingPart}
             returnFocusTo={actionsRef}
           />
         )}
@@ -877,7 +916,14 @@ export function TransactionsPage() {
       >
         <PeriodNav period={period} />
         <ViewModeToggle page="lancamentos" />
-        {ready && transactions.data.length > 0 && <MonthTotals transactions={transactions.data} />}
+        {ready && transactions.data.length > 0 && (
+          <MonthTotals
+            transactions={transactions.data}
+            neutralCategoryIds={
+              new Set(categories.data.filter((category) => category.neutral).map(({ id }) => id))
+            }
+          />
+        )}
         {ready && transactions.data.length > 0 && (
           // The search on a row of its own at every width: beside the filter it was squeezed to a
           // sliver once the filter read "Pagos e recebidos" (ADR 0051).

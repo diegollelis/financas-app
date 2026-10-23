@@ -4,6 +4,8 @@ import {
   formatPeriod,
   hasRole,
   normalizeName,
+  partiallySettleable,
+  settlePartLabels,
   formatIsoDate,
   todayIso,
   transactionStatus,
@@ -52,6 +54,7 @@ import { useCurrentUser } from '@/features/auth/use-me';
 import { signedCents } from '@/features/transactions/row-format';
 import { StatusBadge } from '@/features/transactions/status-badge';
 import { SettleButton } from '@/features/transactions/settle-button';
+import { SettlePartDialog } from '@/features/transactions/settle-part-dialog';
 import { useUpdateTransaction } from '@/features/transactions/use-transactions';
 import { CARD_LIST, CARD_ROW } from '@/features/view-mode/row-styles';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
@@ -228,7 +231,8 @@ function byPeriod(transactions: Transaction[]) {
 /**
  * Every transaction with one person, of any month. A pending one can be marked as received or
  * paid right here: the same settling as "Marcar como pago" in Lançamentos, with today's date, where the
- * debt is seen. An estimated amount still goes to Lançamentos, which asks for the real one.
+ * debt is seen; or only part of it, "Receber parte" (ADR 0057), when it comes back bit by bit.
+ * An estimated amount still goes to Lançamentos, which asks for the real one.
  */
 function PersonHistory({
   workspaceId,
@@ -245,6 +249,11 @@ function PersonHistory({
 }) {
   const transactions = usePersonTransactions(workspaceId, person?.id ?? null);
   const settle = useUpdateTransaction(workspaceId);
+  // "Receber parte" (ADR 0057): the transaction, and where the focus goes back.
+  const [part, setPart] = useState<{
+    transaction: Transaction;
+    returnFocusTo: HTMLElement;
+  } | null>(null);
   const today = todayIso();
   const settleNow = (transaction: Transaction) =>
     settle.mutate(
@@ -314,8 +323,24 @@ function PersonHistory({
                 <ul className={CARD_LIST}>
                   {items.map((transaction) => {
                     const status = transactionStatus(transaction, today);
+                    const settleable =
+                      canEdit && status !== 'SETTLED' && !transaction.amountEstimated;
+                    // A person's transaction is never split, so there are no shares to ask for.
+                    const partable = settleable && partiallySettleable(transaction, false);
+                    const settleButton = (
+                      <SettleButton
+                        type={transaction.type}
+                        overdue={status === 'OVERDUE'}
+                        description={transaction.description}
+                        disabled={settle.isPending}
+                        onClick={() => settleNow(transaction)}
+                      />
+                    );
                     return (
-                      <li key={transaction.id} className={`${CARD_ROW} flex items-start gap-3`}>
+                      <li
+                        key={transaction.id}
+                        className={`${CARD_ROW} flex flex-wrap items-start gap-3`}
+                      >
                         <div className="grid min-w-0 flex-1 gap-1">
                           <p className="font-medium break-words">{transaction.description}</p>
                           {transaction.dueDate && status !== 'SETTLED' && (
@@ -347,16 +372,26 @@ function PersonHistory({
                           >
                             {signedCents(transaction.type, transaction.amountCents)}
                           </span>
-                          {canEdit && status !== 'SETTLED' && !transaction.amountEstimated && (
-                            <SettleButton
-                              type={transaction.type}
-                              overdue={status === 'OVERDUE'}
-                              description={transaction.description}
-                              disabled={settle.isPending}
-                              onClick={() => settleNow(transaction)}
-                            />
-                          )}
+                          {settleable && !partable && settleButton}
                         </div>
+                        {partable && (
+                          // Two buttons get a line of their own: beside the amount they would
+                          // squeeze the description on the phone.
+                          <span className="flex basis-full justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(event) =>
+                                setPart({ transaction, returnFocusTo: event.currentTarget })
+                              }
+                            >
+                              {/* The visible words start the name, for voice control. */}
+                              {settlePartLabels[transaction.type].action}
+                              <span className="sr-only">: {transaction.description}</span>
+                            </Button>
+                            {settleButton}
+                          </span>
+                        )}
                       </li>
                     );
                   })}
@@ -365,6 +400,15 @@ function PersonHistory({
             ))}
           </div>
         ))}
+      {part && (
+        <SettlePartDialog
+          workspaceId={workspaceId}
+          transaction={part.transaction}
+          open
+          onOpenChange={(open) => !open && setPart(null)}
+          returnFocusTo={part.returnFocusTo}
+        />
+      )}
     </ResponsiveDialog>
   );
 }

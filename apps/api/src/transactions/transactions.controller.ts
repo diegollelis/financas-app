@@ -1,10 +1,14 @@
 import {
   createTransactionInputSchema,
+  settlePartInputSchema,
+  settlePartResponseSchema,
   transactionListQuerySchema,
   transactionListResponseSchema,
   transactionSchema,
   updateTransactionInputSchema,
   type CreateTransactionInput,
+  type SettlePartInput,
+  type SettlePartResponse,
   type Transaction,
   type TransactionListQuery,
   type UpdateTransactionInput,
@@ -13,6 +17,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } fr
 import {
   ApiBadRequestResponse,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
@@ -82,6 +87,28 @@ export class TransactionsController {
     @Body({ schema: updateTransactionInputSchema }) input: UpdateTransactionInput,
   ): Promise<Transaction> {
     return this.transactions.update(membership.workspaceId, transactionId, input);
+  }
+
+  @Post(':transactionId/settle-part')
+  @RequireRole('EDITOR')
+  @ApiBody({ schema: openApi(settlePartInputSchema) })
+  @ApiCreatedResponse({
+    description:
+      'The part launched, settled in the competência of its day, and the pending one with the ' +
+      'rest (null when nothing is left) (ADR 0057).',
+    schema: openApi(settlePartResponseSchema),
+  })
+  @ApiBadRequestResponse({ description: 'INVALID_INPUT: more than pending, or a future day.' })
+  @ApiConflictResponse({
+    description: 'NOT_PARTIALLY_SETTLEABLE: settled, split, a share, a recurrence or a plan.',
+  })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  settlePart(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('transactionId') transactionId: string,
+    @Body({ schema: settlePartInputSchema }) input: SettlePartInput,
+  ): Promise<SettlePartResponse> {
+    return this.transactions.settlePart(membership.workspaceId, transactionId, input);
   }
 
   @Delete(':transactionId')

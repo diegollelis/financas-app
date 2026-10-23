@@ -181,9 +181,11 @@ describe('summary', () => {
     expect(october.incomeCents).toBe(500_000);
     expect(october.neutralIncomeCents).toBe(300_000);
     expect(october.expenses.totalCents).toBe(0);
-    // The loan lent leaves less to save; the repayment stays in the balance only.
+    // The loan lent leaves less to save; the repayment stays in the balance only, and the planned
+    // one leaves it out while it has no due date (ADR 0057).
     expect(october.available.plannedCents).toBe(500_000 - 100_000);
-    expect(october.balance.plannedCents).toBe(800_000 - 100_000);
+    expect(october.undatedCents).toBe(300_000);
+    expect(october.balance.plannedCents).toBe(500_000 - 100_000);
   });
 
   it('an empty competência is all zeros, with no budget yet', async () => {

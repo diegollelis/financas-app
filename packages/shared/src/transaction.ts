@@ -170,6 +170,59 @@ export type TransactionListQuery = z.infer<typeof transactionListQuerySchema>;
 export const transactionListResponseSchema = z.array(transactionSchema);
 
 /**
+ * `POST /workspaces/:workspaceId/transactions/:transactionId/settle-part` (ADR 0057): part of a
+ * pending transaction received or paid on that day. The part is launched, settled, in the
+ * competência of the day; the pending one keeps the rest, or goes once nothing is left.
+ */
+export const settlePartInputSchema = z.object({
+  amountCents: amountCentsSchema,
+  settledAt: isoDateSchema,
+});
+
+export type SettlePartInput = z.infer<typeof settlePartInputSchema>;
+
+export const settlePartResponseSchema = z.object({
+  settled: transactionSchema,
+  /** The pending one with what is left; null when the part was all of it. */
+  remaining: transactionSchema.nullable(),
+});
+
+export type SettlePartResponse = z.infer<typeof settlePartResponseSchema>;
+
+/**
+ * Whether part of it may be received or paid (ADR 0057): pending, launched once and not split
+ * (`hasShares`), not a share, a month of a recurrence or an installment.
+ */
+export function partiallySettleable(
+  transaction: Pick<Transaction, 'settledAt' | 'splitOfId' | 'recurrenceId' | 'installment'>,
+  hasShares: boolean,
+): boolean {
+  return (
+    !transaction.settledAt &&
+    !transaction.splitOfId &&
+    !transaction.recurrenceId &&
+    !transaction.installment &&
+    !hasShares
+  );
+}
+
+/**
+ * A pending credit with no due date in a category marked "Nem renda nem gasto" (ADR 0057): money
+ * lent coming back some day, nobody knows when. The planned balance leaves it out.
+ */
+export function undatedReceivable(
+  transaction: Pick<Transaction, 'type' | 'dueDate' | 'settledAt' | 'categoryId'>,
+  neutralCategoryIds: ReadonlySet<string>,
+): boolean {
+  return (
+    transaction.type === 'CREDIT' &&
+    !transaction.dueDate &&
+    !transaction.settledAt &&
+    neutralCategoryIds.has(transaction.categoryId)
+  );
+}
+
+/**
  * Never stored, always derived (ADR 0029): SETTLED once there is a settlement date; OVERDUE when
  * still pending after the due date; PENDING otherwise. `today` is `YYYY-MM-DD` in São Paulo
  * (`todayIso()`); ISO dates compare correctly as text.

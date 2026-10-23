@@ -147,6 +147,10 @@ function BalanceCard({ summary }: { summary: Summary }) {
             Saldo previsto
             <InfoTip term="Saldo previsto">
               <p>Como o mês termina se tudo o que está previsto for recebido e pago.</p>
+              <p>
+                Fica de fora o que está a receber sem vencimento numa categoria que não conta como
+                renda nem gasto, como um empréstimo sem data para voltar.
+              </p>
             </InfoTip>
           </dt>
           <dd className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
@@ -157,6 +161,12 @@ function BalanceCard({ summary }: { summary: Summary }) {
           // The planned view counts estimates of variable bills (ADR 0038): say how much.
           <p className="text-muted-foreground text-sm">
             Inclui {formatCents(summary.estimatedCents)} em valores estimados, de contas que variam.
+          </p>
+        )}
+        {summary.undatedCents > 0 && (
+          // Money lent coming back some day: nobody knows the month (ADR 0057).
+          <p className="text-muted-foreground text-sm">
+            Não inclui {formatCents(summary.undatedCents)} a receber sem data.
           </p>
         )}
       </div>

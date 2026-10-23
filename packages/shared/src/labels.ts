@@ -43,6 +43,15 @@ export const settleActionLabels = {
   DEBIT: { settle: 'Marcar como pago', short: 'Pagar', unsettle: 'Desmarcar pagamento' },
 } as const satisfies Record<TransactionType, { settle: string; short: string; unsettle: string }>;
 
+/**
+ * Part of a pending transaction received or paid (ADR 0057): the action, its amount field and
+ * the word of its toast ("R$ 1.500,00 recebido de …").
+ */
+export const settlePartLabels = {
+  CREDIT: { action: 'Receber parte', amount: 'Valor recebido', done: 'recebido' },
+  DEBIT: { action: 'Pagar parte', amount: 'Valor pago', done: 'pago' },
+} as const satisfies Record<TransactionType, { action: string; amount: string; done: string }>;
+
 /** The statuses that are not settled; the settled one depends on the type (`settledLabels`). */
 export const PENDING_LABEL = 'Pendente';
 export const OVERDUE_LABEL = 'Vencido';

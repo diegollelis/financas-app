@@ -54,3 +54,7 @@ Em produção, a devolução de um empréstimo antigo, de valor alto, entrou na 
 - **Saídas marcadas continuam diminuindo a sobra:** o dinheiro saiu, e há menos para guardar.
 - **O custo:** um empréstimo devolvido como entrada comum na categoria marcada não devolve a sobra que o empréstimo tirou. Na divisão de 100% (a forma recomendada para um empréstimo novo), a parte da pessoa fica em Reembolso, que não é marcada, então a sobra prevista se compensa no próprio mês.
 - **Um empréstimo tomado** segue a mesma regra: o dinheiro emprestado não vira meta, e as parcelas pagas diminuem a sobra dos meses em que saem.
+
+## Nota (o que está a receber sem data, 2026-10-23)
+
+Uma entrada pendente, sem vencimento, numa categoria marcada deixou de contar no Saldo previsto: não há mês em que ela seja esperada. Ela continua nas Entradas e em Pessoas. A decisão, e a ação "Receber parte", estão no [ADR 0057](0057-receber-parte-e-a-receber-sem-data.md).

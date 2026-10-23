@@ -8,7 +8,7 @@ import {
   type Budget,
 } from './budget.ts';
 import { periodSchema } from './money-and-dates.ts';
-import { transactionStatus, type Transaction } from './transaction.ts';
+import { transactionStatus, undatedReceivable, type Transaction } from './transaction.ts';
 
 /**
  * Two views of every indicator (ADR 0031): `planned` counts every transaction of the competência
@@ -53,7 +53,10 @@ export const summarySchema = z.object({
   period: periodSchema,
   credits: sideSchema,
   debits: sideSchema,
-  /** Credits − debits: the money really free, after expenses and applications. */
+  /**
+   * Credits − debits: the money really free, after expenses and applications. The planned view
+   * leaves out `undatedCents` (ADR 0057).
+   */
   balance: twoViewsSchema,
   /** The debits outside the saving destinations' categories and the neutral ones (ADR 0056). */
   expenses: sideSchema,
@@ -92,6 +95,11 @@ export const summarySchema = z.object({
    * left out of `incomeCents`, so the dashboard says how much was left out.
    */
   neutralIncomeCents: z.number().int().default(0),
+  /**
+   * The pending credits with no due date in those categories (`undatedReceivable`, ADR 0057):
+   * still in the credits, left out of the planned balance, since nobody knows when they come.
+   */
+  undatedCents: z.number().int().default(0),
 });
 
 export type Summary = z.infer<typeof summarySchema>;
@@ -134,7 +142,8 @@ function side(transactions: SummaryTransaction[], today: string): Summary['credi
  *
  * `neutralCategoryIds`: the categories marked "Nem renda nem gasto" (ADR 0056). Their debits are
  * not expenses and their credits are not income; the debits still lower what is left to save, the
- * credits stay in the balance only (ADR 0056 note).
+ * credits stay in the balance only (ADR 0056 note), the planned one without those still to receive
+ * with no due date (ADR 0057).
  */
 export function summarizePeriod(
   transactions: SummaryTransaction[],
@@ -238,15 +247,19 @@ export function summarizePeriod(
   );
   const sum = (list: SummaryTransaction[]) =>
     list.reduce((total, transaction) => total + transaction.amountCents, 0);
+  const undatedCents = sum(
+    transactions.filter((transaction) => undatedReceivable(transaction, neutralCategoryIds)),
+  );
 
   return {
     period: budget.period,
     incomeCents: sum(ownCredits.filter((transaction) => !isNeutral(transaction))),
     neutralIncomeCents: sum(ownCredits.filter(isNeutral)),
+    undatedCents,
     credits,
     debits,
     balance: {
-      plannedCents: credits.totalCents - debits.totalCents,
+      plannedCents: credits.totalCents - undatedCents - debits.totalCents,
       settledCents: credits.settledCents - debits.settledCents,
     },
     expenses,
