@@ -49,6 +49,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.27.0** (2026-10-22): o cartão "Orçamento do mês" no painel mostra a renda líquida ao lado das entradas do mês, e o orçamento ganha o atalho "Usar as entradas do mês"; os botões de pagar e receber passam a "↓ Receber" e "↑ Pagar" (vermelho só quando vencido), com "Desfazer" no aviso; e "Ver lançamentos" de Pessoas segue o estilo de Lançamentos ([ADR 0036](adr/0036-design-mobile-first.md), [ADR 0046](adr/0046-orcamento-no-painel.md)).
 - **1.28.0** (2026-10-22): uma categoria pode ser marcada "Nem renda nem gasto", para empréstimos e devoluções: os lançamentos dela continuam no saldo e na sobra para guardar, mas saem das entradas do mês, do limite de gastos e dos gastos da Análise; no cartão do orçamento, cada informação embaixo de "Entradas do mês" fica na sua linha ([ADR 0056](adr/0056-categoria-nem-renda-nem-gasto.md)).
 - **1.28.1** (2026-10-22): nas categorias "Nem renda nem gasto", o dinheiro que volta (ou que se pegou emprestado) não vira meta: fica só no saldo, e a sobra para guardar volta a refletir a renda do mês ([ADR 0056](adr/0056-categoria-nem-renda-nem-gasto.md)).
+- **1.29.0** (2026-10-23): "Receber parte" / "Pagar parte" num lançamento pendente, em Lançamentos e em Pessoas, para um empréstimo devolvido aos poucos; e o que está a receber sem data numa categoria "Nem renda nem gasto" fica fora do Saldo previsto, com uma linha dizendo quanto ([ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md)).
 
 ## Fase 0 — Planejamento ✅
 
