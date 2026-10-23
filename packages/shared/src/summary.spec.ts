@@ -81,7 +81,7 @@ describe('summarizePeriod', () => {
     expect(summary.credits.totalCents).toBe(604_500);
   });
 
-  it('leaves a "Nem renda nem gasto" category out of income and expenses, not of what is left (ADR 0056)', () => {
+  it('leaves a "Nem renda nem gasto" category out of income and expenses (ADR 0056)', () => {
     const loans = id(105);
     const lent = debit(100_000, null, '2026-10-02', loans); // lent to a friend
     const repaid = { ...credit(300_000), categoryId: loans }; // an old loan paid back
@@ -92,9 +92,9 @@ describe('summarizePeriod', () => {
     // Not spending: the expenses and their limit are those of the month without the loan.
     expect(summary.expenses.totalCents).toBe(250_990);
     expect(summary.expensesLeftCents).toBe(300_000 - 250_990);
-    // But the money moved: what is left to save and the balance count both.
+    // The loan lent leaves less to save; the money paid back is no new goal (ADR 0056 note).
     expect(summary.available).toEqual({
-      plannedCents: 900_000 - 250_990 - 100_000,
+      plannedCents: 600_000 - 250_990 - 100_000,
       settledCents: 500_000 - 35_000 - 100_000,
     });
     expect(summary.balance.plannedCents).toBe(900_000 - 420_990);

@@ -318,11 +318,10 @@ function CategoryItem({
                 <AlertDialogDescription asChild>
                   <div className="grid gap-2">
                     <p>
-                      Para empréstimos e devoluções: os lançamentos desta categoria continuam no
-                      saldo e na sobra para guardar, mas saem{' '}
+                      Para empréstimos e devoluções:{' '}
                       {category.type === 'CREDIT'
-                        ? 'das entradas do mês, comparadas com a renda líquida.'
-                        : 'do limite de gastos e dos gastos da Análise.'}
+                        ? 'os lançamentos desta categoria continuam no saldo, mas saem das entradas do mês, comparadas com a renda líquida, e da sobra para guardar.'
+                        : 'os lançamentos desta categoria continuam no saldo e diminuem a sobra para guardar, mas saem do limite de gastos e dos gastos da Análise.'}
                     </p>
                     <p>
                       Vale para todos os meses, inclusive os que já passaram. Dá para desfazer no

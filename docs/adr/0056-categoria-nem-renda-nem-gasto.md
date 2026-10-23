@@ -32,7 +32,7 @@ Opção 4, com o nome **"Nem renda nem gasto"**, escolhido numa prévia entre "F
 - **No painel** (`summarizePeriod`, que recebe as categorias marcadas, arquivadas inclusive):
   - uma saída marcada não é gasto (`expenses`, limite de gastos);
   - uma entrada marcada não entra em `incomeCents` e é somada à parte em `neutralIncomeCents`, que o cartão do orçamento mostra ("Mais R$ 3.000,00 fora da renda", numa linha própria embaixo da comparação com a renda);
-  - a sobra para guardar (`available`) continua sendo o que entrou menos o que saiu: a saída marcada é descontada dela, e a entrada marcada, somada;
+  - a sobra para guardar (`available`) continua sendo o que entrou menos o que saiu: a saída marcada é descontada dela, e a entrada marcada, somada (a entrada deixou de ser somada: ver a nota de 2026-10-22);
   - o saldo do mês e o saldo atual não mudam.
 - **Na Análise:** as saídas marcadas saem dos gastos (`neutralCents` em `MonthlyPoint` e em `seriesTotals`) e dos rankings de gastos por categoria e por meio de pagamento, como as aplicações nas metas (ADR 0047). As entradas marcadas continuam em "Entradas", que na Análise é o dinheiro que entrou.
 - **Na tela:**
@@ -45,3 +45,12 @@ Opção 4, com o nome **"Nem renda nem gasto"**, escolhido numa prévia entre "F
 - **O empréstimo novo, dividido 100% com a pessoa,** sai do limite de gastos. No previsto, a sobra não muda, porque a parte a receber (Reembolso) devolve o valor. No realizado, a sobra fica menor até a pessoa pagar.
 - **Um empréstimo que você tomou** (entrada agora, saídas depois para pagar) segue a mesma regra, se a categoria for marcada.
 - **Uma regra nova sobre saídas ou entradas** precisa decidir o que fazer com as categorias marcadas, como já acontece com as categorias das metas.
+
+## Nota (a devolução não vira meta, 2026-10-22)
+
+Em produção, a devolução de um empréstimo antigo, de valor alto, entrou na sobra para guardar, como esta decisão previa. Cada meta virou um percentual desse valor, e o painel passou a pedir para guardar dezenas de milhares de reais num mês comum.
+
+- **Entradas marcadas saem da sobra para guardar** e ficam só no saldo. As metas dividem o que a renda do mês deixa livre, e dinheiro que volta (ou que se pegou emprestado) não é renda nova. Quem quiser guardá-lo usa "Guardar" na meta.
+- **Saídas marcadas continuam diminuindo a sobra:** o dinheiro saiu, e há menos para guardar.
+- **O custo:** um empréstimo devolvido como entrada comum na categoria marcada não devolve a sobra que o empréstimo tirou. Na divisão de 100% (a forma recomendada para um empréstimo novo), a parte da pessoa fica em Reembolso, que não é marcada, então a sobra prevista se compensa no próprio mês.
+- **Um empréstimo tomado** segue a mesma regra: o dinheiro emprestado não vira meta, e as parcelas pagas diminuem a sobra dos meses em que saem.
