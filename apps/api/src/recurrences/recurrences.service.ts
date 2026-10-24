@@ -449,7 +449,7 @@ export class RecurrencesService {
       const shareType = recurrence.type === 'DEBIT' ? ('CREDIT' as const) : ('DEBIT' as const);
       const shareCategory =
         recurrence.shares.length > 0
-          ? await shareCategoryId(this.prisma, workspaceId, shareType)
+          ? await shareCategoryId(this.prisma, workspaceId, shareType, recurrence.categoryId)
           : null;
       for (const period of missing) {
         const amountCents = recurrence.variableAmount

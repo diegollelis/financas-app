@@ -61,3 +61,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0055](0055-importacao-da-fatura-do-cartao.md)                   | Importação da fatura do cartão, data da compra e apelidos de estabelecimento            | Aceita |
 | [0056](0056-categoria-nem-renda-nem-gasto.md)                    | Categoria "Nem renda nem gasto": empréstimos fora da renda e do limite de gastos        | Aceita |
 | [0057](0057-receber-parte-e-a-receber-sem-data.md)               | Receber parte de um lançamento pendente; o que está a receber sem data fora do previsto | Aceita |
+| [0058](0058-emprestado-para.md)                                  | Emprestado para: a categoria de saída marcada escolhe onde entra a volta do empréstimo  | Aceita |

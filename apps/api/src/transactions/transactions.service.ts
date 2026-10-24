@@ -130,12 +130,12 @@ export class TransactionsService {
     workspaceId: string,
     input: Pick<
       CreateTransactionInput,
-      'type' | 'description' | 'period' | 'dueDate' | 'occurredOn'
+      'type' | 'categoryId' | 'description' | 'period' | 'dueDate' | 'occurredOn'
     >,
     split: SplitShareInput[],
   ) {
     const type = input.type === 'DEBIT' ? ('CREDIT' as const) : ('DEBIT' as const);
-    const categoryId = await shareCategoryId(this.prisma, workspaceId, type);
+    const categoryId = await shareCategoryId(this.prisma, workspaceId, type, input.categoryId);
     const people = await Promise.all(
       split.map((share) => resolveSplitPerson(this.prisma, workspaceId, share)),
     );
@@ -224,6 +224,16 @@ export class TransactionsService {
           transactionId,
           shareDescription(input.description, installment),
         );
+      }
+      // Into or out of a loan's category: its shares follow, to where the money comes back or to
+      // Reembolso (ADR 0058). Shares created by this same edit were already put there.
+      if (type === 'DEBIT' && categoryId !== current.categoryId && shares.length === 0) {
+        await this.prisma.forWorkspace(workspaceId).transaction.updateMany({
+          where: { workspaceId, splitOfId: transactionId },
+          data: {
+            categoryId: await shareCategoryId(this.prisma, workspaceId, 'CREDIT', categoryId),
+          },
+        });
       }
       // And its due date (ADR 0052 note) and its day (ADR 0055).
       const changed = (field: 'dueDate' | 'occurredOn') =>
@@ -384,6 +394,7 @@ export class TransactionsService {
       workspaceId,
       {
         type: input.type ?? current.type,
+        categoryId: input.categoryId ?? current.categoryId,
         description: input.description ?? current.description,
         period: input.period ?? current.period,
         dueDate: dateOf('dueDate'),

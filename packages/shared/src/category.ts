@@ -41,10 +41,18 @@ export const updateCategoryInputSchema = z
     archived: z.boolean().optional(),
     /** "Nem renda nem gasto" (ADR 0056). */
     neutral: z.boolean().optional(),
+    /**
+     * Where the money lent comes back (ADR 0058): on a debit category marked neutral, a credit
+     * category also marked; null goes back to Reembolso.
+     */
+    returnCategoryId: z.uuid().nullable().optional(),
   })
   .refine(
     (input) =>
-      input.name !== undefined || input.archived !== undefined || input.neutral !== undefined,
+      input.name !== undefined ||
+      input.archived !== undefined ||
+      input.neutral !== undefined ||
+      input.returnCategoryId !== undefined,
     {
       message: 'Nada para alterar.',
     },
@@ -74,6 +82,11 @@ export const categorySchema = z.object({
    * to save, but never in "Entradas do mês", the expenses limit or the expenses of the analysis.
    */
   neutral: z.boolean().optional(),
+  /**
+   * A loan (ADR 0058): on a debit category marked neutral, the credit category, also marked, of
+   * the shares split from its transactions ("Emprestado para"); null keeps them in Reembolso.
+   */
+  returnCategoryId: z.uuid().nullable().optional(),
   /**
    * Whether anything uses it, in any competência: transactions, recurrences or installment plans.
    * Only one never used can be deleted. Sent by the list only.

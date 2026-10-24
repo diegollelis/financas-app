@@ -401,6 +401,15 @@ export function TransactionForm({
   const description = useWatch({ control, name: 'description' });
   const merchantName = useWatch({ control, name: 'merchant' });
   const categoryId = useWatch({ control, name: 'categoryId' });
+  // Money lent (ADR 0058): a debit category that says where the money comes back turns the split
+  // into "Emprestado para".
+  const loanReturnId =
+    type === 'DEBIT'
+      ? categories.find((category) => category.id === categoryId)?.returnCategoryId
+      : null;
+  const loanReturn = loanReturnId
+    ? categories.find((category) => category.id === loanReturnId)
+    : undefined;
   const suggested = useWatch({ control, name: 'suggestedCategoryId' });
   const suggestion =
     hints && !initial && !preset
@@ -805,7 +814,7 @@ export function TransactionForm({
                       />
                     </label>
                     <label htmlFor={id('split')} className="cursor-pointer text-sm font-medium">
-                      Dividir com alguém
+                      {loanReturn ? 'Emprestado para' : 'Dividir com alguém'}
                     </label>
                   </div>
                 )}
@@ -833,6 +842,7 @@ export function TransactionForm({
                       : undefined
                   }
                   monthly={recurring ? { variable, yearly } : undefined}
+                  loan={loanReturn ? { returnsTo: loanReturn.name } : undefined}
                 />
               )}
             </div>

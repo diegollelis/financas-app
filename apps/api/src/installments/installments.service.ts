@@ -343,7 +343,7 @@ export class InstallmentsService {
     split: SplitShareInput[],
   ) {
     const type = input.type === 'DEBIT' ? ('CREDIT' as const) : ('DEBIT' as const);
-    const categoryId = await shareCategoryId(this.prisma, workspaceId, type);
+    const categoryId = await shareCategoryId(this.prisma, workspaceId, type, input.categoryId);
     const people = await Promise.all(
       split.map((share) => resolveSplitPerson(this.prisma, workspaceId, share)),
     );

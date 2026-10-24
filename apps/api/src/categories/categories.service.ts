@@ -13,11 +13,17 @@ import {
   type TransactionType,
   type UpdateCategoryInput,
 } from '@financas/shared';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma, type Category as CategoryRow } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { categoriesInUse, categoryInUse } from './categories-in-use.js';
+import { shareCategoryId } from './share-category.js';
 
 function toResponse(
   category: CategoryRow,
@@ -34,6 +40,7 @@ function toResponse(
     destinationId,
     splitRole: category.splitRole,
     neutral: category.neutral,
+    returnCategoryId: category.returnCategoryId,
     ...(inUse !== undefined && { inUse }),
   };
 }
@@ -53,6 +60,12 @@ const ofSplit = () =>
     code: 'CATEGORY_OF_SPLIT',
     message:
       'Esta categoria recebe as partes das divisões entre pessoas: ela não é renomeada, arquivada nem excluída.',
+  });
+
+const notALoan = () =>
+  new ConflictException({
+    code: 'NOT_A_LOAN_CATEGORY',
+    message: 'Só uma categoria de saída marcada "Nem renda nem gasto" escolhe onde entra a volta.',
   });
 
 const categoryExists = () =>
@@ -259,7 +272,7 @@ export class CategoriesService {
           // Every workspace has its own Reembolso and Repasse (ADR 0052 note).
           splitRole: null,
         },
-        select: { name: true, type: true, neutral: true },
+        select: { id: true, name: true, type: true, neutral: true, returnCategoryId: true },
       }),
       this.prisma
         .forWorkspace(workspaceId)
@@ -274,12 +287,22 @@ export class CategoriesService {
       return [{ workspaceId, name: category.name, type: category.type, neutral: category.neutral }];
     });
     // Someone creating the same name meanwhile: the unique index skips it.
-    const { count } = data.length
-      ? await this.prisma
-          .forWorkspace(workspaceId)
-          .category.createMany({ data, skipDuplicates: true })
-      : { count: 0 };
-    return { copied: count, skipped: requested.size - count };
+    const db = this.prisma.forWorkspace(workspaceId);
+    const created = data.length
+      ? await db.category.createManyAndReturn({ data, skipDuplicates: true })
+      : [];
+    // A loan's return goes along when both were copied (ADR 0058).
+    const newId = new Map(created.map((category) => [key(category), category.id]));
+    const sourceKey = new Map(source.map((category) => [category.id, key(category)]));
+    for (const category of source) {
+      const loan = newId.get(key(category));
+      const target = category.returnCategoryId && sourceKey.get(category.returnCategoryId);
+      const returnCategoryId = target && newId.get(target);
+      if (loan && returnCategoryId) {
+        await db.category.update({ where: { id: loan }, data: { returnCategoryId } });
+      }
+    }
+    return { copied: created.length, skipped: requested.size - created.length };
   }
 
   async update(
@@ -296,13 +319,28 @@ export class CategoriesService {
     let archivedAt: Date | null | undefined;
     if (input.archived === true) archivedAt = current.archivedAt ?? new Date();
     if (input.archived === false) archivedAt = null;
+    // Where a loan's money comes back from (ADR 0058) stays marked and offered while chosen.
+    if (input.neutral === false || input.archived === true) {
+      await this.ensureNotALoanReturn(workspaceId, categoryId);
+    }
+    const neutral = input.neutral ?? current.neutral;
+    let returnCategoryId = input.returnCategoryId;
+    if (returnCategoryId) {
+      if (current.type !== 'DEBIT' || !neutral) throw notALoan();
+      await this.ensureLoanReturn(workspaceId, returnCategoryId);
+    }
+    // Unmarked, it is no loan any more: its shares go back to Reembolso.
+    if (!neutral && current.returnCategoryId) returnCategoryId = null;
 
     try {
-      const category = await this.prisma.forWorkspace(workspaceId).category.update({
-        where: { id: categoryId, workspaceId },
-        data: { name: input.name, archivedAt, neutral: input.neutral },
-      });
       const db = this.prisma.forWorkspace(workspaceId);
+      const category = await db.category.update({
+        where: { id: categoryId, workspaceId },
+        data: { name: input.name, archivedAt, neutral: input.neutral, returnCategoryId },
+      });
+      if (returnCategoryId !== undefined && returnCategoryId !== current.returnCategoryId) {
+        await this.moveLoanShares(workspaceId, categoryId);
+      }
       return toResponse(category, 0, null, await categoryInUse(db, workspaceId, categoryId));
     } catch (error) {
       if (isPrismaError(error, 'P2002')) throw categoryExists();
@@ -320,6 +358,7 @@ export class CategoriesService {
     const current = await this.find(workspaceId, categoryId);
     if (current.splitRole) throw ofSplit();
     await this.ensureNotOwnedByDestination(workspaceId, categoryId);
+    await this.ensureNotALoanReturn(workspaceId, categoryId);
     try {
       const { count } = await this.prisma
         .forWorkspace(workspaceId)
@@ -335,6 +374,55 @@ export class CategoriesService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Where a loan's money comes back (ADR 0058): a credit category of this workspace, marked
+   * "Nem renda nem gasto", offered (not archived) and not Reembolso or Repasse.
+   */
+  private async ensureLoanReturn(workspaceId: string, returnCategoryId: string) {
+    const target = await this.prisma.forWorkspace(workspaceId).category.findFirst({
+      where: { id: returnCategoryId, workspaceId },
+    });
+    if (
+      !target ||
+      target.type !== 'CREDIT' ||
+      !target.neutral ||
+      target.archivedAt ||
+      target.splitRole
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_RETURN_CATEGORY',
+        message: 'Escolha uma categoria de entrada marcada "Nem renda nem gasto".',
+      });
+    }
+  }
+
+  /** The category chosen for a loan's return stays marked, offered and in place (ADR 0058). */
+  private async ensureNotALoanReturn(workspaceId: string, categoryId: string) {
+    const loan = await this.prisma.forWorkspace(workspaceId).category.findFirst({
+      where: { workspaceId, returnCategoryId: categoryId },
+      select: { name: true },
+    });
+    if (loan) {
+      throw new ConflictException({
+        code: 'CATEGORY_RECEIVES_LOANS',
+        message: `Esta categoria recebe a volta dos empréstimos de "${loan.name}". Troque lá, em "Onde entra a volta", antes.`,
+      });
+    }
+  }
+
+  /**
+   * The shares split from the debits of this category, settled or not, go where its money comes
+   * back now: the chosen credit category, or Reembolso (ADR 0058). So a loan launched before the
+   * choice is fixed, and taking the choice back undoes it.
+   */
+  private async moveLoanShares(workspaceId: string, categoryId: string) {
+    const target = await shareCategoryId(this.prisma, workspaceId, 'CREDIT', categoryId);
+    await this.prisma.forWorkspace(workspaceId).transaction.updateMany({
+      where: { workspaceId, type: 'CREDIT', splitOf: { is: { categoryId } } },
+      data: { categoryId: target },
+    });
   }
 
   /** A saving destination's category is renamed, archived and deleted with it (ADR 0047). */

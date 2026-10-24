@@ -339,10 +339,13 @@ function LinkBadges({
   transaction,
   personName,
   sharedWith,
+  lent,
 }: {
   transaction: Transaction;
   personName: string | null;
   sharedWith: string[];
+  /** In a loans category that says where the money comes back (ADR 0058): "Emprestado para". */
+  lent: boolean;
 }) {
   return (
     <>
@@ -366,7 +369,7 @@ function LinkBadges({
       {sharedWith.length > 0 && (
         <Badge variant="secondary" className={WRAPPING_BADGE}>
           <Users aria-hidden />
-          Dividido com {sharedWith.join(', ')}
+          {lent ? 'Emprestado para' : 'Dividido com'} {sharedWith.join(', ')}
         </Badge>
       )}
     </>
@@ -670,7 +673,12 @@ function TransactionItem(props: RowProps) {
         )}
         <span className="flex flex-wrap gap-1.5">
           <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
-          <LinkBadges transaction={transaction} personName={personName} sharedWith={sharedWith} />
+          <LinkBadges
+            transaction={transaction}
+            personName={personName}
+            sharedWith={sharedWith}
+            lent={Boolean(category?.returnCategoryId)}
+          />
         </span>
       </div>
       <div className="grid shrink-0 justify-items-end gap-2">
@@ -721,7 +729,12 @@ function TransactionRow(props: RowProps) {
             />
           )}
           <span className="flex flex-wrap gap-1.5 empty:hidden">
-            <LinkBadges transaction={transaction} personName={personName} sharedWith={sharedWith} />
+            <LinkBadges
+              transaction={transaction}
+              personName={personName}
+              sharedWith={sharedWith}
+              lent={Boolean(category?.returnCategoryId)}
+            />
           </span>
         </div>
       </TableCell>

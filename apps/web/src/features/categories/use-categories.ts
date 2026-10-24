@@ -10,6 +10,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { summaryKey } from '@/features/summary/use-summary';
+import { useInvalidateTransactions } from '@/features/transactions/use-transactions';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
 /** Under ['workspaces', id, ...], like everything else of one workspace. */
@@ -63,15 +64,19 @@ export function useCopyCategories(workspaceId: string) {
 export function useUpdateCategory(workspaceId: string) {
   const queryClient = useQueryClient();
   const invalidateCategories = useInvalidateCategories(workspaceId);
+  const invalidateTransactions = useInvalidateTransactions(workspaceId);
   return useMutation({
     mutationFn: ({ id, ...input }: UpdateCategoryInput & { id: string }) =>
       apiPatch(`/api/workspaces/${workspaceId}/categories/${id}`, input, categorySchema),
     // "Nem renda nem gasto" changes the dashboard of every month (ADR 0056); the analysis reads
-    // the mark from the categories list.
-    onSuccess: () =>
+    // the mark from the categories list. Where a loan comes back moves its shares (ADR 0058).
+    onSuccess: (_category, input) =>
       Promise.all([
         invalidateCategories(),
         queryClient.invalidateQueries({ queryKey: summaryKey(workspaceId) }),
+        ...(input.returnCategoryId !== undefined || input.neutral !== undefined
+          ? [invalidateTransactions()]
+          : []),
       ]),
   });
 }

@@ -42,9 +42,16 @@ export function myShareCents(totalCents: number | null, shares: (number | null)[
 
 /**
  * Equal shares for `count` other people, you included in the division (ADR 0042): what each of
- * them types, the leftover cents (or basis points) staying in yours.
+ * them types, the leftover cents (or basis points) staying in yours. Money lent (ADR 0058) is all
+ * theirs: `includingYou` false divides it among them only.
  */
-export function evenShareValues(totalCents: number, count: number, mode: ShareMode): string[] {
-  const parts = splitEvenly(mode === 'REAIS' ? totalCents : FULL, count + 1).slice(1);
+export function evenShareValues(
+  totalCents: number,
+  count: number,
+  mode: ShareMode,
+  includingYou = true,
+): string[] {
+  const whole = mode === 'REAIS' ? totalCents : FULL;
+  const parts = includingYou ? splitEvenly(whole, count + 1).slice(1) : splitEvenly(whole, count);
   return parts.map((part) => typed.format(part / 100));
 }

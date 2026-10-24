@@ -447,6 +447,130 @@ describe('categories', () => {
     });
   });
 
+  describe('where a loan comes back (ADR 0058)', () => {
+    /** A loans category on each side, both marked, Bruno, and money lent to him before any choice. */
+    async function loans() {
+      const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+      const base = `/api/workspaces/${id}`;
+      const marked = async (type: 'CREDIT' | 'DEBIT') => {
+        const category = await create(browser, id, { name: 'Empréstimo pessoal', type });
+        await browser
+          .patch(`${base}/categories/${category.id}`)
+          .send({ neutral: true })
+          .expect(200);
+        return category.id;
+      };
+      const lent = await marked('DEBIT');
+      const back = await marked('CREDIT');
+      const bruno = (await browser.post(`${base}/people`).send({ name: 'Bruno' }).expect(201))
+        .body as { id: string };
+      const lend = async (amountCents: number) =>
+        (
+          await browser
+            .post(`${base}/transactions`)
+            .send({
+              type: 'DEBIT',
+              description: 'Empréstimo ao Bruno',
+              categoryId: lent,
+              amountCents,
+              period: '2026-10',
+              settledAt: '2026-10-21',
+              split: [{ personId: bruno.id, amountCents }],
+            })
+            .expect(201)
+        ).body as { id: string };
+      await lend(50_000);
+      const shareCategories = async () => {
+        const response = await browser.get(`${base}/transactions?period=2026-10`).expect(200);
+        return (response.body as { splitOfId: string | null; categoryId: string }[])
+          .filter((transaction) => transaction.splitOfId)
+          .map((transaction) => transaction.categoryId);
+      };
+      const reimbursement = (await list(browser, id)).find((c) => c.splitRole === 'REIMBURSEMENT')!;
+      const choose = (returnCategoryId: string | null) =>
+        browser.patch(`${base}/categories/${lent}`).send({ returnCategoryId });
+      return { browser, id, base, lent, back, lend, shareCategories, reimbursement, choose };
+    }
+
+    it('moves the shares already launched there, and back to Reembolso when taken back', async () => {
+      const { lent, back, shareCategories, reimbursement, choose } = await loans();
+      expect(await shareCategories()).toEqual([reimbursement.id]);
+
+      const chosen = await choose(back).expect(200);
+
+      expect(categorySchema.parse(chosen.body)).toMatchObject({ id: lent, returnCategoryId: back });
+      expect(await shareCategories()).toEqual([back]);
+      await choose(null).expect(200);
+      expect(await shareCategories()).toEqual([reimbursement.id]);
+    });
+
+    it('puts the shares of money lent from then on there', async () => {
+      const { back, lend, shareCategories, choose } = await loans();
+      await choose(back).expect(200);
+
+      await lend(20_000);
+
+      expect(await shareCategories()).toEqual([back, back]);
+    });
+
+    it('a debit moved out of the loans category takes its shares to Reembolso', async () => {
+      const { browser, id, base, back, lend, shareCategories, reimbursement, choose } =
+        await loans();
+      await choose(back).expect(200);
+      const lunch = await lend(3_000);
+      const restaurants = (await list(browser, id)).find(
+        (c) => c.name === 'Restaurantes' && c.type === 'DEBIT',
+      )!;
+
+      await browser
+        .patch(`${base}/transactions/${lunch.id}`)
+        .send({ categoryId: restaurants.id })
+        .expect(200);
+
+      expect(await shareCategories()).toEqual([back, reimbursement.id]);
+    });
+
+    it('takes the choice back with the mark, and the shares with it', async () => {
+      const { browser, base, lent, back, shareCategories, reimbursement, choose } = await loans();
+      await choose(back).expect(200);
+
+      const unmarked = await browser
+        .patch(`${base}/categories/${lent}`)
+        .send({ neutral: false })
+        .expect(200);
+
+      expect(unmarked.body).toMatchObject({ neutral: false, returnCategoryId: null });
+      expect(await shareCategories()).toEqual([reimbursement.id]);
+    });
+
+    it('accepts only a marked credit category, chosen by a marked debit one', async () => {
+      const { browser, id, base, lent, back, reimbursement, choose } = await loans();
+      const plain = await create(browser, id, { name: 'Prêmios', type: 'CREDIT' });
+      const otherDebit = await create(browser, id, { name: 'Viagem', type: 'DEBIT' });
+
+      for (const target of [plain.id, lent, reimbursement.id, SOME_ID]) {
+        const response = await choose(target).expect(400);
+        expect(response.body).toMatchObject({ code: 'INVALID_RETURN_CATEGORY' });
+      }
+      const notALoan = await browser
+        .patch(`${base}/categories/${otherDebit.id}`)
+        .send({ returnCategoryId: back })
+        .expect(409);
+      expect(notALoan.body).toMatchObject({ code: 'NOT_A_LOAN_CATEGORY' });
+    });
+
+    it('keeps the chosen category marked, offered and in place while chosen', async () => {
+      const { browser, base, back, choose } = await loans();
+      await choose(back).expect(200);
+
+      for (const body of [{ neutral: false }, { archived: true }]) {
+        const response = await browser.patch(`${base}/categories/${back}`).send(body).expect(409);
+        expect(response.body).toMatchObject({ code: 'CATEGORY_RECEIVES_LOANS' });
+      }
+      await browser.delete(`${base}/categories/${back}`).expect(409);
+    });
+  });
+
   describe('in use', () => {
     it('says which categories have anything in them, in any competência', async () => {
       const { browser, personalWorkspaceId: id } = await t.signUp(maria);
@@ -538,6 +662,39 @@ describe('categories', () => {
       );
       expect(house).toContainEqual(
         expect.objectContaining({ name: 'Aluguel recebido', type: 'CREDIT', archived: false }),
+      );
+    });
+
+    it('keeps where a loan comes back when both categories go along (ADR 0058)', async () => {
+      const { browser, personalWorkspaceId: id, houseId } = await twoWorkspaces();
+      const marked = async (type: 'CREDIT' | 'DEBIT') => {
+        const category = await create(browser, id, { name: 'Empréstimo pessoal', type });
+        await browser
+          .patch(`/api/workspaces/${id}/categories/${category.id}`)
+          .send({ neutral: true })
+          .expect(200);
+        return category.id;
+      };
+      const lent = await marked('DEBIT');
+      const back = await marked('CREDIT');
+      await browser
+        .patch(`/api/workspaces/${id}/categories/${lent}`)
+        .send({ returnCategoryId: back })
+        .expect(200);
+
+      await copy(browser, houseId, {
+        sourceWorkspaceId: id,
+        categoryIds: [lent, back],
+      }).expect(201);
+
+      const house = await list(browser, houseId);
+      const copiedBack = house.find((c) => c.name === 'Empréstimo pessoal' && c.type === 'CREDIT');
+      expect(house).toContainEqual(
+        expect.objectContaining({
+          name: 'Empréstimo pessoal',
+          type: 'DEBIT',
+          returnCategoryId: copiedBack?.id,
+        }),
       );
     });
 
