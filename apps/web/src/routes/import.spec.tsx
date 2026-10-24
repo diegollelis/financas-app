@@ -407,15 +407,68 @@ describe('ImportPage', () => {
       /^Planilha12 lançamentos, junho de 2026 a julho de 2026/,
     );
     expect(previous).toHaveTextContent('por Maria Exemplo');
-    await userEvent.click(within(previous).getByRole('button', { name: /^Desfazer a importação/ }));
+    await userEvent.click(within(previous).getByRole('button', { name: /^Ações da importação/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Desfazer importação' }));
     const confirm = await screen.findByRole('alertdialog');
     expect(confirm).toHaveTextContent(
       'inclusive os que foram editados ou marcados como pagos ou recebidos depois',
     );
+    // Nothing was built on it: no list of what else changes.
+    expect(confirm).not.toHaveTextContent('Também muda');
     await userEvent.click(within(confirm).getByRole('button', { name: 'Desfazer importação' }));
 
     await expectCall(fetchMock, `${base}/imports/${previousImport.id}`, { method: 'DELETE' });
     expect(await screen.findByText('Importação desfeita')).toBeInTheDocument();
+  });
+
+  it('says what else undoing changes, and offers to remove it from the history instead (ADR 0060 note)', async () => {
+    const fetchMock = mockImport({
+      [`GET ${base}/imports`]: {
+        body: [
+          {
+            ...previousImport,
+            dependents: {
+              recurrenceMonths: 3,
+              splitTransactions: 1,
+              installmentAdoptions: 0,
+              plansUntil: '2027-05',
+            },
+          },
+        ],
+      },
+      [`DELETE ${base}/imports/${previousImport.id}?keepTransactions=true`]: {
+        status: 204,
+        body: null,
+      },
+    });
+    renderApp(page);
+
+    const previous = await screen.findByRole('region', { name: 'Planilhas importadas' });
+    const actions = within(previous).getByRole('button', { name: /^Ações da importação/ });
+    await userEvent.click(actions);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Desfazer importação' }));
+    const undo = await screen.findByRole('alertdialog');
+    expect(undo).toHaveTextContent(
+      '3 lançamentos viraram meses de recorrência: esses meses não voltam.',
+    );
+    expect(undo).toHaveTextContent(
+      'Os parcelamentos criados por ela saem inteiros, com as parcelas até maio de 2027.',
+    );
+    expect(undo).toHaveTextContent(
+      '1 lançamento foi dividido: as partes das outras pessoas ficam soltas.',
+    );
+    await userEvent.click(within(undo).getByRole('button', { name: 'Cancelar' }));
+
+    await userEvent.click(actions);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Remover do histórico' }));
+    const forget = await screen.findByRole('alertdialog');
+    expect(forget).toHaveTextContent('Os lançamentos e os parcelamentos dela ficam como estão');
+    await userEvent.click(within(forget).getByRole('button', { name: 'Remover do histórico' }));
+
+    await expectCall(fetchMock, `${base}/imports/${previousImport.id}?keepTransactions=true`, {
+      method: 'DELETE',
+    });
+    expect(await screen.findByText('Importação removida do histórico')).toBeInTheDocument();
   });
 
   it('opens the bank statements by default, and moves between the two pages (ADR 0060)', async () => {

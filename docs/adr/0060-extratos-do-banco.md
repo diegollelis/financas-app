@@ -40,3 +40,18 @@ Opção 3.
 - **O extrato da conta** entra como mais um tipo do Nubank, com o seu leitor, as regras da revisão e a **conferência** com o que já está lançado (casar com o pendente e quitar, avisar valor diferente, reconhecer dinheiro entre as suas contas e caixinhas). Ele será registrado numa nota aqui ou num ADR próprio. A análise de um extrato real mostrou que só ler e criar lançamentos duplicaria quase tudo.
 - **Outros bancos** entram pela lista. Um leitor de **OFX**, o formato que muitos bancos brasileiros exportam para a conta, poderia cobrir vários de uma vez, como "Outro banco (OFX)".
 - **O identificador de cada movimento,** que o extrato da conta traz, será guardado com o banco ("NUBANK:<código>"), para nunca colidir entre bancos.
+
+## Nota (o que o desfazer muda e "Remover do histórico", 2026-10-24)
+
+Com várias importações no histórico, "Desfazer" uma antiga podia apagar mais do que parecia. A confirmação dizia que os lançamentos editados ou pagos saíam junto, mas não o que tinha sido construído sobre eles.
+
+- **A lista de importações traz o que depende de cada uma** (`dependents`):
+  - lançamentos que viraram meses de recorrência, que não voltam depois de desfazer;
+  - lançamentos divididos, cujas partes ficam soltas;
+  - lançamentos que viraram parcelados, cujas outras parcelas ficam;
+  - o último mês dos parcelamentos que a importação criou, que saem inteiros.
+- **A confirmação do "Desfazer"** lista o que não for zero, sob "Também muda".
+- **"Remover do histórico"** (`DELETE …/imports/:id?keepTransactions=true`): a importação sai da lista, e os lançamentos e parcelamentos dela ficam como estão, como se lançados à mão. Só não é mais possível desfazê-la de uma vez. Numa transação com o contexto de RLS, o vínculo é solto e depois a importação é apagada.
+- **As duas ações ficam num menu ⋯** em cada importação, cada uma com a sua confirmação.
+
+O "Desfazer" continua permitido com dependências. A confirmação mostra o que muda, e quem só quer limpar o histórico usa a outra ação.

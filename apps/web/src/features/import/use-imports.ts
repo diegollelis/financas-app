@@ -45,3 +45,16 @@ export function useUndoImport(workspaceId: string) {
     onSuccess,
   });
 }
+
+/**
+ * Removes it from the history (ADR 0060 note): its transactions and plans stay, as if launched by
+ * hand; it can no longer be undone at once.
+ */
+export function useForgetImport(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (importId: string) =>
+      apiDelete(`/api/workspaces/${workspaceId}/imports/${importId}?keepTransactions=true`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: importsKey(workspaceId) }),
+  });
+}

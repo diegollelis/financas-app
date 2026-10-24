@@ -5,7 +5,7 @@ import {
   type CreateImportInput,
   type Import,
 } from '@financas/shared';
-import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -13,6 +13,7 @@ import {
   ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
+  ApiQuery,
   ApiTags,
   type SchemaObject,
 } from '@nestjs/swagger';
@@ -63,12 +64,20 @@ export class ImportsController {
   @Delete(':importId')
   @RequireRole('EDITOR')
   @HttpCode(204)
-  @ApiNoContentResponse({ description: 'Undone: every transaction it brought deleted.' })
+  @ApiNoContentResponse({
+    description:
+      'Undone: every transaction it brought deleted. With keepTransactions=true, only removed from ' +
+      'the history: its transactions and plans stay (ADR 0060 note).',
+  })
+  @ApiQuery({ name: 'keepTransactions', required: false })
   @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
   undo(
     @CurrentMembership() membership: WorkspaceMembership,
     @Param('importId') importId: string,
+    @Query('keepTransactions') keepTransactions?: string,
   ): Promise<void> {
-    return this.imports.undo(membership.workspaceId, importId);
+    return keepTransactions === 'true'
+      ? this.imports.forget(membership.workspaceId, importId)
+      : this.imports.undo(membership.workspaceId, importId);
   }
 }
