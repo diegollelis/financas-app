@@ -207,7 +207,10 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Tela: a origem "Fatura do cartão Nubank", o vencimento e a revisão com as regras da fatura
 - [ ] **Extratos do banco** ([ADR 0060](adr/0060-extratos-do-banco.md)): tudo o que passa pelo banco importado e conferido
   - [x] "Importar" em duas páginas (Extrato do banco, a padrão, e Planilha modelo), com o banco e o tipo guardados em cada importação e a lista de bancos e extratos (`statementBanks`)
-  - [ ] Extrato da conta Nubank: leitor (só o nome da outra parte, sem CPF, CNPJ, banco, agência e conta), competência pela data com aviso de conta do mês anterior, "Pagamento de fatura" e caixinhas (RDB) desmarcados, dinheiro entre as suas contas reconhecido, identificador contra duplicatas
+  - [ ] Extrato da conta Nubank ([ADR 0061](adr/0061-extrato-da-conta-e-conferencia.md)): competência pela data com aviso de conta do mês anterior, "Pagamento de fatura" e caixinhas (RDB) desmarcados, dinheiro entre as suas contas reconhecido
+    - [x] O leitor do CSV da conta, sem tela (`parseNubankAccountCsv`: só o nome da outra parte, sem CPF, CNPJ, banco, agência e conta)
+    - [x] API: o identificador de cada movimento (`external_id`, único no espaço), a importação que quita ou vincula o que já está lançado (`matches`), os candidatos de um extrato e o desfazer que mantém o que foi conferido
+    - [ ] Tela: a revisão do extrato da conta com a conferência, e "Conta" liberada em "Qual extrato?"
   - [ ] Conferência: casar cada movimento com o que já está lançado ("Já lançado", quitar o pendente, "Valor diferente", "Recebimento parcial" de um empréstimo)
   - [ ] A conferência também na fatura do cartão
   - [ ] Outros bancos, talvez por OFX ("Outro banco (OFX)") para o extrato da conta

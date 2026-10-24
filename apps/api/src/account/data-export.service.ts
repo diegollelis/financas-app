@@ -196,6 +196,7 @@ export class DataExportService {
         installmentPlanId: transaction.installmentPlanId,
         installmentNumber: transaction.installmentNumber,
         importId: transaction.importId,
+        externalId: transaction.externalId,
         personId: transaction.personId,
         merchantId: transaction.merchantId,
         paymentMethod: transaction.paymentMethod,

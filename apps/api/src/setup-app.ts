@@ -53,11 +53,12 @@ export function setupApp(app: NestExpressApplication) {
 
   // A spreadsheet import (ADR 0040) carries up to 2,000 transactions, some 500 KB and at most
   // about 3 MB: a larger limit for that route only, mounted first (a parsed body is not parsed
-  // again). Every other route keeps the default 100 KB.
+  // again). So does the list of an account statement's movements sent to be compared (ADR 0061),
+  // up to 2,000 identifiers. Every other route keeps the default 100 KB.
   app
     .getHttpAdapter()
     .getInstance()
-    .post(IMPORTS_PATH, json({ limit: IMPORT_BODY_LIMIT }));
+    .post([IMPORTS_PATH, `${IMPORTS_PATH}/candidates`], json({ limit: IMPORT_BODY_LIMIT }));
   app.useBodyParser('json');
   app.useBodyParser('urlencoded', { extended: true });
 

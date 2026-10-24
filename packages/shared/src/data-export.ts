@@ -47,6 +47,8 @@ const exportTransactionSchema = z.object({
   installmentPlanId: z.uuid().nullable(),
   installmentNumber: z.number().int().nullable(),
   importId: z.uuid().nullable(),
+  /** The bank's movement it is (ADR 0061), "NUBANK:<id>"; null for one launched otherwise. */
+  externalId: z.string().nullable().default(null),
   /** A receber de / a pagar para this person, and the debit a share was split from. */
   personId: z.uuid().nullable(),
   /** Where it was bought or who paid it (ADR 0053). */

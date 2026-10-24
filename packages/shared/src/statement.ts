@@ -40,7 +40,7 @@ const INSTALLMENT = /\s*-?\s*parcela\s+(\d+)\s*\/\s*(\d+)\s*$/i;
 const PAYMENT_TITLES = ['pagamento recebido', 'pagamento em'];
 
 /** Splits one CSV line, keeping quoted fields whole ("5.150,01" has a comma inside). */
-function csvFields(line: string): string[] {
+export function csvFields(line: string): string[] {
   const fields: string[] = [];
   let current = '';
   let quoted = false;
@@ -63,7 +63,7 @@ function csvFields(line: string): string[] {
 }
 
 /** "2026-10-16" or "16/10/2026" → "2026-10-16"; null when it is not a day. */
-function readDay(text: string): string | null {
+export function readDay(text: string): string | null {
   const dayMonthYear = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
   const iso = dayMonthYear
     ? `${dayMonthYear[3]}-${dayMonthYear[2]?.padStart(2, '0')}-${dayMonthYear[1]?.padStart(2, '0')}`

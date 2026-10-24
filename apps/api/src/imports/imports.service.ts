@@ -6,23 +6,50 @@ import {
   shiftPeriod,
   type CreateImportInput,
   type Import,
+  type ImportCandidatesInput,
+  type ImportCandidatesResponse,
   type ImportInstallmentPlanInput,
   type ImportKind,
+  type ImportMatchInput,
   type ImportMerchantAliasInput,
   type StatementBank,
 } from '@financas/shared';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategories } from '../categories/ensure-category.js';
-import type { TransactionImport } from '../generated/prisma/client.js';
+import { Prisma, type TransactionImport } from '../generated/prisma/client.js';
 import { PeopleService } from '../people/people.service.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
+import { RecurrencesService } from '../recurrences/recurrences.service.js';
 import { toDate, toIsoDate } from '../transactions/dates.js';
+import { toTransactionResponse, withOrigin } from '../transactions/transactions.service.js';
 
 type ImportRow = TransactionImport & {
   createdBy: { name: string } | null;
-  _count: { installmentPlans: number };
+  _count: { installmentPlans: number; reconciled: number };
 };
+
+/** A movement of the statement is already in the app: the review was opened before it came. */
+const lineImported = () =>
+  new ConflictException({
+    code: 'STATEMENT_LINE_IMPORTED',
+    message: 'Um movimento deste extrato já foi importado. Abra o extrato de novo para conferir.',
+  });
+
+/** A transaction the review matched was deleted, or took another movement, meanwhile. */
+const matchChanged = () =>
+  new ConflictException({
+    code: 'STATEMENT_MATCH_CHANGED',
+    message:
+      'Um dos lançamentos conferidos mudou ou foi excluído. Abra o extrato de novo para conferir.',
+  });
+
+/** A day `days` after an ISO date (before it, when negative). */
+const shiftDay = (isoDate: string, days: number) =>
+  new Date(toDate(isoDate).getTime() + days * 86_400_000);
+
+/** How far around the statement a settled transaction may be the same movement. */
+const SETTLED_WINDOW_DAYS = 7;
 
 const noDependents: Import['dependents'] = {
   recurrenceMonths: 0,
@@ -36,6 +63,7 @@ function toResponse(row: ImportRow, dependents = noDependents): Import {
     id: row.id,
     transactionCount: row.transactionCount,
     planCount: row._count.installmentPlans,
+    reconciledCount: row._count.reconciled,
     label: row.label,
     statementDueDate: row.statementDueDate && toIsoDate(row.statementDueDate),
     kind: row.kind,
@@ -61,7 +89,7 @@ function kindOf(input: CreateImportInput): { kind: ImportKind; bank: StatementBa
 
 const withCreator = {
   createdBy: { select: { name: true } },
-  _count: { select: { installmentPlans: true } },
+  _count: { select: { installmentPlans: true, reconciled: true } },
 } as const;
 
 /**
@@ -74,6 +102,7 @@ export class ImportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly people: PeopleService,
+    private readonly recurrences: RecurrencesService,
   ) {}
 
   /** Newest first. */
@@ -142,7 +171,9 @@ export class ImportsService {
   async create(workspaceId: string, userId: string, input: CreateImportInput): Promise<Import> {
     const plans = input.plans ?? [];
     const aliases = input.aliases ?? [];
+    const matches = input.matches ?? [];
     await ensureUsableCategories(this.prisma, workspaceId, [...input.transactions, ...plans]);
+    const found = await this.checkMovements(workspaceId, input.transactions, matches);
     const newAliases = await this.newAliases(workspaceId, aliases);
     const merchantIds = await this.merchantIds(workspaceId, [
       ...input.transactions.map((transaction) => transaction.merchantName),
@@ -173,59 +204,163 @@ export class ImportsService {
     const periods = [
       ...input.transactions.map((transaction) => transaction.period),
       ...installmentsOf.flat().map((installment) => installment.period),
-    ].sort();
-    const created = await this.prisma.forWorkspace(workspaceId).transactionImport.create({
-      data: {
-        workspaceId,
-        createdById: userId,
-        transactionCount: periods.length,
-        label: input.label ?? null,
-        statementDueDate: input.statementDueDate ? toDate(input.statementDueDate) : null,
-        ...kindOf(input),
-        firstPeriod: periods[0] ?? '',
-        lastPeriod: periods.at(-1) ?? '',
-        installmentPlans: {
-          create: plans.map((plan, index) => ({
+    ];
+    // The months it covers: what it created, and the days of the movements it found in the app.
+    const covered = [...periods, ...matches.map((match) => match.settledAt.slice(0, 7))].sort();
+    // One interactive transaction with the RLS context (ADR 0028): the import with what it creates,
+    // then the transactions it found, or nothing.
+    const created = await this.prisma
+      .$transaction(async (tx) => {
+        await setWorkspaceContext(tx, workspaceId);
+        const row = await tx.transactionImport.create({
+          data: this.importData(workspaceId, userId, input, {
+            count: periods.length,
+            covered,
+            installmentsOf,
+            merchantOf,
+            personOf,
+          }),
+          include: withCreator,
+        });
+        for (const match of matches) {
+          const wasPending = found.get(match.transactionId)?.pending === true;
+          await tx.transaction.update({
+            where: { id: match.transactionId, workspaceId },
+            data: {
+              externalId: match.externalId,
+              reconciledImportId: row.id,
+              // A pending one is settled on the day the money moved; a settled one keeps its day.
+              settledAt: wasPending ? toDate(match.settledAt) : undefined,
+              amountCents: match.amountCents,
+              // Settling, or giving the amount, confirms an estimate (ADR 0038).
+              amountEstimated: wasPending || match.amountCents !== undefined ? false : undefined,
+            },
+          });
+        }
+        return { ...row, _count: { ...row._count, reconciled: matches.length } };
+      })
+      .catch((error: unknown) => {
+        // Another import brought one of these movements meanwhile (the unique key).
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw lineImported();
+        }
+        // A transaction it matched was deleted meanwhile.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+          throw matchChanged();
+        }
+        throw error;
+      });
+    // A month of a split recurrence: its pending shares in percentages follow the amount (ADR 0052).
+    for (const match of matches) {
+      if (
+        match.amountCents !== undefined &&
+        match.amountCents !== found.get(match.transactionId)?.amountCents
+      ) {
+        await this.recurrences.followAmount(workspaceId, match.transactionId, match.amountCents);
+      }
+    }
+    return toResponse(created);
+  }
+
+  /** The import's row with what it creates, in one nested write. */
+  private importData(
+    workspaceId: string,
+    userId: string,
+    input: CreateImportInput,
+    made: {
+      count: number;
+      covered: string[];
+      installmentsOf: ReturnType<ImportsService['installments']>[];
+      merchantOf: (name: string | undefined) => string | null;
+      personOf: (name: string | undefined) => string | null;
+    },
+  ) {
+    const { installmentsOf, merchantOf, personOf } = made;
+    const plans = input.plans ?? [];
+    return {
+      workspaceId,
+      createdById: userId,
+      transactionCount: made.count,
+      label: input.label ?? null,
+      statementDueDate: input.statementDueDate ? toDate(input.statementDueDate) : null,
+      ...kindOf(input),
+      firstPeriod: made.covered[0] ?? '',
+      lastPeriod: made.covered.at(-1) ?? '',
+      installmentPlans: {
+        create: plans.map((plan, index) => ({
+          workspaceId,
+          type: plan.type,
+          description: plan.description,
+          notes: plan.notes ?? null,
+          categoryId: plan.categoryId,
+          totalCents: plan.amountCents * installmentsCreated(plan),
+          installments: plan.installments,
+          firstNumber: plan.firstNumber ?? 1,
+          firstPeriod: plan.firstPeriod,
+          occurredOn: plan.occurredOn ? toDate(plan.occurredOn) : null,
+          dueDay: plan.dueDay ?? null,
+          dueMonthOffset: plan.dueMonthOffset ?? 0,
+          paymentMethod: plan.paymentMethod ?? null,
+          merchantId: merchantOf(plan.merchantName),
+          transactions: { create: installmentsOf[index]! },
+        })),
+      },
+      transactions: {
+        createMany: {
+          data: input.transactions.map((transaction) => ({
             workspaceId,
-            type: plan.type,
-            description: plan.description,
-            notes: plan.notes ?? null,
-            categoryId: plan.categoryId,
-            totalCents: plan.amountCents * installmentsCreated(plan),
-            installments: plan.installments,
-            firstNumber: plan.firstNumber ?? 1,
-            firstPeriod: plan.firstPeriod,
-            occurredOn: plan.occurredOn ? toDate(plan.occurredOn) : null,
-            dueDay: plan.dueDay ?? null,
-            dueMonthOffset: plan.dueMonthOffset ?? 0,
-            paymentMethod: plan.paymentMethod ?? null,
-            merchantId: merchantOf(plan.merchantName),
-            transactions: { create: installmentsOf[index]! },
+            type: transaction.type,
+            description: transaction.description,
+            notes: transaction.notes ?? null,
+            categoryId: transaction.categoryId,
+            amountCents: transaction.amountCents,
+            period: transaction.period,
+            dueDate: transaction.dueDate ? toDate(transaction.dueDate) : null,
+            settledAt: transaction.settledAt ? toDate(transaction.settledAt) : null,
+            occurredOn: transaction.occurredOn ? toDate(transaction.occurredOn) : null,
+            paymentMethod: transaction.paymentMethod ?? null,
+            merchantId: merchantOf(transaction.merchantName),
+            personId: personOf(transaction.personName),
+            externalId: transaction.externalId ?? null,
           })),
         },
-        transactions: {
-          createMany: {
-            data: input.transactions.map((transaction) => ({
-              workspaceId,
-              type: transaction.type,
-              description: transaction.description,
-              notes: transaction.notes ?? null,
-              categoryId: transaction.categoryId,
-              amountCents: transaction.amountCents,
-              period: transaction.period,
-              dueDate: transaction.dueDate ? toDate(transaction.dueDate) : null,
-              settledAt: transaction.settledAt ? toDate(transaction.settledAt) : null,
-              occurredOn: transaction.occurredOn ? toDate(transaction.occurredOn) : null,
-              paymentMethod: transaction.paymentMethod ?? null,
-              merchantId: merchantOf(transaction.merchantName),
-              personId: personOf(transaction.personName),
-            })),
-          },
-        },
       },
-      include: withCreator,
-    });
-    return toResponse(created);
+    } satisfies Prisma.TransactionImportUncheckedCreateInput;
+  }
+
+  /**
+   * The movements of an account statement (ADR 0061), checked before anything is written: none
+   * may be in the app already, and each transaction matched must still be there without one.
+   * Gives each matched one's amount and whether it is pending, to settle it and follow the amount.
+   */
+  private async checkMovements(
+    workspaceId: string,
+    transactions: CreateImportInput['transactions'],
+    matches: ImportMatchInput[],
+  ): Promise<Map<string, { pending: boolean; amountCents: number }>> {
+    const externalIds = [
+      ...transactions.flatMap((transaction) => transaction.externalId ?? []),
+      ...matches.map((match) => match.externalId),
+    ];
+    if (externalIds.length === 0) return new Map();
+    const db = this.prisma.forWorkspace(workspaceId);
+    const [known, matched] = await Promise.all([
+      db.transaction.count({ where: { workspaceId, externalId: { in: externalIds } } }),
+      db.transaction.findMany({
+        where: { workspaceId, id: { in: matches.map((match) => match.transactionId) } },
+        select: { id: true, externalId: true, settledAt: true, amountCents: true },
+      }),
+    ]);
+    if (known > 0) throw lineImported();
+    if (matched.length !== matches.length || matched.some((row) => row.externalId !== null)) {
+      throw matchChanged();
+    }
+    return new Map(
+      matched.map((row) => [
+        row.id,
+        { pending: row.settledAt === null, amountCents: row.amountCents },
+      ]),
+    );
   }
 
   /**
@@ -344,10 +479,66 @@ export class ImportsService {
    */
   async undo(workspaceId: string, importId: string): Promise<void> {
     if (!z.uuid().safeParse(importId).success) throw new NotFoundException();
-    const { count } = await this.prisma
-      .forWorkspace(workspaceId)
-      .transactionImport.deleteMany({ where: { id: importId, workspaceId } });
-    if (count === 0) throw new NotFoundException();
+    const found = await this.prisma.$transaction(async (tx) => {
+      await setWorkspaceContext(tx, workspaceId);
+      // The transactions it found in the app stay as they are, settled or not, without the
+      // movement (ADR 0061): imported again, the statement matches them again.
+      await tx.transaction.updateMany({
+        where: { workspaceId, reconciledImportId: importId },
+        data: { externalId: null },
+      });
+      const { count } = await tx.transactionImport.deleteMany({
+        where: { id: importId, workspaceId },
+      });
+      return count > 0;
+    });
+    if (!found) throw new NotFoundException();
+  }
+
+  /**
+   * What an account statement may already be in the app (ADR 0061): the movements of the file
+   * already imported, and the transactions without a movement that one may be. The months of
+   * the recurrences are created first, as opening them would, so next month's salary is there.
+   */
+  async candidates(
+    workspaceId: string,
+    input: ImportCandidatesInput,
+  ): Promise<ImportCandidatesResponse> {
+    const first = input.from.slice(0, 7);
+    const last = shiftPeriod(input.to.slice(0, 7), 1);
+    const months: string[] = [];
+    for (let period = first; period <= last; period = shiftPeriod(period, 1)) months.push(period);
+    await this.recurrences.materialize(workspaceId, months);
+    const db = this.prisma.forWorkspace(workspaceId);
+    const [known, transactions] = await Promise.all([
+      input.externalIds.length === 0
+        ? []
+        : db.transaction.findMany({
+            where: { workspaceId, externalId: { in: input.externalIds } },
+            select: { id: true, externalId: true },
+          }),
+      db.transaction.findMany({
+        where: {
+          workspaceId,
+          externalId: null,
+          OR: [
+            { settledAt: null, period: { gte: shiftPeriod(first, -12), lte: last } },
+            {
+              settledAt: {
+                gte: shiftDay(input.from, -SETTLED_WINDOW_DAYS),
+                lte: shiftDay(input.to, SETTLED_WINDOW_DAYS),
+              },
+            },
+          ],
+        },
+        orderBy: [{ period: 'asc' }, { createdAt: 'asc' }],
+        include: withOrigin,
+      }),
+    ]);
+    return {
+      known: known.map((row) => ({ externalId: row.externalId!, transactionId: row.id })),
+      transactions: transactions.map(toTransactionResponse),
+    };
   }
 
   /**
