@@ -1,4 +1,5 @@
 import { formatIsoDate, formatPeriod, type Import, type ImportKind } from '@financas/shared';
+import { Ellipsis } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { InfoTip } from '@/components/info-tip';
@@ -15,8 +16,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { apiErrorMessage } from '@/lib/error-message';
-import { useUndoImport } from './use-imports';
+import { useForgetImport, useUndoImport } from './use-imports';
 
 const PREVIOUS_TITLE_ID = 'previous-imports';
 
@@ -39,6 +46,40 @@ const periodsOf = (item: Import) =>
     ? formatPeriod(item.firstPeriod)
     : `${formatPeriod(item.firstPeriod)} a ${formatPeriod(item.lastPeriod)}`;
 
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+/**
+ * What undoing an import also changes (ADR 0060 note), one line each: the months of a recurrence
+ * that will not come back, the plans it created with their last month, the shares left unlinked,
+ * and the installments made from one of its transactions that stay.
+ */
+function dependentLines(dependents: Import['dependents']): string[] {
+  return [
+    ...(dependents.recurrenceMonths > 0
+      ? [
+          dependents.recurrenceMonths === 1
+            ? '1 lançamento virou mês de recorrência: esse mês não volta.'
+            : `${dependents.recurrenceMonths} lançamentos viraram meses de recorrência: esses meses não voltam.`,
+        ]
+      : []),
+    ...(dependents.plansUntil
+      ? [
+          `Os parcelamentos criados por ela saem inteiros, com as parcelas até ${formatPeriod(dependents.plansUntil)}.`,
+        ]
+      : []),
+    ...(dependents.splitTransactions > 0
+      ? [
+          `${plural(dependents.splitTransactions, 'lançamento foi dividido', 'lançamentos foram divididos')}: as partes das outras pessoas ficam soltas.`,
+        ]
+      : []),
+    ...(dependents.installmentAdoptions > 0
+      ? [
+          `${plural(dependents.installmentAdoptions, 'lançamento virou parcelado', 'lançamentos viraram parcelados')}: as outras parcelas ficam.`,
+        ]
+      : []),
+  ];
+}
+
 function PreviousImport({
   workspaceId,
   item,
@@ -48,19 +89,23 @@ function PreviousImport({
   item: Import;
   canEdit: boolean;
 }) {
-  const [confirming, setConfirming] = useState(false);
-  const undoRef = useRef<HTMLButtonElement>(null);
+  const [confirming, setConfirming] = useState<'undo' | 'forget' | null>(null);
+  const actionsRef = useRef<HTMLButtonElement>(null);
   const undo = useUndoImport(workspaceId);
+  const forget = useForgetImport(workspaceId);
   const when = dateTime.format(new Date(item.createdAt));
-  // mutateAsync: once undone, this row leaves the list and its callbacks would not run.
-  const confirmUndo = () =>
-    void undo.mutateAsync(item.id).then(
+  // mutateAsync: once gone, this row leaves the list and its callbacks would not run.
+  const confirm = (action: 'undo' | 'forget') =>
+    void (action === 'undo' ? undo : forget).mutateAsync(item.id).then(
       () => {
-        toast.success('Importação desfeita');
+        toast.success(
+          action === 'undo' ? 'Importação desfeita' : 'Importação removida do histórico',
+        );
         document.getElementById(PREVIOUS_TITLE_ID)?.focus();
       },
       (error: unknown) => toast.error(apiErrorMessage(error)),
     );
+  const touched = dependentLines(item.dependents);
 
   const counts = `${item.transactionCount} ${item.transactionCount === 1 ? 'lançamento' : 'lançamentos'}${
     item.planCount > 0
@@ -90,35 +135,80 @@ function PreviousImport({
       </div>
       {canEdit && (
         <>
-          <Button
-            ref={undoRef}
-            variant="outline"
-            size="sm"
-            aria-label={`Desfazer a importação de ${when}`}
-            onClick={() => setConfirming(true)}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                ref={actionsRef}
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Ações da importação de ${when}`}
+              >
+                <Ellipsis aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-max">
+              <DropdownMenuItem onSelect={() => setConfirming('forget')}>
+                Remover do histórico
+              </DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" onSelect={() => setConfirming('undo')}>
+                Desfazer importação
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AlertDialog
+            open={confirming !== null}
+            onOpenChange={(open) => !open && setConfirming(null)}
           >
-            Desfazer
-          </Button>
-          <AlertDialog open={confirming} onOpenChange={setConfirming}>
             <AlertDialogContent
               onCloseAutoFocus={(event) => {
                 event.preventDefault();
-                undoRef.current?.focus();
+                actionsRef.current?.focus();
               }}
             >
-              <AlertDialogHeader>
-                <AlertDialogTitle>Desfazer a importação de {when}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Os {item.transactionCount} lançamentos dela saem
-                  {item.planCount > 0 && ', com os parcelamentos que ela criou'}, inclusive os que
-                  foram editados ou marcados como pagos ou recebidos depois. Estabelecimentos e
-                  apelidos ficam. Não é possível desfazer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
+              {confirming === 'forget' ? (
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remover a importação de {when} do histórico?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Os lançamentos e os parcelamentos dela ficam como estão, como se lançados à mão.
+                    Só não será mais possível desfazer esta importação de uma vez.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+              ) : (
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Desfazer a importação de {when}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {item.transactionCount === 1
+                      ? 'O lançamento dela sai'
+                      : `Os ${item.transactionCount} lançamentos dela saem`}
+                    {item.planCount > 0 && ', com os parcelamentos que ela criou'},{' '}
+                    {item.transactionCount === 1
+                      ? 'mesmo se foi editado ou marcado como pago ou recebido depois'
+                      : 'inclusive os que foram editados ou marcados como pagos ou recebidos depois'}
+                    . Estabelecimentos e apelidos ficam. Não é possível desfazer.
+                  </AlertDialogDescription>
+                  {/* What was built on it since (ADR 0060 note): said before, not found after. */}
+                  {touched.length > 0 && (
+                    <div className="bg-accent grid gap-1 rounded-md p-3 text-left text-sm">
+                      <p className="font-medium">Também muda:</p>
+                      <ul className="list-disc pl-5">
+                        {touched.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                      <p className="text-muted-foreground">
+                        Para só limpar o histórico, use "Remover do histórico".
+                      </p>
+                    </div>
+                  )}
+                </AlertDialogHeader>
+              )}
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction variant="destructive" onClick={confirmUndo}>
-                  Desfazer importação
+                <AlertDialogAction
+                  variant={confirming === 'forget' ? 'default' : 'destructive'}
+                  onClick={() => confirming && confirm(confirming)}
+                >
+                  {confirming === 'forget' ? 'Remover do histórico' : 'Desfazer importação'}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

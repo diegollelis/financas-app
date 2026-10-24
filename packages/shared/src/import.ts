@@ -148,6 +148,24 @@ export const importSchema = z.object({
   createdAt: z.iso.datetime(),
   /** Who imported; null once that account no longer exists. */
   createdBy: z.object({ name: z.string() }).nullable(),
+  /**
+   * What was built on its transactions since, which undoing it touches (ADR 0060 note): months
+   * of a recurrence (not generated again), split ones (their shares stay unlinked), ones made an
+   * installment plan (the other installments stay), and the last month of the plans it created.
+   */
+  dependents: z
+    .object({
+      recurrenceMonths: z.number().int(),
+      splitTransactions: z.number().int(),
+      installmentAdoptions: z.number().int(),
+      plansUntil: periodSchema.nullable(),
+    })
+    .default({
+      recurrenceMonths: 0,
+      splitTransactions: 0,
+      installmentAdoptions: 0,
+      plansUntil: null,
+    }),
 });
 
 export type Import = z.infer<typeof importSchema>;

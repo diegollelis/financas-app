@@ -345,6 +345,50 @@ describe('imports', () => {
     await browser.delete(`${base}/imports/nao-e-um-id`).expect(404);
   });
 
+  it('removes an import from the history, keeping its transactions (ADR 0060 note)', async () => {
+    const { browser, base, rows, transactionsOf } = await setUp();
+    const created = importSchema.parse(
+      (await browser.post(`${base}/imports`).send({ transactions: rows }).expect(201)).body,
+    );
+
+    await browser.delete(`${base}/imports/${created.id}?keepTransactions=true`).expect(204);
+
+    expect((await browser.get(`${base}/imports`).expect(200)).body).toEqual([]);
+    expect(await transactionsOf('2026-08')).toHaveLength(2);
+    expect(await transactionsOf('2026-09')).toHaveLength(2);
+    await browser.delete(`${base}/imports/${created.id}?keepTransactions=true`).expect(404);
+  });
+
+  it('says what was built on an import since, which undoing it touches (ADR 0060 note)', async () => {
+    const { browser, base, rows, transactionsOf } = await setUp();
+    const created = importSchema.parse(
+      (await browser.post(`${base}/imports`).send({ transactions: rows }).expect(201)).body,
+    );
+    const august = await transactionsOf('2026-08');
+    const salary = august.find((transaction) => transaction.type === 'CREDIT')!;
+    const grocery = august.find((transaction) => transaction.type === 'DEBIT')!;
+    // The salary repeats every month; the grocery bill is split with Ana.
+    await browser
+      .post(`${base}/recurrences/from-transaction`)
+      .send({ transactionId: salary.id })
+      .expect(201);
+    await browser
+      .patch(`${base}/transactions/${grocery.id}`)
+      .send({ split: [{ newPersonName: 'Ana', amountCents: 20_000 }] })
+      .expect(200);
+
+    const list = importListResponseSchema.parse(
+      (await browser.get(`${base}/imports`).expect(200)).body,
+    );
+
+    expect(list.find((item) => item.id === created.id)?.dependents).toEqual({
+      recurrenceMonths: 1,
+      splitTransactions: 1,
+      installmentAdoptions: 0,
+      plansUntil: null,
+    });
+  });
+
   describe('a card statement (ADR 0055)', () => {
     const statementPeriod = '2026-11';
     const tv = (overrides: object = {}) => ({
@@ -402,6 +446,11 @@ describe('imports', () => {
         firstPeriod: statementPeriod,
         lastPeriod: '2027-06',
       });
+      // The list says how far the plans it created go, which undoing it deletes.
+      const [listed] = importListResponseSchema.parse(
+        (await browser.get(`${base}/imports`).expect(200)).body,
+      );
+      expect(listed?.dependents.plansUntil).toBe('2027-06');
       const [plan] = await plansOf(browser, base);
       expect(plan).toMatchObject({
         installments: 10,

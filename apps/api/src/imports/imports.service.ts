@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { ensureUsableCategories } from '../categories/ensure-category.js';
 import type { TransactionImport } from '../generated/prisma/client.js';
 import { PeopleService } from '../people/people.service.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { toDate, toIsoDate } from '../transactions/dates.js';
 
 type ImportRow = TransactionImport & {
@@ -24,7 +24,14 @@ type ImportRow = TransactionImport & {
   _count: { installmentPlans: number };
 };
 
-function toResponse(row: ImportRow): Import {
+const noDependents: Import['dependents'] = {
+  recurrenceMonths: 0,
+  splitTransactions: 0,
+  installmentAdoptions: 0,
+  plansUntil: null,
+};
+
+function toResponse(row: ImportRow, dependents = noDependents): Import {
   return {
     id: row.id,
     transactionCount: row.transactionCount,
@@ -37,6 +44,7 @@ function toResponse(row: ImportRow): Import {
     lastPeriod: row.lastPeriod,
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
+    dependents,
   };
 }
 
@@ -70,12 +78,57 @@ export class ImportsService {
 
   /** Newest first. */
   async list(workspaceId: string): Promise<Import[]> {
-    const imports = await this.prisma.forWorkspace(workspaceId).transactionImport.findMany({
+    const db = this.prisma.forWorkspace(workspaceId);
+    const imports = await db.transactionImport.findMany({
       where: { workspaceId },
       orderBy: { createdAt: 'desc' },
       include: withCreator,
     });
-    return imports.map(toResponse);
+    const ids = imports.map((item) => item.id);
+    // What was built on the transactions of each import since (ADR 0060 note).
+    const [own, installments] = await Promise.all([
+      db.transaction.findMany({
+        where: { workspaceId, importId: { in: ids } },
+        select: {
+          importId: true,
+          occurrence: { select: { recurrenceId: true } },
+          installmentPlan: { select: { importId: true } },
+          _count: { select: { shares: true } },
+        },
+      }),
+      db.transaction.groupBy({
+        by: ['installmentPlanId'],
+        where: { workspaceId, installmentPlan: { importId: { in: ids } } },
+        _max: { period: true },
+      }),
+    ]);
+    const plans = await db.installmentPlan.findMany({
+      where: { workspaceId, importId: { in: ids } },
+      select: { id: true, importId: true },
+    });
+    const lastOfPlan = new Map(
+      installments.map((group) => [group.installmentPlanId, group._max.period]),
+    );
+    const dependentsOf = (importId: string): Import['dependents'] => {
+      const mine = own.filter((transaction) => transaction.importId === importId);
+      const until = plans
+        .filter((plan) => plan.importId === importId)
+        .map((plan) => lastOfPlan.get(plan.id) ?? null)
+        .filter((period): period is string => period !== null)
+        .sort()
+        .at(-1);
+      return {
+        recurrenceMonths: mine.filter((transaction) => transaction.occurrence).length,
+        splitTransactions: mine.filter((transaction) => transaction._count.shares > 0).length,
+        // Made an installment plan after being imported ("Tornar parcelado"), not one it brought.
+        installmentAdoptions: mine.filter(
+          (transaction) =>
+            transaction.installmentPlan && transaction.installmentPlan.importId !== importId,
+        ).length,
+        plansUntil: until ?? null,
+      };
+    };
+    return imports.map((item) => toResponse(item, dependentsOf(item.id)));
   }
 
   /**
@@ -295,5 +348,30 @@ export class ImportsService {
       .forWorkspace(workspaceId)
       .transactionImport.deleteMany({ where: { id: importId, workspaceId } });
     if (count === 0) throw new NotFoundException();
+  }
+
+  /**
+   * "Remover do histórico" (ADR 0060 note): the import leaves the list, its transactions and plans
+   * stay as they are, as if launched by hand. It can no longer be undone at once. One interactive
+   * transaction with the RLS context (ADR 0028): unlink, then delete, or neither.
+   */
+  async forget(workspaceId: string, importId: string): Promise<void> {
+    if (!z.uuid().safeParse(importId).success) throw new NotFoundException();
+    const found = await this.prisma.$transaction(async (tx) => {
+      await setWorkspaceContext(tx, workspaceId);
+      await tx.transaction.updateMany({
+        where: { workspaceId, importId },
+        data: { importId: null },
+      });
+      await tx.installmentPlan.updateMany({
+        where: { workspaceId, importId },
+        data: { importId: null },
+      });
+      const { count } = await tx.transactionImport.deleteMany({
+        where: { id: importId, workspaceId },
+      });
+      return count > 0;
+    });
+    if (!found) throw new NotFoundException();
   }
 }
