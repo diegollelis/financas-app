@@ -28,7 +28,7 @@ export class AnalysisService {
     const db = this.prisma.forWorkspace(workspaceId);
     // Competências are `YYYY-MM`: as text they sort and compare like dates.
     const range = { workspaceId, period: { gte: from, lte: to } };
-    const [planned, settled] = await Promise.all([
+    const [planned, settled, undated] = await Promise.all([
       db.transaction.groupBy({
         by: ['period', 'type', 'categoryId', 'merchantId', 'paymentMethod'],
         where: range,
@@ -37,6 +37,13 @@ export class AnalysisService {
       db.transaction.groupBy({
         by: ['period', 'type', 'categoryId', 'merchantId', 'paymentMethod'],
         where: { ...range, settledAt: { not: null } },
+        _sum: { amountCents: true },
+      }),
+      // Pending with no due date in a category marked "Nem renda nem gasto": out of the planned
+      // view, as on the dashboard (ADR 0057 note).
+      db.transaction.groupBy({
+        by: ['period', 'type', 'categoryId', 'merchantId', 'paymentMethod'],
+        where: { ...range, settledAt: null, dueDate: null, category: { neutral: true } },
         _sum: { amountCents: true },
       }),
     ]);
@@ -50,6 +57,7 @@ export class AnalysisService {
     }) =>
       `${row.period}|${row.type}|${row.categoryId}|${row.merchantId ?? ''}|${row.paymentMethod ?? ''}`;
     const settledByKey = new Map(settled.map((row) => [key(row), row._sum.amountCents ?? 0]));
+    const undatedByKey = new Map(undated.map((row) => [key(row), row._sum.amountCents ?? 0]));
     const rows: AnalysisRow[] = planned
       .map((row) => ({
         period: row.period,
@@ -59,6 +67,7 @@ export class AnalysisService {
         paymentMethod: row.paymentMethod,
         plannedCents: row._sum.amountCents ?? 0,
         settledCents: settledByKey.get(key(row)) ?? 0,
+        undatedCents: undatedByKey.get(key(row)) ?? 0,
       }))
       .sort((a, b) => key(a).localeCompare(key(b)));
     return { from, to, rows };

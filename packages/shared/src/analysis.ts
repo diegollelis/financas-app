@@ -66,6 +66,12 @@ export const analysisRowSchema = z.object({
   paymentMethod: paymentMethodSchema.nullable().default(null),
   plannedCents: z.number().int().nonnegative(),
   settledCents: z.number().int().nonnegative(),
+  /**
+   * The part of `plannedCents` pending with no due date in a category marked "Nem renda nem
+   * gasto" (`undatedReceivable` / `undatedPayable`, ADR 0057): a loan with no month to come back
+   * or be paid, out of the planned view, as on the dashboard.
+   */
+  undatedCents: z.number().int().nonnegative().default(0),
 });
 
 export type AnalysisRow = z.infer<typeof analysisRowSchema>;
@@ -101,8 +107,9 @@ export const defaultAnalysisFilters: AnalysisFilters = {
   merchantIds: [],
 };
 
+/** What a row counts in a view: the planned one leaves out what has no due date (ADR 0057 note). */
 const amountOf = (row: AnalysisRow, view: AnalysisFilters['view']) =>
-  view === 'SETTLED' ? row.settledCents : row.plannedCents;
+  view === 'SETTLED' ? row.settledCents : row.plannedCents - row.undatedCents;
 
 /** Whether a row passes every filter: each one empty means "all". */
 function matches(row: AnalysisRow, filters: AnalysisFilters) {
@@ -128,6 +135,9 @@ export interface MonthlyPoint {
   neutralCents: number;
   /** Credits minus debits of the competência. */
   balanceCents: number;
+  /** Left out of the planned view (ADR 0057 note): to receive, and to pay, with no due date. */
+  undatedCreditsCents: number;
+  undatedDebitsCents: number;
 }
 
 /** No saving destination: every debit is an expense. */
@@ -155,6 +165,8 @@ export function monthlySeries(
         appliedCents: 0,
         neutralCents: 0,
         balanceCents: 0,
+        undatedCreditsCents: 0,
+        undatedDebitsCents: 0,
       },
     ]),
   );
@@ -164,6 +176,10 @@ export function monthlySeries(
     const cents = amountOf(row, filters.view);
     if (row.type === 'CREDIT') point.creditsCents += cents;
     else point.debitsCents += cents;
+    if (filters.view === 'PLANNED') {
+      if (row.type === 'CREDIT') point.undatedCreditsCents += row.undatedCents;
+      else point.undatedDebitsCents += row.undatedCents;
+    }
     if (row.type === 'DEBIT' && savingCategoryIds.has(row.categoryId)) point.appliedCents += cents;
     if (row.type === 'DEBIT' && neutralCategoryIds.has(row.categoryId)) point.neutralCents += cents;
     point.balanceCents = point.creditsCents - point.debitsCents;
@@ -181,6 +197,8 @@ export function seriesTotals(series: MonthlyPoint[]) {
   const appliedCents = series.reduce((sum, point) => sum + point.appliedCents, 0);
   const neutralCents = series.reduce((sum, point) => sum + point.neutralCents, 0);
   return {
+    undatedCreditsCents: series.reduce((sum, point) => sum + point.undatedCreditsCents, 0),
+    undatedDebitsCents: series.reduce((sum, point) => sum + point.undatedDebitsCents, 0),
     creditsCents,
     debitsCents,
     expensesCents: debitsCents - appliedCents - neutralCents,

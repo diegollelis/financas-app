@@ -72,3 +72,22 @@ O lado oposto: um empréstimo que você **tomou**. Você recebeu o dinheiro (uma
 - **Juros ficam de fora desta regra:** quem deve devolver mais do que recebeu lança a saída pendente com o valor total. Separar juros (gasto) de principal (não gasto) exigiria dois lançamentos, e os apps de consumo também não fazem isso.
 
 É o comportamento do Monarch e do YNAB, que só contam o pagamento de uma dívida sem prazo quando ele acontece.
+
+## Nota (fora do previsto, igual nas três telas, 2026-10-24)
+
+A regra valia para o Saldo previsto, mas os números em volta dele não a seguiam:
+
+- **Em Lançamentos e no Painel,** "Entradas" e "Saídas" mostravam tudo, inclusive o que não tem vencimento. A conta Entradas − Saídas não chegava no Saldo previsto: com um empréstimo de R$ 42.000,00 a receber, o topo mostrava entradas muito maiores e um saldo negativo. No Painel, a barra das entradas era quase toda a parte "A receber sem vencimento".
+- **Na Análise,** a visão Prevista contava o empréstimo. O mesmo mês tinha um saldo muito positivo na Análise e negativo no Painel.
+
+O que mudou:
+
+- **"Entradas" e "Saídas" de Lançamentos e do Painel** contam o que entra no Saldo previsto, e os números do topo fecham com ele.
+  - Em Lançamentos, a linha de baixo diz "Mais R$ X sem vencimento, fora do previsto".
+  - No Painel, a frase embaixo do saldo continua: "Não inclui R$ X a receber sem vencimento".
+- **A barra das entradas, no Painel,** perde a parte "A receber sem vencimento": mostra o que foi pago, o que falta pagar e o saldo previsto, que somam as entradas do topo.
+- **A visão Prevista da Análise** aplica a mesma regra.
+  - A rota devolve, em cada soma, quanto está pendente e sem vencimento numa categoria marcada (`undatedCents`), e as funções de `packages/shared/src/analysis.ts` tiram esse valor dos totais, do mês a mês e dos rankings.
+  - O Saldo do período diz "Não inclui R$ X a receber sem vencimento" (ou "a pagar").
+  - A visão Realizada não muda, porque um pendente nunca entra nela.
+- **A lista de lançamentos e Pessoas** continuam mostrando o empréstimo como antes. O cálculo do Saldo previsto não muda.

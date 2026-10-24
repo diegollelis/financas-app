@@ -230,17 +230,18 @@ describe('TransactionsPage', () => {
       ...routes,
     });
 
-  it('leaves money lent with no due date out of "Saldo previsto" (ADR 0057)', async () => {
+  it('leaves money lent with no due date out of "Entradas" and "Saldo previsto" (ADR 0057)', async () => {
     withLoan();
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     const totals = await screen.findByLabelText('Resumo do mês');
-    expect(totals).toHaveTextContent('Entradas+ R$ 8.000,00');
-    expect(nbsp(totals.textContent)).toContain('R$ 3.000,00 sem vencimento, fora do previsto');
+    // What counts in the balance, so the three add up; the loan is said apart (ADR 0057 note).
+    expect(totals).toHaveTextContent('Entradas+ R$ 5.000,00');
+    expect(nbsp(totals.textContent)).toContain('Mais R$ 3.000,00 sem vencimento, fora do previsto');
     expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
   });
 
-  it('leaves money borrowed, to pay back with no due date, out of "Saldo previsto"', async () => {
+  it('leaves money borrowed, to pay back with no due date, out of "Saídas" and "Saldo previsto"', async () => {
     const debtsCategory = {
       id: '01920000-0000-7000-8000-000000000107',
       name: 'Dívidas',
@@ -263,8 +264,8 @@ describe('TransactionsPage', () => {
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     const totals = await screen.findByLabelText('Resumo do mês');
-    expect(totals).toHaveTextContent('Saídas− R$ 2.509,90');
-    expect(nbsp(totals.textContent)).toContain('R$ 2.000,00 sem vencimento, fora do previsto');
+    expect(totals).toHaveTextContent('Saídas− R$ 509,90');
+    expect(nbsp(totals.textContent)).toContain('Mais R$ 2.000,00 sem vencimento, fora do previsto');
     expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
   });
 

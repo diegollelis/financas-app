@@ -2,8 +2,9 @@ import { formatCents, type Summary } from '@financas/shared';
 import { cn } from '@/lib/utils';
 
 /**
- * Where the month's credits go: debits paid, debits still to pay, what is left (the planned
- * balance) and what is to receive with no due date, out of that balance (ADR 0057). It replaces the spreadsheet's pie ("débitos pagos × saldo final"): one stacked bar
+ * Where the month's credits go: debits paid, debits still to pay and what is left (the planned
+ * balance). What has no due date is out of all three (ADR 0057 note), as in "Entradas" and
+ * "Saídas" above it. It replaces the spreadsheet's pie ("débitos pagos × saldo final"): one stacked bar
  * reads better, and also shows what is still to pay. When debits are more than credits, the
  * bar is the debits alone and a note says by how much. The amounts are in the balance card around
  * it, so the legend names the parts only (ADR 0045 note); the bar's label keeps the numbers.
@@ -24,10 +25,6 @@ export function CreditsBar({ summary }: { summary: Summary }) {
     ...(balance.plannedCents > 0
       ? [{ label: 'Saldo previsto', cents: balance.plannedCents, color: 'bg-chart-3' }]
       : []),
-    // Credits too, but out of the planned balance (ADR 0057): their own part, so it adds up.
-    ...(summary.undatedCents > 0
-      ? [{ label: 'A receber sem vencimento', cents: summary.undatedCents, color: 'bg-chart-4' }]
-      : []),
   ];
   const whole = segments.reduce((sum, segment) => sum + segment.cents, 0);
   if (whole === 0) {
@@ -40,7 +37,7 @@ export function CreditsBar({ summary }: { summary: Summary }) {
     <figure className="grid gap-2">
       <div
         role="img"
-        aria-label={`Entradas de ${formatCents(credits.totalCents)}: ${visible
+        aria-label={`Entradas de ${formatCents(credits.totalCents - summary.undatedCents)}: ${visible
           .map((segment) => `${segment.label.toLowerCase()} ${formatCents(segment.cents)}`)
           .join(', ')}.`}
         className="flex h-2.5 gap-0.5 overflow-hidden rounded-full"
@@ -65,10 +62,7 @@ export function CreditsBar({ summary }: { summary: Summary }) {
         </ul>
         {balance.plannedCents < 0 && (
           <p className="text-destructive mt-2 tabular-nums">
-            As saídas passam das entradas
-            {summary.undatedCents + summary.undatedPayableCents > 0 &&
-              ', sem o que não tem vencimento,'}{' '}
-            em {formatCents(-balance.plannedCents)}.
+            As saídas passam das entradas em {formatCents(-balance.plannedCents)}.
           </p>
         )}
       </figcaption>

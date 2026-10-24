@@ -176,12 +176,14 @@ function BalanceCard({ summary }: { summary: Summary }) {
           </p>
         )}
       </div>
+      {/* What counts in the planned balance, so the two add up to it (ADR 0057 note): what has no
+          due date is said under the balance. */}
       <dl className="grid grid-cols-2 gap-4">
         <Figure label="Entradas" sub={`${formatCents(credits.settledCents)} recebidos`}>
-          {formatCents(credits.totalCents)}
+          {formatCents(credits.totalCents - summary.undatedCents)}
         </Figure>
         <Figure label="Saídas" sub={`${formatCents(debits.settledCents)} pagos`}>
-          {formatCents(debits.totalCents)}
+          {formatCents(debits.totalCents - summary.undatedPayableCents)}
         </Figure>
       </dl>
       <CreditsBar summary={summary} />
