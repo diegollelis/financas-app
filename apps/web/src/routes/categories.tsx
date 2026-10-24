@@ -1,6 +1,7 @@
 import {
   createCategoryInputSchema,
   hasRole,
+  loanCategoryLabels,
   normalizeName,
   type Category,
   type CreateCategoryInput,
@@ -200,12 +201,14 @@ function CategoryItem({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingNeutral, setConfirmingNeutral] = useState(false);
   const [choosingReturn, setChoosingReturn] = useState(false);
-  // Every category (already loaded by the page): where a loan comes back, by name (ADR 0058).
+  // Every category (already loaded by the page): where a loan comes back, or a borrowing's debt is
+  // kept, by name (ADRs 0058, 0059).
   const all = useCategories(workspaceId).data ?? [];
   const loanReturn = category.returnCategoryId
     ? all.find((option) => option.id === category.returnCategoryId)
     : undefined;
-  const lends = category.type === 'DEBIT' && category.neutral === true;
+  const lends = category.neutral === true;
+  const loanLabels = loanCategoryLabels[category.type];
   const actionsRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateCategory(workspaceId);
   const remove = useDeleteCategory(workspaceId);
@@ -240,7 +243,11 @@ function CategoryItem({
         {/* Reembolso and Repasse receive the shares of a split and never change (ADR 0052 note). */}
         {category.splitRole && <Badge variant="secondary">Divisão</Badge>}
         {category.neutral && <Badge variant="secondary">Nem renda nem gasto</Badge>}
-        {loanReturn && <Badge variant="secondary">Devolução em {loanReturn.name}</Badge>}
+        {loanReturn && (
+          <Badge variant="secondary">
+            {loanLabels.badge} {loanReturn.name}
+          </Badge>
+        )}
       </span>
       {canEdit && !category.destinationId && !category.splitRole && (
         <>
@@ -287,7 +294,7 @@ function CategoryItem({
                   )}
                   {lends && (
                     <DropdownMenuItem onSelect={() => setChoosingReturn(true)}>
-                      Categoria da devolução
+                      {loanLabels.choice}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(true)}>

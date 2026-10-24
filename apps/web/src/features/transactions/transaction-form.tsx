@@ -2,6 +2,7 @@ import {
   plainTransactionInputSchema,
   currentPeriod,
   installmentCountSchema,
+  loanCategoryLabels,
   MAX_DUE_MONTH_OFFSET,
   parseReais,
   isoDateSchema,
@@ -401,12 +402,9 @@ export function TransactionForm({
   const description = useWatch({ control, name: 'description' });
   const merchantName = useWatch({ control, name: 'merchant' });
   const categoryId = useWatch({ control, name: 'categoryId' });
-  // Money lent (ADR 0058): a debit category that says where the money comes back turns the split
-  // into "Emprestado para".
-  const loanReturnId =
-    type === 'DEBIT'
-      ? categories.find((category) => category.id === categoryId)?.returnCategoryId
-      : null;
+  // A loans category that says where the money comes back, or where the debt is kept, turns the
+  // split into "Emprestado para" (a debit, ADR 0058) or "Peguei emprestado de" (a credit, ADR 0059).
+  const loanReturnId = categories.find((category) => category.id === categoryId)?.returnCategoryId;
   const loanReturn = loanReturnId
     ? categories.find((category) => category.id === loanReturnId)
     : undefined;
@@ -814,7 +812,7 @@ export function TransactionForm({
                       />
                     </label>
                     <label htmlFor={id('split')} className="cursor-pointer text-sm font-medium">
-                      {loanReturn ? 'Emprestado para' : 'Dividir com alguém'}
+                      {loanReturn ? loanCategoryLabels[type].split : 'Dividir com alguém'}
                     </label>
                   </div>
                 )}

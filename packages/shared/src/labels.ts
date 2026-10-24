@@ -65,6 +65,43 @@ export const settlePartLabels = {
   { action: string; submit: string; amount: string; done: string }
 >;
 
+/**
+ * A loans category and the category of the other side it chooses (ADRs 0058, 0059), by the type
+ * of the loans category: a debit one lends ("Emprestado para", the money comes back), a credit one
+ * borrows ("Peguei emprestado de", the debt is kept). `fallback` is where the shares go without a
+ * choice, as any split's.
+ */
+export const loanCategoryLabels = {
+  DEBIT: {
+    choice: 'Categoria da devolução',
+    badge: 'Devolução em',
+    choiceToast: 'A devolução',
+    explanation:
+      'Ao emprestar com "Emprestado para", o valor a receber de cada pessoa cai na categoria escolhida. Vale também para os já lançados.',
+    chosenHint: 'Nem renda nem gasto: fora da renda e das metas',
+    fallback: 'Reembolso',
+    fallbackHint: 'Como uma divisão comum: o valor volta para a sobra',
+    split: 'Emprestado para',
+    who: 'Para quem?',
+    share: 'a receber',
+    untilBack: 'até voltar',
+  },
+  CREDIT: {
+    choice: 'Categoria da dívida',
+    badge: 'Dívida em',
+    choiceToast: 'A dívida',
+    explanation:
+      'Ao pegar emprestado com "Peguei emprestado de", o valor a pagar a cada pessoa cai na categoria escolhida. Vale também para os já lançados.',
+    chosenHint: 'Nem renda nem gasto: fora do limite de gastos',
+    fallback: 'Repasse',
+    fallbackHint: 'Como uma divisão comum: o valor conta como gasto',
+    split: 'Peguei emprestado de',
+    who: 'De quem?',
+    share: 'a pagar',
+    untilBack: 'até ser pago',
+  },
+} as const satisfies Record<TransactionType, Record<string, string>>;
+
 /** The statuses that are not settled; the settled one depends on the type (`settledLabels`). */
 export const PENDING_LABEL = 'Pendente';
 export const OVERDUE_LABEL = 'Vencido';

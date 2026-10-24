@@ -3,6 +3,7 @@ import {
   formatIsoDate,
   formatPeriod,
   hasRole,
+  loanCategoryLabels,
   occurredOnRowLabels,
   partiallySettleable,
   paymentMethodLabels,
@@ -355,7 +356,10 @@ function LinkBadges({
   transaction: Transaction;
   personName: string | null;
   sharedWith: string[];
-  /** In a loans category that says where the money comes back (ADR 0058): "Emprestado para". */
+  /**
+   * In a loans category that says where the shares go (ADRs 0058, 0059): "Emprestado para" or
+   * "Peguei emprestado de".
+   */
   lent: boolean;
 }) {
   return (
@@ -380,7 +384,8 @@ function LinkBadges({
       {sharedWith.length > 0 && (
         <Badge variant="secondary" className={WRAPPING_BADGE}>
           <Users aria-hidden />
-          {lent ? 'Emprestado para' : 'Dividido com'} {sharedWith.join(', ')}
+          {lent ? loanCategoryLabels[transaction.type].split : 'Dividido com'}{' '}
+          {sharedWith.join(', ')}
         </Badge>
       )}
     </>

@@ -1114,6 +1114,62 @@ describe('TransactionsPage', () => {
     });
   });
 
+  it('borrows from someone: "Peguei emprestado de", the whole amount theirs (ADR 0059)', async () => {
+    const debtCategory = {
+      id: '01920000-0000-7000-8000-000000000108',
+      name: 'Dívidas',
+      type: 'DEBIT',
+      archived: false,
+      neutral: true,
+    };
+    const borrowedCategory = {
+      id: '01920000-0000-7000-8000-000000000109',
+      name: 'Empréstimos recebidos',
+      type: 'CREDIT',
+      archived: false,
+      neutral: true,
+      returnCategoryId: debtCategory.id,
+    };
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [salaryCategory, energyCategory, marketCategory, borrowedCategory, debtCategory],
+      },
+      [`POST ${base}`]: {
+        status: 201,
+        body: transaction(11, {
+          type: 'CREDIT',
+          description: 'Empréstimo da Ana',
+          categoryId: borrowedCategory.id,
+          amountCents: 200_000,
+        }),
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.click(within(form).getByRole('radio', { name: 'Entrada' }));
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Empréstimo da Ana');
+    await chooseCategory(form, 'Empréstimos recebidos');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '2000');
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Peguei emprestado de' }));
+    await pickPeople(form, ['Ana'], [], 'De quem?');
+    expect(within(form).getByLabelText('Parte de Ana (R$)')).toHaveValue('2.000,00');
+    expect(
+      within(form).getByText(
+        'Cada pessoa vira um valor a pagar, na categoria Dívidas. Sem vencimento, ele fica fora do Saldo previsto até ser pago.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: expect.stringContaining(
+        `"split":[{"personId":"${ana.id}","amountCents":200000}]`,
+      ) as string,
+    });
+  });
+
   it('says "Emprestado para" on a split debit of a loans category', async () => {
     const lent = transaction(8, {
       type: 'DEBIT',
