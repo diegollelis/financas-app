@@ -1,11 +1,13 @@
 import {
   categoryListResponseSchema,
+  importCandidatesResponseSchema,
   importListResponseSchema,
   importSchema,
   installmentPlanListResponseSchema,
   MAX_IMPORT_TRANSACTIONS,
   merchantListResponseSchema,
   transactionListResponseSchema,
+  transactionSchema,
   type CreateTransactionInput,
   type TransactionType,
 } from '@financas/shared';
@@ -22,6 +24,11 @@ const joao = { name: 'João Exemplo', email: 'joao@example.com', password: 'senh
 const importRoutes: WorkspaceRoute[] = [
   { method: 'get', path: (id) => `/api/workspaces/${id}/imports` },
   { method: 'post', path: (id) => `/api/workspaces/${id}/imports`, body: {} },
+  {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/imports/candidates`,
+    body: { from: '2026-10-01', to: '2026-10-31', externalIds: [] },
+  },
   {
     method: 'delete',
     path: (id) => `/api/workspaces/${id}/imports/01920000-0000-7000-8000-000000000999`,
@@ -551,6 +558,223 @@ describe('imports', () => {
           .parse((await browser.get(`${base}/merchants`).expect(200)).body)
           .map((merchant) => merchant.name),
       ).toEqual(['Pizzaria Exemplo']);
+    });
+  });
+
+  describe('an account statement (ADR 0061)', () => {
+    const account = { kind: 'ACCOUNT_STATEMENT', bank: 'NUBANK', label: 'Conta Nubank' } as const;
+    const id = (n: number) => `NUBANK:6a1f0000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+    async function withLaunched() {
+      const user = await setUp();
+      const launch = async (input: Record<string, unknown>) =>
+        transactionSchema.parse(
+          (
+            await user.browser
+              .post(`${user.base}/transactions`)
+              .send({
+                type: 'DEBIT',
+                categoryId: user.categoryId('Contas da casa', 'DEBIT'),
+                period: '2026-10',
+                ...input,
+              })
+              .expect(201)
+          ).body,
+        );
+      // Pending, due in November: what the October bill paid on 05/11 is.
+      const energy = await launch({
+        description: 'Energia',
+        amountCents: 21_000,
+        dueDate: '2026-11-06',
+      });
+      // Already settled by hand on 16/10.
+      const sweets = await launch({
+        description: 'Doceria',
+        categoryId: user.categoryId('Compras', 'DEBIT'),
+        amountCents: 45_000,
+        settledAt: '2026-10-16',
+      });
+      const newOne = {
+        type: 'DEBIT' as const,
+        description: 'Padaria Exemplo',
+        categoryId: user.categoryId('Mercado', 'DEBIT'),
+        amountCents: 4_590,
+        period: '2026-10',
+        settledAt: '2026-10-08',
+        occurredOn: '2026-10-08',
+        paymentMethod: 'DEBIT_CARD' as const,
+        externalId: id(1),
+      };
+      return { ...user, launch, energy, sweets, newOne };
+    }
+
+    it('creates the new movements with their identifier, and refuses one imported again', async () => {
+      const { browser, base, newOne, transactionsOf } = await withLaunched();
+
+      await browser
+        .post(`${base}/imports`)
+        .send({ ...account, transactions: [newOne] })
+        .expect(201);
+      const again = await browser
+        .post(`${base}/imports`)
+        .send({ ...account, transactions: [{ ...newOne, description: 'Outra vez' }] })
+        .expect(409);
+
+      expect(again.body).toMatchObject({ code: 'STATEMENT_LINE_IMPORTED' });
+      expect(
+        (await transactionsOf('2026-10')).filter((tx) => tx.description === 'Padaria Exemplo'),
+      ).toHaveLength(1);
+      expect((await browser.get(`${base}/imports`).expect(200)).body).toHaveLength(1);
+    });
+
+    it('settles a pending one on the movement day with the bank amount, and links a settled one', async () => {
+      const { browser, base, energy, sweets, newOne, transactionsOf } = await withLaunched();
+
+      const created = importSchema.parse(
+        (
+          await browser
+            .post(`${base}/imports`)
+            .send({
+              ...account,
+              transactions: [newOne],
+              matches: [
+                {
+                  transactionId: energy.id,
+                  externalId: id(2),
+                  settledAt: '2026-11-05',
+                  amountCents: 21_480,
+                },
+                { transactionId: sweets.id, externalId: id(3), settledAt: '2026-10-17' },
+              ],
+            })
+            .expect(201)
+        ).body,
+      );
+
+      expect(created).toMatchObject({
+        transactionCount: 1,
+        reconciledCount: 2,
+        firstPeriod: '2026-10',
+        lastPeriod: '2026-11',
+      });
+      const october = await transactionsOf('2026-10');
+      expect(october.find((tx) => tx.id === energy.id)).toMatchObject({
+        settledAt: '2026-11-05',
+        amountCents: 21_480,
+        period: '2026-10',
+      });
+      // A settled one keeps the day it was given.
+      expect(october.find((tx) => tx.id === sweets.id)).toMatchObject({
+        settledAt: '2026-10-16',
+        amountCents: 45_000,
+      });
+      expect(
+        importListResponseSchema.parse((await browser.get(`${base}/imports`).expect(200)).body)[0],
+      ).toMatchObject({ reconciledCount: 2 });
+    });
+
+    it('takes only matches, but never one transaction for two movements', async () => {
+      const { browser, base, energy } = await withLaunched();
+      const match = { transactionId: energy.id, externalId: id(2), settledAt: '2026-11-05' };
+
+      const twice = await browser
+        .post(`${base}/imports`)
+        .send({ ...account, transactions: [], matches: [match, { ...match, externalId: id(4) }] })
+        .expect(400);
+      expect(twice.body).toMatchObject({ code: 'INVALID_INPUT' });
+
+      await browser
+        .post(`${base}/imports`)
+        .send({ ...account, transactions: [], matches: [match] })
+        .expect(201);
+      // That transaction has a movement now.
+      const taken = await browser
+        .post(`${base}/imports`)
+        .send({ ...account, transactions: [], matches: [{ ...match, externalId: id(5) }] })
+        .expect(409);
+      expect(taken.body).toMatchObject({ code: 'STATEMENT_MATCH_CHANGED' });
+    });
+
+    it('refuses a match whose transaction is gone, writing nothing', async () => {
+      const { browser, base, energy, newOne, transactionsOf } = await withLaunched();
+      await browser.delete(`${base}/transactions/${energy.id}`).expect(204);
+
+      const gone = await browser
+        .post(`${base}/imports`)
+        .send({
+          ...account,
+          transactions: [newOne],
+          matches: [{ transactionId: energy.id, externalId: id(2), settledAt: '2026-11-05' }],
+        })
+        .expect(409);
+
+      expect(gone.body).toMatchObject({ code: 'STATEMENT_MATCH_CHANGED' });
+      expect(await transactionsOf('2026-10')).toHaveLength(1);
+      expect((await browser.get(`${base}/imports`).expect(200)).body).toEqual([]);
+    });
+
+    it('undoing keeps what it found in the app, without the movement, so it matches again', async () => {
+      const { browser, base, energy, newOne, transactionsOf } = await withLaunched();
+      const body = {
+        ...account,
+        transactions: [newOne],
+        matches: [{ transactionId: energy.id, externalId: id(2), settledAt: '2026-11-05' }],
+      };
+      const created = importSchema.parse(
+        (await browser.post(`${base}/imports`).send(body).expect(201)).body,
+      );
+
+      await browser.delete(`${base}/imports/${created.id}`).expect(204);
+
+      const october = await transactionsOf('2026-10');
+      expect(october.map((tx) => tx.description).sort()).toEqual(['Doceria', 'Energia']);
+      expect(october.find((tx) => tx.id === energy.id)?.settledAt).toBe('2026-11-05');
+      await browser.post(`${base}/imports`).send(body).expect(201);
+    });
+
+    it('gives what a statement may already be: its movements imported and the transactions near it', async () => {
+      const { browser, base, energy, sweets, launch, newOne } = await withLaunched();
+      // Settled long before the statement: not a candidate.
+      await launch({
+        description: 'Antiga',
+        amountCents: 1_000,
+        period: '2026-08',
+        settledAt: '2026-08-02',
+      });
+      // Pending more than a year before: not a candidate either.
+      await launch({ description: 'Esquecida', amountCents: 1_000, period: '2025-08' });
+      await browser
+        .post(`${base}/imports`)
+        .send({ ...account, transactions: [newOne] })
+        .expect(201);
+
+      const response = importCandidatesResponseSchema.parse(
+        (
+          await browser
+            .post(`${base}/imports/candidates`)
+            .send({ from: '2026-10-01', to: '2026-10-23', externalIds: [id(1), id(9)] })
+            .expect(200)
+        ).body,
+      );
+
+      expect(response.known.map((item) => item.externalId)).toEqual([id(1)]);
+      // The pending energy and the sweets settled within the statement; never the one imported.
+      expect(response.transactions.map((tx) => tx.id).sort()).toEqual(
+        [energy.id, sweets.id].sort(),
+      );
+    });
+
+    it('a VIEWER does not ask for the candidates', async () => {
+      const { base, personalWorkspaceId } = await withLaunched();
+      const viewer = await t.signUp(joao);
+      await t.prisma.member.create({
+        data: { workspaceId: personalWorkspaceId, userId: viewer.userId, role: 'VIEWER' },
+      });
+
+      await viewer.browser
+        .post(`${base}/imports/candidates`)
+        .send({ from: '2026-10-01', to: '2026-10-31', externalIds: [] })
+        .expect(403);
     });
   });
 

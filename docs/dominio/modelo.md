@@ -34,6 +34,7 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 - `workspace_id`, `type` (`CREDIT` | `DEBIT`), `description`, `notes`, `category_id`
 - `amount_cents` (> 0), `period` (competência `YYYY-MM`), `due_date` (opcional), `settled_at`, `occurred_on` (opcional: o dia da compra, que não muda a competência, [ADR 0055](../adr/0055-importacao-da-fatura-do-cartao.md))
 - `installment_plan_id?`, `installment_number?`, `recurrence_id?`
+- `external_id?`: o movimento do extrato da conta que o lançamento é ("NUBANK:<código>"), único no espaço; `reconciled_import_id?`: a importação que o encontrou já lançado e o quitou ou vinculou ([ADR 0061](../adr/0061-extrato-da-conta-e-conferencia.md))
 - Regras:
   - a categoria pertence ao mesmo espaço e tem o mesmo `type` (garantido pelo banco, [ADR 0029](../adr/0029-lancamentos-e-integridade-no-banco.md)); categoria arquivada não pode ser escolhida;
   - status: **pendente** (`settled_at` nulo), **vencido** (pendente e `due_date` < hoje), **efetivado** (`settled_at` preenchido).
