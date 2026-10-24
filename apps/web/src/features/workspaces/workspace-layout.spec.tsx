@@ -108,6 +108,20 @@ describe('WorkspaceSwitcher', () => {
 });
 
 describe('WorkspaceLayout', () => {
+  it('keeps "Importar" marked on its own pages (ADR 0060)', async () => {
+    mockHouse({
+      [`GET /api/workspaces/${houseId}/categories`]: { body: [] },
+      [`GET /api/workspaces/${houseId}/imports`]: { body: [] },
+    });
+    renderApp(`/espacos/${houseId}/importar/planilha`);
+
+    const nav = await sectionsNav();
+    expect(within(nav).getByRole('link', { name: 'Importar' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
   it('shows the app, the workspace and the section of the page', async () => {
     mockHouse();
 

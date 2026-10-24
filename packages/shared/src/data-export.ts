@@ -150,6 +150,9 @@ const exportImportSchema = z.object({
   transactionCount: z.number().int(),
   label: z.string().nullable(),
   statementDueDate: day.nullable(),
+  /** What it brought and from which bank (ADR 0060). */
+  kind: z.enum(['TEMPLATE', 'CARD_STATEMENT', 'ACCOUNT_STATEMENT']).default('TEMPLATE'),
+  bank: z.enum(['NUBANK']).nullable().default(null),
   firstPeriod: period,
   lastPeriod: period,
   createdAt: instant,

@@ -8,6 +8,8 @@ import {
   settledLabels,
   type Category,
   type Import,
+  type ImportKind,
+  type StatementBank,
   type Merchant,
   type TransactionType,
 } from '@financas/shared';
@@ -219,6 +221,7 @@ export function ImportReview({
   merchants,
   previousImports,
   statement,
+  source,
   defaultLabel,
   onChooseAnother,
   onImported,
@@ -231,6 +234,8 @@ export function ImportReview({
   previousImports: Import[];
   /** A card statement (ADR 0055): its month and due date, and what the review found. */
   statement?: StatementReviewProps;
+  /** What it imports and from which bank (ADR 0060), recorded with the import. */
+  source: { kind: ImportKind; bank: StatementBank | null };
   /** The "Origem" it starts with ("Fatura Nubank", "Planilha modelo"). */
   defaultLabel: string;
   onChooseAnother: () => void;
@@ -328,6 +333,8 @@ export function ImportReview({
         ...(ready.plans.length > 0 && { plans: ready.plans.map(real) }),
         ...(ready.aliases.length > 0 && { aliases: ready.aliases }),
         label,
+        kind: source.kind,
+        bank: source.bank,
         ...(statement?.dueDate && { statementDueDate: statement.dueDate }),
       },
       {

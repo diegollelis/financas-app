@@ -125,6 +125,28 @@ describe('imports', () => {
     expect(list[0]?.id).toBe(created.id);
   });
 
+  it('records what it brought and from which bank (ADR 0060)', async () => {
+    const { browser, base, rows } = await setUp();
+    const send = (body: object) =>
+      browser.post(`${base}/imports`).send({ transactions: rows, ...body });
+
+    expect((await send({ kind: 'TEMPLATE' }).expect(201)).body).toMatchObject({
+      kind: 'TEMPLATE',
+      bank: null,
+    });
+    expect((await send({ kind: 'CARD_STATEMENT', bank: 'NUBANK' }).expect(201)).body).toMatchObject(
+      { kind: 'CARD_STATEMENT', bank: 'NUBANK' },
+    );
+    // A client from before: a due date was only ever sent by Nubank's card statement.
+    expect((await send({ statementDueDate: '2026-11-04' }).expect(201)).body).toMatchObject({
+      kind: 'CARD_STATEMENT',
+      bank: 'NUBANK',
+    });
+    // A statement says its bank; the template has none.
+    await send({ kind: 'CARD_STATEMENT' }).expect(400);
+    await send({ kind: 'TEMPLATE', bank: 'NUBANK' }).expect(400);
+  });
+
   it('names merchants: a new one is created, an existing one reused, an archived one comes back', async () => {
     const { browser, base, rows, transactionsOf } = await setUp();
     const existing = (
