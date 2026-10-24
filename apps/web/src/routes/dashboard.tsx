@@ -149,7 +149,7 @@ function BalanceCard({ summary }: { summary: Summary }) {
               <p>Como o mês termina se tudo o que está previsto for recebido e pago.</p>
               <p>
                 Fica de fora o que está a receber sem vencimento numa categoria que não conta como
-                renda nem gasto, como um empréstimo sem data para voltar.
+                renda nem gasto, como um empréstimo sem prazo para voltar.
               </p>
             </InfoTip>
           </dt>
@@ -166,7 +166,7 @@ function BalanceCard({ summary }: { summary: Summary }) {
         {summary.undatedCents > 0 && (
           // Money lent coming back some day: nobody knows the month (ADR 0057).
           <p className="text-muted-foreground text-sm">
-            Não inclui {formatCents(summary.undatedCents)} a receber sem data.
+            Não inclui {formatCents(summary.undatedCents)} a receber sem vencimento.
           </p>
         )}
       </div>

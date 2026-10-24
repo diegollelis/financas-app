@@ -51,3 +51,12 @@ Opção 3.
 ## Nota (Emprestado para, 2026-10-23)
 
 O pendente da última consequência foi resolvido no [ADR 0058](0058-emprestado-para.md): a categoria de saída marcada escolhe onde entra a volta, e a divisão de uma saída dela põe a parte a receber nessa categoria.
+
+## Nota (nomes revistos, 2026-10-23)
+
+Os nomes da tela foram comparados com os de outros apps de finanças e com o vocabulário de bancos e sistemas de gestão:
+
+- **"Receber parte" / "Pagar parte" viraram "Recebimento parcial" / "Pagamento parcial"**, o termo da fatura do cartão, do boleto e da baixa parcial dos sistemas de contas a receber. O botão que confirma diz "Registrar recebimento" / "Registrar pagamento".
+- **"Sem data" virou "sem vencimento"** ("R$ X sem vencimento, fora do previsto", "Não inclui R$ X a receber sem vencimento", "A receber sem vencimento" na barra). O campo do formulário é "Vencimento", e "Data" é outro campo do lançamento.
+
+O código e a rota mantêm os nomes em inglês (`settlePart`, `undatedReceivable`, `undatedCents`).

@@ -236,7 +236,7 @@ describe('TransactionsPage', () => {
 
     const totals = await screen.findByLabelText('Resumo do mês');
     expect(totals).toHaveTextContent('Entradas+ R$ 8.000,00');
-    expect(nbsp(totals.textContent)).toContain('R$ 3.000,00 sem data, fora do previsto');
+    expect(nbsp(totals.textContent)).toContain('R$ 3.000,00 sem vencimento, fora do previsto');
     expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
   });
 
@@ -258,14 +258,14 @@ describe('TransactionsPage', () => {
     renderApp(`/espacos/${houseId}/lancamentos`);
 
     const menu = await openActions('Empréstimo ao Bruno');
-    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Receber parte' }));
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Recebimento parcial' }));
     const dialog = await screen.findByRole('dialog', {
-      name: 'Receber parte: Empréstimo ao Bruno',
+      name: 'Recebimento parcial: Empréstimo ao Bruno',
     });
     expect(within(dialog).getByLabelText('Recebido em')).toHaveValue('2026-10-15');
     const amount = within(dialog).getByLabelText('Valor recebido (R$)');
     await userEvent.type(amount, '4.000,00');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Receber parte' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar recebimento' }));
     expect(nbsp(dialog.textContent)).toContain('O valor passa do que está pendente (R$ 3.000,00).');
 
     await userEvent.clear(amount);
@@ -276,7 +276,7 @@ describe('TransactionsPage', () => {
     expect(dialog).toHaveTextContent('Quita o que falta: o pendente sai da lista.');
     await userEvent.clear(amount);
     await userEvent.type(amount, '1.000,00');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Receber parte' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar recebimento' }));
 
     await expectCall(fetchMock, `${base}/${loan.id}/settle-part`, {
       method: 'POST',
@@ -289,7 +289,7 @@ describe('TransactionsPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('offers "Receber parte" only for a pending one launched once, not split', async () => {
+  it('offers "Recebimento parcial" only for a pending one launched once, not split', async () => {
     const share = transaction(5, {
       type: 'CREDIT',
       description: 'Parte da luz',
@@ -311,7 +311,7 @@ describe('TransactionsPage', () => {
       'Compras da semana',
     ]) {
       const menu = await openActions(description);
-      expect(within(menu).queryByRole('menuitem', { name: /parte$/ })).not.toBeInTheDocument();
+      expect(within(menu).queryByRole('menuitem', { name: /parcial$/ })).not.toBeInTheDocument();
       await userEvent.keyboard('{Escape}');
     }
   });

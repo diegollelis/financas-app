@@ -240,7 +240,7 @@ function CategoryItem({
         {/* Reembolso and Repasse receive the shares of a split and never change (ADR 0052 note). */}
         {category.splitRole && <Badge variant="secondary">Divisão</Badge>}
         {category.neutral && <Badge variant="secondary">Nem renda nem gasto</Badge>}
-        {loanReturn && <Badge variant="secondary">A volta entra em {loanReturn.name}</Badge>}
+        {loanReturn && <Badge variant="secondary">Devolução em {loanReturn.name}</Badge>}
       </span>
       {canEdit && !category.destinationId && !category.splitRole && (
         <>
@@ -287,7 +287,7 @@ function CategoryItem({
                   )}
                   {lends && (
                     <DropdownMenuItem onSelect={() => setChoosingReturn(true)}>
-                      Onde entra a volta
+                      Categoria da devolução
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(true)}>

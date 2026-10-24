@@ -33,7 +33,7 @@ const partSchema = (pendingCents: number) =>
 type PartSchema = ReturnType<typeof partSchema>;
 
 /**
- * "Receber parte" / "Pagar parte" (ADR 0057): someone pays back a loan bit by bit, or a debt is
+ * "Recebimento parcial" / "Pagamento parcial" (ADR 0057): someone pays back a loan bit by bit, or a debt is
  * paid in parts with no fixed amount. The part is launched as received or paid in the month of its
  * day, and the pending one keeps the rest; when nothing is left, it goes.
  */
@@ -144,7 +144,7 @@ function PartForm({
       )}
       <div className="grid gap-2 sm:flex sm:flex-row-reverse sm:justify-start">
         <Button type="submit" disabled={settlePart.isPending}>
-          {settlePart.isPending ? 'Salvando…' : labels.action}
+          {settlePart.isPending ? 'Salvando…' : labels.submit}
         </Button>
         <Button type="button" variant="outline" onClick={onDone}>
           Cancelar

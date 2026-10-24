@@ -310,11 +310,11 @@ describe('CategoriesPage', () => {
     renderApp(`/espacos/${houseId}/categorias`);
 
     // Only a marked debit category chooses it.
-    expect(await menuOf('Mercado')).not.toContain('Onde entra a volta');
-    expect(await menuOf('Empréstimos a receber')).not.toContain('Onde entra a volta');
-    await choose('Empréstimos feitos', 'Onde entra a volta');
+    expect(await menuOf('Mercado')).not.toContain('Categoria da devolução');
+    expect(await menuOf('Empréstimos a receber')).not.toContain('Categoria da devolução');
+    await choose('Empréstimos feitos', 'Categoria da devolução');
     const dialog = await screen.findByRole('dialog', {
-      name: 'Onde entra a volta: Empréstimos feitos',
+      name: 'Categoria da devolução: Empréstimos feitos',
     });
     expect(within(dialog).getByRole('radio', { name: /^Reembolso/ })).toBeChecked();
     await userEvent.click(within(dialog).getByRole('radio', { name: /^Empréstimos a receber/ }));
@@ -325,7 +325,7 @@ describe('CategoriesPage', () => {
       body: JSON.stringify({ returnCategoryId: back.id }),
     });
     expect(
-      await screen.findByText('A volta de Empréstimos feitos entra em Empréstimos a receber'),
+      await screen.findByText('A devolução de Empréstimos feitos entra em Empréstimos a receber'),
     ).toBeInTheDocument();
   });
 
@@ -336,7 +336,7 @@ describe('CategoriesPage', () => {
     renderApp(`/espacos/${houseId}/categorias`);
 
     const debits = await section('Saídas');
-    expect(within(debits).getByText('A volta entra em Empréstimos a receber')).toBeInTheDocument();
+    expect(within(debits).getByText('Devolução em Empréstimos a receber')).toBeInTheDocument();
   });
 
   it('offers to create the credit category when none is marked yet', async () => {
@@ -348,9 +348,9 @@ describe('CategoriesPage', () => {
     });
     renderApp(`/espacos/${houseId}/categorias`);
 
-    await choose('Empréstimos feitos', 'Onde entra a volta');
+    await choose('Empréstimos feitos', 'Categoria da devolução');
     const dialog = await screen.findByRole('dialog', {
-      name: 'Onde entra a volta: Empréstimos feitos',
+      name: 'Categoria da devolução: Empréstimos feitos',
     });
     await userEvent.click(
       within(dialog).getByRole('button', { name: 'Criar "Empréstimos feitos" de entrada' }),

@@ -89,8 +89,8 @@ describe('DashboardPage', () => {
     const balance = await section('Saldo do mês');
     // 9.000,00 in, 3.000,00 of them with no date: 6.000,00 − 3.009,90, as without it.
     expect(tile('Saldo previsto')).toHaveTextContent('R$ 2.990,10');
-    expect(nbsp(balance.textContent)).toContain('Não inclui R$ 3.000,00 a receber sem data.');
-    expect(within(balance).getByText('A receber sem data')).toBeInTheDocument();
+    expect(nbsp(balance.textContent)).toContain('Não inclui R$ 3.000,00 a receber sem vencimento.');
+    expect(within(balance).getByText('A receber sem vencimento')).toBeInTheDocument();
   });
 
   it('shows the balance, what is left to set aside and what was applied', async () => {

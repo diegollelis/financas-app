@@ -44,13 +44,26 @@ export const settleActionLabels = {
 } as const satisfies Record<TransactionType, { settle: string; short: string; unsettle: string }>;
 
 /**
- * Part of a pending transaction received or paid (ADR 0057): the action, its amount field and
- * the word of its toast ("R$ 1.500,00 recebido de …").
+ * Part of a pending transaction received or paid (ADR 0057): the action ("pagamento parcial", the
+ * market's and the banks' term), its confirm button, its amount field and the word of its toast ("R$ 1.500,00 recebido de …").
  */
 export const settlePartLabels = {
-  CREDIT: { action: 'Receber parte', amount: 'Valor recebido', done: 'recebido' },
-  DEBIT: { action: 'Pagar parte', amount: 'Valor pago', done: 'pago' },
-} as const satisfies Record<TransactionType, { action: string; amount: string; done: string }>;
+  CREDIT: {
+    action: 'Recebimento parcial',
+    submit: 'Registrar recebimento',
+    amount: 'Valor recebido',
+    done: 'recebido',
+  },
+  DEBIT: {
+    action: 'Pagamento parcial',
+    submit: 'Registrar pagamento',
+    amount: 'Valor pago',
+    done: 'pago',
+  },
+} as const satisfies Record<
+  TransactionType,
+  { action: string; submit: string; amount: string; done: string }
+>;
 
 /** The statuses that are not settled; the settled one depends on the type (`settledLabels`). */
 export const PENDING_LABEL = 'Pendente';

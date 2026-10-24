@@ -259,16 +259,16 @@ describe('PeoplePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Ver lançamentos com Bruno' }));
     const history = await screen.findByRole('dialog', { name: 'Lançamentos com Bruno' });
     await userEvent.click(
-      within(history).getByRole('button', { name: 'Receber parte: Empréstimo ao Bruno' }),
+      within(history).getByRole('button', { name: 'Recebimento parcial: Empréstimo ao Bruno' }),
     );
     const dialog = await screen.findByRole('dialog', {
-      name: 'Receber parte: Empréstimo ao Bruno',
+      name: 'Recebimento parcial: Empréstimo ao Bruno',
     });
     await userEvent.type(within(dialog).getByLabelText('Valor recebido (R$)'), '1.500,00');
     const day = within(dialog).getByLabelText('Recebido em');
     await userEvent.clear(day);
     await userEvent.type(day, '2026-10-03');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Receber parte' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar recebimento' }));
 
     await vi.waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -284,7 +284,9 @@ describe('PeoplePage', () => {
     );
     // Back to the history, still open.
     await vi.waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: /^Receber parte/ })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole('dialog', { name: /^Recebimento parcial/ }),
+      ).not.toBeInTheDocument(),
     );
     expect(screen.getByRole('dialog', { name: 'Lançamentos com Bruno' })).toBeInTheDocument();
   });
