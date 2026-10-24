@@ -151,6 +151,38 @@ describe('AnalysisPage', () => {
     expect(within(ranking).queryByText('Investimentos')).not.toBeInTheDocument();
   });
 
+  it('leaves money lent with no due date out of the planned view, and says so (ADR 0057 note)', async () => {
+    const emprestimos = {
+      id: '01920000-0000-7000-8000-000000000105',
+      name: 'Empréstimos',
+      type: 'CREDIT',
+      archived: false,
+      neutral: true,
+    };
+    const lent = {
+      ...row('2026-10', 'CREDIT', emprestimos.id, 3_000_000, 0),
+      undatedCents: 3_000_000,
+    };
+    mockAnalysis(
+      '2026-05',
+      '2026-10',
+      { from: '2026-05', to: '2026-10', rows: [...rows, lent] },
+      [],
+      [salario, aluguel, mercado, emprestimos],
+    );
+
+    renderApp(`/espacos/${houseId}/analise`);
+
+    const stat = async (label: string) =>
+      nbsp((await screen.findByText(label, { selector: 'dt' })).nextElementSibling?.textContent);
+    // As on the dashboard: the loan coming back some day is not this month's (5.100,00 without it).
+    expect(await stat('Saldo do período')).toBe('R$ 5.100,00');
+    expect(await stat('Entradas')).toContain('R$ 10.000,00');
+    expect(nbsp(screen.getByText(/^Não inclui/).textContent)).toBe(
+      'Não inclui R$ 30.000,00 a receber sem vencimento.',
+    );
+  });
+
   it('shows a tapped month against the one before', async () => {
     mockAnalysis('2026-05', '2026-10');
     renderApp(`/espacos/${houseId}/analise`);

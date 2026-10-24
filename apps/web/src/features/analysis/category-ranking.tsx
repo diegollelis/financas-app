@@ -171,6 +171,8 @@ function CategoryDetail({
     appliedCents: 0,
     neutralCents: 0,
     balanceCents: 0,
+    undatedCreditsCents: 0,
+    undatedDebitsCents: 0,
   }));
   const type = credit ? 'CREDIT' : 'DEBIT';
   const total = series.reduce((sum, point) => sum + point.cents, 0);

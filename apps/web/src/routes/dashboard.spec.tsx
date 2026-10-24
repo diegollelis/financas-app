@@ -90,7 +90,9 @@ describe('DashboardPage', () => {
     // 9.000,00 in, 3.000,00 of them with no date: 6.000,00 − 3.009,90, as without it.
     expect(tile('Saldo previsto')).toHaveTextContent('R$ 2.990,10');
     expect(nbsp(balance.textContent)).toContain('Não inclui R$ 3.000,00 a receber sem vencimento.');
-    expect(within(balance).getByText('A receber sem vencimento')).toBeInTheDocument();
+    // "Entradas" and the bar count what the balance counts, so they add up (ADR 0057 note).
+    expect(nbsp(tile('Entradas')?.textContent)).toContain('R$ 6.000,00');
+    expect(within(balance).queryByText('A receber sem vencimento')).not.toBeInTheDocument();
   });
 
   it('leaves money borrowed with no due date out of the planned balance, and says so', async () => {
@@ -104,6 +106,7 @@ describe('DashboardPage', () => {
     // The debt is in the debits, not in the planned balance: 6.000,00 − 3.009,90, as without it.
     expect(tile('Saldo previsto')).toHaveTextContent('R$ 2.990,10');
     expect(nbsp(balance.textContent)).toContain('Não inclui R$ 2.000,00 a pagar sem vencimento.');
+    expect(nbsp(tile('Saídas')?.textContent)).toContain('R$ 3.009,90');
   });
 
   it('shows the balance, what is left to set aside and what was applied', async () => {

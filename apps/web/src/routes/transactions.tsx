@@ -125,19 +125,21 @@ function MonthTotals({
   const undatedPayables = sum(
     transactions.filter((transaction) => undatedPayable(transaction, neutralCategoryIds)),
   );
+  // What counts in the planned balance, so the three add up (ADR 0057 note); what has no due
+  // date is said under its side, and stays in the list below.
   const balance = credits - undated - (debits - undatedPayables);
   const outOfForecast = (cents: number) =>
-    cents > 0 ? `${formatCents(cents)} sem vencimento, fora do previsto` : null;
+    cents > 0 ? `Mais ${formatCents(cents)} sem vencimento, fora do previsto` : null;
   const items = [
     {
       label: 'Entradas',
-      value: signedCents('CREDIT', credits),
+      value: signedCents('CREDIT', credits - undated),
       tone: 'text-credit-foreground',
       sub: outOfForecast(undated),
     },
     {
       label: 'Saídas',
-      value: signedCents('DEBIT', debits),
+      value: signedCents('DEBIT', debits - undatedPayables),
       tone: '',
       sub: outOfForecast(undatedPayables),
     },

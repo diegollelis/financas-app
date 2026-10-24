@@ -101,6 +101,7 @@ describe('analysis', () => {
           paymentMethod: null,
           plannedCents: 65_000,
           settledCents: 40_000,
+          undatedCents: 0,
         },
         {
           period: '2026-10',
@@ -110,6 +111,7 @@ describe('analysis', () => {
           paymentMethod: null,
           plannedCents: 500_000,
           settledCents: 500_000,
+          undatedCents: 0,
         },
         {
           period: '2026-10',
@@ -119,6 +121,7 @@ describe('analysis', () => {
           paymentMethod: null,
           plannedCents: 30_000,
           settledCents: 30_000,
+          undatedCents: 0,
         },
       ],
     });
@@ -186,6 +189,7 @@ describe('analysis', () => {
         paymentMethod: null,
         plannedCents: 15_000,
         settledCents: 0,
+        undatedCents: 0,
       },
       {
         period: '2026-10',
@@ -195,7 +199,45 @@ describe('analysis', () => {
         paymentMethod: null,
         plannedCents: 50_000,
         settledCents: 0,
+        undatedCents: 0,
       },
+    ]);
+  });
+
+  it('says how much is pending with no due date in a category marked "Nem renda nem gasto" (ADR 0057 note)', async () => {
+    const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+    const created = await browser
+      .post(`/api/workspaces/${id}/categories`)
+      .send({ name: 'Empréstimos', type: 'CREDIT' })
+      .expect(201);
+    const loans = (created.body as { id: string }).id;
+    await browser
+      .patch(`/api/workspaces/${id}/categories/${loans}`)
+      .send({ neutral: true })
+      .expect(200);
+    const credit = (amountCents: number, dueDate: string | null, settledAt: string | null) =>
+      create(browser, id, {
+        type: 'CREDIT',
+        description: 'Empréstimo ao Bruno',
+        categoryId: loans,
+        amountCents,
+        period: '2026-10',
+        dueDate,
+        settledAt,
+      });
+    // Coming back some day; coming back on a day; and a part already back.
+    await credit(300_000, null, null);
+    await credit(50_000, '2026-10-20', null);
+    await credit(20_000, null, '2026-10-05');
+
+    const result = await analysis(browser, id, '2026-10', '2026-10');
+
+    expect(result.rows).toEqual([
+      expect.objectContaining({
+        plannedCents: 370_000,
+        settledCents: 20_000,
+        undatedCents: 300_000,
+      }),
     ]);
   });
 

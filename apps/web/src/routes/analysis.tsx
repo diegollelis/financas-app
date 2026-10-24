@@ -92,6 +92,34 @@ function SignedCents({ cents }: { cents: number }) {
 type Totals = ReturnType<typeof seriesTotals>;
 
 /**
+ * What the planned view leaves out (ADR 0057 note): a loan to receive or to pay with no due date,
+ * as the dashboard says under its balance. Nothing in the settled view, which never counts it.
+ */
+function UndatedNote({
+  totals,
+  credits = true,
+  debits = true,
+}: {
+  totals: Totals;
+  credits?: boolean;
+  debits?: boolean;
+}) {
+  const lines = [
+    ...(credits && totals.undatedCreditsCents > 0
+      ? [`Não inclui ${formatCents(totals.undatedCreditsCents)} a receber sem vencimento.`]
+      : []),
+    ...(debits && totals.undatedDebitsCents > 0
+      ? [`Não inclui ${formatCents(totals.undatedDebitsCents)} a pagar sem vencimento.`]
+      : []),
+  ];
+  return lines.map((line) => (
+    <span key={line} className="text-muted-foreground text-sm">
+      {line}
+    </span>
+  ));
+}
+
+/**
  * "+ R$ 1.240,00 sobre o período anterior": the same total over the range right before, with the
  * same filters, in one short line (ADR 0037 note). Nothing when that range had no transactions.
  */
@@ -183,6 +211,7 @@ function Totals({
                 previous ? (credit ? previous.creditsCents : previous.expensesCents) : undefined
               }
             />
+            {credit && <UndatedNote totals={totals} debits={false} />}
             {!credit && totals.appliedCents > 0 && (
               <span className="text-muted-foreground">
                 Além disso, {formatCents(totals.appliedCents)} foram para as metas.
@@ -202,12 +231,23 @@ function Totals({
           Saldo do período
           <InfoTip term="Saldo do período">
             <p>Entradas menos tudo o que saiu no período: gastos e o que foi para as metas.</p>
+            {view === 'PLANNED' && (
+              <p>
+                Fica de fora o que está a receber ou a pagar sem vencimento numa categoria que não
+                conta como renda nem gasto, como um empréstimo sem prazo para voltar.
+              </p>
+            )}
             <p>{comparisonHelp(months)}</p>
           </InfoTip>
         </dt>
         <dd className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
           <SignedCents cents={totals.balanceCents} />
         </dd>
+        {totals.undatedCreditsCents + totals.undatedDebitsCents > 0 && (
+          <dd className="grid">
+            <UndatedNote totals={totals} />
+          </dd>
+        )}
       </dl>
       <dl className="grid gap-4 sm:grid-cols-3">
         <Figure label="Entradas">

@@ -37,6 +37,7 @@ const row = (
   paymentMethod,
   plannedCents,
   settledCents,
+  undatedCents: 0,
 });
 
 // August had nothing at all; in October, part of it is still to be paid.
@@ -102,6 +103,8 @@ describe('monthlySeries', () => {
       appliedCents: 0,
       neutralCents: 0,
       balanceCents: 0,
+      undatedCreditsCents: 0,
+      undatedDebitsCents: 0,
     });
     expect(series[3]).toEqual({
       period: '2026-10',
@@ -110,6 +113,8 @@ describe('monthlySeries', () => {
       appliedCents: 0,
       neutralCents: 0,
       balanceCents: 260_000,
+      undatedCreditsCents: 0,
+      undatedDebitsCents: 0,
     });
   });
 
@@ -123,6 +128,8 @@ describe('monthlySeries', () => {
       appliedCents: 0,
       neutralCents: 0,
       balanceCents: -40_000,
+      undatedCreditsCents: 0,
+      undatedDebitsCents: 0,
     });
   });
 
@@ -145,6 +152,8 @@ describe('monthlySeries', () => {
       appliedCents: 0,
       neutralCents: 0,
       balanceCents: 760_000,
+      undatedCreditsCents: 0,
+      undatedDebitsCents: 0,
     });
   });
 
@@ -181,6 +190,44 @@ describe('monthlySeries', () => {
     expect(
       categoryRanking(analysis, defaultAnalysisFilters, neutral).map((s) => s.categoryId),
     ).toEqual([rent, market]);
+  });
+});
+
+describe('what has no due date (ADR 0057 note)', () => {
+  // A loan lent, coming back some day, and a debt to pay some day: both pending, with no due date,
+  // in categories marked "Nem renda nem gasto". Fuel and rent stand in for them here.
+  const withLoans: Analysis = {
+    ...analysis,
+    rows: [
+      ...analysis.rows,
+      { ...row('2026-10', 'CREDIT', fuel, 4_200_000, 0), undatedCents: 4_200_000 },
+      { ...row('2026-10', 'DEBIT', rent, 200_000, 0), undatedCents: 200_000 },
+    ],
+  };
+
+  it('leaves it out of the planned view, as the dashboard does, and says how much', () => {
+    const totals = seriesTotals(monthlySeries(withLoans, defaultAnalysisFilters));
+
+    expect(totals).toMatchObject({
+      creditsCents: 1_520_000,
+      debitsCents: 760_000,
+      balanceCents: 760_000,
+      undatedCreditsCents: 4_200_000,
+      undatedDebitsCents: 200_000,
+    });
+    expect(
+      categoryRanking(withLoans, { ...defaultAnalysisFilters, type: 'CREDIT' }).map(
+        (share) => share.categoryId,
+      ),
+    ).toEqual([salary]);
+  });
+
+  it('never touches the settled view, which never counts what is pending', () => {
+    const settled = { ...defaultAnalysisFilters, view: 'SETTLED' as const };
+
+    expect(seriesTotals(monthlySeries(withLoans, settled))).toEqual(
+      seriesTotals(monthlySeries(analysis, settled)),
+    );
   });
 });
 

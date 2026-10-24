@@ -214,6 +214,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [ ] Conferência: casar cada movimento com o que já está lançado ("Já lançado", quitar o pendente, "Valor diferente", "Recebimento parcial" de um empréstimo)
   - [ ] A conferência também na fatura do cartão
   - [ ] Outros bancos, talvez por OFX ("Outro banco (OFX)") para o extrato da conta
+- [x] Fora do previsto, igual nas três telas: "Entradas" e "Saídas" de Lançamentos e do Painel, a barra das entradas e a visão Prevista da Análise deixam de fora o que está a receber ou a pagar sem vencimento, e os números fecham com o saldo (nota no [ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md))
 - [x] As partes de uma divisão vencem com o que foi dividido (lançamento, mês da recorrência ou parcela) e acompanham a mudança do vencimento; as pendentes já gravadas ganham o da origem pela migração (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
 - [x] Recorrências: uma encerrada mostra do primeiro ao último mês ("Janeiro a maio de 2026"), e não só "Até maio de 2026" (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
 - [x] "Beleza" entre as categorias padrão de saída dos espaços novos (pedido em 2026-10-17; os espaços existentes continuam com as suas, como no "Bônus", nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
