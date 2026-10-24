@@ -162,6 +162,9 @@ describe('summary', () => {
       categoryId: lent,
       amountCents: 100_000,
       period: '2026-10',
+      // Lent: the money already left (a debt still to pay, with no due date, would be out of
+      // the planned view, ADR 0057 note).
+      settledAt: '2026-10-02',
     });
     await create(browser, id, {
       type: 'CREDIT',

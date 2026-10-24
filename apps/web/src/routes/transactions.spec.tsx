@@ -240,6 +240,34 @@ describe('TransactionsPage', () => {
     expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
   });
 
+  it('leaves money borrowed, to pay back with no due date, out of "Saldo previsto"', async () => {
+    const debtsCategory = {
+      id: '01920000-0000-7000-8000-000000000107',
+      name: 'Dívidas',
+      type: 'DEBIT',
+      archived: false,
+      neutral: true,
+    };
+    const owed = transaction(10, {
+      type: 'DEBIT',
+      description: 'Devolver à Ana',
+      categoryId: debtsCategory.id,
+      amountCents: 200_000,
+    });
+    mockTransactions({
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [salaryCategory, energyCategory, marketCategory, debtsCategory],
+      },
+      [`GET ${base}`]: { body: [salary, light, shopping, owed] },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const totals = await screen.findByLabelText('Resumo do mês');
+    expect(totals).toHaveTextContent('Saídas− R$ 2.509,90');
+    expect(nbsp(totals.textContent)).toContain('R$ 2.000,00 sem vencimento, fora do previsto');
+    expect(totals).toHaveTextContent('Saldo previstoR$ 4.490,10');
+  });
+
   it('receives part of a pending transaction, never more than is pending (ADR 0057)', async () => {
     const fetchMock = withLoan(undefined, {
       [`POST ${base}/${loan.id}/settle-part`]: {

@@ -5,6 +5,7 @@ import {
   partiallySettleable,
   settlePartInputSchema,
   transactionStatus,
+  undatedPayable,
   undatedReceivable,
   updateTransactionInputSchema,
 } from './transaction.ts';
@@ -148,5 +149,22 @@ describe('undatedReceivable', () => {
     expect(undatedReceivable({ ...lentBack, settledAt: '2026-10-03' }, neutral)).toBe(false);
     expect(undatedReceivable({ ...lentBack, type: 'DEBIT' }, neutral)).toBe(false);
     expect(undatedReceivable(lentBack, new Set())).toBe(false);
+  });
+});
+
+describe('undatedPayable', () => {
+  const loans = '01920000-0000-7000-8000-000000000105';
+  const neutral = new Set([loans]);
+  const owed = { type: 'DEBIT' as const, dueDate: null, settledAt: null, categoryId: loans };
+
+  it('is a pending debit with no due date in a "Nem renda nem gasto" category', () => {
+    expect(undatedPayable(owed, neutral)).toBe(true);
+  });
+
+  it('is not one with a due date, paid, a credit or of another category', () => {
+    expect(undatedPayable({ ...owed, dueDate: '2026-10-30' }, neutral)).toBe(false);
+    expect(undatedPayable({ ...owed, settledAt: '2026-10-03' }, neutral)).toBe(false);
+    expect(undatedPayable({ ...owed, type: 'CREDIT' }, neutral)).toBe(false);
+    expect(undatedPayable(owed, new Set())).toBe(false);
   });
 });

@@ -8,7 +8,12 @@ import {
   type Budget,
 } from './budget.ts';
 import { periodSchema } from './money-and-dates.ts';
-import { transactionStatus, undatedReceivable, type Transaction } from './transaction.ts';
+import {
+  transactionStatus,
+  undatedPayable,
+  undatedReceivable,
+  type Transaction,
+} from './transaction.ts';
 
 /**
  * Two views of every indicator (ADR 0031): `planned` counts every transaction of the competência
@@ -100,6 +105,11 @@ export const summarySchema = z.object({
    * still in the credits, left out of the planned balance, since nobody knows when they come.
    */
   undatedCents: z.number().int().default(0),
+  /**
+   * The pending debits with no due date in those categories (`undatedPayable`, ADR 0057 note):
+   * still in the debits, left out of the planned balance and of what is left to save.
+   */
+  undatedPayableCents: z.number().int().default(0),
 });
 
 export type Summary = z.infer<typeof summarySchema>;
@@ -143,7 +153,7 @@ function side(transactions: SummaryTransaction[], today: string): Summary['credi
  * `neutralCategoryIds`: the categories marked "Nem renda nem gasto" (ADR 0056). Their debits are
  * not expenses and their credits are not income; the debits still lower what is left to save, the
  * credits stay in the balance only (ADR 0056 note), the planned one without those still to receive
- * with no due date (ADR 0057).
+ * or to pay with no due date (ADR 0057).
  */
 export function summarizePeriod(
   transactions: SummaryTransaction[],
@@ -183,12 +193,17 @@ export function summarizePeriod(
     today,
   );
   const applications = transactions.filter(isApplication);
+  // Money borrowed to pay back with no due date: not this month's, so not in the planned view
+  // (ADR 0057 note).
+  const undatedPayableCents = transactions
+    .filter((transaction) => undatedPayable(transaction, neutralCategoryIds))
+    .reduce((total, transaction) => total + transaction.amountCents, 0);
   const available = {
     plannedCents:
       credits.totalCents -
       neutralCredits.totalCents -
       expenses.totalCents -
-      neutralDebits.totalCents,
+      (neutralDebits.totalCents - undatedPayableCents),
     settledCents:
       credits.settledCents -
       neutralCredits.settledCents -
@@ -256,10 +271,11 @@ export function summarizePeriod(
     incomeCents: sum(ownCredits.filter((transaction) => !isNeutral(transaction))),
     neutralIncomeCents: sum(ownCredits.filter(isNeutral)),
     undatedCents,
+    undatedPayableCents,
     credits,
     debits,
     balance: {
-      plannedCents: credits.totalCents - undatedCents - debits.totalCents,
+      plannedCents: credits.totalCents - undatedCents - (debits.totalCents - undatedPayableCents),
       settledCents: credits.settledCents - debits.settledCents,
     },
     expenses,

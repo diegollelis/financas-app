@@ -14,7 +14,13 @@ export function CreditsBar({ summary }: { summary: Summary }) {
   // legend never shows "Saldo previsto R$ 0,00" under a negative one (ADR 0051 note).
   const segments = [
     { label: 'Saídas pagas', cents: debits.settledCents, color: 'bg-chart-1' },
-    { label: 'Saídas a pagar', cents: debits.pendingCents, color: 'bg-chart-2' },
+    // A debt with no due date is not this month's to pay (ADR 0057 note): out of the bar, said
+    // under the planned balance.
+    {
+      label: 'Saídas a pagar',
+      cents: debits.pendingCents - summary.undatedPayableCents,
+      color: 'bg-chart-2',
+    },
     ...(balance.plannedCents > 0
       ? [{ label: 'Saldo previsto', cents: balance.plannedCents, color: 'bg-chart-3' }]
       : []),
@@ -60,8 +66,9 @@ export function CreditsBar({ summary }: { summary: Summary }) {
         {balance.plannedCents < 0 && (
           <p className="text-destructive mt-2 tabular-nums">
             As saídas passam das entradas
-            {summary.undatedCents > 0 && ', sem as que não têm vencimento,'} em{' '}
-            {formatCents(-balance.plannedCents)}.
+            {summary.undatedCents + summary.undatedPayableCents > 0 &&
+              ', sem o que não tem vencimento,'}{' '}
+            em {formatCents(-balance.plannedCents)}.
           </p>
         )}
       </figcaption>

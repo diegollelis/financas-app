@@ -113,6 +113,31 @@ describe('summarizePeriod', () => {
     expect(summary.balance.plannedCents).toBe(1_000_000 - 320_990);
   });
 
+  it('leaves money borrowed, to pay back with no due date, out of the planned view (ADR 0057 note)', () => {
+    const loans = id(105);
+    const borrowed = { ...credit(500_000, '2026-10-03'), categoryId: loans };
+    const owed = debit(500_000, null, null, loans);
+    const summary = summarizePeriod([...month, borrowed, owed], budget, today, new Set([loans]));
+
+    // Still in the debits, and still owed; not this month's to pay.
+    expect(summary.debits.totalCents).toBe(820_990);
+    expect(summary.undatedPayableCents).toBe(500_000);
+    expect(summary.balance.plannedCents).toBe(1_100_000 - 320_990);
+    // The money borrowed is no goal, and the debt does not eat what is left to save.
+    expect(summary.available.plannedCents).toBe(600_000 - 250_990);
+  });
+
+  it('keeps a debt with a due date in the planned view, and a payment in the settled one', () => {
+    const loans = id(105);
+    const due = debit(100_000, '2026-10-28', null, loans);
+    const paid = debit(50_000, null, '2026-10-04', loans);
+    const summary = summarizePeriod([...month, due, paid], budget, today, new Set([loans]));
+
+    expect(summary.undatedPayableCents).toBe(0);
+    expect(summary.balance.plannedCents).toBe(600_000 - 470_990);
+    expect(summary.available.settledCents).toBe(500_000 - 35_000 - 50_000);
+  });
+
   it('leaves in the planned balance a pending credit with no due date in any other category', () => {
     expect(summarizePeriod(month, budget, today).undatedCents).toBe(0);
   });

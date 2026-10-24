@@ -11,6 +11,7 @@ import {
   todayIso,
   transactionTypeLabels,
   transactionStatus,
+  undatedPayable,
   undatedReceivable,
   type Category,
   type Transaction,
@@ -103,8 +104,8 @@ const showError = (error: unknown) => toast.error(apiErrorMessage(error));
 /**
  * What the month adds up to, whatever the search or the filter: what comes in, what goes out
  * and how it ends if everything is paid and received, the Painel's "Saldo previsto" (ADR 0036
- * note). Money lent coming back with no due date stays in the credits but out of the balance
- * (ADR 0057), and a line under the credits says so.
+ * note). Money lent coming back, or borrowed to pay back, with no due date stays in the credits
+ * or the debits but out of the balance (ADR 0057 and its note), and a line under them says so.
  */
 function MonthTotals({
   transactions,
@@ -120,15 +121,25 @@ function MonthTotals({
   const undated = sum(
     transactions.filter((transaction) => undatedReceivable(transaction, neutralCategoryIds)),
   );
-  const balance = credits - undated - debits;
+  const undatedPayables = sum(
+    transactions.filter((transaction) => undatedPayable(transaction, neutralCategoryIds)),
+  );
+  const balance = credits - undated - (debits - undatedPayables);
+  const outOfForecast = (cents: number) =>
+    cents > 0 ? `${formatCents(cents)} sem vencimento, fora do previsto` : null;
   const items = [
     {
       label: 'Entradas',
       value: signedCents('CREDIT', credits),
       tone: 'text-credit-foreground',
-      sub: undated > 0 ? `${formatCents(undated)} sem vencimento, fora do previsto` : null,
+      sub: outOfForecast(undated),
     },
-    { label: 'Saídas', value: signedCents('DEBIT', debits), tone: '' },
+    {
+      label: 'Saídas',
+      value: signedCents('DEBIT', debits),
+      tone: '',
+      sub: outOfForecast(undatedPayables),
+    },
     {
       label: 'Saldo previsto',
       value: formatCents(balance),
