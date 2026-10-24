@@ -50,6 +50,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.28.0** (2026-10-22): uma categoria pode ser marcada "Nem renda nem gasto", para empréstimos e devoluções: os lançamentos dela continuam no saldo e na sobra para guardar, mas saem das entradas do mês, do limite de gastos e dos gastos da Análise; no cartão do orçamento, cada informação embaixo de "Entradas do mês" fica na sua linha ([ADR 0056](adr/0056-categoria-nem-renda-nem-gasto.md)).
 - **1.28.1** (2026-10-22): nas categorias "Nem renda nem gasto", o dinheiro que volta (ou que se pegou emprestado) não vira meta: fica só no saldo, e a sobra para guardar volta a refletir a renda do mês ([ADR 0056](adr/0056-categoria-nem-renda-nem-gasto.md)).
 - **1.29.0** (2026-10-23): "Receber parte" / "Pagar parte" num lançamento pendente, em Lançamentos e em Pessoas, para um empréstimo devolvido aos poucos; e o que está a receber sem data numa categoria "Nem renda nem gasto" fica fora do Saldo previsto, com uma linha dizendo quanto ([ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md)).
+- **1.30.0** (2026-10-23): "Emprestado para": uma categoria de saída "Nem renda nem gasto" escolhe a categoria da devolução, e dividir uma saída dela põe o valor a receber nessa categoria, já fora da renda e das metas, com os lançamentos antigos corrigidos sozinhos ([ADR 0058](adr/0058-emprestado-para.md)); e nomes revistos com base no mercado: "Recebimento parcial" / "Pagamento parcial", "sem vencimento" e "Categoria da devolução".
 
 ## Fase 0 — Planejamento ✅
 
