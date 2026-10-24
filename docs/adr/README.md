@@ -63,3 +63,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0057](0057-receber-parte-e-a-receber-sem-data.md)               | Receber parte de um lançamento pendente; o que está a receber sem data fora do previsto | Aceita |
 | [0058](0058-emprestado-para.md)                                  | Emprestado para: a categoria de saída marcada escolhe onde entra a volta do empréstimo  | Aceita |
 | [0059](0059-peguei-emprestado-de.md)                             | Peguei emprestado de: a categoria de entrada marcada escolhe a categoria da dívida      | Aceita |
+| [0060](0060-extratos-do-banco.md)                                | Extratos do banco: duas páginas de importação, o banco e o tipo de cada importação      | Aceita |

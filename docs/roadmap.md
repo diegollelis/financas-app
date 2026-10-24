@@ -204,6 +204,12 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] O leitor do CSV do Nubank, sem tela (`parseNubankCsv` em `packages/shared`)
   - [x] API: a "Origem" digitada e o vencimento da fatura em cada importação, e quantos parcelamentos ela criou
   - [x] Tela: a origem "Fatura do cartão Nubank", o vencimento e a revisão com as regras da fatura
+- [ ] **Extratos do banco** ([ADR 0060](adr/0060-extratos-do-banco.md)): tudo o que passa pelo banco importado e conferido
+  - [x] "Importar" em duas páginas (Extrato do banco, a padrão, e Planilha modelo), com o banco e o tipo guardados em cada importação e a lista de bancos e extratos (`statementBanks`)
+  - [ ] Extrato da conta Nubank: leitor (só o nome da outra parte, sem CPF, CNPJ, banco, agência e conta), competência pela data com aviso de conta do mês anterior, "Pagamento de fatura" e caixinhas (RDB) desmarcados, dinheiro entre as suas contas reconhecido, identificador contra duplicatas
+  - [ ] Conferência: casar cada movimento com o que já está lançado ("Já lançado", quitar o pendente, "Valor diferente", "Recebimento parcial" de um empréstimo)
+  - [ ] A conferência também na fatura do cartão
+  - [ ] Outros bancos, talvez por OFX ("Outro banco (OFX)") para o extrato da conta
 - [x] As partes de uma divisão vencem com o que foi dividido (lançamento, mês da recorrência ou parcela) e acompanham a mudança do vencimento; as pendentes já gravadas ganham o da origem pela migração (nota no [ADR 0052](adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md))
 - [x] Recorrências: uma encerrada mostra do primeiro ao último mês ("Janeiro a maio de 2026"), e não só "Até maio de 2026" (nota no [ADR 0038](adr/0038-recorrencias-e-parcelamentos.md))
 - [x] "Beleza" entre as categorias padrão de saída dos espaços novos (pedido em 2026-10-17; os espaços existentes continuam com as suas, como no "Bônus", nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))

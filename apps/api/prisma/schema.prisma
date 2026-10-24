@@ -415,6 +415,18 @@ model MerchantAlias {
   @@map("merchant_aliases")
 }
 
+// What an import brought (ADR 0060): the app's spreadsheet, or a bank's card or account statement.
+enum ImportKind {
+  TEMPLATE
+  CARD_STATEMENT
+  ACCOUNT_STATEMENT
+}
+
+// The bank of a statement imported (ADR 0060): one reader per bank and kind.
+enum StatementBank {
+  NUBANK
+}
+
 // Importação (ADR 0040): one spreadsheet import, all its transactions created at once and
 // undone together (deleting it cascades to them). The file never reaches the API: the browser
 // reads it and sends only the confirmed transactions. CHECKs on count and periods are in the
@@ -431,6 +443,9 @@ model TransactionImport {
   // (ADR 0055 note): what tells one import from another in the list.
   label            String?           @db.VarChar(100)
   statementDueDate DateTime?         @map("statement_due_date") @db.Date
+  // What was imported and from which bank (ADR 0060): the template has no bank.
+  kind             ImportKind        @default(TEMPLATE)
+  bank             StatementBank?
   firstPeriod      String            @map("first_period") @db.Char(7)
   lastPeriod       String            @map("last_period") @db.Char(7)
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)

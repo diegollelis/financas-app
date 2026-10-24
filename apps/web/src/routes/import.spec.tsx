@@ -10,7 +10,8 @@ import { renderApp } from '@/test/render';
 const houseId = '01920000-0000-7000-8000-000000000002';
 const house = { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' };
 const base = `/api/workspaces/${houseId}`;
-const page = `/espacos/${houseId}/importar`;
+const page = `/espacos/${houseId}/importar/planilha`;
+const statementPage = `/espacos/${houseId}/importar/extrato`;
 
 const category = (n: number, name: string, type: 'CREDIT' | 'DEBIT') => ({
   id: `01920000-0000-7000-8000-0000000001${String(n).padStart(2, '0')}`,
@@ -156,6 +157,9 @@ describe('ImportPage', () => {
         ],
         // The "Origem" it starts with (ADR 0055 note).
         label: 'Planilha modelo',
+        // What it brings (ADR 0060): the template has no bank.
+        kind: 'TEMPLATE',
+        bank: null,
       }),
     });
     expect(await screen.findByText('2 lançamentos importados')).toBeInTheDocument();
@@ -397,7 +401,7 @@ describe('ImportPage', () => {
     });
     renderApp(page);
 
-    const previous = await screen.findByRole('region', { name: 'Importações anteriores' });
+    const previous = await screen.findByRole('region', { name: 'Planilhas importadas' });
     // Without a due date, it came from the template.
     expect(within(previous).getByRole('listitem')).toHaveTextContent(
       /^Planilha12 lançamentos, junho de 2026 a julho de 2026/,
@@ -412,6 +416,40 @@ describe('ImportPage', () => {
 
     await expectCall(fetchMock, `${base}/imports/${previousImport.id}`, { method: 'DELETE' });
     expect(await screen.findByText('Importação desfeita')).toBeInTheDocument();
+  });
+
+  it('opens the bank statements by default, and moves between the two pages (ADR 0060)', async () => {
+    mockImport({
+      [`GET ${base}/imports`]: {
+        body: [
+          previousImport,
+          {
+            ...previousImport,
+            id: '01920000-0000-7000-8000-000000000902',
+            kind: 'CARD_STATEMENT',
+            bank: 'NUBANK',
+            label: 'Fatura Nubank',
+          },
+        ],
+      },
+    });
+    const { router } = renderApp(`/espacos/${houseId}/importar`);
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe(statementPage));
+    const tabs = await screen.findByRole('navigation', { name: 'O que importar' });
+    expect(within(tabs).getByRole('link', { name: 'Extrato do banco' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    // Each page lists its own imports.
+    const statements = await screen.findByRole('region', { name: 'Extratos importados' });
+    expect(within(statements).getAllByRole('listitem')).toHaveLength(1);
+
+    await userEvent.click(within(tabs).getByRole('link', { name: 'Planilha modelo' }));
+
+    expect(router.state.location.pathname).toBe(page);
+    const sheets = await screen.findByRole('region', { name: 'Planilhas importadas' });
+    expect(within(sheets).getAllByRole('listitem')).toHaveLength(1);
   });
 
   it('is read-only for a VIEWER', async () => {
@@ -464,8 +502,7 @@ describe('ImportPage', () => {
         ...overrides,
       });
     const chooseStatement = async (file = statementFile()) => {
-      await userEvent.click(await screen.findByRole('radio', { name: 'Fatura Nubank' }));
-      await userEvent.upload(screen.getByLabelText('Escolher fatura (.csv)'), file);
+      await userEvent.upload(await screen.findByLabelText('Escolher fatura (.csv)'), file);
     };
     /** The due date is typed at the top of the review (ADR 0055 note). */
     const dueDateField = () => screen.findByLabelText('Vencimento da fatura', { exact: true });
@@ -475,7 +512,7 @@ describe('ImportPage', () => {
 
     it('reviews the statement, learns an alias and imports with its origin and due date', async () => {
       const fetchMock = mockStatement();
-      renderApp(page);
+      renderApp(statementPage);
 
       await chooseStatement();
 
@@ -525,7 +562,7 @@ describe('ImportPage', () => {
       await expectCall(fetchMock, `${base}/imports`, {
         method: 'POST',
         body: expect.stringContaining(
-          '"aliases":[{"merchantName":"Spaceship","alias":"Spaceship.Com"}],"label":"Fatura Nubank","statementDueDate":"2026-11-04"',
+          '"aliases":[{"merchantName":"Spaceship","alias":"Spaceship.Com"}],"label":"Fatura Nubank","kind":"CARD_STATEMENT","bank":"NUBANK","statementDueDate":"2026-11-04"',
         ) as unknown,
       });
       await expectCall(fetchMock, `${base}/imports`, {
@@ -538,7 +575,7 @@ describe('ImportPage', () => {
 
     it('offers a merchant added on one line to the others, and applies its alias at once', async () => {
       mockStatement();
-      renderApp(page);
+      renderApp(statementPage);
       const file = new File(
         [
           [
@@ -606,7 +643,7 @@ describe('ImportPage', () => {
 
     it('checks and unchecks every line at once, leaving out what the app unchecked on purpose', async () => {
       mockStatement();
-      renderApp(page);
+      renderApp(statementPage);
       await chooseStatement();
 
       const all = await screen.findByRole('checkbox', { name: 'Marcar todas' });
@@ -636,7 +673,7 @@ describe('ImportPage', () => {
 
     it('takes the due date typed, whatever the file name says, and another reference month', async () => {
       mockStatement();
-      renderApp(page);
+      renderApp(statementPage);
 
       await chooseStatement();
       // The name carries a date, and the field still comes empty.
@@ -657,7 +694,7 @@ describe('ImportPage', () => {
 
     it('refuses a file that is not a Nubank statement', async () => {
       mockStatement();
-      renderApp(page);
+      renderApp(statementPage);
 
       await chooseStatement(
         new File(['Data;Valor\n10/10/2026;10'], 'outra.csv', { type: 'text/csv' }),
@@ -668,6 +705,34 @@ describe('ImportPage', () => {
       );
     });
 
+    it('tells an account statement chosen as a card one, instead of a generic error (ADR 0060)', async () => {
+      mockStatement();
+      renderApp(statementPage);
+
+      // An invented line in the format of Nubank's account statement.
+      await chooseStatement(
+        new File(
+          ['Data,Valor,Identificador,Descrição\n03/10/2026,-10.00,abc,Pix enviado'],
+          'conta.csv',
+          { type: 'text/csv' },
+        ),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Este arquivo parece o extrato de conta do Nubank, que o app ainda não lê.',
+      );
+    });
+
+    it('asks the bank first, and shows the account statement as coming next (ADR 0060)', async () => {
+      mockStatement();
+      renderApp(statementPage);
+
+      expect(await screen.findByRole('combobox', { name: 'Banco' })).toHaveTextContent('Nubank');
+      expect(screen.getByRole('radio', { name: 'Fatura' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Conta' })).toBeDisabled();
+      expect(screen.getByText('"Conta" chega no próximo passo.')).toBeInTheDocument();
+    });
+
     it('names a past import by its origin and due date', async () => {
       mockImport({
         [`GET ${base}/imports`]: {
@@ -676,14 +741,16 @@ describe('ImportPage', () => {
               ...previousImport,
               label: 'Fatura Nubank',
               statementDueDate: '2026-11-04',
+              kind: 'CARD_STATEMENT',
+              bank: 'NUBANK',
               planCount: 1,
             },
           ],
         },
       });
-      renderApp(page);
+      renderApp(statementPage);
 
-      const previous = await screen.findByRole('region', { name: 'Importações anteriores' });
+      const previous = await screen.findByRole('region', { name: 'Extratos importados' });
       // The badge first: a statement, since it has a due date.
       expect(within(previous).getByRole('listitem')).toHaveTextContent(
         /^FaturaFatura Nubank · vence 04\/11\/202612 lançamentos e 1 parcelamento, junho de 2026 a julho de 2026 · /,

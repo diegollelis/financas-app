@@ -78,8 +78,24 @@ export const importMerchantAliasInputSchema = createMerchantAliasInputSchema.ext
 
 export type ImportMerchantAliasInput = z.infer<typeof importMerchantAliasInputSchema>;
 
+/** What an import brought (ADR 0060): the app's spreadsheet, or a bank's statement. */
+export const importKindSchema = z.enum(['TEMPLATE', 'CARD_STATEMENT', 'ACCOUNT_STATEMENT']);
+
+export type ImportKind = z.infer<typeof importKindSchema>;
+
+/** The bank of a statement (ADR 0060). */
+export const statementBankSchema = z.enum(['NUBANK']);
+
+export type StatementBank = z.infer<typeof statementBankSchema>;
+
 export const createImportInputSchema = z
   .object({
+    /**
+     * What it brings and from which bank (ADR 0060). Without them, it is read as before: a card
+     * statement of Nubank when it has a due date, the template otherwise.
+     */
+    kind: importKindSchema.optional(),
+    bank: statementBankSchema.nullable().optional(),
     transactions: z
       .array(importTransactionInputSchema)
       .max(
@@ -92,6 +108,10 @@ export const createImportInputSchema = z
     label: importLabelSchema.nullable().optional(),
     /** The due date of the card statement imported, when it is one. */
     statementDueDate: isoDateSchema.nullable().optional(),
+  })
+  .refine((input) => !input.kind || (input.kind === 'TEMPLATE') === !input.bank, {
+    message: 'Um extrato diz o banco; a planilha modelo não tem banco.',
+    path: ['bank'],
   })
   .refine((input) => input.transactions.length + (input.plans?.length ?? 0) > 0, {
     message: 'Escolha ao menos um lançamento para importar.',
@@ -120,6 +140,9 @@ export const importSchema = z.object({
   label: z.string().nullable().default(null),
   /** The due date of the card statement, when it was one. */
   statementDueDate: isoDateSchema.nullable().default(null),
+  /** What it brought and from which bank (ADR 0060); null bank for the template. */
+  kind: importKindSchema.default('TEMPLATE'),
+  bank: statementBankSchema.nullable().default(null),
   firstPeriod: periodSchema,
   lastPeriod: periodSchema,
   createdAt: z.iso.datetime(),

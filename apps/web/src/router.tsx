@@ -14,7 +14,8 @@ import { RootLayout } from '@/components/root-layout';
 import { GuestOnly, RequireAuth } from '@/features/auth/route-guards';
 import { AccountLayout, WorkspaceLayout } from '@/features/workspaces/workspace-layout';
 import { AnalysisPage } from '@/routes/analysis';
-import { ImportPage } from '@/routes/import';
+import { StatementImportPage } from '@/routes/import-statement';
+import { TemplateImportPage } from '@/routes/import-template';
 import { RecurrencesPage } from '@/routes/recurrences';
 import { BudgetRedirect } from '@/routes/budget';
 import { CategoriesPage } from '@/routes/categories';
@@ -89,8 +90,16 @@ export const routes: RouteObject[] = [
               { path: 'pessoas', element: <PeoplePage /> },
               // Where a transaction was bought or who paid it (ADR 0053).
               { path: 'estabelecimentos', element: <MerchantsPage /> },
-              // The spreadsheet is read in the browser; only confirmed rows go out (ADR 0040).
-              { path: 'importar', element: <ImportPage /> },
+              // The file is read in the browser; only confirmed rows go out (ADR 0040). The bank's
+              // statements and the app's spreadsheet on pages of their own (ADR 0060).
+              {
+                path: 'importar',
+                children: [
+                  { index: true, element: <Navigate to="extrato" replace /> },
+                  { path: 'extrato', element: <StatementImportPage /> },
+                  { path: 'planilha', element: <TemplateImportPage /> },
+                ],
+              },
             ],
           },
         ],

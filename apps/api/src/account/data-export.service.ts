@@ -284,6 +284,8 @@ export class DataExportService {
         transactionCount: item.transactionCount,
         label: item.label,
         statementDueDate: dayOrNull(item.statementDueDate),
+        kind: item.kind,
+        bank: item.bank,
         firstPeriod: item.firstPeriod,
         lastPeriod: item.lastPeriod,
         createdAt: iso(item.createdAt),

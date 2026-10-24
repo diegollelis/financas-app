@@ -48,6 +48,8 @@ type Section = {
   byPeriod?: boolean;
   /** Behind "Mais" in the phone's tab bar; in the sidebar from md. */
   more?: boolean;
+  /** Pages of its own under it (Importar, ADR 0060): it stays marked on them. */
+  nested?: boolean;
 };
 
 const sections: Section[] = [
@@ -58,7 +60,7 @@ const sections: Section[] = [
   { path: 'recorrencias', label: 'Recorrências', icon: Repeat, more: true },
   { path: 'pessoas', label: 'Pessoas', icon: HandCoins, more: true },
   { path: 'estabelecimentos', label: 'Estabelecimentos', icon: Store, more: true },
-  { path: 'importar', label: 'Importar', icon: FileUp, more: true },
+  { path: 'importar', label: 'Importar', icon: FileUp, more: true, nested: true },
   { path: 'categorias', label: 'Categorias', icon: Tags, more: true },
   { path: '', label: 'Membros', icon: Users, more: true },
 ];
@@ -90,7 +92,9 @@ function MoreSheet({ links }: { links: ReturnType<typeof useSectionLinks> }) {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const more = links.filter((link) => link.more);
-  const active = more.some((link) => link.to === pathname);
+  const active = more.some(
+    (link) => link.to === pathname || (link.nested && pathname.startsWith(`${link.to}/`)),
+  );
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -117,7 +121,7 @@ function MoreSheet({ links }: { links: ReturnType<typeof useSectionLinks> }) {
               <SheetClose asChild>
                 <NavLink
                   to={link.to}
-                  end
+                  end={!link.nested}
                   className="hover:bg-muted aria-[current=page]:text-primary flex h-12 items-center gap-3 rounded-lg px-3 text-base font-medium"
                 >
                   <link.icon aria-hidden className="size-5" />
@@ -142,7 +146,7 @@ function SectionNav({ workspaceId }: { workspaceId: string }) {
       <ul className="grid grid-cols-4 md:flex md:flex-col md:gap-1">
         {links.map((link) => (
           <li key={link.path} className={cn(link.more && 'hidden md:block')}>
-            <NavLink to={link.to} end className={navItemClassName}>
+            <NavLink to={link.to} end={!link.nested} className={navItemClassName}>
               <span className={navIconClassName}>
                 <link.icon aria-hidden className="size-5 md:size-4" />
               </span>

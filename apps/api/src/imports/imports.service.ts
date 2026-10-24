@@ -7,7 +7,9 @@ import {
   type CreateImportInput,
   type Import,
   type ImportInstallmentPlanInput,
+  type ImportKind,
   type ImportMerchantAliasInput,
+  type StatementBank,
 } from '@financas/shared';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
@@ -29,11 +31,24 @@ function toResponse(row: ImportRow): Import {
     planCount: row._count.installmentPlans,
     label: row.label,
     statementDueDate: row.statementDueDate && toIsoDate(row.statementDueDate),
+    kind: row.kind,
+    bank: row.bank,
     firstPeriod: row.firstPeriod,
     lastPeriod: row.lastPeriod,
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
   };
+}
+
+/**
+ * What an import brings and from which bank (ADR 0060). A client from before them is read as it
+ * meant: a statement due date was only ever sent by Nubank's card statement (ADR 0055).
+ */
+function kindOf(input: CreateImportInput): { kind: ImportKind; bank: StatementBank | null } {
+  if (input.kind) return { kind: input.kind, bank: input.bank ?? null };
+  return input.statementDueDate
+    ? { kind: 'CARD_STATEMENT', bank: 'NUBANK' }
+    : { kind: 'TEMPLATE', bank: null };
 }
 
 const withCreator = {
@@ -113,6 +128,7 @@ export class ImportsService {
         transactionCount: periods.length,
         label: input.label ?? null,
         statementDueDate: input.statementDueDate ? toDate(input.statementDueDate) : null,
+        ...kindOf(input),
         firstPeriod: periods[0] ?? '',
         lastPeriod: periods.at(-1) ?? '',
         installmentPlans: {
