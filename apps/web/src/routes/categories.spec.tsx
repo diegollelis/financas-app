@@ -329,6 +329,30 @@ describe('CategoriesPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('chooses where a borrowing keeps its debt, and shows it (ADR 0059)', async () => {
+    const fetchMock = mockCategories({
+      [`GET ${base}`]: { body: [...categories, lent, back] },
+      [`PATCH ${base}/${back.id}`]: { body: { ...back, returnCategoryId: lent.id } },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    await choose('Empréstimos a receber', 'Categoria da dívida');
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Categoria da dívida: Empréstimos a receber',
+    });
+    expect(within(dialog).getByRole('radio', { name: /^Repasse/ })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('radio', { name: /^Empréstimos feitos/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/${back.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ returnCategoryId: lent.id }),
+    });
+    expect(
+      await screen.findByText('A dívida de Empréstimos a receber entra em Empréstimos feitos'),
+    ).toBeInTheDocument();
+  });
+
   it('shows where a loan comes back on its category', async () => {
     mockCategories({
       [`GET ${base}`]: { body: [...categories, { ...lent, returnCategoryId: back.id }, back] },

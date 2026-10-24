@@ -17,32 +17,40 @@ export async function shareCategoryId(
   prisma: PrismaService,
   workspaceId: string,
   shareType: TransactionType,
-  /** The category of what is split: a loan's points to where the money comes back (ADR 0058). */
+  /**
+   * The category of what is split: a loan's points to where the money comes back (ADR 0058), a
+   * borrowing's to where the debt is kept (ADR 0059).
+   */
   sourceCategoryId?: string,
 ): Promise<string> {
-  if (shareType === 'CREDIT' && sourceCategoryId) {
-    const loanReturn = await loanReturnCategoryId(prisma, workspaceId, sourceCategoryId);
-    if (loanReturn) return loanReturn;
+  if (sourceCategoryId) {
+    const loan = await loanCategoryId(prisma, workspaceId, sourceCategoryId, shareType);
+    if (loan) return loan;
   }
   return splitCategoryId(prisma, workspaceId, shareType);
 }
 
 /**
- * Where the shares of a debit in this category go when it is a loan (ADR 0058): the credit
- * category its return points to, while both are still marked "Nem renda nem gasto" and that one
- * is not archived. Null otherwise: Reembolso, as any split.
+ * Where the shares split from this category go when it is a loan (ADRs 0058, 0059): the category
+ * of the other side it points to (`returnCategoryId`), while both are still marked "Nem renda nem
+ * gasto" and that one is offered. Null otherwise: Reembolso or Repasse, as any split.
  */
-export async function loanReturnCategoryId(
+export async function loanCategoryId(
   prisma: PrismaService,
   workspaceId: string,
-  debitCategoryId: string,
+  sourceCategoryId: string,
+  shareType: TransactionType,
 ): Promise<string | null> {
   const category = await prisma.forWorkspace(workspaceId).category.findFirst({
-    where: { id: debitCategoryId, workspaceId, type: 'DEBIT', neutral: true },
-    select: { returnCategory: { select: { id: true, neutral: true, archivedAt: true } } },
+    where: { id: sourceCategoryId, workspaceId, neutral: true },
+    select: {
+      returnCategory: { select: { id: true, type: true, neutral: true, archivedAt: true } },
+    },
   });
   const target = category?.returnCategory;
-  return target && target.neutral && !target.archivedAt ? target.id : null;
+  return target && target.type === shareType && target.neutral && !target.archivedAt
+    ? target.id
+    : null;
 }
 
 /** Reembolso or Repasse, found by its mark (ADR 0052 note), created when missing. */

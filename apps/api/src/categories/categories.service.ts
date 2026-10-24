@@ -66,8 +66,15 @@ const notALoan = () =>
   new ConflictException({
     code: 'NOT_A_LOAN_CATEGORY',
     message:
-      'Só uma categoria de saída marcada "Nem renda nem gasto" escolhe a categoria da devolução.',
+      'Só uma categoria marcada "Nem renda nem gasto" escolhe a categoria da devolução ou da dívida.',
   });
+
+/** The other side: a debit's shares are credits, a credit's are debits. */
+const opposite = (type: TransactionType): TransactionType =>
+  type === 'DEBIT' ? 'CREDIT' : 'DEBIT';
+
+/** What the chosen category is to a loan of that side (ADRs 0058, 0059), as the UI says it. */
+const loanRole = (type: TransactionType) => (type === 'DEBIT' ? 'devolução' : 'dívida');
 
 const categoryExists = () =>
   new ConflictException({
@@ -320,17 +327,18 @@ export class CategoriesService {
     let archivedAt: Date | null | undefined;
     if (input.archived === true) archivedAt = current.archivedAt ?? new Date();
     if (input.archived === false) archivedAt = null;
-    // Where a loan's money comes back from (ADR 0058) stays marked and offered while chosen.
+    // Where a loan's money comes back, or a borrowing's debt is kept (ADRs 0058, 0059), stays
+    // marked and offered while chosen.
     if (input.neutral === false || input.archived === true) {
       await this.ensureNotALoanReturn(workspaceId, categoryId);
     }
     const neutral = input.neutral ?? current.neutral;
     let returnCategoryId = input.returnCategoryId;
     if (returnCategoryId) {
-      if (current.type !== 'DEBIT' || !neutral) throw notALoan();
-      await this.ensureLoanReturn(workspaceId, returnCategoryId);
+      if (!neutral) throw notALoan();
+      await this.ensureLoanReturn(workspaceId, returnCategoryId, opposite(current.type));
     }
-    // Unmarked, it is no loan any more: its shares go back to Reembolso.
+    // Unmarked, it is no loan any more: its shares go back to Reembolso or Repasse.
     if (!neutral && current.returnCategoryId) returnCategoryId = null;
 
     try {
@@ -340,7 +348,7 @@ export class CategoriesService {
         data: { name: input.name, archivedAt, neutral: input.neutral, returnCategoryId },
       });
       if (returnCategoryId !== undefined && returnCategoryId !== current.returnCategoryId) {
-        await this.moveLoanShares(workspaceId, categoryId);
+        await this.moveLoanShares(workspaceId, categoryId, opposite(current.type));
       }
       return toResponse(category, 0, null, await categoryInUse(db, workspaceId, categoryId));
     } catch (error) {
@@ -378,50 +386,61 @@ export class CategoriesService {
   }
 
   /**
-   * Where a loan's money comes back (ADR 0058): a credit category of this workspace, marked
-   * "Nem renda nem gasto", offered (not archived) and not Reembolso or Repasse.
+   * Where a loan's money comes back, or a borrowing's debt is kept (ADRs 0058, 0059): a category
+   * of the other side in this workspace, marked "Nem renda nem gasto", offered (not archived) and
+   * not Reembolso or Repasse.
    */
-  private async ensureLoanReturn(workspaceId: string, returnCategoryId: string) {
+  private async ensureLoanReturn(
+    workspaceId: string,
+    returnCategoryId: string,
+    type: TransactionType,
+  ) {
     const target = await this.prisma.forWorkspace(workspaceId).category.findFirst({
       where: { id: returnCategoryId, workspaceId },
     });
     if (
       !target ||
-      target.type !== 'CREDIT' ||
+      target.type !== type ||
       !target.neutral ||
       target.archivedAt ||
       target.splitRole
     ) {
+      const side = type === 'CREDIT' ? 'entrada' : 'saída';
       throw new BadRequestException({
         code: 'INVALID_RETURN_CATEGORY',
-        message: 'Escolha uma categoria de entrada marcada "Nem renda nem gasto".',
+        message: `Escolha uma categoria de ${side} marcada "Nem renda nem gasto".`,
       });
     }
   }
 
-  /** The category chosen for a loan's return stays marked, offered and in place (ADR 0058). */
+  /** The category chosen by a loans category stays marked, offered and in place (ADRs 0058, 0059). */
   private async ensureNotALoanReturn(workspaceId: string, categoryId: string) {
     const loan = await this.prisma.forWorkspace(workspaceId).category.findFirst({
       where: { workspaceId, returnCategoryId: categoryId },
-      select: { name: true },
+      select: { name: true, type: true },
     });
     if (loan) {
+      const role = loanRole(loan.type);
       throw new ConflictException({
         code: 'CATEGORY_RECEIVES_LOANS',
-        message: `Esta categoria recebe a devolução dos empréstimos de "${loan.name}". Troque lá, em "Categoria da devolução", antes.`,
+        message: `Esta categoria é a ${role} dos empréstimos de "${loan.name}". Troque lá, em "Categoria da ${role}", antes.`,
       });
     }
   }
 
   /**
-   * The shares split from the debits of this category, settled or not, go where its money comes
-   * back now: the chosen credit category, or Reembolso (ADR 0058). So a loan launched before the
-   * choice is fixed, and taking the choice back undoes it.
+   * The shares split from the transactions of this category, settled or not, go where they belong
+   * now: the chosen category of the other side, or Reembolso or Repasse (ADRs 0058, 0059). So a
+   * loan launched before the choice is fixed, and taking the choice back undoes it.
    */
-  private async moveLoanShares(workspaceId: string, categoryId: string) {
-    const target = await shareCategoryId(this.prisma, workspaceId, 'CREDIT', categoryId);
+  private async moveLoanShares(
+    workspaceId: string,
+    categoryId: string,
+    shareType: TransactionType,
+  ) {
+    const target = await shareCategoryId(this.prisma, workspaceId, shareType, categoryId);
     await this.prisma.forWorkspace(workspaceId).transaction.updateMany({
-      where: { workspaceId, type: 'CREDIT', splitOf: { is: { categoryId } } },
+      where: { workspaceId, type: shareType, splitOf: { is: { categoryId } } },
       data: { categoryId: target },
     });
   }

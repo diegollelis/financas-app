@@ -571,6 +571,98 @@ describe('categories', () => {
     });
   });
 
+  describe('where a borrowing keeps its debt (ADR 0059)', () => {
+    /** A loans category on each side, both marked, Ana, and money borrowed from her before any choice. */
+    async function borrowings() {
+      const { browser, personalWorkspaceId: id } = await t.signUp(maria);
+      const base = `/api/workspaces/${id}`;
+      const marked = async (type: 'CREDIT' | 'DEBIT') => {
+        const category = await create(browser, id, { name: 'Empréstimo pessoal', type });
+        await browser
+          .patch(`${base}/categories/${category.id}`)
+          .send({ neutral: true })
+          .expect(200);
+        return category.id;
+      };
+      const borrowed = await marked('CREDIT');
+      const debt = await marked('DEBIT');
+      const ana = (await browser.post(`${base}/people`).send({ name: 'Ana' }).expect(201)).body as {
+        id: string;
+      };
+      const borrow = (amountCents: number) =>
+        browser
+          .post(`${base}/transactions`)
+          .send({
+            type: 'CREDIT',
+            description: 'Empréstimo da Ana',
+            categoryId: borrowed,
+            amountCents,
+            period: '2026-10',
+            settledAt: '2026-10-24',
+            split: [{ personId: ana.id, amountCents }],
+          })
+          .expect(201);
+      await borrow(200_000);
+      const shareCategories = async () => {
+        const response = await browser.get(`${base}/transactions?period=2026-10`).expect(200);
+        return (response.body as { splitOfId: string | null; categoryId: string }[])
+          .filter((transaction) => transaction.splitOfId)
+          .map((transaction) => transaction.categoryId);
+      };
+      const passThrough = (await list(browser, id)).find((c) => c.splitRole === 'PASS_THROUGH')!;
+      const choose = (returnCategoryId: string | null) =>
+        browser.patch(`${base}/categories/${borrowed}`).send({ returnCategoryId });
+      return { browser, id, base, borrowed, debt, borrow, shareCategories, passThrough, choose };
+    }
+
+    it('moves the debts already launched there, and back to Repasse when taken back', async () => {
+      const { borrowed, debt, shareCategories, passThrough, choose } = await borrowings();
+      expect(await shareCategories()).toEqual([passThrough.id]);
+
+      const chosen = await choose(debt).expect(200);
+
+      expect(categorySchema.parse(chosen.body)).toMatchObject({
+        id: borrowed,
+        returnCategoryId: debt,
+      });
+      expect(await shareCategories()).toEqual([debt]);
+      await choose(null).expect(200);
+      expect(await shareCategories()).toEqual([passThrough.id]);
+    });
+
+    it('puts the debts of money borrowed from then on there', async () => {
+      const { debt, borrow, shareCategories, choose } = await borrowings();
+      await choose(debt).expect(200);
+
+      await borrow(50_000);
+
+      expect(await shareCategories()).toEqual([debt, debt]);
+    });
+
+    it('accepts only a marked debit category, and keeps it in place while chosen', async () => {
+      const { browser, id, base, borrowed, debt, choose } = await borrowings();
+      const plain = await create(browser, id, { name: 'Viagem', type: 'DEBIT' });
+
+      for (const target of [plain.id, borrowed]) {
+        const response = await choose(target).expect(400);
+        expect(response.body).toMatchObject({
+          code: 'INVALID_RETURN_CATEGORY',
+          message: 'Escolha uma categoria de saída marcada "Nem renda nem gasto".',
+        });
+      }
+      await choose(debt).expect(200);
+      const unmark = await browser
+        .patch(`${base}/categories/${debt}`)
+        .send({ neutral: false })
+        .expect(409);
+      expect(unmark.body).toMatchObject({
+        code: 'CATEGORY_RECEIVES_LOANS',
+        message:
+          'Esta categoria é a dívida dos empréstimos de "Empréstimo pessoal". Troque lá, em "Categoria da dívida", antes.',
+      });
+    });
+  });
+
   describe('in use', () => {
     it('says which categories have anything in them, in any competência', async () => {
       const { browser, personalWorkspaceId: id } = await t.signUp(maria);

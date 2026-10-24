@@ -79,7 +79,8 @@ export function ResponsiveDialog({
           onInteractOutside={onInteractOutside}
         >
           <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
+            {/* Room for the close button at the top right: a long title never runs under it. */}
+            <DialogTitle className="pr-8">{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           {children}
@@ -103,7 +104,7 @@ export function ResponsiveDialog({
         }
       >
         <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
+          <SheetTitle className="pr-8">{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-4">{children}</div>

@@ -225,13 +225,15 @@ export class TransactionsService {
           shareDescription(input.description, installment),
         );
       }
-      // Into or out of a loan's category: its shares follow, to where the money comes back or to
-      // Reembolso (ADR 0058). Shares created by this same edit were already put there.
-      if (type === 'DEBIT' && categoryId !== current.categoryId && shares.length === 0) {
+      // Into or out of a loan's category: its shares follow, to where the money comes back or the
+      // debt is kept, or to Reembolso or Repasse (ADRs 0058, 0059). The type of a split one never
+      // changes (TYPE_LOCKED), and shares created by this same edit were already put there.
+      if (categoryId !== current.categoryId && shares.length === 0) {
+        const shareType = type === 'DEBIT' ? 'CREDIT' : 'DEBIT';
         await this.prisma.forWorkspace(workspaceId).transaction.updateMany({
           where: { workspaceId, splitOfId: transactionId },
           data: {
-            categoryId: await shareCategoryId(this.prisma, workspaceId, 'CREDIT', categoryId),
+            categoryId: await shareCategoryId(this.prisma, workspaceId, shareType, categoryId),
           },
         });
       }

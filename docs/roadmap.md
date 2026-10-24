@@ -217,6 +217,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Coluna opcional "Meio de pagamento" na planilha modelo (lida pelo rótulo ou por sinônimos comuns, um valor fora da lista vira aviso; a aba "Meios de pagamento" na planilha baixada)
 - [x] **Empréstimo devolvido aos poucos** ([ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md)): "Receber parte" / "Pagar parte" de um lançamento pendente, em Lançamentos e em Pessoas, e o que está a receber sem data numa categoria "Nem renda nem gasto" fora do Saldo previsto
 - [x] **Emprestado para** ([ADR 0058](adr/0058-emprestado-para.md)): a categoria de saída marcada escolhe a categoria de entrada marcada da volta, em Categorias; a divisão de uma saída dela vira "Emprestado para", e as partes já lançadas acompanham a escolha
+- [x] **Peguei emprestado de** ([ADR 0059](adr/0059-peguei-emprestado-de.md)): a categoria de entrada marcada escolhe a categoria da dívida; a divisão de uma entrada dela vira "Peguei emprestado de", com a parte a pagar fora do limite de gastos
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês

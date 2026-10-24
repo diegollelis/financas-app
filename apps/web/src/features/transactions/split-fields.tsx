@@ -1,5 +1,6 @@
 import {
   formatCents,
+  loanCategoryLabels,
   MAX_SPLIT_PEOPLE,
   splitInstallments,
   type Person,
@@ -80,8 +81,8 @@ export function SplitFields({
   /** Every month, or every year (ADR 0038 note). */
   monthly?: { variable: boolean; yearly?: boolean };
   /**
-   * Money lent (ADR 0058): a debit in a loans category that says where the money comes back.
-   * "Emprestado para": the amount starts all with them, and each share lands in that category.
+   * A loan (ADRs 0058, 0059): a debit ("Emprestado para") or a credit ("Peguei emprestado de") in a
+   * loans category that says where the shares go. The amount starts all with them.
    */
   loan?: { returnsTo: string };
 }) {
@@ -154,7 +155,7 @@ export function SplitFields({
         : '';
     if (loan) {
       parts.push(
-        `Cada pessoa vira um valor a receber${where}, na categoria ${loan.returnsTo}. Sem vencimento, ele fica fora do Saldo previsto até voltar.`,
+        `Cada pessoa vira um valor ${loanCategoryLabels[type].share}${where}, na categoria ${loan.returnsTo}. Sem vencimento, ele fica fora do Saldo previsto ${loanCategoryLabels[type].untilBack}.`,
       );
     } else
       parts.push(
@@ -178,10 +179,12 @@ export function SplitFields({
 
   return (
     <fieldset className="grid gap-3">
-      <legend className="sr-only">{lending ? 'Emprestado para' : 'Dividir com alguém'}</legend>
+      <legend className="sr-only">
+        {lending ? loanCategoryLabels[type].split : 'Dividir com alguém'}
+      </legend>
       <div className="grid gap-1">
         <label htmlFor={whoId} className="text-sm font-medium">
-          {lending ? 'Para quem?' : 'Com quem?'}
+          {lending ? loanCategoryLabels[type].who : 'Com quem?'}
         </label>
         <PeopleMultiSelect
           id={whoId}
@@ -189,7 +192,7 @@ export function SplitFields({
           onChange={pickPeople}
           people={people}
           userId={userId}
-          title={lending ? 'Para quem?' : 'Com quem?'}
+          title={lending ? loanCategoryLabels[type].who : 'Com quem?'}
           aria-invalid={whoError ? true : undefined}
           aria-describedby={whoError ? `${whoId}-error` : undefined}
         />
