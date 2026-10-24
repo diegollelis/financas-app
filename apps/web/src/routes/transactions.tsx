@@ -126,7 +126,7 @@ function MonthTotals({
       label: 'Entradas',
       value: signedCents('CREDIT', credits),
       tone: 'text-credit-foreground',
-      sub: undated > 0 ? `${formatCents(undated)} sem data, fora do previsto` : null,
+      sub: undated > 0 ? `${formatCents(undated)} sem vencimento, fora do previsto` : null,
     },
     { label: 'Saídas', value: signedCents('DEBIT', debits), tone: '' },
     {

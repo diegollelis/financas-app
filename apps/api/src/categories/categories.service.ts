@@ -65,7 +65,8 @@ const ofSplit = () =>
 const notALoan = () =>
   new ConflictException({
     code: 'NOT_A_LOAN_CATEGORY',
-    message: 'Só uma categoria de saída marcada "Nem renda nem gasto" escolhe onde entra a volta.',
+    message:
+      'Só uma categoria de saída marcada "Nem renda nem gasto" escolhe a categoria da devolução.',
   });
 
 const categoryExists = () =>
@@ -407,7 +408,7 @@ export class CategoriesService {
     if (loan) {
       throw new ConflictException({
         code: 'CATEGORY_RECEIVES_LOANS',
-        message: `Esta categoria recebe a volta dos empréstimos de "${loan.name}". Troque lá, em "Onde entra a volta", antes.`,
+        message: `Esta categoria recebe a devolução dos empréstimos de "${loan.name}". Troque lá, em "Categoria da devolução", antes.`,
       });
     }
   }

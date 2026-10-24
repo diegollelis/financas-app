@@ -49,3 +49,7 @@ Opção 3.
 - **Com a parte numa categoria marcada,** a saída do empréstimo diminui a sobra para guardar também no previsto, como o ADR 0056 queria.
 - **Mudar a categoria de uma recorrência** dividida não move as partes dos meses pendentes já gerados. Só os meses gerados depois usam a categoria nova.
 - **Uma divisão comum** (jantar, contas da casa) continua em Reembolso, sem mudança nenhuma.
+
+## Nota (nomes revistos, 2026-10-23)
+
+"Onde entra a volta" virou **"Categoria da devolução"**, e o selo "A volta entra em …" virou **"Devolução em …"**. "Volta" é coloquial e ambíguo, e "devolução" é a palavra de quem empresta e recebe de volta. "Emprestado para" e "Para quem?" ficaram, porque correspondem ao uso dos apps de dívidas entre pessoas. O código mantém `returnCategoryId`.

@@ -231,7 +231,7 @@ function byPeriod(transactions: Transaction[]) {
 /**
  * Every transaction with one person, of any month. A pending one can be marked as received or
  * paid right here: the same settling as "Marcar como pago" in Lançamentos, with today's date, where the
- * debt is seen; or only part of it, "Receber parte" (ADR 0057), when it comes back bit by bit.
+ * debt is seen; or only part of it, "Recebimento parcial" (ADR 0057), when it comes back bit by bit.
  * An estimated amount still goes to Lançamentos, which asks for the real one.
  */
 function PersonHistory({
@@ -249,7 +249,7 @@ function PersonHistory({
 }) {
   const transactions = usePersonTransactions(workspaceId, person?.id ?? null);
   const settle = useUpdateTransaction(workspaceId);
-  // "Receber parte" (ADR 0057): the transaction, and where the focus goes back.
+  // "Recebimento parcial" (ADR 0057): the transaction, and where the focus goes back.
   const [part, setPart] = useState<{
     transaction: Transaction;
     returnFocusTo: HTMLElement;

@@ -11,7 +11,7 @@ import { useCreateCategory, useUpdateCategory } from './use-categories';
 const REIMBURSEMENT = 'reimbursement';
 
 /**
- * "Onde entra a volta" (ADR 0058): on a debit category marked "Nem renda nem gasto", the credit
+ * "Categoria da devolução" (ADR 0058): on a debit category marked "Nem renda nem gasto", the credit
  * category, also marked, where the money lent comes back. "Emprestado para" then puts each
  * person's share there, and choosing moves the shares already launched.
  */
@@ -36,7 +36,7 @@ export function LoanReturnDialog({
       open={open}
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
-      title={`Onde entra a volta: ${category.name}`}
+      title={`Categoria da devolução: ${category.name}`}
       description='Ao emprestar com "Emprestado para", o valor a receber de cada pessoa cai na categoria escolhida. Vale também para os já lançados.'
     >
       {/* Mounted on each opening: the current choice, no error left over. */}
@@ -86,8 +86,8 @@ function ReturnForm({
           onDone();
           toast.success(
             target
-              ? `A volta de ${category.name} entra em ${target.name}`
-              : `A volta de ${category.name} fica em Reembolso`,
+              ? `A devolução de ${category.name} entra em ${target.name}`
+              : `A devolução de ${category.name} fica em Reembolso`,
           );
         },
       },
@@ -118,7 +118,7 @@ function ReturnForm({
           </Button>
         </div>
       )}
-      <RadioGroup value={choice} onValueChange={setChoice} aria-label="Onde entra a volta">
+      <RadioGroup value={choice} onValueChange={setChoice} aria-label="Categoria da devolução">
         {options.map((option) => (
           <label
             key={option.id}
