@@ -133,8 +133,13 @@ async function pickPerson(form: HTMLElement, label: string, name: string, { add 
  * "Com quem?" (ADR 0052): open it, pick people listed and add new names, all at once, then
  * close it with "Pronto" (the sheet of the phone, as in jsdom).
  */
-async function pickPeople(form: HTMLElement, listed: string[], added: string[] = []) {
-  await userEvent.click(within(form).getByRole('combobox', { name: 'Com quem?' }));
+async function pickPeople(
+  form: HTMLElement,
+  listed: string[],
+  added: string[] = [],
+  label = 'Com quem?',
+) {
+  await userEvent.click(within(form).getByRole('combobox', { name: label }));
   for (const name of listed) {
     await userEvent.click(await screen.findByRole('option', { name }));
   }
@@ -1019,6 +1024,96 @@ describe('TransactionsPage', () => {
     expect(
       await screen.findByText('Lançamento adicionado, repetindo todo mês, dividido com 1 pessoa'),
     ).toBeInTheDocument();
+  });
+
+  // A loans category that says where the money comes back (ADR 0058).
+  const backCategory = {
+    id: '01920000-0000-7000-8000-000000000106',
+    name: 'Empréstimos a receber',
+    type: 'CREDIT',
+    archived: false,
+    neutral: true,
+  };
+  const lentCategory = {
+    id: '01920000-0000-7000-8000-000000000105',
+    name: 'Empréstimos feitos',
+    type: 'DEBIT',
+    archived: false,
+    neutral: true,
+    returnCategoryId: backCategory.id,
+  };
+
+  it('lends to someone: "Emprestado para", the whole amount theirs (ADR 0058)', async () => {
+    const fetchMock = mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [salaryCategory, energyCategory, marketCategory, lentCategory, backCategory],
+      },
+      [`POST ${base}`]: {
+        status: 201,
+        body: transaction(8, {
+          type: 'DEBIT',
+          description: 'Empréstimo à Ana',
+          categoryId: lentCategory.id,
+          amountCents: 50_000,
+        }),
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Empréstimo à Ana');
+    await chooseCategory(form, 'Empréstimos feitos');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '500');
+    expect(
+      within(form).queryByRole('checkbox', { name: 'Dividir com alguém' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('checkbox', { name: 'Emprestado para' }));
+    await pickPeople(form, ['Ana'], [], 'Para quem?');
+    expect(within(form).getByLabelText('Parte de Ana (R$)')).toHaveValue('500,00');
+    expect(
+      within(form).getByText(
+        'Cada pessoa vira um valor a receber, na categoria Empréstimos a receber. Sem vencimento, ele fica fora do Saldo previsto até voltar.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: expect.stringContaining(
+        `"split":[{"personId":"${ana.id}","amountCents":50000}]`,
+      ) as string,
+    });
+  });
+
+  it('says "Emprestado para" on a split debit of a loans category', async () => {
+    const lent = transaction(8, {
+      type: 'DEBIT',
+      description: 'Empréstimo à Ana',
+      categoryId: lentCategory.id,
+      amountCents: 50_000,
+      settledAt: '2026-10-10',
+    });
+    const owed = transaction(9, {
+      type: 'CREDIT',
+      description: 'Empréstimo à Ana',
+      categoryId: backCategory.id,
+      amountCents: 50_000,
+      personId: ana.id,
+      splitOfId: lent.id,
+    });
+    mockTransactions({
+      [`GET ${peopleBase}`]: { body: [ana] },
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [salaryCategory, energyCategory, marketCategory, lentCategory, backCategory],
+      },
+      [`GET ${base}`]: { body: [lent, owed] },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    expect(row(await section('Saídas'), 'Empréstimo à Ana')).toHaveTextContent(
+      'Emprestado para Ana',
+    );
   });
 
   it('splits a fixed monthly one in reais, with a new person', async () => {

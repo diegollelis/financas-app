@@ -298,6 +298,74 @@ describe('CategoriesPage', () => {
     ).toBeInTheDocument();
   });
 
+  // Money lent and where it comes back, both marked (ADRs 0056, 0058).
+  const lent = { ...category(7, 'Empréstimos feitos', 'DEBIT'), neutral: true };
+  const back = { ...category(8, 'Empréstimos a receber', 'CREDIT'), neutral: true };
+
+  it('chooses where a loan comes back, and shows it (ADR 0058)', async () => {
+    const fetchMock = mockCategories({
+      [`GET ${base}`]: { body: [...categories, lent, back] },
+      [`PATCH ${base}/${lent.id}`]: { body: { ...lent, returnCategoryId: back.id } },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    // Only a marked debit category chooses it.
+    expect(await menuOf('Mercado')).not.toContain('Onde entra a volta');
+    expect(await menuOf('Empréstimos a receber')).not.toContain('Onde entra a volta');
+    await choose('Empréstimos feitos', 'Onde entra a volta');
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Onde entra a volta: Empréstimos feitos',
+    });
+    expect(within(dialog).getByRole('radio', { name: /^Reembolso/ })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('radio', { name: /^Empréstimos a receber/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/${lent.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ returnCategoryId: back.id }),
+    });
+    expect(
+      await screen.findByText('A volta de Empréstimos feitos entra em Empréstimos a receber'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows where a loan comes back on its category', async () => {
+    mockCategories({
+      [`GET ${base}`]: { body: [...categories, { ...lent, returnCategoryId: back.id }, back] },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    const debits = await section('Saídas');
+    expect(within(debits).getByText('A volta entra em Empréstimos a receber')).toBeInTheDocument();
+  });
+
+  it('offers to create the credit category when none is marked yet', async () => {
+    const created = category(9, 'Empréstimos feitos', 'CREDIT');
+    const fetchMock = mockCategories({
+      [`GET ${base}`]: { body: [...categories, lent] },
+      [`POST ${base}`]: { status: 201, body: created },
+      [`PATCH ${base}/${created.id}`]: { body: { ...created, neutral: true } },
+    });
+    renderApp(`/espacos/${houseId}/categorias`);
+
+    await choose('Empréstimos feitos', 'Onde entra a volta');
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Onde entra a volta: Empréstimos feitos',
+    });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Criar "Empréstimos feitos" de entrada' }),
+    );
+
+    await expectCall(fetchMock, base, {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Empréstimos feitos', type: 'CREDIT' }),
+    });
+    await expectCall(fetchMock, `${base}/${created.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ neutral: true, archived: false }),
+    });
+  });
+
   it('shows the mark and offers to count the category again', async () => {
     const loans = { ...category(6, 'Empréstimo recebido', 'CREDIT'), neutral: true };
     const fetchMock = mockCategories({

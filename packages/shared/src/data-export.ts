@@ -25,6 +25,8 @@ const exportCategorySchema = z.object({
   splitRole: splitRoleSchema.nullable(),
   /** "Nem renda nem gasto" (ADR 0056). */
   neutral: z.boolean(),
+  /** Where the money lent comes back (ADR 0058); null for the others. */
+  returnCategoryId: z.uuid().nullable().default(null),
   createdAt: instant,
 });
 

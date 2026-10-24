@@ -47,3 +47,7 @@ Opção 3.
 - **A regra do Saldo previsto depende de dois dados:** o vencimento e a marca da categoria. Uma entrada a receber de um empréstimo com data combinada continua no previsto do mês dela.
 - **Desfazer uma parte** é manual: excluir o recebido e editar o valor do pendente, ou recriá-lo, se ele já tiver sido excluído.
 - **Pendente:** um empréstimo novo lançado com "Dividir com alguém" ainda põe a parte a receber em Reembolso, que não é marcada. O próximo passo é deixar a categoria da saída marcada apontar para uma categoria de entrada marcada, escolhida pela pessoa, e chamar a divisão de "Emprestado para".
+
+## Nota (Emprestado para, 2026-10-23)
+
+O pendente da última consequência foi resolvido no [ADR 0058](0058-emprestado-para.md): a categoria de saída marcada escolhe onde entra a volta, e a divisão de uma saída dela põe a parte a receber nessa categoria.

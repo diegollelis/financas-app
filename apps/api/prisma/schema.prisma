@@ -228,6 +228,11 @@ model Category {
   // "Nem renda nem gasto" (ADR 0056): its transactions count in the balance and in what is left
   // to save, never as income or as an expense (a loan and its repayment).
   neutral          Boolean            @default(false)
+  // A loan (ADR 0058): on a debit category marked neutral, the credit category, also marked, of
+  // the shares split from its transactions ("Emprestado para"); null keeps them in Reembolso.
+  returnCategoryId String?            @map("return_category_id") @db.Uuid
+  returnCategory   Category?          @relation("LoanReturn", fields: [returnCategoryId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  loanCategories   Category[]         @relation("LoanReturn")
 
   @@unique([workspaceId, type, name])
   // One Reembolso and one Repasse per workspace.
@@ -236,6 +241,7 @@ model Category {
   @@unique([id, workspaceId, type])
   // Target of the composite foreign key of budget destinations (ADR 0047).
   @@unique([id, workspaceId])
+  @@index([returnCategoryId])
   @@map("categories")
 }
 
@@ -414,20 +420,20 @@ model MerchantAlias {
 // reads it and sends only the confirmed transactions. CHECKs on count and periods are in the
 // migration.
 model TransactionImport {
-  id               String        @id @default(uuid(7)) @db.Uuid
-  workspaceId      String        @map("workspace_id") @db.Uuid
-  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id               String            @id @default(uuid(7)) @db.Uuid
+  workspaceId      String            @map("workspace_id") @db.Uuid
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Who imported; kept as null if that account is later deleted.
-  createdById      String?       @map("created_by") @db.Uuid
-  createdBy        User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  transactionCount Int           @map("transaction_count")
+  createdById      String?           @map("created_by") @db.Uuid
+  createdBy        User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  transactionCount Int               @map("transaction_count")
   // How the person names it ("Fatura Nubank"), and the bill's due date of a card statement
   // (ADR 0055 note): what tells one import from another in the list.
-  label            String?       @db.VarChar(100)
-  statementDueDate DateTime?     @map("statement_due_date") @db.Date
-  firstPeriod      String        @map("first_period") @db.Char(7)
-  lastPeriod       String        @map("last_period") @db.Char(7)
-  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  label            String?           @db.VarChar(100)
+  statementDueDate DateTime?         @map("statement_due_date") @db.Date
+  firstPeriod      String            @map("first_period") @db.Char(7)
+  lastPeriod       String            @map("last_period") @db.Char(7)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   transactions     Transaction[]
   installmentPlans InstallmentPlan[]
 
@@ -441,44 +447,44 @@ model TransactionImport {
 // pending installments from this month on and stamps ended_at. Same composite category key as
 // transactions; CHECKs on amount, count and periods are in the migration.
 model InstallmentPlan {
-  id             String          @id @default(uuid(7)) @db.Uuid
-  workspaceId    String          @map("workspace_id") @db.Uuid
-  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  type           TransactionType
-  description    String          @db.VarChar(200)
-  notes          String?         @db.VarChar(1000)
-  categoryId     String          @map("category_id") @db.Uuid
-  category       Category        @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
-  totalCents     Int             @map("total_cents")
-  installments   Int             @db.SmallInt
+  id                   String             @id @default(uuid(7)) @db.Uuid
+  workspaceId          String             @map("workspace_id") @db.Uuid
+  workspace            Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type                 TransactionType
+  description          String             @db.VarChar(200)
+  notes                String?            @db.VarChar(1000)
+  categoryId           String             @map("category_id") @db.Uuid
+  category             Category           @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
+  totalCents           Int                @map("total_cents")
+  installments         Int                @db.SmallInt
   // The number of the first installment created (ADR 0055): 3 for a purchase already at 3/10,
   // which gets installments 3 to 10. CHECK (1 to installments) in the migration.
-  firstNumber    Int             @default(1) @map("first_number") @db.SmallInt
+  firstNumber          Int                @default(1) @map("first_number") @db.SmallInt
   // The day of the purchase (ADR 0055 note), copied to every installment and share.
-  occurredOn     DateTime?       @map("occurred_on") @db.Date
+  occurredOn           DateTime?          @map("occurred_on") @db.Date
   // Created by a card statement import (ADR 0055): undoing the import deletes it.
-  importId       String?            @map("import_id") @db.Uuid
-  importBatch    TransactionImport? @relation(fields: [importId], references: [id], onDelete: Cascade)
-  firstPeriod    String          @map("first_period") @db.Char(7)
-  dueDay         Int?            @map("due_day") @db.SmallInt
+  importId             String?            @map("import_id") @db.Uuid
+  importBatch          TransactionImport? @relation(fields: [importId], references: [id], onDelete: Cascade)
+  firstPeriod          String             @map("first_period") @db.Char(7)
+  dueDay               Int?               @map("due_day") @db.SmallInt
   // Each installment due in its own month (0) or in the next one (1), ADR 0038 note.
-  dueMonthOffset Int             @default(0) @map("due_month_offset") @db.SmallInt
+  dueMonthOffset       Int                @default(0) @map("due_month_offset") @db.SmallInt
   // "A receber de" / "a pagar para" (ADR 0052), copied to every installment.
-  personId       String?         @map("person_id") @db.Uuid
-  person         Person?         @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  personId             String?            @map("person_id") @db.Uuid
+  person               Person?            @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   // Where it was bought or who pays it (ADR 0053), copied to every installment.
-  merchantId     String?         @map("merchant_id") @db.Uuid
+  merchantId           String?            @map("merchant_id") @db.Uuid
   // How it is paid or received (ADR 0054); a split's shares do not inherit it.
-  paymentMethod  PaymentMethod?  @map("payment_method")
-  merchant       Merchant?       @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
-  endedAt        DateTime?       @map("ended_at") @db.Timestamptz(3)
+  paymentMethod        PaymentMethod?     @map("payment_method")
+  merchant             Merchant?          @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  endedAt              DateTime?          @map("ended_at") @db.Timestamptz(3)
   // "Tornar parcelado" (ADR 0038 note): the transaction it adopted and its amount before, given
   // back as launched once when the plan is ended or deleted while it is pending.
-  adoptedTransactionId String?       @map("adopted_transaction_id") @db.Uuid
-  adoptedAmountCents   Int?          @map("adopted_amount_cents")
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
-  transactions   Transaction[]
+  adoptedTransactionId String?            @map("adopted_transaction_id") @db.Uuid
+  adoptedAmountCents   Int?               @map("adopted_amount_cents")
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions         Transaction[]
 
   @@index([workspaceId])
   @@map("installment_plans")
@@ -489,41 +495,41 @@ model InstallmentPlan {
 // there, with the estimated amount. Active while end_period is null. Same composite category key
 // as transactions. CHECKs on amount, due day and periods are in the migration.
 model Recurrence {
-  id             String                 @id @default(uuid(7)) @db.Uuid
-  workspaceId    String                 @map("workspace_id") @db.Uuid
-  workspace      Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  type           TransactionType
-  description    String                 @db.VarChar(200)
-  notes          String?                @db.VarChar(1000)
-  categoryId     String                 @map("category_id") @db.Uuid
-  category       Category               @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
-  amountCents    Int                    @map("amount_cents")
+  id                   String                 @id @default(uuid(7)) @db.Uuid
+  workspaceId          String                 @map("workspace_id") @db.Uuid
+  workspace            Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type                 TransactionType
+  description          String                 @db.VarChar(200)
+  notes                String?                @db.VarChar(1000)
+  categoryId           String                 @map("category_id") @db.Uuid
+  category             Category               @relation(fields: [categoryId, workspaceId, type], references: [id, workspaceId, type], onDelete: NoAction, onUpdate: NoAction)
+  amountCents          Int                    @map("amount_cents")
   // Energy, water: each month starts from the average of the last 3 settled (ADR 0038).
-  variableAmount Boolean                @default(false) @map("variable_amount")
+  variableAmount       Boolean                @default(false) @map("variable_amount")
   // Day of the month it is due (1-31); a longer number than the month has means its last day.
-  dueDay         Int?                   @map("due_day") @db.SmallInt
+  dueDay               Int?                   @map("due_day") @db.SmallInt
   // Due in the same month (0) or in the next one (1): energy of October due on November 10th.
-  dueMonthOffset Int                    @default(0) @map("due_month_offset") @db.SmallInt
+  dueMonthOffset       Int                    @default(0) @map("due_month_offset") @db.SmallInt
   // Every 1 month or every 12 (ADR 0038 note): only the months of its cycle are generated.
-  intervalMonths Int                    @default(1) @map("interval_months") @db.SmallInt
+  intervalMonths       Int                    @default(1) @map("interval_months") @db.SmallInt
   // "A receber de" / "a pagar para" (ADR 0052), copied to every month it generates.
-  personId       String?                @map("person_id") @db.Uuid
-  person         Person?                @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  personId             String?                @map("person_id") @db.Uuid
+  person               Person?                @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   // Where it is bought or who pays it (ADR 0053), copied to every month it generates.
-  merchantId     String?                @map("merchant_id") @db.Uuid
+  merchantId           String?                @map("merchant_id") @db.Uuid
   // How it is paid or received (ADR 0054); a split's shares do not inherit it.
-  paymentMethod  PaymentMethod?         @map("payment_method")
-  merchant       Merchant?              @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
-  startPeriod    String                 @map("start_period") @db.Char(7)
-  endPeriod      String?                @map("end_period") @db.Char(7)
+  paymentMethod        PaymentMethod?         @map("payment_method")
+  merchant             Merchant?              @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  startPeriod          String                 @map("start_period") @db.Char(7)
+  endPeriod            String?                @map("end_period") @db.Char(7)
   // "Tornar recorrente" (ADR 0038 note): the transaction it adopted, which existed before it.
   // Ending it gives that one back as launched once while pending. No foreign key: a deleted
   // transaction leaves an id that matches nothing.
-  adoptedTransactionId String?          @map("adopted_transaction_id") @db.Uuid
-  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
-  occurrences    RecurrenceOccurrence[]
-  shares         RecurrenceShare[]
+  adoptedTransactionId String?                @map("adopted_transaction_id") @db.Uuid
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+  occurrences          RecurrenceOccurrence[]
+  shares               RecurrenceShare[]
 
   @@index([workspaceId])
   @@map("recurrences")

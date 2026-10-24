@@ -53,6 +53,7 @@ export function SplitFields({
   userId,
   installments,
   monthly,
+  loan,
 }: {
   idPrefix: string;
   control: Control<SplitFormFields>;
@@ -78,6 +79,11 @@ export function SplitFields({
    */
   /** Every month, or every year (ADR 0038 note). */
   monthly?: { variable: boolean; yearly?: boolean };
+  /**
+   * Money lent (ADR 0058): a debit in a loans category that says where the money comes back.
+   * "Emprestado para": the amount starts all with them, and each share lands in that category.
+   */
+  loan?: { returnsTo: string };
 }) {
   const { fields, replace, remove } = useFieldArray({ control, name: 'shares' });
   const mode = useWatch({ control, name: 'shareMode' });
@@ -92,25 +98,26 @@ export function SplitFields({
   const whoError = errors.shares?.root?.message ?? errors.shares?.message;
   const percentOnly = monthly?.variable === true;
   const count = shares.length;
+  const lending = loan !== undefined;
 
   // A variable amount is split in percentages only: reais typed would not follow it.
   useEffect(() => {
     if (!percentOnly || mode === 'PERCENT') return;
     setValue('shareMode', 'PERCENT');
     // The numbers typed meant reais: start again from equal shares.
-    evenShareValues(0, count, 'PERCENT').forEach((value, index) =>
+    evenShareValues(0, count, 'PERCENT', !lending).forEach((value, index) =>
       setValue(`shares.${index}.value`, value, { shouldValidate: false }),
     );
-  }, [percentOnly, mode, count, setValue]);
+  }, [percentOnly, mode, count, lending, setValue]);
 
   // Keeps the shares equal while nobody typed one: as people come and go, and as the amount or
   // the unit changes.
   useEffect(() => {
     if (manual || count === 0 || (mode === 'REAIS' && totalCents === null)) return;
-    evenShareValues(totalCents ?? 0, count, mode).forEach((value, index) =>
+    evenShareValues(totalCents ?? 0, count, mode, !lending).forEach((value, index) =>
       setValue(`shares.${index}.value`, value, { shouldValidate: false }),
     );
-  }, [manual, count, mode, totalCents, setValue]);
+  }, [manual, count, mode, totalCents, lending, setValue]);
 
   // "Sua parte: R$ 400,00 do total. Por parcela: Ana R$ 133,33. Cada pessoa vira…"
   const summary = (myCents: number) => {
@@ -125,7 +132,8 @@ export function SplitFields({
         : installments.amountIs === 'TOTAL'
           ? ' do total'
           : ' por parcela';
-    const parts = [`Sua parte: ${formatCents(myCents)}${meaning}.`];
+    // Money lent is all theirs: no "Sua parte: R$ 0,00".
+    const parts = lending && myCents === 0 ? [] : [`Sua parte: ${formatCents(myCents)}${meaning}.`];
     if (installments?.amountIs === 'TOTAL' && installments.count >= 2) {
       // Each share divided like the installments themselves, the leftover cents on the last.
       const each = shares.map((share, index) => {
@@ -144,11 +152,16 @@ export function SplitFields({
       : installments
         ? ' em cada parcela'
         : '';
-    parts.push(
-      type === 'CREDIT'
-        ? `Cada pessoa vira um valor a pagar${where}, na categoria Repasse.`
-        : `Cada pessoa vira um valor a receber${where}, na categoria Reembolso.`,
-    );
+    if (loan) {
+      parts.push(
+        `Cada pessoa vira um valor a receber${where}, na categoria ${loan.returnsTo}. Sem vencimento, ele fica fora do Saldo previsto até voltar.`,
+      );
+    } else
+      parts.push(
+        type === 'CREDIT'
+          ? `Cada pessoa vira um valor a pagar${where}, na categoria Repasse.`
+          : `Cada pessoa vira um valor a receber${where}, na categoria Reembolso.`,
+      );
     if (monthly?.variable) {
       parts.push(`As partes acompanham o valor real de cada ${monthly.yearly ? 'ano' : 'mês'}.`);
     }
@@ -165,10 +178,10 @@ export function SplitFields({
 
   return (
     <fieldset className="grid gap-3">
-      <legend className="sr-only">Dividir com alguém</legend>
+      <legend className="sr-only">{lending ? 'Emprestado para' : 'Dividir com alguém'}</legend>
       <div className="grid gap-1">
         <label htmlFor={whoId} className="text-sm font-medium">
-          Com quem?
+          {lending ? 'Para quem?' : 'Com quem?'}
         </label>
         <PeopleMultiSelect
           id={whoId}
@@ -176,7 +189,7 @@ export function SplitFields({
           onChange={pickPeople}
           people={people}
           userId={userId}
-          title="Com quem?"
+          title={lending ? 'Para quem?' : 'Com quem?'}
           aria-invalid={whoError ? true : undefined}
           aria-describedby={whoError ? `${whoId}-error` : undefined}
         />
@@ -266,8 +279,9 @@ export function SplitFields({
               disabled={totalCents === null && mode === 'REAIS'}
               onClick={() => {
                 setManual(false);
-                evenShareValues(totalCents ?? 0, fields.length, mode).forEach((value, index) =>
-                  setValue(`shares.${index}.value`, value, { shouldValidate: true }),
+                evenShareValues(totalCents ?? 0, fields.length, mode, !lending).forEach(
+                  (value, index) =>
+                    setValue(`shares.${index}.value`, value, { shouldValidate: true }),
                 );
               }}
             >

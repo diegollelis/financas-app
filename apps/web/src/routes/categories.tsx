@@ -39,6 +39,7 @@ import { Input } from '@/components/ui/input';
 import { SearchInput } from '@/components/search-input';
 import { PageActionButton } from '@/components/page-action-button';
 import { CopyCategoriesDialog } from '@/features/categories/copy-categories-dialog';
+import { LoanReturnDialog } from '@/features/categories/loan-return-dialog';
 import {
   useCategories,
   useCreateCategory,
@@ -198,6 +199,13 @@ function CategoryItem({
   const [renaming, setRenaming] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingNeutral, setConfirmingNeutral] = useState(false);
+  const [choosingReturn, setChoosingReturn] = useState(false);
+  // Every category (already loaded by the page): where a loan comes back, by name (ADR 0058).
+  const all = useCategories(workspaceId).data ?? [];
+  const loanReturn = category.returnCategoryId
+    ? all.find((option) => option.id === category.returnCategoryId)
+    : undefined;
+  const lends = category.type === 'DEBIT' && category.neutral === true;
   const actionsRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateCategory(workspaceId);
   const remove = useDeleteCategory(workspaceId);
@@ -232,6 +240,7 @@ function CategoryItem({
         {/* Reembolso and Repasse receive the shares of a split and never change (ADR 0052 note). */}
         {category.splitRole && <Badge variant="secondary">Divisão</Badge>}
         {category.neutral && <Badge variant="secondary">Nem renda nem gasto</Badge>}
+        {loanReturn && <Badge variant="secondary">A volta entra em {loanReturn.name}</Badge>}
       </span>
       {canEdit && !category.destinationId && !category.splitRole && (
         <>
@@ -276,6 +285,11 @@ function CategoryItem({
                       Não contar como renda nem gasto
                     </DropdownMenuItem>
                   )}
+                  {lends && (
+                    <DropdownMenuItem onSelect={() => setChoosingReturn(true)}>
+                      Onde entra a volta
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(true)}>
                     Arquivar
                   </DropdownMenuItem>
@@ -291,6 +305,16 @@ function CategoryItem({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          {lends && (
+            <LoanReturnDialog
+              workspaceId={workspaceId}
+              category={category}
+              categories={all}
+              open={choosingReturn}
+              onOpenChange={setChoosingReturn}
+              returnFocusTo={actionsRef}
+            />
+          )}
           <ResponsiveDialog
             open={renaming}
             onOpenChange={setRenaming}

@@ -214,7 +214,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Análise "Despesas por meio de pagamento" (ou "Entradas por meio de recebimento"), com os mesmos filtros das categorias e "Sem meio" por último
   - [x] Coluna opcional "Meio de pagamento" na planilha modelo (lida pelo rótulo ou por sinônimos comuns, um valor fora da lista vira aviso; a aba "Meios de pagamento" na planilha baixada)
 - [x] **Empréstimo devolvido aos poucos** ([ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md)): "Receber parte" / "Pagar parte" de um lançamento pendente, em Lançamentos e em Pessoas, e o que está a receber sem data numa categoria "Nem renda nem gasto" fora do Saldo previsto
-- [ ] Empréstimo pelo "Dividir com": a categoria de saída marcada aponta para uma categoria de entrada marcada, escolhida pela pessoa, e a divisão vira "Emprestado para" (próximo passo do ADR 0057)
+- [x] **Emprestado para** ([ADR 0058](adr/0058-emprestado-para.md)): a categoria de saída marcada escolhe a categoria de entrada marcada da volta, em Categorias; a divisão de uma saída dela vira "Emprestado para", e as partes já lançadas acompanham a escolha
 - [x] Comparativos entre meses e gastos por categoria ao longo do tempo ([ADR 0037](adr/0037-analise-de-periodos.md))
   - [x] API: somas por competência, tipo e categoria (`/workspaces/:workspaceId/analysis`) e funções de análise em `packages/shared`
   - [x] Página "Análise": período, filtros e evolução mês a mês
