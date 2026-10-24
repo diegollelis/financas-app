@@ -223,6 +223,23 @@ export function undatedReceivable(
 }
 
 /**
+ * The same on the other side (ADR 0057 note): a pending debit with no due date in a category
+ * marked "Nem renda nem gasto", money borrowed to pay back some day. The planned balance and what
+ * is left to save leave it out; each payment counts in the month it is made.
+ */
+export function undatedPayable(
+  transaction: Pick<Transaction, 'type' | 'dueDate' | 'settledAt' | 'categoryId'>,
+  neutralCategoryIds: ReadonlySet<string>,
+): boolean {
+  return (
+    transaction.type === 'DEBIT' &&
+    !transaction.dueDate &&
+    !transaction.settledAt &&
+    neutralCategoryIds.has(transaction.categoryId)
+  );
+}
+
+/**
  * Never stored, always derived (ADR 0029): SETTLED once there is a settlement date; OVERDUE when
  * still pending after the due date; PENDING otherwise. `today` is `YYYY-MM-DD` in São Paulo
  * (`todayIso()`); ISO dates compare correctly as text.

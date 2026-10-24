@@ -60,3 +60,15 @@ Os nomes da tela foram comparados com os de outros apps de finanças e com o voc
 - **"Sem data" virou "sem vencimento"** ("R$ X sem vencimento, fora do previsto", "Não inclui R$ X a receber sem vencimento", "A receber sem vencimento" na barra). O campo do formulário é "Vencimento", e "Data" é outro campo do lançamento.
 
 O código e a rota mantêm os nomes em inglês (`settlePart`, `undatedReceivable`, `undatedCents`).
+
+## Nota (o que está a pagar sem vencimento, 2026-10-23)
+
+O lado oposto: um empréstimo que você **tomou**. Você recebeu o dinheiro (uma entrada na categoria marcada) e deve devolver sem data (uma saída pendente, "A pagar para" a pessoa, numa categoria de saída marcada). A dívida inteira pesava no Saldo previsto e na sobra para guardar prevista do mês em que foi lançada, como se fosse paga de uma vez.
+
+- **O que está a pagar sem vencimento** (`undatedPayable`) é uma saída pendente, sem vencimento, numa categoria marcada. Ela continua nas Saídas e em Pessoas ("Você deve"), mas fica fora do Saldo previsto e da sobra para guardar prevista (`undatedPayableCents` no resumo).
+- **Cada pagamento** ("Pagamento parcial") entra no mês em que é feito e diminui a sobra daquele mês, porque o dinheiro saiu.
+- **Uma dívida com vencimento combinado** continua no previsto do mês dela, e um empréstimo de banco continua como "Parcelado".
+- **Na tela:** embaixo de "Saídas", em Lançamentos, "R$ X sem vencimento, fora do previsto". No Painel, "Não inclui R$ X a pagar sem vencimento". Na barra das entradas, a dívida não entra em "Saídas a pagar".
+- **Juros ficam de fora desta regra:** quem deve devolver mais do que recebeu lança a saída pendente com o valor total. Separar juros (gasto) de principal (não gasto) exigiria dois lançamentos, e os apps de consumo também não fazem isso.
+
+É o comportamento do Monarch e do YNAB, que só contam o pagamento de uma dívida sem prazo quando ele acontece.

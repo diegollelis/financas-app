@@ -93,6 +93,19 @@ describe('DashboardPage', () => {
     expect(within(balance).getByText('A receber sem vencimento')).toBeInTheDocument();
   });
 
+  it('leaves money borrowed with no due date out of the planned balance, and says so', async () => {
+    const debts = '01920000-0000-7000-8000-0000000000e4';
+    const owed = debit(200_000, null, null, debts);
+    mockDashboard(summarizePeriod([...october, owed], budget, today, new Set([debts])));
+
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    const balance = await section('Saldo do mês');
+    // The debt is in the debits, not in the planned balance: 6.000,00 − 3.009,90, as without it.
+    expect(tile('Saldo previsto')).toHaveTextContent('R$ 2.990,10');
+    expect(nbsp(balance.textContent)).toContain('Não inclui R$ 2.000,00 a pagar sem vencimento.');
+  });
+
   it('shows the balance, what is left to set aside and what was applied', async () => {
     mockDashboard(summarizePeriod(october, budget, today));
 

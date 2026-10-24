@@ -148,8 +148,8 @@ function BalanceCard({ summary }: { summary: Summary }) {
             <InfoTip term="Saldo previsto">
               <p>Como o mês termina se tudo o que está previsto for recebido e pago.</p>
               <p>
-                Fica de fora o que está a receber sem vencimento numa categoria que não conta como
-                renda nem gasto, como um empréstimo sem prazo para voltar.
+                Fica de fora o que está a receber ou a pagar sem vencimento numa categoria que não
+                conta como renda nem gasto, como um empréstimo sem prazo para voltar.
               </p>
             </InfoTip>
           </dt>
@@ -167,6 +167,12 @@ function BalanceCard({ summary }: { summary: Summary }) {
           // Money lent coming back some day: nobody knows the month (ADR 0057).
           <p className="text-muted-foreground text-sm">
             Não inclui {formatCents(summary.undatedCents)} a receber sem vencimento.
+          </p>
+        )}
+        {summary.undatedPayableCents > 0 && (
+          // Money borrowed to pay back some day (ADR 0057 note).
+          <p className="text-muted-foreground text-sm">
+            Não inclui {formatCents(summary.undatedPayableCents)} a pagar sem vencimento.
           </p>
         )}
       </div>
@@ -342,7 +348,8 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
               </p>
               <p>
                 Nas categorias "Nem renda nem gasto", um empréstimo feito diminui a sobra, e o
-                dinheiro que volta ou que você pegou emprestado fica só no saldo.
+                dinheiro que volta ou que você pegou emprestado fica só no saldo. Uma dívida sem
+                vencimento só diminui a sobra quando é paga.
               </p>
               <p>O que você guarda não entra na conta: guardar mais não diminui as metas.</p>
             </>
