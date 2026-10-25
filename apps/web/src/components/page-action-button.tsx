@@ -20,6 +20,9 @@ export function PageActionButton({
       {...props}
       className={cn(
         'fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 shadow-lg md:static md:shadow-none',
+        // Floating over the page, it is never see-through: off, a solid muted fill, so the text
+        // behind it never shows (on the page from md, the usual faded look).
+        'max-md:disabled:bg-muted max-md:disabled:text-muted-foreground max-md:disabled:opacity-100',
         wide && 'left-4',
         className,
       )}
