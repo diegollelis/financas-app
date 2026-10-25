@@ -1,5 +1,5 @@
 import { TEMPLATE_HEADERS } from '@financas/shared';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import writeXlsxFile from 'write-excel-file/browser';
@@ -101,6 +101,45 @@ function expectCall(fetchMock: ReturnType<typeof mockApi>, path: string, init: o
 }
 
 describe('ImportPage', () => {
+  it('cancels a review: at once with nothing changed, asking first otherwise', async () => {
+    mockImport();
+    renderApp(page);
+
+    await choose(await spreadsheet([salaryRow, groceryRow]));
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
+    // Nothing changed: back to choosing the file, the tabs in sight again.
+    expect(await screen.findByRole('heading', { name: '1. Baixe o modelo' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'O que importar' })).toBeInTheDocument();
+
+    await choose(await spreadsheet([salaryRow, groceryRow]));
+    await userEvent.click(await screen.findByRole('checkbox', { name: /^Importar Salário/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Descartar a revisão?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar revisando' }));
+    expect(screen.getByRole('heading', { name: 'Revisar planilha' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await userEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: 'Descartar revisão',
+      }),
+    );
+    expect(await screen.findByRole('heading', { name: '1. Baixe o modelo' })).toBeInTheDocument();
+  });
+
+  it('asks before leaving a review with choices made', async () => {
+    mockImport();
+    const { router } = renderApp(page);
+    await choose(await spreadsheet([salaryRow, groceryRow]));
+    await userEvent.click(await screen.findByRole('checkbox', { name: /^Importar Salário/ }));
+
+    await act(() => router.navigate(`/espacos/${houseId}/lancamentos`));
+
+    const dialog = await screen.findByRole('alertdialog', { name: 'Sair da revisão?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continuar revisando' }));
+    expect(router.state.location.pathname).toBe(`/espacos/${houseId}/importar/planilha`);
+  });
+
   it('previews the rows by competência and imports the checked ones', async () => {
     const fetchMock = mockImport({
       [`POST ${base}/imports`]: {
@@ -121,7 +160,12 @@ describe('ImportPage', () => {
       screen.getByRole('heading', { name: '2. Escolha a planilha preenchida' }),
     ).toBeInTheDocument();
     await choose(await spreadsheet([salaryRow, groceryRow]));
-    expect(await screen.findByRole('heading', { name: '3. Revise e importe' })).toBeInTheDocument();
+    // The review is a step of its own: its title, what it reviews and where the flow is.
+    expect(await screen.findByRole('heading', { name: 'Revisar planilha' })).toBeInTheDocument();
+    expect(screen.getByText('Planilha modelo · 2 linhas')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Etapas' })).getByText('Revisão'),
+    ).toHaveAttribute('aria-current', 'step');
 
     const august = await screen.findByRole('region', { name: 'agosto de 2026' });
     expect(august).toHaveTextContent('Entradas R$ 5.200,00, saídas R$ 640,35');

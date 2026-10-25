@@ -146,6 +146,10 @@ function AccountReview({
             : [],
       }}
       source={{ kind: 'ACCOUNT_STATEMENT', bank: bank.bank }}
+      heading={{
+        title: 'Revisar extrato da conta',
+        subtitle: `${bank.label} · ${file.lines.length} ${file.lines.length === 1 ? 'movimento' : 'movimentos'}`,
+      }}
       defaultLabel={`Conta ${bank.label}`}
       onChooseAnother={onChooseAnother}
       onImported={onImported}
@@ -245,6 +249,10 @@ function StatementReview({
         notices,
       }}
       source={{ kind: 'CARD_STATEMENT', bank: bank.bank }}
+      heading={{
+        title: 'Revisar fatura do cartão',
+        subtitle: `${bank.label} · ${statement.lines.length} ${statement.lines.length === 1 ? 'linha' : 'linhas'}`,
+      }}
       defaultLabel={`Fatura ${bank.label}`}
       onChooseAnother={onChooseAnother}
       onImported={onImported}
@@ -313,7 +321,8 @@ export function StatementImportPage() {
 
   return (
     <>
-      <ImportHeader workspaceId={workspace.id} />
+      {/* While a file is reviewed, the review is the page's step (its own title and Cancelar). */}
+      {!statement && <ImportHeader workspaceId={workspace.id} />}
       <QueryState queries={[categories, imports]} />
       {ready && canEdit && !statement && (
         <SectionCard title="Nova importação">
