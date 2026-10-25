@@ -60,6 +60,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.34.0** (2026-10-25): a fatura do cartão também é conferida com o que já está lançado: compras, meses de recorrência, parcelas e a última parcela já lançadas vêm como "Já lançado" (até 3 dias de diferença na data) e recebem o vencimento da fatura e a data da compra, e o "Valor diferente" fica com o valor da fatura ([ADR 0061](adr/0061-extrato-da-conta-e-conferencia.md)); e a avaliação de um assistente de IA, registrada para depois ([docs/avaliacoes/assistente-de-ia.md](avaliacoes/assistente-de-ia.md)).
 - **1.35.0** (2026-10-25): a revisão da importação vira uma etapa: título, o que está sendo revisado, "Arquivo → Revisão → Importado", "Cancelar" que pergunta antes de descartar escolhas, o topo preso ao rolar no celular e um aviso antes de sair com alterações (nota no [ADR 0060](adr/0060-extratos-do-banco.md)).
 - **1.35.1** (2026-10-25): no celular, o botão de importar diz o que falta ("Informe o vencimento da fatura") e leva até lá, o botão fixo desabilitado deixa de ser translúcido em todas as páginas, e o topo da revisão volta a rolar com a página (nota no [ADR 0060](adr/0060-extratos-do-banco.md)).
+- **1.36.0** (2026-10-25): fechar sem querer um diálogo com formulário (tocar fora, Esc, ✕) depois de digitar algo pergunta "Descartar as alterações?" antes de perder o que foi digitado; o "Cancelar" do próprio formulário fecha direto (nota no [ADR 0036](adr/0036-design-mobile-first.md)).
 
 ## Fase 0 — Planejamento ✅
 
