@@ -91,14 +91,18 @@ export const importMerchantAliasInputSchema = createMerchantAliasInputSchema.ext
 export type ImportMerchantAliasInput = z.infer<typeof importMerchantAliasInputSchema>;
 
 /**
- * A movement of an account statement that is already in the app (ADR 0061): the transaction
- * takes its identifier and, while pending, is settled on its day. `amountCents` gives the
- * amount the bank moved, when it differs ("Valor diferente").
+ * A movement of a statement that is already in the app (ADR 0061). Of an account statement: the
+ * transaction takes its identifier and, while pending, is settled on its day. Of a card
+ * statement (ADR 0061 note), which has no identifiers and settles nothing: it takes the bill's
+ * due date and the day of the purchase. `amountCents` gives the amount the bank moved, when it
+ * differs ("Valor diferente").
  */
 export const importMatchInputSchema = z.object({
   transactionId: z.uuid(),
-  externalId: externalIdSchema,
-  settledAt: isoDateSchema,
+  externalId: externalIdSchema.optional(),
+  settledAt: isoDateSchema.optional(),
+  dueDate: isoDateSchema.optional(),
+  occurredOn: isoDateSchema.optional(),
   amountCents: amountCentsSchema.optional(),
 });
 
@@ -172,7 +176,7 @@ export const createImportInputSchema = z
     (input) => {
       const ids = [
         ...input.transactions.flatMap((transaction) => transaction.externalId ?? []),
-        ...(input.matches ?? []).map((match) => match.externalId),
+        ...(input.matches ?? []).flatMap((match) => match.externalId ?? []),
         ...(input.parts ?? []).map((part) => part.externalId),
       ];
       const matched = (input.matches ?? []).map((match) => match.transactionId);

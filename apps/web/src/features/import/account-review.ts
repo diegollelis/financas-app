@@ -341,6 +341,13 @@ export function partText(row: ReviewRow & { part: AccountPart }): string {
 export function matchText(row: ReviewRow & { match: AccountMatch }): string {
   const { match } = row;
   const when = match.date ? formatIsoDate(match.date) : null;
+  // A card's line (ADR 0061 note): nothing is settled, the bill's due date goes to it.
+  if (match.card) {
+    const what = `"${match.description}"${match.recurring ? ', da recorrência' : ''}`;
+    return match.sameAmount
+      ? `Já está no app: ${what}, com o mesmo valor. Importar só põe nele o vencimento da fatura e a data da compra, sem criar nada.`
+      : `Parece ${what}, com ${formatCents(match.amountCents)}. A fatura mostra ${formatCents(row.amountCents ?? 0)}.`;
+  }
   if (!match.sameAmount) {
     return `Parece "${match.description}", ${match.pending ? 'pendente' : `pago em ${when}`} com ${formatCents(match.amountCents)}. O banco mostra ${formatCents(row.amountCents ?? 0)}.`;
   }

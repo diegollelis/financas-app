@@ -17,7 +17,7 @@ import {
   type Transaction,
   type TransactionType,
 } from '@financas/shared';
-import type { ReviewRow } from './review';
+import type { AccountMatch, ReviewRow } from './review';
 
 // The review of a card statement (ADR 0055 and its notes), kept apart from the screen: what each
 // line of the bank's file becomes, and why a line comes unchecked. Nothing here talks to the API.
@@ -48,8 +48,11 @@ export function suggestedPeriod(lines: StatementLine[]): string {
   return latest ? latest.slice(0, 7) : currentPeriod();
 }
 
-/** A recurrence's month is "the same" when within 10% of the line (an energy bill varies). */
-const closeAmount = (a: number, b: number) => Math.abs(a - b) <= Math.max(a, b) * 0.1;
+/**
+ * A recurrence's month is "the same" when within 20% of the line (a bill in dollars varies), as
+ * on the account statement (ADR 0061 note).
+ */
+const closeAmount = (a: number, b: number) => Math.abs(a - b) <= Math.max(a, b) * 0.2;
 
 const sameText = (a: string, b: string) => normalizeName(a) === normalizeName(b);
 
@@ -83,6 +86,8 @@ export function startStatementReview(
   context: StatementContext,
 ): ReviewRow[] {
   const { period } = context;
+  // Each transaction already in the app is one line only (ADR 0061 note).
+  const used = new Set<string>();
   return lines.map((line) => {
     const type: TransactionType = line.kind === 'PURCHASE' ? 'DEBIT' : 'CREDIT';
     const merchantId = findMerchantByAlias(line.title, context.merchants);
@@ -161,38 +166,43 @@ export function startStatementReview(
       merchantId
         ? transaction.merchantId === merchantId
         : sameText(transaction.description, description);
-    const imported = context.transactions.find(
+    // Already in the app (ADR 0061 note): the same purchase, of the same day or with none, and
+    // the same amount; or a recurrence's month of the merchant, with an amount near the line's.
+    // Importing then gives it the bill's due date and the purchase's day, creating nothing.
+    const open = context.transactions.filter(
       (transaction) =>
+        !used.has(transaction.id) &&
         transaction.period === period &&
         transaction.type === type &&
-        transaction.occurredOn === line.occurredOn &&
-        transaction.amountCents === line.amountCents &&
+        transaction.installment === null &&
         sameMerchant(transaction),
     );
-    if (imported) {
-      return skip(
-        `Possivelmente já importada: ${formatPeriod(period)} já tem esta compra, no mesmo dia e valor.`,
-      );
-    }
-    const recurring =
-      type === 'DEBIT'
-        ? context.transactions.find(
+    const found =
+      open.find(
+        (transaction) =>
+          transaction.amountCents === line.amountCents &&
+          (transaction.occurredOn === null || transaction.occurredOn === line.occurredOn),
+      ) ??
+      (type === 'DEBIT'
+        ? open.find(
             (transaction) =>
-              transaction.period === period &&
               transaction.recurrenceId !== null &&
-              transaction.type === 'DEBIT' &&
-              sameMerchant(transaction) &&
               closeAmount(transaction.amountCents, line.amountCents),
           )
-        : undefined;
-    if (recurring) {
-      const difference =
-        recurring.amountCents === line.amountCents
-          ? ''
-          : ` (${formatCents(recurring.amountCents)} na recorrência; a fatura diz ${formatCents(line.amountCents)})`;
-      return skip(
-        `Já lançada pela recorrência "${recurring.description}"${difference}. Para o valor real, edite o lançamento da recorrência.`,
-      );
+        : undefined);
+    if (found) {
+      used.add(found.id);
+      const match: AccountMatch = {
+        transactionId: found.id,
+        description: found.description,
+        pending: found.settledAt === null,
+        date: found.dueDate,
+        amountCents: found.amountCents,
+        sameAmount: found.amountCents === line.amountCents,
+        card: true,
+        ...(found.recurrenceId !== null && { recurring: true }),
+      };
+      return { ...row, match };
     }
     return line.kind === 'REFUND'
       ? {

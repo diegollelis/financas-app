@@ -92,6 +92,13 @@ export type AccountMatch = {
   amountCents: number;
   /** False: "Valor diferente", the bank's amount replaces the app's if confirmed. */
   sameAmount: boolean;
+  /**
+   * A card statement's line (ADR 0061 note): nothing is settled, the transaction takes the bill's
+   * due date and the day of the purchase; there is no identifier.
+   */
+  card?: boolean;
+  /** A recurrence's month, said on the card. */
+  recurring?: boolean;
 };
 
 /** A movement taken as the transaction it matched, not as a new one. */
@@ -281,6 +288,20 @@ export function readyImport(
   for (const row of rows) {
     if (!row.included) continue;
     if (takesMatch(row)) {
+      const amount =
+        !row.match.sameAmount && row.amountCents ? { amountCents: row.amountCents } : {};
+      // A card's line: the bill's due date and the purchase's day, nothing settled.
+      if (row.match.card) {
+        if (row.dueDate) {
+          ready.matches.push({
+            transactionId: row.match.transactionId,
+            dueDate: row.dueDate,
+            ...(row.occurredOn && { occurredOn: row.occurredOn }),
+            ...amount,
+          });
+        }
+        continue;
+      }
       // Settled (or linked) on the movement's day, with the bank's amount when it differs.
       if (row.externalId && row.occurredOn) {
         ready.matches.push({

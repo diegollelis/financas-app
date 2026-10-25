@@ -152,3 +152,21 @@ A entrada de uma pessoa que tem um empréstimo pendente vinha desmarcada, com a 
   - **O problema:** a revisão olhava só o primeiro empréstimo da pessoa. Quando ele era a parte de uma divisão (um empréstimo feito com "Emprestado para", que não aceita parte), o movimento ficava desmarcado, mesmo com outro empréstimo da mesma pessoa que aceitava.
   - **A correção:** a revisão procura entre todos os empréstimos da pessoa e usa, entre os que aceitam parte e comportam o valor, o que tem mais a receber.
   - **Quando nenhum serve:** o movimento continua desmarcado, e o aviso mostra quanto falta somando todos os empréstimos da pessoa. O aviso só sugere "Recebimento parcial" se algum deles aceita parte.
+
+## Nota (a conferência também na fatura do cartão, 2026-10-25)
+
+A revisão da fatura só desmarcava o que parecia já lançado: a compra com o mesmo dia e o mesmo valor, ou o mês de uma recorrência do estabelecimento, que pedia para editar o lançamento à mão para pôr o valor real. Agora a fatura também é conferida, como a conta:
+
+- **"Já lançado":** uma compra do mesmo estabelecimento (ou da mesma descrição), no mês da fatura, com o mesmo valor e o mesmo dia (ou sem dia), ou um mês de recorrência com o mesmo valor. Importar não cria nada: põe no lançamento o vencimento da fatura e a data da compra.
+- **"Valor diferente":** um mês de recorrência do estabelecimento com até **20%** de diferença (antes, 10%). A escolha "É este / É outro" fica no cartão. "É este" fica com o valor da fatura, o que confirma a estimativa de uma conta que varia.
+- **"Não é este"** transforma a linha em lançamento novo. Um lançamento casa com uma linha só, e a parcela de um parcelamento que já existe continua desmarcada.
+- **Na API:** `matches` aceita a conferência sem identificador e sem quitação. A fatura não tem identificador por linha, e a compra continua a pagar até a fatura.
+  - Cada item da fatura traz `dueDate` e `occurredOn`, e a conferência atualiza o lançamento com eles, sem vínculo com o extrato.
+  - As partes pendentes de um lançamento dividido acompanham o vencimento e a data, como em [ADR 0052](0052-divisao-em-entradas-recorrencias-e-parcelamentos.md).
+  - O mês da importação é o do lançamento conferido.
+  - Uma fatura importada de novo continua sendo reconhecida por comparação.
+- **Na tela:**
+  - o selo aparece nos cartões conferidos;
+  - "Prontas" conta os conferidos;
+  - o botão diz "Importar 3 lançamentos e conferir 2", ou "Conferir 2" quando nada é novo;
+  - o aviso de sucesso diz quantos foram conferidos.

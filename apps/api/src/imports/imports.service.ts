@@ -30,6 +30,7 @@ import { PeopleService } from '../people/people.service.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
 import { toDate, toIsoDate } from '../transactions/dates.js';
+import { followShares } from '../transactions/share-description.js';
 import { toTransactionResponse, withOrigin } from '../transactions/transactions.service.js';
 
 type ImportRow = TransactionImport & {
@@ -269,7 +270,14 @@ export class ImportsService {
       ...parts.map((part) => part.settledAt.slice(0, 7)),
     ];
     // The months it covers: what it created, and the days of the movements it found in the app.
-    const covered = [...periods, ...matches.map((match) => match.settledAt.slice(0, 7))].sort();
+    const covered = [
+      ...periods,
+      // A card's match settles nothing: the month of the transaction it found (ADR 0061 note).
+      ...matches.flatMap((match) => {
+        const month = match.settledAt?.slice(0, 7) ?? found.get(match.transactionId)?.period;
+        return month ? [month] : [];
+      }),
+    ].sort();
     // One interactive transaction with the RLS context (ADR 0028): the import with what it creates,
     // then the transactions it found, or nothing.
     const created = await this.prisma
@@ -328,10 +336,16 @@ export class ImportsService {
               externalId: match.externalId,
               reconciledImportId: row.id,
               // A pending one is settled on the day the money moved; a settled one keeps its day.
-              settledAt: wasPending ? toDate(match.settledAt) : undefined,
+              // A card's purchase stays to pay until the bill (no settledAt).
+              settledAt: wasPending && match.settledAt ? toDate(match.settledAt) : undefined,
+              dueDate: match.dueDate ? toDate(match.dueDate) : undefined,
+              occurredOn: match.occurredOn ? toDate(match.occurredOn) : undefined,
               amountCents: match.amountCents,
               // Settling, or giving the amount, confirms an estimate (ADR 0038).
-              amountEstimated: wasPending || match.amountCents !== undefined ? false : undefined,
+              amountEstimated:
+                (wasPending && match.settledAt) || match.amountCents !== undefined
+                  ? false
+                  : undefined,
             },
           });
         }
@@ -348,6 +362,15 @@ export class ImportsService {
         }
         throw error;
       });
+    // Its pending shares fall due with it, and are of the same day (ADR 0052 note, 0055).
+    for (const match of matches) {
+      if (match.dueDate || match.occurredOn) {
+        await followShares(this.prisma, workspaceId, match.transactionId, {
+          dueDate: match.dueDate ? toDate(match.dueDate) : undefined,
+          occurredOn: match.occurredOn ? toDate(match.occurredOn) : undefined,
+        });
+      }
+    }
     // A month of a split recurrence: its pending shares in percentages follow the amount (ADR 0052).
     for (const match of matches) {
       if (
@@ -436,29 +459,36 @@ export class ImportsService {
     transactions: CreateImportInput['transactions'],
     matches: ImportMatchInput[],
     partIds: string[],
-  ): Promise<Map<string, { pending: boolean; amountCents: number }>> {
+  ): Promise<Map<string, { pending: boolean; amountCents: number; period: string }>> {
     const externalIds = [
       ...transactions.flatMap((transaction) => transaction.externalId ?? []),
-      ...matches.map((match) => match.externalId),
+      ...matches.flatMap((match) => match.externalId ?? []),
       ...partIds,
     ];
-    if (externalIds.length === 0) return new Map();
+    if (externalIds.length === 0 && matches.length === 0) return new Map();
     const db = this.prisma.forWorkspace(workspaceId);
     const [known, matched] = await Promise.all([
       db.transaction.count({ where: { workspaceId, externalId: { in: externalIds } } }),
       db.transaction.findMany({
         where: { workspaceId, id: { in: matches.map((match) => match.transactionId) } },
-        select: { id: true, externalId: true, settledAt: true, amountCents: true },
+        select: { id: true, externalId: true, settledAt: true, amountCents: true, period: true },
       }),
     ]);
     if (known > 0) throw lineImported();
-    if (matched.length !== matches.length || matched.some((row) => row.externalId !== null)) {
+    // One that took another movement meanwhile; a card's match brings none (ADR 0061 note).
+    const withMovement = new Set(
+      matches.filter((match) => match.externalId).map((match) => match.transactionId),
+    );
+    if (
+      matched.length !== matches.length ||
+      matched.some((row) => row.externalId !== null && withMovement.has(row.id))
+    ) {
       throw matchChanged();
     }
     return new Map(
       matched.map((row) => [
         row.id,
-        { pending: row.settledAt === null, amountCents: row.amountCents },
+        { pending: row.settledAt === null, amountCents: row.amountCents, period: row.period },
       ]),
     );
   }
