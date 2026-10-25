@@ -221,7 +221,9 @@ export function startAccountReview(
     // Money lent coming back, or paid back, with no due date (ADR 0057): a part of the loan,
     // which "Recebimento parcial" records without counting it twice.
     if (person) {
-      const loan = context.candidates.find(
+      // Every loan of this person still pending with no due date, in a marked category: a
+      // person may have several (one lent with "Emprestado para", older ones launched once).
+      const loans = context.candidates.filter(
         (transaction) =>
           transaction.personId === person.id &&
           transaction.type === type &&
@@ -231,17 +233,21 @@ export function startAccountReview(
             (category) => category.id === transaction.categoryId && category.neutral,
           ),
       );
-      // Taken as a part when it may be one (ADR 0057): launched once, not split nor a share,
-      // and not more than is left.
-      const remaining = loan ? (left.get(loan.id) ?? loan.amountCents) : 0;
-      const partly =
-        loan &&
-        !loan.splitOfId &&
-        !loan.recurrenceId &&
-        !loan.installment &&
-        !context.candidates.some((transaction) => transaction.splitOfId === loan.id) &&
-        line.amountCents <= remaining;
-      if (loan && partly) {
+      const remainingOf = (loan: Transaction) => left.get(loan.id) ?? loan.amountCents;
+      // A part only of one that takes parts (ADR 0057): launched once, not split nor a share.
+      const partly = loans.filter(
+        (loan) =>
+          !loan.splitOfId &&
+          !loan.recurrenceId &&
+          !loan.installment &&
+          !context.candidates.some((transaction) => transaction.splitOfId === loan.id),
+      );
+      // The one with the most left among those it fits in.
+      const loan = partly
+        .filter((item) => line.amountCents <= remainingOf(item))
+        .sort((a, b) => remainingOf(b) - remainingOf(a))[0];
+      if (loan) {
+        const remaining = remainingOf(loan);
         left.set(loan.id, remaining - line.amountCents);
         return {
           ...row,
@@ -253,11 +259,19 @@ export function startAccountReview(
           },
         };
       }
-      if (loan) {
+      if (loans.length > 0) {
+        const total = loans.reduce((sum, item) => sum + remainingOf(item), 0);
+        // "Recebimento parcial" only when one of them takes parts.
+        const hint =
+          partly.length === 0
+            ? ''
+            : type === 'CREDIT'
+              ? ' Nesse caso, em vez de importar, use "Recebimento parcial" no empréstimo.'
+              : ' Nesse caso, em vez de importar, use "Pagamento parcial" na dívida.';
         return skip(
           type === 'CREDIT'
-            ? `Pode ser a devolução do empréstimo a ${person.name} (faltam ${formatCents(loan.amountCents)}). Nesse caso, em vez de importar, use "Recebimento parcial" no empréstimo.`
-            : `Pode ser um pagamento da dívida com ${person.name} (faltam ${formatCents(loan.amountCents)}). Nesse caso, em vez de importar, use "Pagamento parcial" na dívida.`,
+            ? `Pode ser a devolução do empréstimo a ${person.name} (faltam ${formatCents(total)}).${hint}`
+            : `Pode ser um pagamento da dívida com ${person.name} (faltam ${formatCents(total)}).${hint}`,
         );
       }
     }

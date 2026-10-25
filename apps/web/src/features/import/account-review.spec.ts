@@ -275,6 +275,49 @@ describe('startAccountReview', () => {
     expect(second!.warnings[0]).toContain('Pode ser a devolução do empréstimo a Pedro Exemplo');
   });
 
+  it('takes the part from the loan that takes parts, when the person has several', () => {
+    // A share lent with "Emprestado para" comes first, and does not take parts (ADR 0057).
+    const share = transaction({
+      type: 'CREDIT',
+      description: 'Empréstimo pessoal',
+      categoryId: ids.loans,
+      amountCents: 50_000,
+      personId: pedro.id,
+      splitOfId: '01920000-0000-7000-8000-0000000000d1',
+    });
+    const older = transaction({
+      type: 'CREDIT',
+      description: 'Empréstimo pessoal',
+      categoryId: ids.loans,
+      amountCents: 4_180_000,
+      personId: pedro.id,
+    });
+    const movement = parseNubankAccountCsv(
+      [
+        'Data,Valor,Identificador,Descrição',
+        line(
+          1,
+          '06/10/2026',
+          '670.00',
+          'Transferência recebida pelo Pix - PEDRO EXEMPLO - •••.654.321-•• - BANCO (0999) Agência: 2 Conta: 2-2',
+        ),
+      ].join('\n'),
+    ).lines;
+
+    const [row] = startAccountReview(movement, {
+      ...context,
+      candidates: [share, older],
+    }).rows;
+    expect(row!.part).toMatchObject({ transactionId: older.id, remainingCents: 4_180_000 });
+
+    // With only the share, it stays out, without suggesting what the share cannot take.
+    const [alone] = startAccountReview(movement, { ...context, candidates: [share] }).rows;
+    expect(alone!.part).toBeUndefined();
+    expect(alone!.warnings[0]).toBe(
+      `Pode ser a devolução do empréstimo a Pedro Exemplo (faltam ${formatCents(50_000)}).`,
+    );
+  });
+
   it('never matches one transaction with two movements', () => {
     const twice = parseNubankAccountCsv(
       [
