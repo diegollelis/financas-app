@@ -15,7 +15,8 @@ import {
 } from '@financas/shared';
 import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useBlocker } from 'react-router';
 import { toast } from 'sonner';
 import { FormField } from '@/components/form-field';
 import { InfoTip } from '@/components/info-tip';
@@ -25,6 +26,17 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { StepIndicator } from '@/components/step-indicator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { PageActionButton } from '@/components/page-action-button';
@@ -350,6 +362,7 @@ export function ImportReview({
   account,
   source,
   defaultLabel,
+  heading,
   onChooseAnother,
   onImported,
 }: {
@@ -370,6 +383,8 @@ export function ImportReview({
   source: { kind: ImportKind; bank: StatementBank | null };
   /** The "Origem" it starts with ("Fatura Nubank", "Planilha modelo"). */
   defaultLabel: string;
+  /** The step's title and what it reviews ("Revisar fatura do cartão", "Nubank · 50 linhas"). */
+  heading: { title: string; subtitle: string };
   onChooseAnother: () => void;
   onImported: (firstPeriod: string) => void;
 }) {
@@ -451,6 +466,25 @@ export function ImportReview({
       : rows;
   const found = account ? accountSummary(rows) : null;
 
+  // The review is a step of its own: leaving it with choices made asks first, since they live
+  // only here (the file is read on the device and never kept).
+  const dirty = rows.some((row) => row.touched) || matches.size > 0 || label !== defaultLabel;
+  const leaving = useRef(false);
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty && !leaving.current && currentLocation.pathname !== nextLocation.pathname,
+  );
+  useEffect(() => {
+    if (!dirty) return;
+    // Closing or reloading the tab: the browser's own warning, which no page can word.
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+  const [discarding, setDiscarding] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const cancel = () => (dirty ? setDiscarding(true) : onChooseAnother());
+
   const update = (line: number, change: (row: ReviewRow) => ReviewRow) =>
     setRows((current) => current.map((row) => (row.line === line ? change(row) : row)));
 
@@ -498,6 +532,7 @@ export function ImportReview({
                     : ''
                 }`,
           );
+          leaving.current = true;
           onImported(created.firstPeriod);
         },
       },
@@ -549,17 +584,25 @@ export function ImportReview({
 
   return (
     <div className="grid gap-6">
+      {/* The step's top: what is reviewed and "Cancelar". On the phone its first line stays in
+          sight under the app's header while the list scrolls; the steps scroll with the page. */}
+      {/* A direct child of the whole review: sticky holds only within its parent. */}
+      <div className="bg-background sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 -mx-4 flex items-center justify-between gap-3 border-b px-4 py-2 sm:-mx-6 sm:px-6 md:static md:mx-0 md:items-start md:border-0 md:p-0">
+        <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight md:text-2xl md:whitespace-normal">
+          {heading.title}
+        </h1>
+        <Button ref={cancelRef} variant="outline" size="sm" onClick={cancel}>
+          Cancelar
+        </Button>
+      </div>
+      <div className="-mt-3 grid gap-3">
+        <p className="text-muted-foreground">{heading.subtitle}</p>
+        <StepIndicator steps={['Arquivo', 'Revisão', 'Importado']} current={1} />
+      </div>
       {/* The check before importing (ADR 0040 note): the numbers side by side, as the month's
           totals in Lançamentos, then the statement's month and due date (ADR 0055 note) and what
           tells this import apart later, each explained behind its "ⓘ". */}
-      <SectionCard
-        title="3. Revise e importe"
-        action={
-          <Button variant="outline" size="sm" onClick={onChooseAnother}>
-            Escolher outro arquivo
-          </Button>
-        }
-      >
+      <SectionCard title="Resumo">
         {/* The live region wraps the list: on the <dl> itself it would stop being one (axe). */}
         <div role="status">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-4">
@@ -898,6 +941,52 @@ export function ImportReview({
                   }${ready.matches.length > 0 ? ` e conferir ${ready.matches.length}` : ''}`}
         </PageActionButton>
       </div>
+
+      <AlertDialog open={discarding} onOpenChange={setDiscarding}>
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            cancelRef.current?.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descartar a revisão?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As escolhas que você fez nas linhas (categorias, estabelecimentos, o que marcou ou
+              desmarcou) se perdem. Nada foi importado ainda.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar revisando</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onChooseAnother}>
+              Descartar revisão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={blocker.state === 'blocked'}
+        onOpenChange={(open) => !open && blocker.state === 'blocked' && blocker.reset()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sair da revisão?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A revisão ainda não foi importada, e as escolhas feitas nas linhas se perdem se você
+              sair agora.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar revisando</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => blocker.state === 'blocked' && blocker.proceed()}
+            >
+              Sair sem importar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ResponsiveDialog
         open={Boolean(editingRow)}

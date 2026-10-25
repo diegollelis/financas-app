@@ -55,3 +55,18 @@ Com várias importações no histórico, "Desfazer" uma antiga podia apagar mais
 - **As duas ações ficam num menu ⋯** em cada importação, cada uma com a sua confirmação.
 
 O "Desfazer" continua permitido com dependências. A confirmação mostra o que muda, e quem só quer limpar o histórico usa a outra ação.
+
+## Nota (a revisão como uma etapa, 2026-10-25)
+
+A revisão aparecia no lugar da escolha do arquivo sem dizer o que estava acontecendo: o endereço não mudava, as abas e o histórico sumiam, e restava um "3. Revise e importe" solto. O voltar do celular saía da página e perdia as escolhas sem aviso, e a única saída era "Escolher outro arquivo". Um modal não serve aqui: a revisão é longa, cada linha abre o seu próprio diálogo, e fechá-lo sem querer perderia tudo. Por isso, a revisão continua em tela inteira e ganha cara de etapa:
+
+- **O topo da etapa:**
+  - um título ("Revisar fatura do cartão", "Revisar extrato da conta", "Revisar planilha");
+  - o que está sendo revisado ("Nubank · 50 linhas"). O nome do arquivo não aparece, porque o do extrato da conta traz o número da conta;
+  - o indicador "Arquivo → Revisão → Importado" (`StepIndicator`, `components/step-indicator.tsx`);
+  - **"Cancelar",** um botão em contorno pequeno, como os outros botões de topo do app.
+  - As abas ficam escondidas durante a revisão, e o cartão de números passa a se chamar "Resumo".
+- **No celular,** a primeira linha do topo (o título e "Cancelar") fica presa logo abaixo do cabeçalho do app enquanto a lista rola. O indicador de etapas rola com a página, e o rodapé fixo continua só com o botão de importar. Um botão flutuante de cancelar foi descartado: disputaria espaço com a ação principal, e os guias de interface reservam o botão flutuante para a ação positiva.
+- **Cancelar:** sem nada mudado, volta direto para a escolha do arquivo. Com alguma linha alterada, pergunta antes, no diálogo de confirmação do app: "Descartar a revisão?", com "Descartar revisão" e "Continuar revisando" (e não "Cancelar", para não haver dois "Cancelar" com sentidos opostos).
+- **Sair sem querer:** com alguma linha alterada, trocar de seção ou voltar pergunta "Sair da revisão?" (`useBlocker` do React Router). Fechar ou recarregar a aba mostra o aviso padrão do navegador (`beforeunload`). Depois de importar, a ida para Lançamentos não pergunta nada.
+- **O endereço continua o mesmo.** Um endereço próprio para a revisão faria o voltar do navegador perder o arquivo, que só existe na memória do navegador.

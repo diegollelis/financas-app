@@ -68,7 +68,8 @@ export function TemplateImportPage() {
 
   return (
     <>
-      <ImportHeader workspaceId={workspace.id} />
+      {/* While a file is reviewed, the review is the page's step (its own title and Cancelar). */}
+      {!review && <ImportHeader workspaceId={workspace.id} />}
       <QueryState queries={[categories, imports]} />
       {/* The steps, numbered, in a card of their own. Choosing the file only opens the review. How
           to do each step is behind its "ⓘ". */}
@@ -144,6 +145,10 @@ export function TemplateImportPage() {
           categories={categories.data}
           previousImports={imports.data}
           source={{ kind: 'TEMPLATE', bank: null }}
+          heading={{
+            title: 'Revisar planilha',
+            subtitle: `Planilha modelo · ${review.rows.length} ${review.rows.length === 1 ? 'linha' : 'linhas'}`,
+          }}
           defaultLabel="Planilha modelo"
           onChooseAnother={() => setReview(null)}
           onImported={imported}
