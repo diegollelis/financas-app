@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiErrorMessage } from '@/lib/error-message';
 import { useCreateWorkspace } from './use-workspace';
+import { useDialogDirty } from '@/components/dialog-dirty';
 
 /** Inside the "Novo espaço compartilhado" dialog, mounted on each opening. */
 export function CreateWorkspaceForm({
@@ -24,6 +25,8 @@ export function CreateWorkspaceForm({
     resolver: zodResolver(createWorkspaceInputSchema),
     defaultValues: { name: '' },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const submit = (input: CreateWorkspaceInput) =>
     createWorkspace.mutate(input, { onSuccess: onCreated });
 

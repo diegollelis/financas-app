@@ -15,6 +15,7 @@ import { FormField } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiErrorMessage } from '@/lib/error-message';
+import { useDialogDirty } from '@/components/dialog-dirty';
 
 /** Text typed in a field → number, or a pt-BR message. */
 function textField(parse: (text: string) => number | null, messages: Record<string, string>) {
@@ -108,6 +109,8 @@ export function BudgetForm({
       })),
     },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   // The 100% rule is on the whole list: React Hook Form keeps such an error under `root`.
   const sumError =
     formState.errors.shares?.root?.message ?? formState.errors.shares?.message ?? null;

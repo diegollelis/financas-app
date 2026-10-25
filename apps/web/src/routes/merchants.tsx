@@ -14,6 +14,7 @@ import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { useDialogDirty } from '@/components/dialog-dirty';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,6 +87,8 @@ function NameForm({
     resolver: zodResolver(createMerchantInputSchema),
     defaultValues: { name: initial },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
 
   return (
     <form

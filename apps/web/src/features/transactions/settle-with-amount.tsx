@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { useDialogDirty } from '@/components/dialog-dirty';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -78,6 +79,8 @@ function SettleForm({
     resolver: zodResolver(settleSchema),
     defaultValues: { amount: amountText.format(transaction.amountCents / 100) },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const id = `settle-${transaction.id}`;
 
   return (

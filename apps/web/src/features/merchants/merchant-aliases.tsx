@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiErrorMessage } from '@/lib/error-message';
 import { useAddMerchantAlias, useRemoveMerchantAlias } from './use-merchants';
+import { useDialogDirty } from '@/components/dialog-dirty';
 
 /**
  * The texts a merchant appears as in a card statement (ADR 0055): the list, each with "Remover",
@@ -31,6 +32,8 @@ export function MerchantAliases({
     resolver: zodResolver(createMerchantAliasInputSchema),
     defaultValues: { alias: '' },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const fieldId = `alias-${merchant.id}`;
 
   return (

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { FormField } from '@/components/form-field';
 import { PasswordInput } from '@/components/password-input';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { useDialogDirty } from '@/components/dialog-dirty';
 import { SectionCard } from '@/components/section-card';
 import {
   AlertDialog,
@@ -74,6 +75,8 @@ function NameForm({ onDone }: { onDone: () => void }) {
     resolver: zodResolver(updateNameInputSchema),
     defaultValues: { name: user.name },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   return (
     <form
       noValidate
@@ -126,6 +129,8 @@ function EmailForm({ onDone }: { onDone: () => void }) {
     resolver: zodResolver(schema),
     defaultValues: { newEmail: '' },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
 
   if (change.isSuccess) {
     return (
@@ -175,6 +180,8 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
     resolver: zodResolver(changePasswordFormSchema),
     defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   return (
     <form
       noValidate
