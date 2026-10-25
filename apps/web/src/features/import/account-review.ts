@@ -14,7 +14,13 @@ import {
   type Person,
   type Transaction,
 } from '@financas/shared';
-import { takesMatch, type AccountMatch, type ReviewRow } from './review';
+import {
+  takesMatch,
+  takesPart,
+  type AccountMatch,
+  type AccountPart,
+  type ReviewRow,
+} from './review';
 
 // The review of an account statement (ADR 0061), kept apart from the screen: each movement is
 // first compared with what is already in the app, so nothing comes in twice. A pending
@@ -95,6 +101,8 @@ export function startAccountReview(
 ): { rows: ReviewRow[]; knownCount: number } {
   const fresh = lines.filter((line) => !context.known.has(line.externalId));
   const used = new Set<string>();
+  // What each loan still has, as the movements before take parts of it.
+  const left = new Map<string, number>();
   const sameName = (a: string, b: string) => normalizeName(a) === normalizeName(b);
   const personOf = (name: string | null) =>
     name ? context.people.find((person) => !person.archived && sameName(person.name, name)) : null;
@@ -223,6 +231,28 @@ export function startAccountReview(
             (category) => category.id === transaction.categoryId && category.neutral,
           ),
       );
+      // Taken as a part when it may be one (ADR 0057): launched once, not split nor a share,
+      // and not more than is left.
+      const remaining = loan ? (left.get(loan.id) ?? loan.amountCents) : 0;
+      const partly =
+        loan &&
+        !loan.splitOfId &&
+        !loan.recurrenceId &&
+        !loan.installment &&
+        !context.candidates.some((transaction) => transaction.splitOfId === loan.id) &&
+        line.amountCents <= remaining;
+      if (loan && partly) {
+        left.set(loan.id, remaining - line.amountCents);
+        return {
+          ...row,
+          part: {
+            transactionId: loan.id,
+            description: loan.description,
+            personName: person.name,
+            remainingCents: remaining,
+          },
+        };
+      }
       if (loan) {
         return skip(
           type === 'CREDIT'
@@ -265,7 +295,7 @@ export type AccountGroup = 'NEW' | 'MATCHED' | 'OUT';
 
 /** Which group a row is in: already in the app (also with another amount), out, or new. */
 export function accountGroup(row: ReviewRow): AccountGroup {
-  if (takesMatch(row)) return 'MATCHED';
+  if (takesMatch(row) || takesPart(row)) return 'MATCHED';
   if (row.skipped && !row.included) return 'OUT';
   return 'NEW';
 }
@@ -277,9 +307,20 @@ export function accountSummary(rows: ReviewRow[]) {
     matched: matched.filter((row) => row.match.sameAmount).length,
     settling: matched.filter((row) => row.match.sameAmount && row.match.pending).length,
     different: matched.filter((row) => !row.match.sameAmount).length,
+    parts: rows.filter(takesPart).length,
     fresh: rows.filter((row) => accountGroup(row) === 'NEW').length,
     out: rows.filter((row) => accountGroup(row) === 'OUT').length,
   };
+}
+
+/** What a part of a loan says on the card: the loan, and what is left after it. */
+export function partText(row: ReviewRow & { part: AccountPart }): string {
+  const { part } = row;
+  const kind = row.type === 'CREDIT' ? 'Recebimento parcial' : 'Pagamento parcial';
+  const after = part.remainingCents - (row.amountCents ?? 0);
+  return after === 0
+    ? `${kind} de "${part.description}", de ${part.personName}: quita o que faltava, e o pendente sai da lista.`
+    : `${kind} de "${part.description}", de ${part.personName}: faltam ${formatCents(part.remainingCents)}; depois deste, ${formatCents(after)}.`;
 }
 
 /** What a match says on the card: what the app has, and what importing does to it. */

@@ -1,5 +1,6 @@
 import {
   dueDateFor,
+  formatCents,
   installmentsCreated,
   normalizeName,
   normalizeStatementTitle,
@@ -12,9 +13,16 @@ import {
   type ImportKind,
   type ImportMatchInput,
   type ImportMerchantAliasInput,
+  type ImportPartInput,
   type StatementBank,
+  todayIso,
 } from '@financas/shared';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { ensureUsableCategories } from '../categories/ensure-category.js';
 import { Prisma, type TransactionImport } from '../generated/prisma/client.js';
@@ -44,6 +52,51 @@ const matchChanged = () =>
       'Um dos lançamentos conferidos mudou ou foi excluído. Abra o extrato de novo para conferir.',
   });
 
+/**
+ * How the loans an import took parts of were before it (ADR 0061 note), kept with the import:
+ * undoing it gives each one back what it took, or creates it again if nothing was left.
+ */
+const restoreDataSchema = z.object({
+  parts: z.number().int(),
+  loans: z.array(
+    z.object({
+      takenCents: z.number().int(),
+      row: z.object({
+        id: z.uuid(),
+        type: z.enum(['CREDIT', 'DEBIT']),
+        description: z.string(),
+        notes: z.string().nullable(),
+        categoryId: z.uuid(),
+        amountCents: z.number().int(),
+        period: z.string(),
+        dueDate: z.string().nullable(),
+        occurredOn: z.string().nullable(),
+        importId: z.uuid().nullable(),
+        personId: z.uuid().nullable(),
+        merchantId: z.uuid().nullable(),
+        paymentMethod: z.string().nullable(),
+      }),
+    }),
+  ),
+});
+
+type RestoreData = z.infer<typeof restoreDataSchema>;
+
+const readRestoreData = (value: unknown): RestoreData | null => {
+  const parsed = restoreDataSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
+
+/** A part of a loan that cannot be taken: settled, split, a share, a month or an installment. */
+const partRefused = (message: string) =>
+  new ConflictException({ code: 'NOT_PARTIALLY_SETTLEABLE', message });
+
+/**
+ * An import writes up to 2,000 transactions in one interactive transaction: Prisma's default of
+ * 5 seconds is too short for that on a remote database (Neon), so it gets more room.
+ */
+const IMPORT_TRANSACTION = { maxWait: 10_000, timeout: 60_000 };
+
 /** A day `days` after an ISO date (before it, when negative). */
 const shiftDay = (isoDate: string, days: number) =>
   new Date(toDate(isoDate).getTime() + days * 86_400_000);
@@ -64,6 +117,7 @@ function toResponse(row: ImportRow, dependents = noDependents): Import {
     transactionCount: row.transactionCount,
     planCount: row._count.installmentPlans,
     reconciledCount: row._count.reconciled,
+    partCount: readRestoreData(row.restoreData)?.parts ?? 0,
     label: row.label,
     statementDueDate: row.statementDueDate && toIsoDate(row.statementDueDate),
     kind: row.kind,
@@ -172,8 +226,15 @@ export class ImportsService {
     const plans = input.plans ?? [];
     const aliases = input.aliases ?? [];
     const matches = input.matches ?? [];
+    const parts = input.parts ?? [];
     await ensureUsableCategories(this.prisma, workspaceId, [...input.transactions, ...plans]);
-    const found = await this.checkMovements(workspaceId, input.transactions, matches);
+    const found = await this.checkMovements(
+      workspaceId,
+      input.transactions,
+      matches,
+      parts.map((part) => part.externalId),
+    );
+    const restore = await this.checkParts(workspaceId, parts);
     const newAliases = await this.newAliases(workspaceId, aliases);
     const merchantIds = await this.merchantIds(workspaceId, [
       ...input.transactions.map((transaction) => transaction.merchantName),
@@ -204,6 +265,8 @@ export class ImportsService {
     const periods = [
       ...input.transactions.map((transaction) => transaction.period),
       ...installmentsOf.flat().map((installment) => installment.period),
+      // Each part is launched in the month of its day (ADR 0057).
+      ...parts.map((part) => part.settledAt.slice(0, 7)),
     ];
     // The months it covers: what it created, and the days of the movements it found in the app.
     const covered = [...periods, ...matches.map((match) => match.settledAt.slice(0, 7))].sort();
@@ -213,15 +276,50 @@ export class ImportsService {
       .$transaction(async (tx) => {
         await setWorkspaceContext(tx, workspaceId);
         const row = await tx.transactionImport.create({
-          data: this.importData(workspaceId, userId, input, {
-            count: periods.length,
-            covered,
-            installmentsOf,
-            merchantOf,
-            personOf,
-          }),
+          data: {
+            ...this.importData(workspaceId, userId, input, {
+              count: periods.length,
+              covered,
+              installmentsOf,
+              merchantOf,
+              personOf,
+            }),
+            ...(restore && { restoreData: restore }),
+          },
           include: withCreator,
         });
+        // The parts of loans, as "Recebimento parcial" makes them (ADR 0057): launched, settled,
+        // in the month of their day, brought by this import; each loan keeps the rest or goes.
+        for (const part of parts) {
+          const loan = restore!.loans.find((item) => item.row.id === part.transactionId)!.row;
+          await tx.transaction.create({
+            data: {
+              workspaceId,
+              type: loan.type,
+              description: loan.description,
+              categoryId: loan.categoryId,
+              amountCents: part.amountCents,
+              period: part.settledAt.slice(0, 7),
+              settledAt: toDate(part.settledAt),
+              occurredOn: toDate(part.settledAt),
+              personId: loan.personId,
+              merchantId: loan.merchantId,
+              paymentMethod: loan.paymentMethod as Prisma.TransactionCreateInput['paymentMethod'],
+              externalId: part.externalId,
+              importId: row.id,
+            },
+          });
+        }
+        for (const { takenCents, row: loan } of restore?.loans ?? []) {
+          if (takenCents === loan.amountCents) {
+            await tx.transaction.delete({ where: { id: loan.id, workspaceId } });
+          } else {
+            await tx.transaction.update({
+              where: { id: loan.id, workspaceId },
+              data: { amountCents: loan.amountCents - takenCents },
+            });
+          }
+        }
         for (const match of matches) {
           const wasPending = found.get(match.transactionId)?.pending === true;
           await tx.transaction.update({
@@ -238,7 +336,7 @@ export class ImportsService {
           });
         }
         return { ...row, _count: { ...row._count, reconciled: matches.length } };
-      })
+      }, IMPORT_TRANSACTION)
       .catch((error: unknown) => {
         // Another import brought one of these movements meanwhile (the unique key).
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -337,10 +435,12 @@ export class ImportsService {
     workspaceId: string,
     transactions: CreateImportInput['transactions'],
     matches: ImportMatchInput[],
+    partIds: string[],
   ): Promise<Map<string, { pending: boolean; amountCents: number }>> {
     const externalIds = [
       ...transactions.flatMap((transaction) => transaction.externalId ?? []),
       ...matches.map((match) => match.externalId),
+      ...partIds,
     ];
     if (externalIds.length === 0) return new Map();
     const db = this.prisma.forWorkspace(workspaceId);
@@ -361,6 +461,72 @@ export class ImportsService {
         { pending: row.settledAt === null, amountCents: row.amountCents },
       ]),
     );
+  }
+
+  /**
+   * The loans an account statement takes parts of (ADR 0061 note), checked as "Recebimento
+   * parcial" checks one (ADR 0057): pending, launched once, not split and not a share; the parts
+   * of each within what is pending, on days not in the future. Gives how each one is now, to give
+   * it back on undo; null when there are none.
+   */
+  private async checkParts(
+    workspaceId: string,
+    parts: ImportPartInput[],
+  ): Promise<RestoreData | null> {
+    if (parts.length === 0) return null;
+    if (parts.some((part) => part.settledAt > todayIso())) {
+      throw new BadRequestException({
+        code: 'INVALID_INPUT',
+        message: 'A data não pode ser no futuro.',
+      });
+    }
+    const taken = new Map<string, number>();
+    for (const part of parts) {
+      taken.set(part.transactionId, (taken.get(part.transactionId) ?? 0) + part.amountCents);
+    }
+    const loans = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+      where: { workspaceId, id: { in: [...taken.keys()] } },
+      include: {
+        occurrence: { select: { recurrenceId: true } },
+        _count: { select: { shares: true } },
+      },
+    });
+    if (loans.length !== taken.size) throw matchChanged();
+    for (const loan of loans) {
+      if (loan.settledAt) throw partRefused('Um dos lançamentos já foi quitado.');
+      if (loan.splitOfId || loan._count.shares > 0 || loan.occurrence || loan.installmentPlanId) {
+        throw partRefused(
+          'Um mês de recorrência, uma parcela ou uma divisão se quita pelo valor todo.',
+        );
+      }
+      if ((taken.get(loan.id) ?? 0) > loan.amountCents) {
+        throw new BadRequestException({
+          code: 'INVALID_INPUT',
+          message: `O valor passa do que está pendente (${formatCents(loan.amountCents)}).`,
+        });
+      }
+    }
+    return {
+      parts: parts.length,
+      loans: loans.map((loan) => ({
+        takenCents: taken.get(loan.id) ?? 0,
+        row: {
+          id: loan.id,
+          type: loan.type,
+          description: loan.description,
+          notes: loan.notes,
+          categoryId: loan.categoryId,
+          amountCents: loan.amountCents,
+          period: loan.period,
+          dueDate: loan.dueDate && toIsoDate(loan.dueDate),
+          occurredOn: loan.occurredOn && toIsoDate(loan.occurredOn),
+          importId: loan.importId,
+          personId: loan.personId,
+          merchantId: loan.merchantId,
+          paymentMethod: loan.paymentMethod,
+        },
+      })),
+    };
   }
 
   /**
@@ -487,10 +653,53 @@ export class ImportsService {
         where: { workspaceId, reconciledImportId: importId },
         data: { externalId: null },
       });
-      const { count } = await tx.transactionImport.deleteMany({
+      const row = await tx.transactionImport.findFirst({
         where: { id: importId, workspaceId },
+        select: { restoreData: true },
       });
-      return count > 0;
+      if (!row) return false;
+      // Its parts of loans go with it (cascade); the loans get back what it took (ADR 0061 note).
+      await tx.transactionImport.delete({ where: { id: importId, workspaceId } });
+      for (const { takenCents, row: loan } of readRestoreData(row.restoreData)?.loans ?? []) {
+        const still = await tx.transaction.findFirst({
+          where: { id: loan.id, workspaceId },
+          select: { amountCents: true },
+        });
+        if (still) {
+          await tx.transaction.update({
+            where: { id: loan.id, workspaceId },
+            data: { amountCents: still.amountCents + takenCents },
+          });
+          continue;
+        }
+        // Nothing was left, so it went: created again as it was, with the import it came from,
+        // if that one is still there.
+        const from =
+          loan.importId &&
+          (await tx.transactionImport.findFirst({
+            where: { id: loan.importId, workspaceId },
+            select: { id: true },
+          }));
+        await tx.transaction.create({
+          data: {
+            id: loan.id,
+            workspaceId,
+            type: loan.type,
+            description: loan.description,
+            notes: loan.notes,
+            categoryId: loan.categoryId,
+            amountCents: loan.amountCents,
+            period: loan.period,
+            dueDate: loan.dueDate ? toDate(loan.dueDate) : null,
+            occurredOn: loan.occurredOn ? toDate(loan.occurredOn) : null,
+            importId: from ? loan.importId : null,
+            personId: loan.personId,
+            merchantId: loan.merchantId,
+            paymentMethod: loan.paymentMethod as Prisma.TransactionCreateInput['paymentMethod'],
+          },
+        });
+      }
+      return true;
     });
     if (!found) throw new NotFoundException();
   }

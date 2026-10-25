@@ -453,6 +453,8 @@ model TransactionImport {
   label            String?           @db.VarChar(100)
   statementDueDate DateTime?         @map("statement_due_date") @db.Date
   // What was imported and from which bank (ADR 0060): the template has no bank.
+  // How the loans it took parts of were before (ADR 0061 note): undoing it gives them back.
+  restoreData      Json?             @map("restore_data")
   kind             ImportKind        @default(TEMPLATE)
   bank             StatementBank?
   firstPeriod      String            @map("first_period") @db.Char(7)

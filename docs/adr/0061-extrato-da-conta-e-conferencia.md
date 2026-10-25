@@ -129,3 +129,22 @@ A revisão descrita acima foi feita, e "Conta" passou a estar disponível em "Qu
   - **a escolha "É este / É outro"** num lançamento de valor diferente;
   - **o botão:** "Importar 4 novos e conferir 6", ou "Conferir 3" quando nada é novo.
 - **Em "Extratos importados":** a contagem diz quantos lançamentos a importação conferiu. A confirmação do desfazer diz que eles continuam pagos ou recebidos, só sem o vínculo com o extrato.
+
+## Nota (recebimento parcial de um empréstimo direto da revisão, 2026-10-25)
+
+A entrada de uma pessoa que tem um empréstimo pendente vinha desmarcada, com a sugestão de usar "Recebimento parcial" fora da importação. O empréstimo é uma entrada sem vencimento, numa categoria "Nem renda nem gasto". Agora a revisão registra a parte direto:
+
+- **Na revisão:** a entrada (ou a saída, numa dívida) vem marcada como "Recebimento parcial" (ou "Pagamento parcial"), com quanto faltava e quanto fica. "Não é este" faz dela um lançamento novo.
+  - Vale só para um empréstimo que aceita parte, como no [ADR 0057](0057-receber-parte-e-a-receber-sem-data.md): lançado uma vez, sem divisão e sem ser uma parte.
+  - Vale só se o valor não passa do que falta. Dois movimentos do mesmo empréstimo vão diminuindo o que falta.
+  - Fora disso, o movimento continua desmarcado, com a sugestão de antes.
+- **Na importação:** a API recebe `parts: [{ transactionId, externalId, amountCents, settledAt }]` e faz o que o "Recebimento parcial" faz:
+  - lança a parte, quitada, no mês do seu dia, como um lançamento da importação, com o identificador do movimento;
+  - o empréstimo fica com o resto, ou sai quando não resta nada.
+  - **Recusas:** um empréstimo quitado, dividido, que é parte de outro, um mês de recorrência ou uma parcela recebe 409 `NOT_PARTIALLY_SETTLEABLE`. Mais do que está pendente ou uma data no futuro recebe 400 `INVALID_INPUT`. Um empréstimo que também está em `matches` recebe 400.
+  - `partCount` diz quantas partes a importação registrou.
+- **Desfazer:** a importação guarda como estava cada empréstimo de que tirou uma parte (`imports.restore_data`).
+  - Desfazer apaga as partes, junto com a importação, e devolve a cada empréstimo o que ela tirou.
+  - Se o empréstimo tinha saído, ele é criado de novo como era, com o mesmo id.
+  - "Remover do histórico" mantém tudo como ficou.
+- **Limite de tempo:** a importação roda numa transação interativa. O limite padrão do Prisma, 5 segundos, é curto para 2.000 lançamentos num banco remoto, e a importação ganhou 60 segundos.
