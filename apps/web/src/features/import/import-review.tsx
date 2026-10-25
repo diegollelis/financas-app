@@ -39,11 +39,19 @@ import {
   resolveCategory,
   rowProblems,
   takesMatch,
+  takesPart,
   unmatchedCategories,
   type AccountMatch,
+  type AccountPart,
   type ReviewRow,
 } from './review';
-import { accountGroup, accountSummary, matchText, type AccountGroup } from './account-review';
+import {
+  accountGroup,
+  accountSummary,
+  matchText,
+  partText,
+  type AccountGroup,
+} from './account-review';
 import {
   newCategoryName,
   newCategoryValue,
@@ -132,7 +140,7 @@ function RowItem({
 }) {
   const label = row.description || `Linha ${row.line}`;
   // A movement already in the app creates nothing: what it matched is said instead (ADR 0061).
-  const matched = takesMatch(row);
+  const matched = takesMatch(row) || takesPart(row);
   // A statement's line without a category picks it right on the card, as most lines of a first
   // statement have none yet (ADR 0055 note).
   const picksCategory =
@@ -165,17 +173,26 @@ function RowItem({
             variant="outline"
             className={cn(
               'justify-self-start',
-              matched && row.match.sameAmount && 'border-transparent bg-success-muted',
-              matched && !row.match.sameAmount && 'border-transparent bg-warning-muted',
+              matched &&
+                (row.part || row.match?.sameAmount) &&
+                'border-transparent bg-success-muted',
+              matched &&
+                row.match &&
+                !row.match.sameAmount &&
+                'border-transparent bg-warning-muted',
             )}
           >
             {!matched
               ? 'Novo'
-              : !row.match.sameAmount
-                ? 'Valor diferente'
-                : row.match.pending
-                  ? 'Quita um pendente'
-                  : 'Já lançado'}
+              : row.part
+                ? row.type === 'CREDIT'
+                  ? 'Recebimento parcial'
+                  : 'Pagamento parcial'
+                : !row.match!.sameAmount
+                  ? 'Valor diferente'
+                  : row.match!.pending
+                    ? 'Quita um pendente'
+                    : 'Já lançado'}
           </Badge>
         )}
         <p className="font-medium break-words">{label}</p>
@@ -183,6 +200,13 @@ function RowItem({
         {row.statementTitle && row.statementTitle !== row.description && (
           <p className="text-muted-foreground text-sm break-words">
             No extrato: {row.statementTitle}
+          </p>
+        )}
+        {row.part && row.included && (
+          <p className="text-muted-foreground text-sm">
+            {row.matchRefused
+              ? `Não é parte de "${row.part.description}": entra como um lançamento novo.`
+              : partText(row as ReviewRow & { part: AccountPart })}
           </p>
         )}
         {row.match && row.included && (
@@ -283,7 +307,7 @@ function RowItem({
         <span className="text-base font-semibold tabular-nums">
           {row.amountCents && row.amountCents > 0 ? formatCents(row.amountCents) : 'Sem valor'}
         </span>
-        {row.match && row.match.sameAmount && row.included ? (
+        {((row.match && row.match.sameAmount) || row.part) && row.included ? (
           // "Não é este" turns it into a new transaction; "É este" takes it back (ADR 0061).
           <Button
             variant="ghost"
@@ -373,6 +397,7 @@ export function ImportReview({
           (row) =>
             row.included &&
             !takesMatch(row) &&
+            !takesPart(row) &&
             row.type === 'DEBIT' &&
             !row.merchantName.trim() &&
             rowProblems(row, resolveCategory(row, categories, matches)).length === 0,
@@ -452,6 +477,7 @@ export function ImportReview({
         ...(ready.plans.length > 0 && { plans: ready.plans.map(real) }),
         ...(ready.aliases.length > 0 && { aliases: ready.aliases }),
         ...(ready.matches.length > 0 && { matches: ready.matches }),
+        ...(ready.parts.length > 0 && { parts: ready.parts }),
         label,
         kind: source.kind,
         bank: source.bank,
@@ -461,7 +487,10 @@ export function ImportReview({
         onSuccess: (created) => {
           toast.success(
             account
-              ? importedSummary(created.transactionCount, created.reconciledCount)
+              ? importedSummary(
+                  created.transactionCount - created.partCount,
+                  created.reconciledCount + created.partCount,
+                )
               : `${created.transactionCount} ${created.transactionCount === 1 ? 'lançamento importado' : 'lançamentos importados'}`,
           );
           onImported(created.firstPeriod);
@@ -498,7 +527,7 @@ export function ImportReview({
   ];
   const stats: [string, string, string?][] = [
     account
-      ? ['Já no app', String(ready.matches.length)]
+      ? ['Já no app', String(ready.matches.length + ready.parts.length)]
       : ['Prontas', `${readyCount} de ${rows.length}`],
     [account ? 'Saídas novas' : 'Saídas', formatCents(debits)],
     [
@@ -602,6 +631,9 @@ export function ImportReview({
                         null,
                       ] as const,
                     ]
+                  : []),
+                ...(found.parts > 0
+                  ? [['Recebimentos ou pagamentos parciais de empréstimos', found.parts] as const]
                   : []),
                 ...(found.different > 0
                   ? [['Valor diferente, para você decidir', found.different] as const]
@@ -841,7 +873,7 @@ export function ImportReview({
           wide
           onClick={() => void submit()}
           disabled={
-            readyCount + ready.matches.length === 0 ||
+            readyCount + ready.matches.length + ready.parts.length === 0 ||
             missingDueDate ||
             (Boolean(statement) && !statement?.baseRows) ||
             category.isPending ||
@@ -851,7 +883,7 @@ export function ImportReview({
           {category.isPending || create.isPending
             ? 'Importando…'
             : account
-              ? accountButton(ready.transactions.length, ready.matches.length)
+              ? accountButton(ready.transactions.length, ready.matches.length + ready.parts.length)
               : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
                   ready.plans.length > 0
                     ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`

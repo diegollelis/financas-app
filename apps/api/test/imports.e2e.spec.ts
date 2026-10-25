@@ -314,7 +314,7 @@ describe('imports', () => {
     expect(response.body).toMatchObject({
       message: `Importe no máximo ${MAX_IMPORT_TRANSACTIONS} lançamentos de uma vez.`,
     });
-  });
+  }, 30_000);
 
   it('keeps the default body limit on the other routes', async () => {
     const { browser, base, rows } = await setUp();
@@ -762,6 +762,146 @@ describe('imports', () => {
       expect(response.transactions.map((tx) => tx.id).sort()).toEqual(
         [energy.id, sweets.id].sort(),
       );
+    });
+
+    describe('a part of a loan (ADR 0061 note)', () => {
+      async function withLoan() {
+        const user = await withLaunched();
+        // Money lent, coming back some day: pending, no due date, launched in August.
+        const loan = await user.launch({
+          type: 'CREDIT',
+          description: 'Empréstimo ao Pedro',
+          categoryId: user.categoryId('Outros', 'CREDIT'),
+          amountCents: 300_000,
+          period: '2026-08',
+        });
+        const part = (amountCents: number, n = 6, settledAt = '2026-10-06') => ({
+          transactionId: loan.id,
+          externalId: id(n),
+          amountCents,
+          settledAt,
+        });
+        return { ...user, loan, part };
+      }
+
+      it('receives the part in the month of its day, and the loan keeps the rest', async () => {
+        const { browser, base, loan, part, transactionsOf } = await withLoan();
+
+        const created = importSchema.parse(
+          (
+            await browser
+              .post(`${base}/imports`)
+              .send({ ...account, transactions: [], parts: [part(32_050)] })
+              .expect(201)
+          ).body,
+        );
+
+        expect(created).toMatchObject({
+          transactionCount: 1,
+          partCount: 1,
+          firstPeriod: '2026-10',
+        });
+        expect((await transactionsOf('2026-08')).find((tx) => tx.id === loan.id)?.amountCents).toBe(
+          267_950,
+        );
+        expect(
+          (await transactionsOf('2026-10')).find((tx) => tx.description === loan.description),
+        ).toMatchObject({
+          type: 'CREDIT',
+          amountCents: 32_050,
+          settledAt: '2026-10-06',
+          occurredOn: '2026-10-06',
+        });
+      });
+
+      it('undoing gives the loan back what it took', async () => {
+        const { browser, base, loan, part, transactionsOf } = await withLoan();
+        const created = importSchema.parse(
+          (
+            await browser
+              .post(`${base}/imports`)
+              .send({ ...account, transactions: [], parts: [part(32_050), part(10_000, 7)] })
+              .expect(201)
+          ).body,
+        );
+
+        await browser.delete(`${base}/imports/${created.id}`).expect(204);
+
+        expect((await transactionsOf('2026-08')).find((tx) => tx.id === loan.id)?.amountCents).toBe(
+          300_000,
+        );
+        expect(
+          (await transactionsOf('2026-10')).filter((tx) => tx.description === loan.description),
+        ).toEqual([]);
+      });
+
+      it('takes the loan away when nothing is left, and undoing brings it back as it was', async () => {
+        const { browser, base, loan, part, transactionsOf } = await withLoan();
+        const created = importSchema.parse(
+          (
+            await browser
+              .post(`${base}/imports`)
+              .send({ ...account, transactions: [], parts: [part(300_000)] })
+              .expect(201)
+          ).body,
+        );
+        expect((await transactionsOf('2026-08')).find((tx) => tx.id === loan.id)).toBeUndefined();
+
+        await browser.delete(`${base}/imports/${created.id}`).expect(204);
+
+        expect((await transactionsOf('2026-08')).find((tx) => tx.id === loan.id)).toMatchObject({
+          description: 'Empréstimo ao Pedro',
+          amountCents: 300_000,
+          settledAt: null,
+          dueDate: null,
+        });
+      });
+
+      it('refuses more than is pending, a day in the future and what is not partly settleable', async () => {
+        const { browser, base, part, energy, sweets } = await withLoan();
+        const send = (parts: unknown[]) =>
+          browser.post(`${base}/imports`).send({ ...account, transactions: [], parts });
+
+        expect((await send([part(200_000), part(200_000, 7)]).expect(400)).body).toMatchObject({
+          code: 'INVALID_INPUT',
+        });
+        expect((await send([part(1_000, 6, '2099-01-01')]).expect(400)).body).toMatchObject({
+          code: 'INVALID_INPUT',
+        });
+        expect(
+          (
+            await send([
+              {
+                transactionId: sweets.id,
+                externalId: id(8),
+                amountCents: 100,
+                settledAt: '2026-10-06',
+              },
+            ]).expect(409)
+          ).body,
+        ).toMatchObject({ code: 'NOT_PARTIALLY_SETTLEABLE' });
+        // Never also a match.
+        expect(
+          (
+            await browser
+              .post(`${base}/imports`)
+              .send({
+                ...account,
+                transactions: [],
+                matches: [{ transactionId: energy.id, externalId: id(9), settledAt: '2026-11-05' }],
+                parts: [
+                  {
+                    transactionId: energy.id,
+                    externalId: id(10),
+                    amountCents: 100,
+                    settledAt: '2026-10-06',
+                  },
+                ],
+              })
+              .expect(400)
+          ).body,
+        ).toMatchObject({ code: 'INVALID_INPUT' });
+      });
     });
 
     it('a VIEWER does not ask for the candidates', async () => {

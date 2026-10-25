@@ -6,6 +6,7 @@ import {
   type ImportInstallmentPlanInput,
   type ImportMatchInput,
   type ImportMerchantAliasInput,
+  type ImportPartInput,
   type ImportTransactionInput,
   type PaymentMethod,
   type TemplateDraft,
@@ -61,9 +62,24 @@ export type ReviewRow = {
   externalId?: string;
   /** The transaction already in the app the movement seems to be (ADR 0061). */
   match?: AccountMatch;
+  /** A part of a loan still pending (ADR 0061 note): received or paid on the movement's day. */
+  part?: AccountPart;
   /** "Não é este" / "É outro": the movement comes in as a new transaction after all. */
   matchRefused?: boolean;
 };
+
+/** A loan still pending that an account statement's movement is a part of (ADR 0061 note). */
+export type AccountPart = {
+  transactionId: string;
+  description: string;
+  personName: string;
+  /** What the loan still had before this movement. */
+  remainingCents: number;
+};
+
+/** A movement taken as a part of the loan it matched, not as a new transaction. */
+export const takesPart = (row: ReviewRow): row is ReviewRow & { part: AccountPart } =>
+  Boolean(row.part) && !row.matchRefused;
 
 /** A transaction already in the app that an account statement's movement is (ADR 0061). */
 export type AccountMatch = {
@@ -237,8 +253,9 @@ export function toPlan(
 
 /** What still keeps a row out of the import: a transaction's problems, or a plan's. */
 export function rowProblems(row: ReviewRow, categoryId: string | null): string[] {
-  // A movement already in the app creates nothing: it needs no category (ADR 0061).
-  if (takesMatch(row)) return [];
+  // A movement already in the app creates nothing: it needs no category (ADR 0061); a part of a
+  // loan takes the loan's.
+  if (takesMatch(row) || takesPart(row)) return [];
   const result = row.plan ? toPlan(row, categoryId) : toTransaction(row, categoryId);
   return result.ok ? [] : result.problems;
 }
@@ -250,6 +267,8 @@ export type ReadyImport = {
   aliases: ImportMerchantAliasInput[];
   /** An account statement's movements already in the app (ADR 0061). */
   matches: ImportMatchInput[];
+  /** An account statement's movements that are parts of a loan (ADR 0061 note). */
+  parts: ImportPartInput[];
 };
 
 /** The checked rows that are ready, as the API takes them, with the aliases to remember. */
@@ -258,7 +277,7 @@ export function readyImport(
   categories: Category[],
   matches: ReadonlyMap<string, string>,
 ): ReadyImport {
-  const ready: ReadyImport = { transactions: [], plans: [], aliases: [], matches: [] };
+  const ready: ReadyImport = { transactions: [], plans: [], aliases: [], matches: [], parts: [] };
   for (const row of rows) {
     if (!row.included) continue;
     if (takesMatch(row)) {
@@ -269,6 +288,17 @@ export function readyImport(
           externalId: row.externalId,
           settledAt: row.occurredOn,
           ...(!row.match.sameAmount && row.amountCents && { amountCents: row.amountCents }),
+        });
+      }
+      continue;
+    }
+    if (takesPart(row)) {
+      if (row.externalId && row.occurredOn && row.amountCents) {
+        ready.parts.push({
+          transactionId: row.part.transactionId,
+          externalId: row.externalId,
+          amountCents: row.amountCents,
+          settledAt: row.occurredOn,
         });
       }
       continue;

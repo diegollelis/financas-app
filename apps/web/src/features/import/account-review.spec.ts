@@ -1,4 +1,5 @@
 import {
+  formatCents,
   parseNubankAccountCsv,
   type Category,
   type Merchant,
@@ -6,7 +7,13 @@ import {
   type Transaction,
 } from '@financas/shared';
 import { describe, expect, it } from 'vitest';
-import { accountGroup, accountSummary, matchText, startAccountReview } from './account-review';
+import {
+  accountGroup,
+  accountSummary,
+  matchText,
+  partText,
+  startAccountReview,
+} from './account-review';
 import { readyImport, takesMatch, type ReviewRow } from './review';
 
 // Invented movements and transactions (ADR 0019: never a real statement).
@@ -212,17 +219,60 @@ describe('startAccountReview', () => {
     expect(accountGroup(row)).toBe('NEW');
   });
 
-  it('leaves out the card bill, savings, money between own accounts, a loan part and last month’s bill', () => {
+  it('leaves out the card bill, savings, money between own accounts and last month’s bill', () => {
     const { rows } = review();
-    const out = [5, 6, 7, 8, 9].map((n) => rowOf(rows, n));
+    const out = [5, 6, 7, 9].map((n) => rowOf(rows, n));
 
     expect(out.every((row) => !row.included && row.skipped)).toBe(true);
-    expect(out.map((row) => accountGroup(row))).toEqual(['OUT', 'OUT', 'OUT', 'OUT', 'OUT']);
+    expect(out.map((row) => accountGroup(row))).toEqual(['OUT', 'OUT', 'OUT', 'OUT']);
     expect(out[2]!.warnings[0]).toBe('Entre as suas contas: veio de uma conta no seu nome.');
-    expect(out[3]!.warnings[0]).toContain('Pode ser a devolução do empréstimo a Pedro Exemplo');
-    expect(out[4]!.warnings[0]).toContain(
+    expect(out[3]!.warnings[0]).toContain(
       'Pode ser a conta de setembro de 2026 de "Energia Exemplo S.A."',
     );
+  });
+
+  it('takes money coming back from a person with a loan as a part of it (ADR 0061 note)', () => {
+    const row = rowOf(review().rows, 8);
+
+    expect(row).toMatchObject({
+      included: true,
+      part: {
+        transactionId: loan.id,
+        description: 'Empréstimo ao Pedro',
+        personName: 'Pedro Exemplo',
+        remainingCents: 300_000,
+      },
+    });
+    expect(accountGroup(row)).toBe('MATCHED');
+    expect(partText(row as never)).toBe(
+      `Recebimento parcial de "Empréstimo ao Pedro", de Pedro Exemplo: faltam ${formatCents(300_000)}; depois deste, ${formatCents(267_950)}.`,
+    );
+  });
+
+  it('leaves out a part bigger than what the loan still has', () => {
+    const big = parseNubankAccountCsv(
+      [
+        'Data,Valor,Identificador,Descrição',
+        line(
+          1,
+          '06/10/2026',
+          '2000.00',
+          'Transferência recebida pelo Pix - PEDRO EXEMPLO - •••.654.321-•• - BANCO (0999) Agência: 2 Conta: 2-2',
+        ),
+        line(
+          2,
+          '07/10/2026',
+          '1500.00',
+          'Transferência recebida pelo Pix - PEDRO EXEMPLO - •••.654.321-•• - BANCO (0999) Agência: 2 Conta: 2-2',
+        ),
+      ].join('\n'),
+    ).lines;
+    const [first, second] = startAccountReview(big, context).rows;
+
+    expect(first!.part?.remainingCents).toBe(300_000);
+    // After the first, R$ 1.000,00 is left: the second does not fit.
+    expect(second!.part).toBeUndefined();
+    expect(second!.warnings[0]).toContain('Pode ser a devolução do empréstimo a Pedro Exemplo');
   });
 
   it('never matches one transaction with two movements', () => {
@@ -243,8 +293,9 @@ describe('startAccountReview', () => {
       matched: 2,
       settling: 1,
       different: 1,
+      parts: 1,
       fresh: 1,
-      out: 5,
+      out: 4,
     });
   });
 });
@@ -271,6 +322,14 @@ describe('readyImport of an account statement', () => {
         externalId: 'NUBANK:6a1f0000-0000-4000-8000-000000000003',
         settledAt: '2026-10-01',
         amountCents: 57_876,
+      },
+    ]);
+    expect(ready.parts).toEqual([
+      {
+        transactionId: loan.id,
+        externalId: 'NUBANK:6a1f0000-0000-4000-8000-000000000008',
+        amountCents: 32_050,
+        settledAt: '2026-10-06',
       },
     ]);
     expect(ready.transactions).toEqual([

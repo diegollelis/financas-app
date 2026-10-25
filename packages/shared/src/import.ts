@@ -104,6 +104,21 @@ export const importMatchInputSchema = z.object({
 
 export type ImportMatchInput = z.infer<typeof importMatchInputSchema>;
 
+/**
+ * A movement that is part of a loan still pending (ADR 0061 note): received or paid on its day,
+ * as "Recebimento parcial" / "Pagamento parcial" does (ADR 0057). The part is created, settled,
+ * in the month of its day; the pending one keeps the rest, or goes once nothing is left. Undoing
+ * the import gives it back.
+ */
+export const importPartInputSchema = z.object({
+  transactionId: z.uuid(),
+  externalId: externalIdSchema,
+  amountCents: amountCentsSchema,
+  settledAt: isoDateSchema,
+});
+
+export type ImportPartInput = z.infer<typeof importPartInputSchema>;
+
 /** What an import brought (ADR 0060): the app's spreadsheet, or a bank's statement. */
 export const importKindSchema = z.enum(['TEMPLATE', 'CARD_STATEMENT', 'ACCOUNT_STATEMENT']);
 
@@ -132,6 +147,8 @@ export const createImportInputSchema = z
     aliases: z.array(importMerchantAliasInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
     /** Movements already in the app, settled or linked instead of created (ADR 0061). */
     matches: z.array(importMatchInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
+    /** Movements that are parts of a loan still pending (ADR 0061 note). */
+    parts: z.array(importPartInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
     /** "Origem" (ADR 0055 note). */
     label: importLabelSchema.nullable().optional(),
     /** The due date of the card statement imported, when it is one. */
@@ -143,7 +160,11 @@ export const createImportInputSchema = z
   })
   .refine(
     (input) =>
-      input.transactions.length + (input.plans?.length ?? 0) + (input.matches?.length ?? 0) > 0,
+      input.transactions.length +
+        (input.plans?.length ?? 0) +
+        (input.matches?.length ?? 0) +
+        (input.parts?.length ?? 0) >
+      0,
     { message: 'Escolha ao menos um lançamento para importar.', path: ['transactions'] },
   )
   // A movement comes once, and a transaction takes one movement.
@@ -152,9 +173,16 @@ export const createImportInputSchema = z
       const ids = [
         ...input.transactions.flatMap((transaction) => transaction.externalId ?? []),
         ...(input.matches ?? []).map((match) => match.externalId),
+        ...(input.parts ?? []).map((part) => part.externalId),
       ];
       const matched = (input.matches ?? []).map((match) => match.transactionId);
-      return new Set(ids).size === ids.length && new Set(matched).size === matched.length;
+      // A loan may get several parts, but is never also a match.
+      const parted = new Set((input.parts ?? []).map((part) => part.transactionId));
+      return (
+        new Set(ids).size === ids.length &&
+        new Set(matched).size === matched.length &&
+        matched.every((id) => !parted.has(id))
+      );
     },
     { message: 'Um movimento do extrato aparece duas vezes.', path: ['matches'] },
   )
@@ -182,6 +210,11 @@ export const importSchema = z.object({
    * they are, only without the movement's identifier.
    */
   reconciledCount: z.number().int().default(0),
+  /**
+   * Parts of loans it received or paid (ADR 0061 note), among `transactionCount`. Undoing it
+   * gives the loans back what it took.
+   */
+  partCount: z.number().int().default(0),
   /** "Origem", as typed; null for an import made before it, or without one. */
   label: z.string().nullable().default(null),
   /** The due date of the card statement, when it was one. */

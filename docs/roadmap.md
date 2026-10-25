@@ -214,7 +214,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
     - [x] API: o identificador de cada movimento (`external_id`, único no espaço), a importação que quita ou vincula o que já está lançado (`matches`), os candidatos de um extrato e o desfazer que mantém o que foi conferido
     - [x] Tela: a revisão do extrato da conta com a conferência, e "Conta" liberada em "Qual extrato?"
   - [x] Conferência: casar cada movimento com o que já está lançado ("Já lançado", quitar o pendente, "Valor diferente"; uma devolução de empréstimo vem desmarcada, com a sugestão do "Recebimento parcial")
-  - [ ] Registrar a devolução de um empréstimo direto da revisão do extrato, sem passar pelo "Recebimento parcial"
+  - [x] Registrar a devolução de um empréstimo direto da revisão do extrato, como recebimento ou pagamento parcial, que o desfazer devolve ao empréstimo (nota no [ADR 0061](adr/0061-extrato-da-conta-e-conferencia.md))
   - [ ] A conferência também na fatura do cartão
   - [ ] Outros bancos, talvez por OFX ("Outro banco (OFX)") para o extrato da conta
 - [x] Fora do previsto, igual nas três telas: "Entradas" e "Saídas" de Lançamentos e do Painel, a barra das entradas e a visão Prevista da Análise deixam de fora o que está a receber ou a pagar sem vencimento, e os números fecham com o saldo (nota no [ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md))

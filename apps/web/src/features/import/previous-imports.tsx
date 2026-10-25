@@ -198,6 +198,14 @@ function PreviousImport({
                     )}{' '}
                     Não é possível desfazer.
                   </AlertDialogDescription>
+                  {/* The parts of loans it received or paid go; the loans get it back. */}
+                  {item.partCount > 0 && (
+                    <p className="text-muted-foreground text-left text-sm">
+                      {item.partCount === 1
+                        ? 'O recebimento ou pagamento parcial que ela registrou sai, e o empréstimo volta ao valor de antes.'
+                        : `Os ${item.partCount} recebimentos ou pagamentos parciais que ela registrou saem, e os empréstimos voltam ao valor de antes.`}
+                    </p>
+                  )}
                   {/* What it found in the app stays as it is (ADR 0061). */}
                   {item.reconciledCount > 0 && (
                     <p className="text-muted-foreground text-left text-sm">
