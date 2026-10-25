@@ -277,6 +277,102 @@ describe('startStatementReview', () => {
     expect(ready.transactions).toEqual([]);
   });
 
+  it('matches a purchase launched by hand a few days off the bank, the closest first', () => {
+    const rows = startStatementReview(
+      lines(
+        '2026-10-24,Padaria Exemplo,"15,00"',
+        '2026-10-22,Livraria Exemplo,"40,00"',
+        '2026-10-21,Banca Exemplo,"27,23"',
+      ),
+      context({
+        transactions: [
+          // One and two days before the bank's day: the same purchases.
+          transaction(1, {
+            description: 'Padaria Exemplo',
+            amountCents: 1_500,
+            occurredOn: '2026-10-23',
+          }),
+          transaction(2, {
+            description: 'Livraria Exemplo',
+            amountCents: 4_000,
+            occurredOn: '2026-10-21',
+          }),
+          // Five days off: another purchase.
+          transaction(3, {
+            description: 'Banca Exemplo',
+            amountCents: 2_723,
+            occurredOn: '2026-10-16',
+          }),
+        ],
+      }),
+    );
+
+    expect(rows.map((row) => row.match?.transactionId ?? null)).toEqual([id(61), id(62), null]);
+    // Importing gives it the bank's day.
+    expect(readyImport(rows.slice(0, 1), [], new Map()).matches[0]?.occurredOn).toBe('2026-10-24');
+  });
+
+  it('matches a last installment already launched as a plain purchase, and an installment of a plan', () => {
+    const rows = startStatementReview(
+      lines(
+        '2026-09-27,Loja.Exemplo - Parcela 5/5,"53,99"',
+        '2026-09-27,Loja.Exemplo - Parcela 4/10,"120,00"',
+        '2026-09-27,Cursos Exemplo - Parcela 6/6,"99,00"',
+      ),
+      context({
+        plans: [
+          {
+            id: id(80),
+            type: 'DEBIT',
+            description: 'Geladeira',
+            notes: null,
+            categoryId: compras.id,
+            totalCents: 120_000,
+            installments: 10,
+            firstNumber: 1,
+            occurredOn: null,
+            firstPeriod: '2026-07',
+            dueDay: 4,
+            dueMonthOffset: 1,
+            personId: null,
+            merchantId: loja.id,
+            paymentMethod: 'CREDIT_CARD',
+            isSplit: false,
+            endedAt: null,
+            adoptedTransactionId: null,
+            settledCount: 3,
+            pendingCount: 7,
+            pendingCents: 84_000,
+            lastPendingPeriod: '2027-04',
+          } as never,
+        ],
+        transactions: [
+          transaction(1, {
+            description: 'Loja Exemplo',
+            merchantId: loja.id,
+            amountCents: 5_399,
+            notes: 'Parcela 5/5',
+            occurredOn: '2026-09-27',
+          }),
+          transaction(2, {
+            description: 'Geladeira',
+            merchantId: loja.id,
+            amountCents: 12_000,
+            installment: { planId: id(80), number: 4, count: 10 },
+          }),
+        ],
+      }),
+    );
+
+    // The last installment is the plain purchase already launched: never a second one.
+    expect(rows[0]).toMatchObject({ included: true, match: { transactionId: id(61), card: true } });
+    // An installment of a plan in the app is that plan's month, "Já lançado".
+    expect(rows[1]).toMatchObject({ included: true, match: { transactionId: id(62), card: true } });
+    // A last installment not in the app still comes as a plain purchase.
+    expect(rows[2]).toMatchObject({ included: true, notes: 'Parcela 6/6' });
+    expect(rows[2]!.match).toBeUndefined();
+  });
+
   it('turns a match into a new purchase with "Não é este", and never takes one twice', () => {
     const rows = startStatementReview(
       lines('2026-10-03,Ifd*Pizzaria Exemplo,"86,50"', '2026-10-04,Ifd*Pizzaria Exemplo,"86,50"'),

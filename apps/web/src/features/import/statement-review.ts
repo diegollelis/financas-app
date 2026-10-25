@@ -56,6 +56,15 @@ const closeAmount = (a: number, b: number) => Math.abs(a - b) <= Math.max(a, b) 
 
 const sameText = (a: string, b: string) => normalizeName(a) === normalizeName(b);
 
+/** A purchase launched by hand is the bank's line when their days are this close. */
+const SAME_PURCHASE_DAYS = 3;
+
+/** Days from one ISO date to another, by the calendar (no time zone shift). */
+function daysBetween(a: string, b: string): number {
+  const day = (iso: string) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+  return Math.round((day(b) - day(a)) / 86_400_000);
+}
+
 /** The plan this installment line already belongs to: same merchant (or description), N and amount. */
 function existingPlan(
   line: StatementLine,
@@ -135,9 +144,65 @@ export function startStatementReview(
     if (line.kind === 'PAYMENT') {
       return skip('Pagamento da fatura anterior: não é uma entrada.');
     }
+    const sameMerchant = (transaction: Transaction) =>
+      merchantId
+        ? transaction.merchantId === merchantId
+        : sameText(transaction.description, description);
+    // Already in the app (ADR 0061 note): importing gives it the bill's due date and the
+    // purchase's day, creating nothing. Each transaction is one line only.
+    const asMatch = (found: Transaction): ReviewRow => {
+      used.add(found.id);
+      const match: AccountMatch = {
+        transactionId: found.id,
+        description: found.description,
+        pending: found.settledAt === null,
+        date: found.dueDate,
+        amountCents: found.amountCents,
+        sameAmount: found.amountCents === line.amountCents,
+        card: true,
+        ...(found.recurrenceId !== null && { recurring: true }),
+      };
+      return { ...row, match };
+    };
+    const open = context.transactions.filter(
+      (transaction) =>
+        !used.has(transaction.id) &&
+        transaction.period === period &&
+        transaction.type === type &&
+        transaction.installment === null &&
+        sameMerchant(transaction),
+    );
+    // The same purchase: the same amount, on a day near the line's (one launched by hand may be
+    // a day or two off the bank's), the closest first; or with no day at all.
+    const samePurchase = open
+      .filter(
+        (transaction) =>
+          transaction.amountCents === line.amountCents &&
+          (transaction.occurredOn === null ||
+            Math.abs(daysBetween(transaction.occurredOn, line.occurredOn)) <= SAME_PURCHASE_DAYS),
+      )
+      .sort(
+        (a, b) =>
+          Math.abs(daysBetween(a.occurredOn ?? line.occurredOn, line.occurredOn)) -
+          Math.abs(daysBetween(b.occurredOn ?? line.occurredOn, line.occurredOn)),
+      )[0];
+
     if (line.installment) {
       const { number, count } = line.installment;
+      // An installment of a plan already in the app is that plan's month (ADR 0061 note).
+      const plan = existingPlan(line, description, merchantId, context.plans);
+      const installment =
+        plan &&
+        context.transactions.find(
+          (transaction) =>
+            !used.has(transaction.id) &&
+            transaction.installment?.planId === plan.id &&
+            transaction.installment.number === number,
+        );
+      if (installment) return asMatch(installment);
       if (number === count) {
+        // The last one is a plain purchase: already launched as one, it is that one.
+        if (samePurchase) return asMatch(samePurchase);
         return {
           ...row,
           notes: `Parcela ${number}/${count}`,
@@ -146,7 +211,6 @@ export function startStatementReview(
           ],
         };
       }
-      const plan = existingPlan(line, description, merchantId, context.plans);
       if (plan) {
         return skip(
           `Já lançada: é a parcela ${number}/${count} do parcelamento "${plan.description}".`,
@@ -162,27 +226,9 @@ export function startStatementReview(
       };
     }
 
-    const sameMerchant = (transaction: Transaction) =>
-      merchantId
-        ? transaction.merchantId === merchantId
-        : sameText(transaction.description, description);
-    // Already in the app (ADR 0061 note): the same purchase, of the same day or with none, and
-    // the same amount; or a recurrence's month of the merchant, with an amount near the line's.
-    // Importing then gives it the bill's due date and the purchase's day, creating nothing.
-    const open = context.transactions.filter(
-      (transaction) =>
-        !used.has(transaction.id) &&
-        transaction.period === period &&
-        transaction.type === type &&
-        transaction.installment === null &&
-        sameMerchant(transaction),
-    );
+    // Or a recurrence's month of the merchant, with an amount near the line's.
     const found =
-      open.find(
-        (transaction) =>
-          transaction.amountCents === line.amountCents &&
-          (transaction.occurredOn === null || transaction.occurredOn === line.occurredOn),
-      ) ??
+      samePurchase ??
       (type === 'DEBIT'
         ? open.find(
             (transaction) =>
@@ -190,20 +236,7 @@ export function startStatementReview(
               closeAmount(transaction.amountCents, line.amountCents),
           )
         : undefined);
-    if (found) {
-      used.add(found.id);
-      const match: AccountMatch = {
-        transactionId: found.id,
-        description: found.description,
-        pending: found.settledAt === null,
-        date: found.dueDate,
-        amountCents: found.amountCents,
-        sameAmount: found.amountCents === line.amountCents,
-        card: true,
-        ...(found.recurrenceId !== null && { recurring: true }),
-      };
-      return { ...row, match };
-    }
+    if (found) return asMatch(found);
     return line.kind === 'REFUND'
       ? {
           ...row,
