@@ -519,6 +519,142 @@ describe('ImportPage', () => {
     expect(screen.queryByRole('button', { name: /^Desfazer/ })).not.toBeInTheDocument();
   });
 
+  describe('a Nubank account statement (ADR 0061)', () => {
+    const tx = (n: number, fields: Record<string, unknown>) => ({
+      id: `01920000-0000-7000-8000-0000000009${String(n).padStart(2, '0')}`,
+      type: 'DEBIT',
+      notes: null,
+      period: '2026-10',
+      dueDate: null,
+      settledAt: null,
+      ...fields,
+    });
+    const pay = tx(1, {
+      type: 'CREDIT',
+      description: 'Salário',
+      categoryId: salario.id,
+      amountCents: 500_000,
+      dueDate: '2026-10-05',
+    });
+    const rent = tx(2, {
+      description: 'Aluguel',
+      categoryId: moradia.id,
+      amountCents: 150_000,
+      settledAt: '2026-10-10',
+    });
+    const id = (n: number) => `6a1f0000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    // Invented movements in the bank's format.
+    const csv = [
+      'Data,Valor,Identificador,Descrição',
+      `05/10/2026,5000.00,${id(1)},Transferência recebida pelo Pix - EMPRESA EXEMPLO - 12.345.678/0001-90 - BANCO (0999) Agência: 1 Conta: 1-1`,
+      `10/10/2026,-1500.00,${id(2)},Transferência enviada pelo Pix - IMOBILIARIA EXEMPLO - 22.345.678/0001-90 - BANCO (0999) Agência: 1 Conta: 1-1`,
+      `12/10/2026,-45.90,${id(3)},Compra no débito - PADARIA EXEMPLO`,
+      `15/10/2026,-900.00,${id(4)},Pagamento de fatura`,
+      `16/10/2026,-30.00,${id(5)},Compra no débito - LOJA JA IMPORTADA`,
+    ].join('\n');
+    const mockAccount = () =>
+      mockImport({
+        [`GET ${base}/merchants`]: { body: [] },
+        [`GET ${base}/people`]: { body: [] },
+        [`GET ${base}/categories/hints`]: {
+          body: {
+            merchants: [],
+            descriptions: [],
+            paymentMethods: { merchants: [], descriptions: [] },
+          },
+        },
+        [`POST ${base}/imports/candidates`]: {
+          body: {
+            known: [
+              {
+                externalId: `NUBANK:${id(5)}`,
+                transactionId: '01920000-0000-7000-8000-000000000999',
+              },
+            ],
+            transactions: [pay, rent],
+          },
+        },
+        [`POST ${base}/imports`]: {
+          status: 201,
+          body: {
+            ...previousImport,
+            transactionCount: 1,
+            reconciledCount: 2,
+            kind: 'ACCOUNT_STATEMENT',
+            bank: 'NUBANK',
+            firstPeriod: '2026-10',
+          },
+        },
+      });
+
+    it('checks each movement against what is in the app, and imports only what is new', async () => {
+      const fetchMock = mockAccount();
+      renderApp(statementPage);
+
+      await userEvent.click(await screen.findByRole('radio', { name: 'Conta' }));
+      await userEvent.upload(
+        await screen.findByLabelText('Escolher extrato (.csv)'),
+        new File([csv], 'extrato.csv', { type: 'text/csv' }),
+      );
+
+      // The summary at the top: what it found, and what was imported before.
+      const summary = await screen.findByRole('region', { name: 'Conferência' });
+      expect(summary).toHaveTextContent('Já lançados no app2');
+      expect(summary).toHaveTextContent('Um deles está pendente e será quitado');
+      expect(summary).toHaveTextContent('Mais 1 movimento já importado antes, que fica de fora.');
+      const october = screen.getByRole('region', { name: 'outubro de 2026' });
+      const [salary, aluguel, bakery, bill] = within(october).getAllByRole('listitem');
+      expect(salary).toHaveTextContent('Quita um pendente');
+      expect(aluguel).toHaveTextContent('Já lançado');
+      expect(bill).toHaveTextContent('importar o pagamento contaria tudo duas vezes');
+      expect(within(bill!).getByRole('checkbox')).not.toBeChecked();
+      expect(screen.getByLabelText('Origem (opcional)')).toHaveValue('Conta Nubank');
+
+      // The new one picks its category on the card.
+      await userEvent.click(
+        within(bakery!).getByRole('combobox', { name: 'Categoria de Padaria Exemplo' }),
+      );
+      await userEvent.click(await screen.findByRole('option', { name: 'Mercado' }));
+      // The filter shows one group at a time.
+      await userEvent.click(screen.getByRole('radio', { name: 'Fora' }));
+      expect(
+        within(screen.getByRole('region', { name: 'outubro de 2026' })).getAllByRole('listitem'),
+      ).toHaveLength(1);
+      await userEvent.click(screen.getByRole('radio', { name: 'Todos' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Importar 1 novo e conferir 2' }));
+
+      await expectCall(fetchMock, `${base}/imports`, {
+        method: 'POST',
+        body: expect.stringContaining(
+          `"matches":[{"transactionId":"${pay.id}","externalId":"NUBANK:${id(1)}","settledAt":"2026-10-05"},{"transactionId":"${rent.id}","externalId":"NUBANK:${id(2)}","settledAt":"2026-10-10"}],"label":"Conta Nubank","kind":"ACCOUNT_STATEMENT","bank":"NUBANK"`,
+        ) as unknown,
+      });
+      await expectCall(fetchMock, `${base}/imports`, {
+        method: 'POST',
+        body: expect.stringContaining(`"externalId":"NUBANK:${id(3)}"`) as unknown,
+      });
+      expect(await screen.findByText('1 lançamento novo e 2 conferidos')).toBeInTheDocument();
+    });
+
+    it('turns a match into a new transaction with "Não é este"', async () => {
+      mockAccount();
+      renderApp(statementPage);
+      await userEvent.click(await screen.findByRole('radio', { name: 'Conta' }));
+      await userEvent.upload(
+        await screen.findByLabelText('Escolher extrato (.csv)'),
+        new File([csv], 'extrato.csv', { type: 'text/csv' }),
+      );
+      const october = await screen.findByRole('region', { name: 'outubro de 2026' });
+      const aluguel = within(october).getAllByRole('listitem')[1]!;
+
+      await userEvent.click(within(aluguel).getByRole('button', { name: /^Não é este/ }));
+
+      expect(aluguel).toHaveTextContent('Não é "Aluguel": entra como um lançamento novo.');
+      expect(within(aluguel).getByRole('button', { name: /^É este/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Conferir 1' })).toBeInTheDocument();
+    });
+  });
+
   describe('a Nubank card statement (ADR 0055)', () => {
     const pizzaria = {
       id: '01920000-0000-7000-8000-000000000601',
@@ -772,18 +908,18 @@ describe('ImportPage', () => {
       );
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
-        'Este arquivo parece o extrato de conta do Nubank, que o app ainda não lê.',
+        'Este arquivo parece o extrato de conta do Nubank: escolha "Conta" em "Qual extrato?".',
       );
     });
 
-    it('asks the bank first, and shows the account statement as coming next (ADR 0060)', async () => {
+    it('asks the bank first, then the card or the account statement (ADRs 0060, 0061)', async () => {
       mockStatement();
       renderApp(statementPage);
 
       expect(await screen.findByRole('combobox', { name: 'Banco' })).toHaveTextContent('Nubank');
       expect(screen.getByRole('radio', { name: 'Fatura' })).toBeChecked();
-      expect(screen.getByRole('radio', { name: 'Conta' })).toBeDisabled();
-      expect(screen.getByText('"Conta" chega no próximo passo.')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Conta' })).toBeEnabled();
+      expect(screen.queryByText(/chega no próximo passo/)).not.toBeInTheDocument();
     });
 
     it('names a past import by its origin and due date', async () => {

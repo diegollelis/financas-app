@@ -96,3 +96,36 @@ O tipo "Conta" continua desabilitado em `statementBanks` até a revisão existir
 - **A conferência quita lançamentos que já existiam.** Desfazer a importação não desfaz essas quitações. A confirmação do desfazer vai dizer isso, com `reconciledCount`.
 - **A fatura do cartão não tem identificador por linha.** Ela continua evitando duplicatas por comparação ([ADR 0055](0055-importacao-da-fatura-do-cartao.md)). A conferência pode chegar a ela depois, com os mesmos `matches`, mas sem o identificador.
 - **Outros bancos e o OFX** usam o mesmo identificador (o FITID do OFX), com o banco na frente.
+
+## Nota (a revisão do extrato da conta, 2026-10-24)
+
+A revisão descrita acima foi feita, e "Conta" passou a estar disponível em "Qual extrato?". A lógica fica separada da tela, em `apps/web/src/features/import/account-review.ts` (`startAccountReview`), com testes próprios.
+
+- **Os candidatos** vêm de `POST …/imports/candidates`, pedido uma vez para os dias do arquivo.
+- **Como cada movimento é conferido:**
+  - **"Já importado":** fica fora e só aparece no resumo.
+  - **"Quita um pendente" / "Já lançado":** mesmo tipo e mesmo valor.
+    - Num pendente, o vencimento precisa estar até 10 dias do movimento. Sem vencimento, vale o mês do movimento ou o anterior.
+    - Num lançamento quitado, a quitação precisa estar até 5 dias do movimento.
+    - Se mais de um lançamento serve, vence o mais próximo.
+  - **"Valor diferente":** até **20%** de diferença, sempre com o mesmo estabelecimento, pessoa ou descrição. Com 10%, uma parcela de R$ 520,88 paga com R$ 578,76 ficava de fora, e o vínculo com o estabelecimento, a pessoa ou a descrição já evita casar com outro lançamento.
+  - **Um lançamento casa com um movimento só.**
+- **Desmarcados, com o motivo no cartão:**
+  - o pagamento de fatura;
+  - a caixinha;
+  - **uma conta no seu nome:** o primeiro e o último nome da conta no app aparecem no nome da outra parte;
+  - **uma possível devolução de empréstimo:** a pessoa tem algo pendente, sem vencimento, numa categoria marcada. O cartão sugere "Recebimento parcial" ou "Pagamento parcial".
+  - **uma conta que parece do mês anterior:** um débito até o dia 15, parecido com um mês de recorrência deste mês que vence só no mês seguinte.
+- **Um movimento novo:**
+  - fica no mês do seu dia, já quitado nesse dia, com o meio de pagamento do movimento;
+  - o estabelecimento vem pelo apelido ou pelo nome, se a outra parte não é uma pessoa;
+  - a pessoa vem de Pessoas, pelo nome, se a outra parte é uma pessoa;
+  - a categoria vem do histórico.
+- **Na tela, a revisão é a da fatura (`ImportReview`) com `account`:**
+  - **o cartão "Conferência":** o resumo do que o app encontrou e quantos movimentos já tinham sido importados;
+  - **o filtro "Todos, Novos, Lançados, Fora",** ao qual "Marcar todas" se aplica;
+  - **o selo de cada cartão;**
+  - **"Não é este" / "É este"** num lançamento de mesmo valor;
+  - **a escolha "É este / É outro"** num lançamento de valor diferente;
+  - **o botão:** "Importar 4 novos e conferir 6", ou "Conferir 3" quando nada é novo.
+- **Em "Extratos importados":** a contagem diz quantos lançamentos a importação conferiu. A confirmação do desfazer diz que eles continuam pagos ou recebidos, só sem o vínculo com o extrato.

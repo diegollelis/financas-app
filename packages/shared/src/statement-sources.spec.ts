@@ -23,11 +23,11 @@ describe('detectStatement', () => {
 });
 
 describe('statementBanks', () => {
-  it('offers the Nubank card statement now, and its account statement next', () => {
+  it('offers the Nubank card statement and account statement', () => {
     const nubank = statementBanks.find((bank) => bank.bank === 'NUBANK');
     expect(nubank?.sources.map((source) => [source.kind, source.available])).toEqual([
       ['CARD_STATEMENT', true],
-      ['ACCOUNT_STATEMENT', false],
+      ['ACCOUNT_STATEMENT', true],
     ]);
   });
 });

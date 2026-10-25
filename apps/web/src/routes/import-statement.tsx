@@ -3,8 +3,10 @@ import {
   formatCents,
   formatPeriod,
   hasRole,
+  parseNubankAccountCsv,
   parseNubankCsv,
   statementBanks,
+  type AccountLine,
   type Import,
   type StatementBank,
   type StatementLine,
@@ -16,7 +18,7 @@ import { InfoTip } from '@/components/info-tip';
 import { QueryState } from '@/components/query-state';
 import { SectionCard } from '@/components/section-card';
 import { SegmentedControl } from '@/components/segmented-control';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -24,7 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useCurrentUser } from '@/features/auth/use-me';
 import { useCategories, useCategoryHints } from '@/features/categories/use-categories';
+import { startAccountReview } from '@/features/import/account-review';
 import { ImportReview } from '@/features/import/import-review';
 import { ImportHeader } from '@/features/import/import-tabs';
 import { PreviousImports } from '@/features/import/previous-imports';
@@ -34,15 +38,120 @@ import {
   suggestedPeriod,
   wholeBillAlreadyLaunched,
 } from '@/features/import/statement-review';
-import { useImports } from '@/features/import/use-imports';
+import { useImportCandidates, useImports } from '@/features/import/use-imports';
 import { useInstallmentPlans } from '@/features/installments/use-installments';
 import { useMerchants } from '@/features/merchants/use-merchants';
+import { usePeople } from '@/features/people/use-people';
 import { useTransactions } from '@/features/transactions/use-transactions';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { cn } from '@/lib/utils';
 
 /** A statement read. */
 type StatementFile = { lines: StatementLine[]; unread: string[] };
+
+/** An account statement read (ADR 0061). */
+type AccountFile = { lines: AccountLine[]; unread: string[] };
+
+/** What the file was, by the kind chosen. */
+type ReadFile =
+  ({ kind: 'CARD_STATEMENT' } & StatementFile) | ({ kind: 'ACCOUNT_STATEMENT' } & AccountFile);
+
+/**
+ * The review of an account statement (ADR 0061), opened once what it compares with is loaded:
+ * the movements already imported and the transactions one may be, asked of the API for the
+ * statement's days, with the merchants, the people and the history.
+ */
+function AccountReview({
+  workspaceId,
+  bank,
+  file,
+  previousImports,
+  onChooseAnother,
+  onImported,
+}: {
+  workspaceId: string;
+  bank: { bank: StatementBank; label: string };
+  file: AccountFile;
+  previousImports: Import[];
+  onChooseAnother: () => void;
+  onImported: (firstPeriod: string) => void;
+}) {
+  const user = useCurrentUser();
+  const categories = useCategories(workspaceId);
+  const merchants = useMerchants(workspaceId);
+  const people = usePeople(workspaceId);
+  const hints = useCategoryHints(workspaceId);
+  const range = useMemo(() => {
+    const days = file.lines.map((line) => line.occurredOn).sort();
+    return {
+      from: days[0] ?? '',
+      to: days.at(-1) ?? '',
+      externalIds: file.lines.map((line) => line.externalId),
+    };
+  }, [file.lines]);
+  const candidates = useImportCandidates(workspaceId, range);
+  // The review opens once, with what was read; later loads do not reset the person's choices.
+  const [review, setReview] = useState<ReturnType<typeof startAccountReview> | null>(null);
+  if (
+    !review &&
+    categories.data &&
+    merchants.data &&
+    people.data &&
+    candidates.data &&
+    !hints.isPending
+  ) {
+    setReview(
+      startAccountReview(file.lines, {
+        known: new Set(candidates.data.known.map((item) => item.externalId)),
+        candidates: candidates.data.transactions,
+        merchants: merchants.data,
+        categories: categories.data,
+        people: people.data,
+        hints: hints.data,
+        userName: user.name,
+      }),
+    );
+  }
+  if (!review || !categories.data || !merchants.data) {
+    return <QueryState queries={[categories, merchants, people, candidates]} />;
+  }
+  if (review.rows.length === 0) {
+    return (
+      <SectionCard title="Nada novo neste extrato">
+        <p>
+          {review.knownCount === 1
+            ? 'O único movimento deste extrato já foi importado antes.'
+            : `Os ${review.knownCount} movimentos deste extrato já foram importados antes.`}
+        </p>
+        <Button variant="outline" className="justify-self-start" onClick={onChooseAnother}>
+          Escolher outro arquivo
+        </Button>
+      </SectionCard>
+    );
+  }
+  return (
+    <ImportReview
+      workspaceId={workspaceId}
+      initialRows={review.rows}
+      categories={categories.data}
+      merchants={merchants.data}
+      previousImports={previousImports}
+      account={{
+        knownCount: review.knownCount,
+        notices:
+          file.unread.length > 0
+            ? [
+                `Algumas linhas do arquivo não puderam ser lidas e ficam de fora: ${file.unread.join('; ')}.`,
+              ]
+            : [],
+      }}
+      source={{ kind: 'ACCOUNT_STATEMENT', bank: bank.bank }}
+      defaultLabel={`Conta ${bank.label}`}
+      onChooseAnother={onChooseAnother}
+      onImported={onImported}
+    />
+  );
+}
 
 /**
  * The review of a card statement (ADR 0055), opened once what it compares with is loaded: the
@@ -159,7 +268,8 @@ export function StatementImportPage() {
   const [kind, setKind] = useState(bank.sources.find((source) => source.available)!.kind);
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
-  const [statement, setStatement] = useState<StatementFile | null>(null);
+  const [statement, setStatement] = useState<ReadFile | null>(null);
+  const account = kind === 'ACCOUNT_STATEMENT';
   const ready = categories.isSuccess && imports.isSuccess;
   const unavailable = bank.sources.filter((source) => !source.available);
   const imported = (firstPeriod: string) =>
@@ -171,7 +281,10 @@ export function StatementImportPage() {
     setReadError(null);
     try {
       const text = await file.text();
-      const parsed = parseNubankCsv(text);
+      const parsed =
+        kind === 'ACCOUNT_STATEMENT'
+          ? { kind, ...parseNubankAccountCsv(text) }
+          : { kind, ...parseNubankCsv(text) };
       const fatal = parsed.issues.find((issue) => issue.line === 1 || issue.line === null);
       if (fatal) {
         // Another statement, not an unreadable file: say which (ADR 0060).
@@ -182,10 +295,12 @@ export function StatementImportPage() {
             : fatal.message,
         );
       } else {
-        setStatement({
-          lines: parsed.lines,
-          unread: parsed.issues.map((issue) => `linha ${issue.line} (${issue.message})`),
-        });
+        const unread = parsed.issues.map((issue) => `linha ${issue.line} (${issue.message})`);
+        setStatement(
+          parsed.kind === 'ACCOUNT_STATEMENT'
+            ? { kind: parsed.kind, lines: parsed.lines, unread }
+            : { kind: parsed.kind, lines: parsed.lines, unread },
+        );
       }
     } catch {
       setReadError('Não foi possível ler o arquivo.');
@@ -261,18 +376,18 @@ export function StatementImportPage() {
           <section aria-labelledby="import-step-statement" className="grid gap-2">
             <div className="flex items-center">
               <h3 id="import-step-statement" className="font-medium">
-                1. Baixe a fatura em CSV
+                1. Baixe {account ? 'o extrato' : 'a fatura'} em CSV
               </h3>
-              <InfoTip term="Baixe a fatura em CSV">
-                No app ou no site do {bank.label}, abra a fatura do cartão e exporte em CSV. Na
-                revisão, você confirma o mês da fatura e o vencimento, e as compras parceladas viram
-                parcelamentos.
+              <InfoTip term={`Baixe ${account ? 'o extrato' : 'a fatura'} em CSV`}>
+                {account
+                  ? `No app do ${bank.label}, abra o extrato da conta, escolha o período e exporte em CSV. Na revisão, cada movimento é conferido com o que já está lançado, e o que já existe não entra de novo. Do Pix e da transferência, o app guarda só o nome da outra parte: CPF, CNPJ, banco, agência e conta ficam de fora.`
+                  : `No app ou no site do ${bank.label}, abra a fatura do cartão e exporte em CSV. Na revisão, você confirma o mês da fatura e o vencimento, e as compras parceladas viram parcelamentos.`}
               </InfoTip>
             </div>
           </section>
           <section aria-labelledby="import-step-statement-file" className="grid gap-2">
             <h3 id="import-step-statement-file" className="font-medium">
-              2. Escolha o arquivo da fatura
+              2. Escolha o arquivo {account ? 'do extrato' : 'da fatura'}
             </h3>
             <input
               id="import-statement-input"
@@ -294,21 +409,31 @@ export function StatementImportPage() {
               )}
             >
               <FileUp aria-hidden />
-              Escolher fatura (.csv)
+              Escolher {account ? 'extrato' : 'fatura'} (.csv)
             </label>
             {readError && (
               <p id="import-file-error" role="alert" className="text-destructive">
                 {readError}
               </p>
             )}
-            {reading && <p role="status">Lendo a fatura…</p>}
+            {reading && <p role="status">Lendo {account ? 'o extrato' : 'a fatura'}…</p>}
           </section>
         </SectionCard>
       )}
       {ready && !canEdit && (
         <p className="text-muted-foreground">Quem só visualiza o espaço não importa arquivos.</p>
       )}
-      {ready && statement && (
+      {ready && statement?.kind === 'ACCOUNT_STATEMENT' && (
+        <AccountReview
+          workspaceId={workspace.id}
+          bank={bank}
+          file={statement}
+          previousImports={imports.data}
+          onChooseAnother={() => setStatement(null)}
+          onImported={imported}
+        />
+      )}
+      {ready && statement?.kind === 'CARD_STATEMENT' && (
         <StatementReview
           workspaceId={workspace.id}
           bank={bank}

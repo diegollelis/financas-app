@@ -41,7 +41,7 @@ export const statementBanks: readonly StatementBankSource[] = [
         kind: 'ACCOUNT_STATEMENT',
         label: 'Conta',
         short: 'Conta',
-        available: false,
+        available: true,
         columns: ['data', 'valor', 'identificador', 'descricao'],
       },
     ],

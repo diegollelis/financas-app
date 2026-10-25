@@ -111,6 +111,11 @@ function PreviousImport({
     item.planCount > 0
       ? ` e ${item.planCount} ${item.planCount === 1 ? 'parcelamento' : 'parcelamentos'}`
       : ''
+  }${
+    // An account statement also checked transactions already in the app (ADR 0061).
+    item.reconciledCount > 0
+      ? ` e ${item.reconciledCount} ${item.reconciledCount === 1 ? 'conferido' : 'conferidos'}`
+      : ''
   }, ${periodsOf(item)}`;
   // Its "Origem" and the statement's due date tell it apart (ADR 0055 note); an import made
   // before them shows what it brought, as it always did.
@@ -177,15 +182,30 @@ function PreviousImport({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Desfazer a importação de {when}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    {item.transactionCount === 1
-                      ? 'O lançamento dela sai'
-                      : `Os ${item.transactionCount} lançamentos dela saem`}
-                    {item.planCount > 0 && ', com os parcelamentos que ela criou'},{' '}
-                    {item.transactionCount === 1
-                      ? 'mesmo se foi editado ou marcado como pago ou recebido depois'
-                      : 'inclusive os que foram editados ou marcados como pagos ou recebidos depois'}
-                    . Estabelecimentos e apelidos ficam. Não é possível desfazer.
+                    {item.transactionCount === 0 ? (
+                      'Ela não criou lançamentos: só conferiu os que já estavam no app.'
+                    ) : (
+                      <>
+                        {item.transactionCount === 1
+                          ? 'O lançamento dela sai'
+                          : `Os ${item.transactionCount} lançamentos dela saem`}
+                        {item.planCount > 0 && ', com os parcelamentos que ela criou'},{' '}
+                        {item.transactionCount === 1
+                          ? 'mesmo se foi editado ou marcado como pago ou recebido depois'
+                          : 'inclusive os que foram editados ou marcados como pagos ou recebidos depois'}
+                        . Estabelecimentos e apelidos ficam.
+                      </>
+                    )}{' '}
+                    Não é possível desfazer.
                   </AlertDialogDescription>
+                  {/* What it found in the app stays as it is (ADR 0061). */}
+                  {item.reconciledCount > 0 && (
+                    <p className="text-muted-foreground text-left text-sm">
+                      {item.reconciledCount === 1
+                        ? 'O lançamento que ela conferiu continua como está, pago ou recebido e com o valor do banco: só deixa de estar ligado ao extrato, e uma nova importação o encontra de novo.'
+                        : `Os ${item.reconciledCount} lançamentos que ela conferiu continuam como estão, pagos ou recebidos e com o valor do banco: só deixam de estar ligados ao extrato, e uma nova importação os encontra de novo.`}
+                    </p>
+                  )}
                   {/* What was built on it since (ADR 0060 note): said before, not found after. */}
                   {touched.length > 0 && (
                     <div className="bg-accent grid gap-1 rounded-md p-3 text-left text-sm">

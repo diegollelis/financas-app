@@ -25,6 +25,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { PageActionButton } from '@/components/page-action-button';
 import { CategorySelect } from '@/features/categories/category-picker';
@@ -37,9 +38,12 @@ import {
   readyImport,
   resolveCategory,
   rowProblems,
+  takesMatch,
   unmatchedCategories,
+  type AccountMatch,
   type ReviewRow,
 } from './review';
+import { accountGroup, accountSummary, matchText, type AccountGroup } from './account-review';
 import {
   newCategoryName,
   newCategoryValue,
@@ -71,6 +75,31 @@ const typeLabel = { CREDIT: 'entrada', DEBIT: 'saída' } as const;
 /** A notice of what could count twice or stay out: the warning colors (ADR 0036 tokens). */
 const NOTICE_CLASS = 'border-warning/40 bg-warning-muted rounded-lg border p-3';
 
+/** "4 lançamentos novos e 6 conferidos": what an account statement's import did (ADR 0061). */
+function importedSummary(created: number, reconciled: number) {
+  const made = `${created} ${created === 1 ? 'lançamento novo' : 'lançamentos novos'}`;
+  if (reconciled === 0) return made;
+  return `${made} e ${reconciled} ${reconciled === 1 ? 'conferido' : 'conferidos'}`;
+}
+
+/** The button of an account statement (ADR 0061): what will be created, and what checked. */
+function accountButton(created: number, matched: number) {
+  const parts = [
+    ...(created > 0 ? [`${created} ${created === 1 ? 'novo' : 'novos'}`] : []),
+    ...(matched > 0 ? [`conferir ${matched}`] : []),
+  ];
+  if (parts.length === 0) return 'Importar';
+  if (created === 0) return `Conferir ${matched}`;
+  return `Importar ${parts.join(' e ')}`;
+}
+
+const accountGroups = [
+  { value: 'ALL', label: 'Todos' },
+  { value: 'NEW', label: 'Novos' },
+  { value: 'MATCHED', label: 'Lançados' },
+  { value: 'OUT', label: 'Fora' },
+] as const;
+
 /** "2026-08 a 2026-09" of a previous import overlaps what is about to be imported. */
 function overlapsPrevious(imports: Import[], rows: ReviewRow[]) {
   const periods = rows.filter((row) => row.included && row.period).map((row) => row.period ?? '');
@@ -87,6 +116,7 @@ function RowItem({
   onToggle,
   onCategory,
   onEdit,
+  onRefuse,
 }: {
   row: ReviewRow;
   /** The app's category the row goes to, or null while there is none. */
@@ -97,11 +127,16 @@ function RowItem({
   onToggle: (included: boolean) => void;
   onCategory: (categoryId: string) => void;
   onEdit: (trigger: HTMLButtonElement) => void;
+  /** An account statement's movement (ADR 0061): not the transaction it matched, or it after all. */
+  onRefuse: (refused: boolean) => void;
 }) {
   const label = row.description || `Linha ${row.line}`;
+  // A movement already in the app creates nothing: what it matched is said instead (ADR 0061).
+  const matched = takesMatch(row);
   // A statement's line without a category picks it right on the card, as most lines of a first
   // statement have none yet (ADR 0055 note).
-  const picksCategory = Boolean(row.statementTitle) && !categoryName && row.type !== null;
+  const picksCategory =
+    Boolean(row.statementTitle) && !categoryName && row.type !== null && !matched;
   // A statement's line unchecked by a rule says only why; checking it shows what it lacks.
   const shown = row.statementTitle && !row.included ? [] : problems;
   const visibleProblems = picksCategory
@@ -125,6 +160,24 @@ function RowItem({
         />
       </label>
       <div className="grid min-w-0 flex-1 gap-1">
+        {row.externalId && row.included && (
+          <Badge
+            variant="outline"
+            className={cn(
+              'justify-self-start',
+              matched && row.match.sameAmount && 'border-transparent bg-success-muted',
+              matched && !row.match.sameAmount && 'border-transparent bg-warning-muted',
+            )}
+          >
+            {!matched
+              ? 'Novo'
+              : !row.match.sameAmount
+                ? 'Valor diferente'
+                : row.match.pending
+                  ? 'Quita um pendente'
+                  : 'Já lançado'}
+          </Badge>
+        )}
         <p className="font-medium break-words">{label}</p>
         {/* The bank's text, to check against the statement (ADR 0055 note). */}
         {row.statementTitle && row.statementTitle !== row.description && (
@@ -132,33 +185,67 @@ function RowItem({
             No extrato: {row.statementTitle}
           </p>
         )}
-        <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
-          <span>
-            {categoryName ??
-              (row.statementTitle
-                ? 'Sem categoria'
-                : `${row.categoryName || 'Sem categoria'} (sem correspondência)`)}
-          </span>
-          {row.merchantName && <span>{row.merchantName}</span>}
-          {row.personName && row.type && (
+        {row.match && row.included && (
+          <p className="text-muted-foreground text-sm">
+            {row.matchRefused && row.match.sameAmount
+              ? `Não é "${row.match.description}": entra como um lançamento novo.`
+              : matchText(row as ReviewRow & { match: AccountMatch })}
+          </p>
+        )}
+        {row.match && row.included && !row.match.sameAmount && (
+          // The choice stays on the card (ADR 0061): the same transaction, or another one.
+          <RadioGroup
+            aria-label={`O que é ${label}`}
+            value={row.matchRefused ? 'NEW' : 'MATCH'}
+            onValueChange={(value) => onRefuse(value === 'NEW')}
+            className="mt-1 gap-1"
+          >
+            {[
+              {
+                value: 'MATCH',
+                text: `É este: fica com o valor do banco, ${formatCents(row.amountCents ?? 0)}`,
+              },
+              { value: 'NEW', text: 'É outro: importar como lançamento novo' },
+            ].map((option) => (
+              <label
+                key={option.value}
+                className="flex min-h-11 cursor-pointer items-center gap-2 text-sm md:min-h-8"
+              >
+                <RadioGroupItem value={option.value} />
+                {option.text}
+              </label>
+            ))}
+          </RadioGroup>
+        )}
+        {!matched && !(row.externalId && row.skipped && !row.included) && (
+          <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
             <span>
-              {row.type === 'CREDIT' ? 'A receber de' : 'A pagar para'} {row.personName}
+              {categoryName ??
+                (row.statementTitle
+                  ? 'Sem categoria'
+                  : `${row.categoryName || 'Sem categoria'} (sem correspondência)`)}
             </span>
-          )}
-          {row.paymentMethod && <span>{paymentMethodLabels[row.paymentMethod]}</span>}
-          {row.occurredOn && (
+            {row.merchantName && <span>{row.merchantName}</span>}
+            {row.personName && row.type && (
+              <span>
+                {row.type === 'CREDIT' ? 'A receber de' : 'A pagar para'} {row.personName}
+              </span>
+            )}
+            {row.paymentMethod && <span>{paymentMethodLabels[row.paymentMethod]}</span>}
+            {row.occurredOn && !(row.externalId && row.occurredOn === row.settledAt) && (
+              <span>
+                {row.type ? occurredOnRowLabels[row.type] : 'Em'} {formatIsoDate(row.occurredOn)}
+              </span>
+            )}
+            {row.dueDate && <span>Vence em {formatIsoDate(row.dueDate)}</span>}
             <span>
-              {row.type ? occurredOnRowLabels[row.type] : 'Em'} {formatIsoDate(row.occurredOn)}
+              {row.settledAt
+                ? `${row.type ? settledLabels[row.type] : 'Pago ou recebido'} em ${formatIsoDate(row.settledAt)}`
+                : PENDING_LABEL}
             </span>
-          )}
-          {row.dueDate && <span>Vence em {formatIsoDate(row.dueDate)}</span>}
-          <span>
-            {row.settledAt
-              ? `${row.type ? settledLabels[row.type] : 'Pago ou recebido'} em ${formatIsoDate(row.settledAt)}`
-              : PENDING_LABEL}
-          </span>
-          <span>Linha {row.line}</span>
-        </p>
+            <span>Linha {row.line}</span>
+          </p>
+        )}
         {picksCategory && row.included && (
           <div className="mt-1 grid max-w-xs gap-1">
             <FormField id={`import-row-${row.line}-category`} label={`Categoria de ${label}`}>
@@ -169,6 +256,7 @@ function RowItem({
         {/* Optional: a hint, not a problem (ADR 0055 note), once what is required is there. */}
         {row.statementTitle &&
           row.included &&
+          !matched &&
           categoryName &&
           !row.merchantName &&
           row.type === 'DEBIT' && (
@@ -195,14 +283,27 @@ function RowItem({
         <span className="text-base font-semibold tabular-nums">
           {row.amountCents && row.amountCents > 0 ? formatCents(row.amountCents) : 'Sem valor'}
         </span>
-        <Button
-          variant={blocked ? 'secondary' : 'ghost'}
-          size="sm"
-          aria-label={`${blocked ? 'Corrigir' : 'Editar'} ${label}`}
-          onClick={(event) => onEdit(event.currentTarget)}
-        >
-          {blocked ? 'Corrigir' : 'Editar'}
-        </Button>
+        {row.match && row.match.sameAmount && row.included ? (
+          // "Não é este" turns it into a new transaction; "É este" takes it back (ADR 0061).
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`${row.matchRefused ? 'É este' : 'Não é este'}: ${label}`}
+            onClick={() => onRefuse(!row.matchRefused)}
+          >
+            {row.matchRefused ? 'É este' : 'Não é este'}
+          </Button>
+        ) : null}
+        {!matched && (
+          <Button
+            variant={blocked ? 'secondary' : 'ghost'}
+            size="sm"
+            aria-label={`${blocked ? 'Corrigir' : 'Editar'} ${label}`}
+            onClick={(event) => onEdit(event.currentTarget)}
+          >
+            {blocked ? 'Corrigir' : 'Editar'}
+          </Button>
+        )}
       </div>
     </li>
   );
@@ -221,6 +322,7 @@ export function ImportReview({
   merchants,
   previousImports,
   statement,
+  account,
   source,
   defaultLabel,
   onChooseAnother,
@@ -234,6 +336,11 @@ export function ImportReview({
   previousImports: Import[];
   /** A card statement (ADR 0055): its month and due date, and what the review found. */
   statement?: StatementReviewProps;
+  /**
+   * An account statement (ADR 0061): its movements compared with what is in the app, how many
+   * were imported before (left out), and what to warn about.
+   */
+  account?: { knownCount: number; notices: string[] };
   /** What it imports and from which bank (ADR 0060), recorded with the import. */
   source: { kind: ImportKind; bank: StatementBank | null };
   /** The "Origem" it starts with ("Fatura Nubank", "Planilha modelo"). */
@@ -260,20 +367,23 @@ export function ImportReview({
   const ready = readyImport(rows, categories, matches);
   const readyCount = ready.transactions.length + ready.plans.length;
   // Optional, but worth a word before importing (ADR 0055 note).
-  const withoutMerchant = statement
-    ? rows.filter(
-        (row) =>
-          row.included &&
-          row.type === 'DEBIT' &&
-          !row.merchantName.trim() &&
-          rowProblems(row, resolveCategory(row, categories, matches)).length === 0,
-      ).length
-    : 0;
+  const withoutMerchant =
+    statement || account
+      ? rows.filter(
+          (row) =>
+            row.included &&
+            !takesMatch(row) &&
+            row.type === 'DEBIT' &&
+            !row.merchantName.trim() &&
+            rowProblems(row, resolveCategory(row, categories, matches)).length === 0,
+        ).length
+      : 0;
   const unmatched = unmatchedCategories(rows, categories).filter(
     (entry) => !matches.has(entry.key),
   );
   // A statement may be imported again on purpose: what is already in comes unchecked instead.
-  const overlapping = statement ? [] : overlapsPrevious(previousImports, rows);
+  // An account statement knows what came by the bank's identifiers (ADR 0061).
+  const overlapping = statement || account ? [] : overlapsPrevious(previousImports, rows);
   const nameOf = (id: string | null) => {
     // One to create on import says so.
     const added = id && newCategoryName(id);
@@ -304,7 +414,16 @@ export function ImportReview({
   // Hides rows from the view only: nothing leaves the import because of it.
   const [onlyProblems, setOnlyProblems] = useState(false);
   const filtering = onlyProblems && withProblems.length > 0;
-  const visible = filtering ? withProblems : rows;
+  // An account statement's review shows one group at a time, if asked (ADR 0061).
+  const [group, setGroup] = useState<AccountGroup | 'ALL'>('ALL');
+  const visible = account
+    ? group === 'ALL'
+      ? rows
+      : rows.filter((row) => accountGroup(row) === group)
+    : filtering
+      ? withProblems
+      : rows;
+  const found = account ? accountSummary(rows) : null;
 
   const update = (line: number, change: (row: ReviewRow) => ReviewRow) =>
     setRows((current) => current.map((row) => (row.line === line ? change(row) : row)));
@@ -332,6 +451,7 @@ export function ImportReview({
         transactions: ready.transactions.map(real),
         ...(ready.plans.length > 0 && { plans: ready.plans.map(real) }),
         ...(ready.aliases.length > 0 && { aliases: ready.aliases }),
+        ...(ready.matches.length > 0 && { matches: ready.matches }),
         label,
         kind: source.kind,
         bank: source.bank,
@@ -340,7 +460,9 @@ export function ImportReview({
       {
         onSuccess: (created) => {
           toast.success(
-            `${created.transactionCount} ${created.transactionCount === 1 ? 'lançamento importado' : 'lançamentos importados'}`,
+            account
+              ? importedSummary(created.transactionCount, created.reconciledCount)
+              : `${created.transactionCount} ${created.transactionCount === 1 ? 'lançamento importado' : 'lançamentos importados'}`,
           );
           onImported(created.firstPeriod);
         },
@@ -375,16 +497,20 @@ export function ImportReview({
     ...(marked === 0 ? ['Marque ao menos uma linha.'] : []),
   ];
   const stats: [string, string, string?][] = [
-    ['Prontas', `${readyCount} de ${rows.length}`],
-    ['Saídas', formatCents(debits)],
+    account
+      ? ['Já no app', String(ready.matches.length)]
+      : ['Prontas', `${readyCount} de ${rows.length}`],
+    [account ? 'Saídas novas' : 'Saídas', formatCents(debits)],
     [
-      'Entradas',
+      account ? 'Entradas novas' : 'Entradas',
       credits > 0 ? `+ ${formatCents(credits)}` : formatCents(0),
       credits > 0 ? 'text-credit-foreground' : undefined,
     ],
-    statement
-      ? ['Parcelamentos novos', String(ready.plans.length)]
-      : ['Com problema', String(withProblems.length)],
+    account
+      ? ['Novos', String(ready.transactions.length)]
+      : statement
+        ? ['Parcelamentos novos', String(ready.plans.length)]
+        : ['Com problema', String(withProblems.length)],
   ];
 
   return (
@@ -460,7 +586,48 @@ export function ImportReview({
 
       {statement && !statement.baseRows && <p role="status">Atualizando a revisão…</p>}
       {/* What could count twice or stay out, in the warning colors: never behind an "ⓘ". */}
-      {statement?.notices.map((notice) => (
+      {account && found && (
+        <SectionCard
+          title="Conferência"
+          help="Antes de importar, o app compara cada movimento com o que já está lançado. O que já está no app não entra de novo: um pendente é quitado no dia do movimento. O que não existe vira um lançamento novo."
+        >
+          <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+            {(
+              [
+                ['Já lançados no app', found.matched],
+                ...(found.settling > 0
+                  ? [
+                      [
+                        `${found.settling === 1 ? 'Um deles está pendente e será quitado' : `${found.settling} deles estão pendentes e serão quitados`}`,
+                        null,
+                      ] as const,
+                    ]
+                  : []),
+                ...(found.different > 0
+                  ? [['Valor diferente, para você decidir', found.different] as const]
+                  : []),
+                ['Novos', found.fresh],
+                ['Fora, com o motivo', found.out],
+              ] as const
+            ).map(([term, count]) => (
+              <div key={term} className="contents">
+                <dt className={count === null ? 'text-muted-foreground pl-3 text-sm' : undefined}>
+                  {term}
+                </dt>
+                <dd className="text-right font-semibold tabular-nums">{count ?? ''}</dd>
+              </div>
+            ))}
+          </dl>
+          {account.knownCount > 0 && (
+            <p className="text-muted-foreground text-sm">
+              {account.knownCount === 1
+                ? 'Mais 1 movimento já importado antes, que fica de fora.'
+                : `Mais ${account.knownCount} movimentos já importados antes, que ficam de fora.`}
+            </p>
+          )}
+        </SectionCard>
+      )}
+      {[...(statement?.notices ?? []), ...(account?.notices ?? [])].map((notice) => (
         <p key={notice} role="note" className={NOTICE_CLASS}>
           {notice}
         </p>
@@ -526,16 +693,25 @@ export function ImportReview({
       )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        {withProblems.length > 0 && (
+        {account ? (
           <SegmentedControl
             label="Mostrar"
-            options={[
-              { value: 'all', label: 'Todas' },
-              { value: 'problems', label: 'Com problemas' },
-            ]}
-            value={onlyProblems ? 'problems' : 'all'}
-            onChange={(value) => setOnlyProblems(value === 'problems')}
+            options={accountGroups}
+            value={group}
+            onChange={setGroup}
           />
+        ) : (
+          withProblems.length > 0 && (
+            <SegmentedControl
+              label="Mostrar"
+              options={[
+                { value: 'all', label: 'Todas' },
+                { value: 'problems', label: 'Com problemas' },
+              ]}
+              value={onlyProblems ? 'problems' : 'all'}
+              onChange={(value) => setOnlyProblems(value === 'problems')}
+            />
+          )
         )}
         <div className="flex items-center">
           {/* A 44px target on the phone, like each row's box (ADR 0036). */}
@@ -562,6 +738,14 @@ export function ImportReview({
               Marca as linhas à vista, menos as que o app desmarcou por um motivo, como o pagamento
               da fatura ou uma compra já lançada: essas você marca uma a uma. Desmarcar todas
               desmarca qualquer linha.
+            </InfoTip>
+          )}
+          {account && (
+            <InfoTip term="Marcar todas">
+              Marca os movimentos à vista, menos os que o app desmarcou por um motivo, como o
+              pagamento da fatura ou uma caixinha: esses você marca um a um. Desmarcar todas
+              desmarca qualquer movimento. Desmarcar um já lançado quer dizer não conferir: nada é
+              criado nem quitado.
             </InfoTip>
           )}
         </div>
@@ -606,6 +790,9 @@ export function ImportReview({
                       triggerRef.current = trigger;
                       setEditing(row.line);
                     }}
+                    onRefuse={(matchRefused) =>
+                      update(row.line, (current) => ({ ...current, matchRefused, touched: true }))
+                    }
                   />
                 );
               })}
@@ -654,7 +841,7 @@ export function ImportReview({
           wide
           onClick={() => void submit()}
           disabled={
-            readyCount === 0 ||
+            readyCount + ready.matches.length === 0 ||
             missingDueDate ||
             (Boolean(statement) && !statement?.baseRows) ||
             category.isPending ||
@@ -663,11 +850,13 @@ export function ImportReview({
         >
           {category.isPending || create.isPending
             ? 'Importando…'
-            : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
-                ready.plans.length > 0
-                  ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`
-                  : ''
-              }`}
+            : account
+              ? accountButton(ready.transactions.length, ready.matches.length)
+              : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
+                  ready.plans.length > 0
+                    ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`
+                    : ''
+                }`}
         </PageActionButton>
       </div>
 
@@ -675,7 +864,7 @@ export function ImportReview({
         open={Boolean(editingRow)}
         onOpenChange={(open) => !open && setEditing(null)}
         returnFocusTo={triggerRef}
-        title={`Linha ${editingRow?.line ?? ''} da ${statement ? 'fatura' : 'planilha'}`}
+        title={`Linha ${editingRow?.line ?? ''} ${account ? 'do extrato' : statement ? 'da fatura' : 'da planilha'}`}
         description="A mudança vale só para esta importação; o arquivo não muda."
       >
         {editingRow && (

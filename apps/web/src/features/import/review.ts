@@ -4,6 +4,7 @@ import {
   normalizeName,
   type Category,
   type ImportInstallmentPlanInput,
+  type ImportMatchInput,
   type ImportMerchantAliasInput,
   type ImportTransactionInput,
   type PaymentMethod,
@@ -56,7 +57,30 @@ export type ReviewRow = {
   /** A statement's line the app unchecked for a reason (the bill payment, one already in):
    * "Marcar todas" leaves it out, so it is only checked on purpose, one by one. */
   skipped?: boolean;
+  /** An account statement's movement (ADR 0061): the bank's identifier, with the bank. */
+  externalId?: string;
+  /** The transaction already in the app the movement seems to be (ADR 0061). */
+  match?: AccountMatch;
+  /** "Não é este" / "É outro": the movement comes in as a new transaction after all. */
+  matchRefused?: boolean;
 };
+
+/** A transaction already in the app that an account statement's movement is (ADR 0061). */
+export type AccountMatch = {
+  transactionId: string;
+  description: string;
+  /** Pending: importing settles it on the movement's day. Settled: only linked. */
+  pending: boolean;
+  /** Its due date while pending, its settlement day once settled. */
+  date: string | null;
+  amountCents: number;
+  /** False: "Valor diferente", the bank's amount replaces the app's if confirmed. */
+  sameAmount: boolean;
+};
+
+/** A movement taken as the transaction it matched, not as a new one. */
+export const takesMatch = (row: ReviewRow): row is ReviewRow & { match: AccountMatch } =>
+  Boolean(row.match) && !row.matchRefused;
 
 /**
  * A category still to create (`newCategoryValue`) is checked as if it existed: it becomes a
@@ -213,6 +237,8 @@ export function toPlan(
 
 /** What still keeps a row out of the import: a transaction's problems, or a plan's. */
 export function rowProblems(row: ReviewRow, categoryId: string | null): string[] {
+  // A movement already in the app creates nothing: it needs no category (ADR 0061).
+  if (takesMatch(row)) return [];
   const result = row.plan ? toPlan(row, categoryId) : toTransaction(row, categoryId);
   return result.ok ? [] : result.problems;
 }
@@ -222,6 +248,8 @@ export type ReadyImport = {
   transactions: ImportTransactionInput[];
   plans: ImportInstallmentPlanInput[];
   aliases: ImportMerchantAliasInput[];
+  /** An account statement's movements already in the app (ADR 0061). */
+  matches: ImportMatchInput[];
 };
 
 /** The checked rows that are ready, as the API takes them, with the aliases to remember. */
@@ -230,9 +258,21 @@ export function readyImport(
   categories: Category[],
   matches: ReadonlyMap<string, string>,
 ): ReadyImport {
-  const ready: ReadyImport = { transactions: [], plans: [], aliases: [] };
+  const ready: ReadyImport = { transactions: [], plans: [], aliases: [], matches: [] };
   for (const row of rows) {
     if (!row.included) continue;
+    if (takesMatch(row)) {
+      // Settled (or linked) on the movement's day, with the bank's amount when it differs.
+      if (row.externalId && row.occurredOn) {
+        ready.matches.push({
+          transactionId: row.match.transactionId,
+          externalId: row.externalId,
+          settledAt: row.occurredOn,
+          ...(!row.match.sameAmount && row.amountCents && { amountCents: row.amountCents }),
+        });
+      }
+      continue;
+    }
     const categoryId = resolveCategory(row, categories, matches);
     if (row.plan) {
       const result = toPlan(row, categoryId);
@@ -241,7 +281,9 @@ export function readyImport(
     } else {
       const result = toTransaction(row, categoryId);
       if (!result.ok) continue;
-      ready.transactions.push(result.transaction);
+      ready.transactions.push(
+        row.externalId ? { ...result.transaction, externalId: row.externalId } : result.transaction,
+      );
     }
     const alias = row.rememberAlias?.trim();
     const merchantName = row.merchantName.trim();
