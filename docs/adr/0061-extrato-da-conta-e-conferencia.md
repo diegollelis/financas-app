@@ -148,3 +148,7 @@ A entrada de uma pessoa que tem um empréstimo pendente vinha desmarcada, com a 
   - Se o empréstimo tinha saído, ele é criado de novo como era, com o mesmo id.
   - "Remover do histórico" mantém tudo como ficou.
 - **Limite de tempo:** a importação roda numa transação interativa. O limite padrão do Prisma, 5 segundos, é curto para 2.000 lançamentos num banco remoto, e a importação ganhou 60 segundos.
+- **Correção (2026-10-25):**
+  - **O problema:** a revisão olhava só o primeiro empréstimo da pessoa. Quando ele era a parte de uma divisão (um empréstimo feito com "Emprestado para", que não aceita parte), o movimento ficava desmarcado, mesmo com outro empréstimo da mesma pessoa que aceitava.
+  - **A correção:** a revisão procura entre todos os empréstimos da pessoa e usa, entre os que aceitam parte e comportam o valor, o que tem mais a receber.
+  - **Quando nenhum serve:** o movimento continua desmarcado, e o aviso mostra quanto falta somando todos os empréstimos da pessoa. O aviso só sugere "Recebimento parcial" se algum deles aceita parte.
