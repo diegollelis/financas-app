@@ -767,8 +767,11 @@ describe('ImportPage', () => {
       await userEvent.click(await screen.findByRole('option', { name: 'Moradia' }));
       // Ready without a merchant: only a quiet mark. The due date is still missing.
       expect(unknown).toHaveTextContent('Sem estabelecimento');
-      expect(screen.getByRole('button', { name: 'Importar 2 lançamentos' })).toBeDisabled();
-      // Why "Importar" is off, beside it.
+      // What is missing, on the button itself, which goes there (ADR 0060 note).
+      const missing = screen.getByRole('button', { name: 'Informe o vencimento da fatura' });
+      expect(missing).toBeEnabled();
+      await userEvent.click(missing);
+      expect(await dueDateField()).toHaveFocus();
       expect(screen.getByText('Antes de importar:').parentElement).toHaveTextContent(
         'Informe o vencimento da fatura.',
       );

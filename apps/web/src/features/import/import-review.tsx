@@ -560,6 +560,22 @@ export function ImportReview({
       }),
     );
   };
+  // What keeps the import from going, said on the button itself on the phone, where the list
+  // beside it is out of sight; tapping it goes there (ADR 0060 note).
+  const nothingReady = readyCount + ready.matches.length + ready.parts.length === 0;
+  const firstToFix = rows.find((row) => row.included && check(row).problems.length > 0);
+  const missing = missingDueDate
+    ? { label: 'Informe o vencimento da fatura', target: 'import-due-date' }
+    : marked === 0
+      ? { label: 'Marque ao menos uma linha', target: 'import-all' }
+      : nothingReady && firstToFix
+        ? { label: 'Complete as linhas marcadas', target: `import-row-${firstToFix.line}` }
+        : null;
+  const goTo = (id: string) => {
+    const target = document.getElementById(id);
+    target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    target?.focus({ preventScroll: true });
+  };
   // What keeps "Importar" off, together beside it.
   const blockers = [
     ...(missingDueDate ? ['Informe o vencimento da fatura.'] : []),
@@ -584,11 +600,10 @@ export function ImportReview({
 
   return (
     <div className="grid gap-6">
-      {/* The step's top: what is reviewed and "Cancelar". On the phone its first line stays in
-          sight under the app's header while the list scrolls; the steps scroll with the page. */}
-      {/* A direct child of the whole review: sticky holds only within its parent. */}
-      <div className="bg-background sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 -mx-4 flex items-center justify-between gap-3 border-b px-4 py-2 sm:-mx-6 sm:px-6 md:static md:mx-0 md:items-start md:border-0 md:p-0">
-        <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight md:text-2xl md:whitespace-normal">
+      {/* The step's top: what is reviewed and "Cancelar", scrolling with the page (a band fixed on
+          the phone took room from the list for a rare action; leaving by mistake asks anyway). */}
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-balance">
           {heading.title}
         </h1>
         <Button ref={cancelRef} variant="outline" size="sm" onClick={cancel}>
@@ -919,10 +934,10 @@ export function ImportReview({
         {/* Fixed above the tab bar on the phone, within reach of the thumb (ADR 0036). */}
         <PageActionButton
           wide
-          onClick={() => void submit()}
+          variant={missing ? 'secondary' : 'default'}
+          onClick={() => (missing ? goTo(missing.target) : void submit())}
           disabled={
-            readyCount + ready.matches.length + ready.parts.length === 0 ||
-            missingDueDate ||
+            (nothingReady && !missing) ||
             (Boolean(statement) && !statement?.baseRows) ||
             category.isPending ||
             create.isPending
@@ -930,15 +945,20 @@ export function ImportReview({
         >
           {category.isPending || create.isPending
             ? 'Importando…'
-            : account
-              ? accountButton(ready.transactions.length, ready.matches.length + ready.parts.length)
-              : readyCount === 0 && ready.matches.length > 0
-                ? `Conferir ${ready.matches.length}`
-                : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
-                    ready.plans.length > 0
-                      ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`
-                      : ''
-                  }${ready.matches.length > 0 ? ` e conferir ${ready.matches.length}` : ''}`}
+            : missing
+              ? missing.label
+              : account
+                ? accountButton(
+                    ready.transactions.length,
+                    ready.matches.length + ready.parts.length,
+                  )
+                : readyCount === 0 && ready.matches.length > 0
+                  ? `Conferir ${ready.matches.length}`
+                  : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
+                      ready.plans.length > 0
+                        ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`
+                        : ''
+                    }${ready.matches.length > 0 ? ` e conferir ${ready.matches.length}` : ''}`}
         </PageActionButton>
       </div>
 
