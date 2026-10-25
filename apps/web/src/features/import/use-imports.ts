@@ -1,4 +1,10 @@
-import { importListResponseSchema, importSchema, type CreateImportInput } from '@financas/shared';
+import {
+  importCandidatesResponseSchema,
+  importListResponseSchema,
+  importSchema,
+  type CreateImportInput,
+  type ImportCandidatesInput,
+} from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiDelete, apiGet, apiPost } from '@/lib/api';
 import { useInvalidateTransactions } from '@/features/transactions/use-transactions';
@@ -12,6 +18,25 @@ export function useImports(workspaceId: string) {
   return useQuery({
     queryKey: importsKey(workspaceId),
     queryFn: () => apiGet(`/api/workspaces/${workspaceId}/imports`, importListResponseSchema),
+  });
+}
+
+/**
+ * What an account statement may already be in the app (ADR 0061): read once per file, fresh each
+ * time a statement is opened (it also creates the recurrences' months of its range).
+ */
+export function useImportCandidates(workspaceId: string, input: ImportCandidatesInput | null) {
+  return useQuery({
+    queryKey: [...importsKey(workspaceId), 'candidates', input],
+    queryFn: () =>
+      apiPost(
+        `/api/workspaces/${workspaceId}/imports/candidates`,
+        input,
+        importCandidatesResponseSchema,
+      ),
+    enabled: input !== null,
+    gcTime: 0,
+    staleTime: Infinity,
   });
 }
 
