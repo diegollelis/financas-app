@@ -764,6 +764,40 @@ describe('imports', () => {
       );
     });
 
+    it('matches a card purchase already in the app: its due date and day, nothing settled (ADR 0061 note)', async () => {
+      const { browser, base, energy, transactionsOf } = await withLaunched();
+
+      const created = importSchema.parse(
+        (
+          await browser
+            .post(`${base}/imports`)
+            .send({
+              kind: 'CARD_STATEMENT',
+              bank: 'NUBANK',
+              statementDueDate: '2026-11-04',
+              transactions: [],
+              matches: [
+                {
+                  transactionId: energy.id,
+                  dueDate: '2026-11-04',
+                  occurredOn: '2026-10-20',
+                  amountCents: 22_340,
+                },
+              ],
+            })
+            .expect(201)
+        ).body,
+      );
+
+      expect(created).toMatchObject({ transactionCount: 0, reconciledCount: 1 });
+      expect((await transactionsOf('2026-10')).find((tx) => tx.id === energy.id)).toMatchObject({
+        settledAt: null,
+        dueDate: '2026-11-04',
+        occurredOn: '2026-10-20',
+        amountCents: 22_340,
+      });
+    });
+
     describe('a part of a loan (ADR 0061 note)', () => {
       async function withLoan() {
         const user = await withLaunched();

@@ -218,7 +218,7 @@ describe('startStatementReview', () => {
     expect(refund?.warnings[0]).toMatch(/^Valor negativo na fatura: entra como entrada/);
   });
 
-  it("leaves out a purchase already in the statement's month, and the month of a recurrence", () => {
+  it("matches a purchase already in the statement's month, and the month of a recurrence (ADR 0061 note)", () => {
     const rows = startStatementReview(
       lines('2026-10-03,Ifd*Pizzaria Exemplo,"86,50"', '2026-10-20,Netflix.Com,"56,90"'),
       context({
@@ -247,16 +247,60 @@ describe('startStatementReview', () => {
       }),
     );
 
+    // The same purchase: already in the app, it creates nothing.
     expect(rows[0]).toMatchObject({
-      included: false,
-      warnings: [
-        'Possivelmente já importada: outubro de 2026 já tem esta compra, no mesmo dia e valor.',
-      ],
+      included: true,
+      match: { transactionId: id(61), sameAmount: true, card: true },
     });
-    expect(rows[1]?.included).toBe(false);
-    expect(plain(rows[1]?.warnings)).toEqual([
-      'Já lançada pela recorrência "Netflix" (R$ 55,90 na recorrência; a fatura diz R$ 56,90). Para o valor real, edite o lançamento da recorrência.',
+    // This month's Netflix, with another amount: "Valor diferente", never September's.
+    expect(rows[1]).toMatchObject({
+      included: true,
+      match: { transactionId: id(62), sameAmount: false, card: true, recurring: true },
+    });
+
+    // Importing gives each one the bill's due date and the purchase's day; the bill's amount
+    // where it differs. Nothing is settled.
+    const ready = readyImport(
+      rows.map((row) => ({ ...row, dueDate: '2026-11-04' })),
+      [],
+      new Map(),
+    );
+    expect(ready.matches).toEqual([
+      { transactionId: id(61), dueDate: '2026-11-04', occurredOn: '2026-10-03' },
+      {
+        transactionId: id(62),
+        dueDate: '2026-11-04',
+        occurredOn: '2026-10-20',
+        amountCents: 5_690,
+      },
     ]);
+    expect(ready.transactions).toEqual([]);
+  });
+
+  it('turns a match into a new purchase with "Não é este", and never takes one twice', () => {
+    const rows = startStatementReview(
+      lines('2026-10-03,Ifd*Pizzaria Exemplo,"86,50"', '2026-10-04,Ifd*Pizzaria Exemplo,"86,50"'),
+      context({
+        transactions: [
+          transaction(1, {
+            description: 'Pizzaria Exemplo',
+            merchantId: pizzaria.id,
+            amountCents: 8_650,
+          }),
+        ],
+      }),
+    );
+
+    expect(rows.map((row) => row.match?.transactionId ?? null)).toEqual([id(61), null]);
+    const refused = {
+      ...rows[0]!,
+      matchRefused: true,
+      categoryId: compras.id,
+      dueDate: '2026-11-04',
+    };
+    const ready = readyImport([refused], [], new Map());
+    expect(ready.matches).toEqual([]);
+    expect(ready.transactions).toHaveLength(1);
   });
 
   it('sends a plan, a transaction and the alias learned, as the import takes them', () => {

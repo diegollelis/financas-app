@@ -168,7 +168,8 @@ function RowItem({
         />
       </label>
       <div className="grid min-w-0 flex-1 gap-1">
-        {row.externalId && row.included && (
+        {/* An account's movement always says what it is; a card's line, when already in the app. */}
+        {(row.externalId || row.match) && row.included && (
           <Badge
             variant="outline"
             className={cn(
@@ -190,7 +191,7 @@ function RowItem({
                   : 'Pagamento parcial'
                 : !row.match!.sameAmount
                   ? 'Valor diferente'
-                  : row.match!.pending
+                  : row.match!.pending && !row.match!.card
                     ? 'Quita um pendente'
                     : 'Já lançado'}
           </Badge>
@@ -491,7 +492,11 @@ export function ImportReview({
                   created.transactionCount - created.partCount,
                   created.reconciledCount + created.partCount,
                 )
-              : `${created.transactionCount} ${created.transactionCount === 1 ? 'lançamento importado' : 'lançamentos importados'}`,
+              : `${created.transactionCount} ${created.transactionCount === 1 ? 'lançamento importado' : 'lançamentos importados'}${
+                  created.reconciledCount > 0
+                    ? ` e ${created.reconciledCount} ${created.reconciledCount === 1 ? 'conferido' : 'conferidos'}`
+                    : ''
+                }`,
           );
           onImported(created.firstPeriod);
         },
@@ -528,7 +533,7 @@ export function ImportReview({
   const stats: [string, string, string?][] = [
     account
       ? ['Já no app', String(ready.matches.length + ready.parts.length)]
-      : ['Prontas', `${readyCount} de ${rows.length}`],
+      : ['Prontas', `${readyCount + ready.matches.length} de ${rows.length}`],
     [account ? 'Saídas novas' : 'Saídas', formatCents(debits)],
     [
       account ? 'Entradas novas' : 'Entradas',
@@ -884,11 +889,13 @@ export function ImportReview({
             ? 'Importando…'
             : account
               ? accountButton(ready.transactions.length, ready.matches.length + ready.parts.length)
-              : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
-                  ready.plans.length > 0
-                    ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`
-                    : ''
-                }`}
+              : readyCount === 0 && ready.matches.length > 0
+                ? `Conferir ${ready.matches.length}`
+                : `Importar ${ready.transactions.length} ${ready.transactions.length === 1 ? 'lançamento' : 'lançamentos'}${
+                    ready.plans.length > 0
+                      ? ` e ${ready.plans.length} ${ready.plans.length === 1 ? 'parcelamento' : 'parcelamentos'}`
+                      : ''
+                  }${ready.matches.length > 0 ? ` e conferir ${ready.matches.length}` : ''}`}
         </PageActionButton>
       </div>
 
