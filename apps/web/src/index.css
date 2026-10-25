@@ -72,6 +72,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -105,6 +106,9 @@
   /* Brand blue. White text on it: 4.8:1. */
   --primary: #0066ff;
   --primary-foreground: #ffffff;
+  /* The primary under the mouse: a solid shade, never the primary made see-through, so the
+     text keeps its contrast (6.8:1 on white text; the primary itself, 4.8:1). */
+  --primary-hover: #0052cc;
   /* Derived: the step between Light and Border, a fill that shows on both. */
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
@@ -169,6 +173,8 @@
   /* Derived from #0066ff, lighter: the brand blue is too dark on navy. Navy text on it: 5.5:1. */
   --primary: #4d94ff;
   --primary-foreground: #0a1f3d;
+  /* Lighter in the dark theme, where the text is dark: 7.7:1 (the primary itself, 5.5:1). */
+  --primary-hover: #80b3ff;
   --secondary: #1f3b6d;
   --secondary-foreground: #f8fafc;
   --muted: #11284a;

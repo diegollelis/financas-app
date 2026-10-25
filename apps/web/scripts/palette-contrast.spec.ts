@@ -53,6 +53,8 @@ const textPairs: [string, string][] = [
   ['muted-foreground', 'card'],
   ['muted-foreground', 'muted'],
   ['primary-foreground', 'primary'],
+  // The primary button under the mouse.
+  ['primary-foreground', 'primary-hover'],
   ['primary', 'background'],
   ['primary', 'card'],
   ['secondary-foreground', 'secondary'],
@@ -128,6 +130,8 @@ const DERIVED: Record<string, string> = {
   '#fef3c7': '#f59e0b, light tint: warning fill',
   '#fee2e2': '#ef4444, light tint: debit fill',
   '#4d94ff': '#0066ff, lighter: primary on navy',
+  '#0052cc': '#0066ff, darker: the primary under the mouse, white text at 6.8:1',
+  '#80b3ff': '#4d94ff, lighter: the primary under the mouse on navy, dark text at 7.7:1',
   '#f87171': '#ef4444, lighter: 4.5:1 on the navy surface',
   '#0f3b2a': '#16a34a, dark tint: success and credit fill on navy',
   '#3a2a0c': '#f59e0b, dark tint: warning fill on navy',

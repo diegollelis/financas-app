@@ -8,7 +8,7 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground [a]:hover:bg-primary/80',
+        default: 'bg-primary text-primary-foreground [a]:hover:bg-primary-hover',
         secondary: 'bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80',
         // On its own registered fill, like success and warning: a translucent red took its
         // contrast from whatever was under it and fell short on a navy card (ADR 0036 note).
