@@ -36,6 +36,7 @@ import {
   useDeleteBudgetDestination,
   useUpdateBudgetDestination,
 } from './use-budget-destinations';
+import { useDialogDirty } from '@/components/dialog-dirty';
 
 const nameSchema = z.object({ name: budgetDestinationNameSchema });
 type NameInput = z.infer<typeof nameSchema>;
@@ -65,6 +66,8 @@ function NameForm({
     resolver: zodResolver(nameSchema),
     defaultValues: { name: initial },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const submit = ({ name }: NameInput) =>
     onSubmit(name).then(
       () => reset({ name: '' }),

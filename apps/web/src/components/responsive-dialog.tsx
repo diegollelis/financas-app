@@ -1,4 +1,14 @@
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +23,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { DialogDirtyContext } from '@/components/dialog-dirty';
 import { useKeyboardInset } from '@/lib/use-keyboard-inset';
 import { cn } from '@/lib/utils';
 import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
@@ -20,6 +31,9 @@ import { DESKTOP_QUERY, useMediaQuery } from '@/lib/use-media-query';
 /**
  * A form's container (ADR 0036): a sheet rising from the bottom on the phone, within reach of the
  * thumb, and a centered dialog from md. Both trap focus and give it back to the trigger on close.
+ * With something typed in a form inside (`useDialogDirty`), closing it by mistake (a tap outside,
+ * Esc, the ✕) asks "Descartar as alterações?" first; the form's own buttons (Cancelar, Salvar)
+ * close it through `open`, never asking.
  */
 export function ResponsiveDialog({
   open,
@@ -44,6 +58,38 @@ export function ResponsiveDialog({
   children: ReactNode;
 }) {
   const desktop = useMediaQuery(DESKTOP_QUERY);
+  // The forms inside with something typed; any of them makes closing by mistake ask first.
+  const [dirtyForms, setDirtyForms] = useState<ReadonlySet<string>>(new Set());
+  const report = useCallback((key: string, dirty: boolean) => {
+    setDirtyForms((current) => {
+      if (current.has(key) === dirty) return current;
+      const next = new Set(current);
+      if (dirty) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+  const [confirming, setConfirming] = useState(false);
+  const changeOpen = (next: boolean) => {
+    if (!next && dirtyForms.size > 0) setConfirming(true);
+    else onOpenChange(next);
+  };
+  const discardDialog = (
+    <AlertDialog open={confirming} onOpenChange={setConfirming}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Descartar as alterações?</AlertDialogTitle>
+          <AlertDialogDescription>O que você digitou aqui se perde.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => onOpenChange(false)}>
+            Descartar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
   const keyboard = useKeyboardInset();
   const sheetRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -72,43 +118,49 @@ export function ResponsiveDialog({
 
   if (desktop) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className={cn('max-h-[90svh] overflow-y-auto sm:max-w-lg', wide && 'lg:max-w-2xl')}
-          onCloseAutoFocus={onCloseAutoFocus}
-          onInteractOutside={onInteractOutside}
-        >
-          <DialogHeader>
-            {/* Room for the close button at the top right: a long title never runs under it. */}
-            <DialogTitle className="pr-8">{title}</DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
-          </DialogHeader>
-          {children}
-        </DialogContent>
-      </Dialog>
+      <DialogDirtyContext.Provider value={report}>
+        <Dialog open={open} onOpenChange={changeOpen}>
+          <DialogContent
+            className={cn('max-h-[90svh] overflow-y-auto sm:max-w-lg', wide && 'lg:max-w-2xl')}
+            onCloseAutoFocus={onCloseAutoFocus}
+            onInteractOutside={onInteractOutside}
+          >
+            <DialogHeader>
+              {/* Room for the close button at the top right: a long title never runs under it. */}
+              <DialogTitle className="pr-8">{title}</DialogTitle>
+              <DialogDescription>{description}</DialogDescription>
+            </DialogHeader>
+            {children}
+          </DialogContent>
+        </Dialog>
+        {discardDialog}
+      </DialogDirtyContext.Provider>
     );
   }
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        ref={sheetRef}
-        side="bottom"
-        onCloseAutoFocus={onCloseAutoFocus}
-        onInteractOutside={onInteractOutside}
-        className="max-h-[92svh] overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
-        // Above the keyboard, and no taller than what it leaves visible (see useKeyboardInset).
-        style={
-          keyboard.inset > 0
-            ? { bottom: keyboard.inset, maxHeight: keyboard.visibleHeight - 16 }
-            : undefined
-        }
-      >
-        <SheetHeader>
-          <SheetTitle className="pr-8">{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
-        </SheetHeader>
-        <div className="px-4 pb-4">{children}</div>
-      </SheetContent>
-    </Sheet>
+    <DialogDirtyContext.Provider value={report}>
+      <Sheet open={open} onOpenChange={changeOpen}>
+        <SheetContent
+          ref={sheetRef}
+          side="bottom"
+          onCloseAutoFocus={onCloseAutoFocus}
+          onInteractOutside={onInteractOutside}
+          className="max-h-[92svh] overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+          // Above the keyboard, and no taller than what it leaves visible (see useKeyboardInset).
+          style={
+            keyboard.inset > 0
+              ? { bottom: keyboard.inset, maxHeight: keyboard.visibleHeight - 16 }
+              : undefined
+          }
+        >
+          <SheetHeader>
+            <SheetTitle className="pr-8">{title}</SheetTitle>
+            <SheetDescription>{description}</SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-4">{children}</div>
+        </SheetContent>
+      </Sheet>
+      {discardDialog}
+    </DialogDirtyContext.Provider>
   );
 }

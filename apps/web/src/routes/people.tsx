@@ -22,6 +22,7 @@ import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { useDialogDirty } from '@/components/dialog-dirty';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -181,6 +182,8 @@ function NewPersonForm({ workspaceId, onDone }: { workspaceId: string; onDone: (
     resolver: zodResolver(nameSchema),
     defaultValues: { name: '' },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const submit = ({ name }: NameInput) =>
     create.mutate(
       { name },
@@ -431,6 +434,8 @@ function RenameDialog({
     resolver: zodResolver(nameSchema),
     defaultValues: { name: person.name },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const submit = ({ name }: NameInput) =>
     update.mutate(
       { id: person.id, name },

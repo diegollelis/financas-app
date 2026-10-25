@@ -17,6 +17,7 @@ import { FormField } from '@/components/form-field';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { useDialogDirty } from '@/components/dialog-dirty';
 import { SegmentedControl } from '@/components/segmented-control';
 import {
   AlertDialog,
@@ -87,6 +88,8 @@ function NewCategoryForm({ workspaceId, onDone }: { workspaceId: string; onDone:
     // Debit: most categories are of spending.
     defaultValues: { name: '', type: 'DEBIT' },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const submit = (input: CreateCategoryInput) =>
     create.mutate(input, {
       onSuccess: () => {
@@ -144,6 +147,8 @@ function RenameForm({
     resolver: zodResolver(nameSchema),
     defaultValues: { name: category.name },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const submit = ({ name }: NameInput) =>
     update.mutate(
       { id: category.id, name },

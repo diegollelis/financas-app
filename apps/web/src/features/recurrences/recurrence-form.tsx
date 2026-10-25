@@ -25,6 +25,7 @@ import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PersonSelect } from '@/features/people/person-picker';
 import { PaymentMethodSelect } from '@/features/transactions/payment-method-select';
 import { apiErrorMessage } from '@/lib/error-message';
+import { useDialogDirty } from '@/components/dialog-dirty';
 
 /** What can change in a recurrence: not its type nor its start (ADR 0038). */
 const recurrenceFormSchema = recurrenceFieldsSchema
@@ -138,6 +139,8 @@ export function RecurrenceForm({
       merchant: currentMerchant,
     },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const variable = useWatch({ control, name: 'amountKind' }) === 'VARIABLE';
   // Only categories of its type; an archived one only if it is already the current one.
   const options = categories.filter(

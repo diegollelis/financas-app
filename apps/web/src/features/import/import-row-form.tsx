@@ -27,6 +27,7 @@ import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PaymentMethodSelect } from '@/features/transactions/payment-method-select';
 import type { ReviewRow } from './review';
+import { useDialogDirty } from '@/components/dialog-dirty';
 
 /** Empty means none; anything else must be a real date. */
 const optionalDate = z
@@ -142,6 +143,8 @@ export function ImportRowForm({
         row.rememberAlias ?? (row.statementTitle ? withoutInstallment(row.statementTitle) : ''),
     },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const merchantName = useWatch({ control, name: 'merchant' });
   const remember = useWatch({ control, name: 'remember' });
   const alias = useWatch({ control, name: 'alias' });

@@ -268,3 +268,17 @@ O "○ Pagar" / "○ Receber" com contorno parecia um campo desabilitado e não 
 - **"Desfazer" no aviso:** um toque marca, então um toque desfaz. O aviso "Marcado como pago" traz a ação, que volta o lançamento a pendente ("Pagamento desmarcado"). O menu ⋯ continua com "Desmarcar pagamento".
 - **"Ver lançamentos" de Pessoas** passa a seguir Lançamentos: um cartão por lançamento, agrupado por competência (a mais recente primeiro), o valor com sinal, os mesmos selos e o mesmo botão de pagar e receber. Antes, cada linha tinha o mês por escrito e um "Marcar como recebido" por extenso.
 - **A escala de texto** fica escrita na skill do projeto (`.claude/skills/financas-ui/SKILL.md`), com o nível de cada título e número. O cartão "Orçamento do mês" usava números maiores (`text-xl`) que os outros cartões do painel e agora usa o mesmo `Figure` (`text-lg`); a diferença para a renda fica em texto suave, sem verde.
+
+## Nota (fechar sem querer um diálogo com formulário, 2026-10-25)
+
+Num diálogo com formulário, quem já tinha digitado algo e fechava sem querer perdia tudo, sem aviso. Isso acontecia ao tocar fora, apertar Esc ou tocar no ✕.
+
+- **Com algo digitado,** essas saídas perguntam antes: **"Descartar as alterações?"**, com "Descartar" (a ação destrutiva no estilo suave do app) e "Continuar editando". É o mesmo diálogo de confirmação da revisão da importação. "Continuar editando" volta ao formulário com tudo como estava.
+- **Sem nada digitado,** o diálogo fecha como antes. Depois de salvar, também fecha sem perguntar.
+- **O botão "Cancelar" do formulário fecha direto,** porque é uma escolha explícita.
+- **Como funciona:**
+  - a regra fica num lugar só, o `ResponsiveDialog`;
+  - cada formulário dentro dele avisa que algo foi digitado com `useDialogDirty(formState.isDirty)` (`components/dialog-dirty.ts`), o estado do React Hook Form;
+  - um diálogo com mais de um formulário (o orçamento e as metas) pergunta se qualquer um deles mudou;
+  - os botões do próprio formulário fecham pelo `open`, e por isso nunca perguntam.
+- **Onde vale:** os diálogos com formulário (lançamento, recebimento parcial, orçamento e metas, recorrência, parcelamento, categoria, estabelecimento e apelidos, pessoa, novo espaço, os da conta e a linha da importação). As confirmações curtas ficam como estão, porque não têm nada digitado.

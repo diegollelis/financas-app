@@ -46,6 +46,7 @@ import { firstNumberOf, installmentsPreview } from '@/features/installments/prev
 import { shareCents } from './split';
 import { PaymentMethodSelect } from './payment-method-select';
 import { SplitFields, type SplitFormFields } from './split-fields';
+import { useDialogDirty } from '@/components/dialog-dirty';
 
 /**
  * What the form edits: the shared rules for description and notes, plus the fields typed as
@@ -329,6 +330,8 @@ export function TransactionForm({
       shares: [],
     },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   // useWatch rather than watch(): the hook form is safe for the React Compiler.
   const type = useWatch({ control, name: 'type' });
   const repeat = useWatch({ control, name: 'repeat' });

@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
+import { useDialogDirty } from '@/components/dialog-dirty';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiErrorMessage } from '@/lib/error-message';
@@ -90,6 +91,8 @@ function PartForm({
     resolver: zodResolver(partSchema(pendingCents)),
     defaultValues: { amount: '', settledAt: todayIso() },
   });
+  // Closing the dialog by mistake with something typed asks first.
+  useDialogDirty(formState.isDirty);
   const typed = reaisInputSchema.safeParse(useWatch({ control, name: 'amount' }));
   const id = `settle-part-${transaction.id}`;
 
