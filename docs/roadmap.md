@@ -252,6 +252,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] DNS no Cloudflare, domínio no Pages e variáveis de produção
   - [x] E-mail com o domínio verificado no Resend
   - [x] Exigir a verificação de e-mail no cadastro
+- [ ] **Assistente de IA** (em avaliação, [docs/avaliacoes/assistente-de-ia.md](avaliacoes/assistente-de-ia.md)): perguntas sobre as finanças e lançamentos por texto, de preferência com o app como conector (MCP) da IA do próprio usuário, sem custo de IA para o app
 
 ## Fase 6 — Identidade visual
 

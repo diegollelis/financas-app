@@ -15,6 +15,7 @@ Finanças App: a multi-user, public web app for monthly personal finance. Users 
 - `docs/dominio/modelo.md` has the entities, rules and default categories. `glossario.md` maps each UI term to its name in the code (ADR 0051: the UI follows the market's terms, the code keeps its English names) and has the Protheus analogies. A new UI term goes there first.
 - `docs/roadmap.md` lists the phases as checklists. Tick items as they are completed.
 - `docs/deploy.md` is the production runbook (Neon, Resend, Render, then Cloudflare Pages).
+- `docs/avaliacoes/` holds evaluations of ideas not decided yet (e.g. `assistente-de-ia.md`, an AI assistant, preferably as an MCP connector of the user's own AI); a decision taken from one becomes an ADR.
 - `docs/backup.md` is the backup runbook (ADR 0035): `.github/workflows/backup.yml` is a reusable workflow called daily by the private repo `financas-backup`; it never runs on its own here.
 - **Front end** (ADR 0036): any change in `apps/web` follows the project skill `.claude/skills/financas-ui/SKILL.md` (mobile first, app shell, shadcn, tokens, states, accessibility, tests, review checklist). The official `frontend-design` plugin is enabled for the project in `.claude/settings.json`; the project skill is its brief and wins where they differ.
 
