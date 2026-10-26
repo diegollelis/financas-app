@@ -51,3 +51,14 @@ O [ADR 0007](0007-autenticacao-better-auth.md) escolheu o Better Auth. Para colo
 - **Pendência para a fase 4:** em produção, front (`*.pages.dev`) e API (`*.onrender.com`) ficam em _sites_ diferentes, e cookies `SameSite=Lax` não seriam enviados. Será preciso usar um domínio próprio (`app.` e `api.` do mesmo site) ou cookies `SameSite=None; Secure`. Revisar este ADR nesse momento. **Resolvido no [ADR 0033](0033-topologia-e-limites-do-deploy.md):** proxy `/api/*` numa Pages Function, front e API no mesmo site.
 - O rate limit embutido do Better Auth só fica ativo com `NODE_ENV=production` e guarda os contadores em memória. A configuração própria é o próximo item do roadmap.
 - `sessions` guarda IP e _user agent_, que são dados pessoais ([ADR 0012](0012-privacidade-lgpd.md)). Eles são apagados junto com o usuário (`ON DELETE CASCADE`).
+
+## Nota (um banco por worker, 2026-10-25)
+
+Com um arquivo de cada vez, os testes da API levavam quase 10 minutos (574 s), e a suíte inteira passava de 15. Agora os arquivos rodam em paralelo, cada um no banco do seu worker:
+
+- **Um banco por worker:** o `globalSetup` migra o `financas_test` e o copia uma vez por worker (`financas_test_1`, `_2`, …) com `CREATE DATABASE … TEMPLATE financas_test`. Copiar é mais rápido que migrar cada um. `test/test-env.ts` escolhe a cópia pelo `VITEST_POOL_ID`, e `test/worker-database.ts` aponta o `DATABASE_URL` do worker para ela. Cada teste continua limpando as tabelas do seu banco.
+- **Seis workers:** cada um abre um pool de até 10 conexões, e seis ficam abaixo das 100 do Postgres. Oito ganhavam pouco e chegavam perto do limite.
+- **`isolate: false`:** o worker reaproveita os módulos (o app do Nest, o cliente do Prisma) de um arquivo para o outro. Importá-los de novo em cada arquivo tomava metade do tempo.
+- **Grupo próprio** (`sequence.groupOrder: 1`): o Vitest exige um grupo separado para um projeto com `maxWorkers` próprio. A API roda depois do web e do shared, sem disputar o processador com o jsdom.
+
+A API caiu de 574 s para cerca de 140 s. O web segue em torno de 4 minutos e é limitado pelo processador: dividir o arquivo mais longo, `isolate: false`, `vmThreads`, menos workers e happy-dom não ganharam nada que valesse, e alguns quebraram testes.
