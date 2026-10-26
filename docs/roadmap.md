@@ -61,6 +61,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - **1.35.0** (2026-10-25): a revisão da importação vira uma etapa: título, o que está sendo revisado, "Arquivo → Revisão → Importado", "Cancelar" que pergunta antes de descartar escolhas, o topo preso ao rolar no celular e um aviso antes de sair com alterações (nota no [ADR 0060](adr/0060-extratos-do-banco.md)).
 - **1.35.1** (2026-10-25): no celular, o botão de importar diz o que falta ("Informe o vencimento da fatura") e leva até lá, o botão fixo desabilitado deixa de ser translúcido em todas as páginas, e o topo da revisão volta a rolar com a página (nota no [ADR 0060](adr/0060-extratos-do-banco.md)).
 - **1.36.0** (2026-10-25): fechar sem querer um diálogo com formulário (tocar fora, Esc, ✕) depois de digitar algo pergunta "Descartar as alterações?" antes de perder o que foi digitado; o "Cancelar" do próprio formulário fecha direto (nota no [ADR 0036](adr/0036-design-mobile-first.md)).
+- **1.36.1** (2026-10-25): o botão principal mantém o contraste com o mouse em cima: um azul sólido no lugar do mesmo azul transparente, que deixava o texto abaixo de 4,5:1 (nota no [ADR 0043](adr/0043-identidade-visual-codelelis.md)). Nos bastidores, os testes da API rodam em paralelo, cada worker com o seu banco, e a suíte caiu de cerca de 17 para 6 minutos (nota no [ADR 0020](adr/0020-integracao-better-auth-nestjs.md)).
 
 ## Fase 0 — Planejamento ✅
 
