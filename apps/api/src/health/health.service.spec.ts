@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import { HealthService } from './health.service.js';
 
@@ -12,6 +12,11 @@ describe('HealthService', () => {
   beforeEach(() => {
     queryRaw.mockReset();
     warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+  });
+
+  // The worker runs other files after this one (isolate: false): the logger must work there.
+  afterEach(() => {
+    warn.mockRestore();
   });
 
   it('reports ok when the database answers', async () => {

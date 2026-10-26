@@ -110,6 +110,7 @@ As cores oficiais são as da paleta aprovada, mais as de estado (sucesso `#22C55
 | `#B45309`                                      | `--warning` (claro)                          | `#F59E0B`, mais escuro                                           | alerta como texto (a oficial dá 2,1:1)                                                                          |
 | `#DCFCE7`, `#FEF3C7`, `#FEE2E2`                | `*-muted` (claro)                            | receitas, alertas e despesas, tons claros                        | fundos dos selos e avisos                                                                                       |
 | `#4D94FF`                                      | `--primary` (escuro)                         | `#0066FF`, mais claro                                            | o azul da marca fica escuro demais sobre o marinho                                                              |
+| `#0052CC`, `#80B3FF`                           | `--primary-hover` (claro, escuro)            | `#0066FF` mais escuro, `#4D94FF` mais claro                      | o botão principal sob o mouse; o primário com 80% de opacidade dava 3,5:1 e 4,0:1 (nota de 2026-10-25)          |
 | `#F87171`                                      | `--destructive`, `--debit` (escuro)          | `#EF4444`, mais claro                                            | a oficial dá 3,9:1 sobre o cartão marinho                                                                       |
 | `#0F3B2A`, `#3A2A0C`, `#3B1520`                | `*-muted` (escuro)                           | receitas, alertas e despesas, tons escuros                       | fundos sobre o marinho                                                                                          |
 | `#2A78D6`, `#EB6834`, `#1BAF7A` e os do escuro | `--chart-1..3`                               | a paleta validada do [ADR 0032](0032-graficos-sem-biblioteca.md) | revalidada a partir das cores oficiais no PR do Painel                                                          |
@@ -165,3 +166,12 @@ Uma versão da logo para tamanhos pequenos, com "FINANÇAS" proporcionalmente ma
 - **O tema escuro muda de cinza para marinho:** todas as telas precisam de captura nos dois temas antes do merge do PR de tokens.
 - **O nome muda nos e-mails:** o padrão de `MAIL_FROM_NAME` passou a ser "CodeLélis Finanças". O nome vai no remetente, e os assuntos ficaram curtos, sem ele (nota de 2026-10-10 no [ADR 0022](0022-envio-de-email.md)).
 - **A skill `financas-ui` passa a descrever a marca e essas regras.**
+
+## Nota (o botão principal sob o mouse, 2026-10-25)
+
+O botão principal escurecia sob o mouse ficando 80% opaco (`hover:bg-primary/80`). O fundo da página aparecia através dele e o texto perdia contraste: 3,5:1 no tema claro e 4,0:1 no escuro, abaixo dos 4,5:1. O axe achou o problema numa captura com o mouse em cima. Só quem usa mouse via; toque e teclado não passam por esse estado.
+
+- **O token `--primary-hover`** guarda uma cor sólida: `#0052CC` no claro, mais escura que o primário, e `#80B3FF` no escuro, mais clara, porque lá o texto é escuro. O contraste do texto sobe para 6,8:1 e 7,7:1.
+- **O botão e o selo principais** usam `hover:bg-primary-hover`.
+- **O teste da paleta** confere o par `--primary-foreground` sobre `--primary-hover` nos dois temas.
+- **A regra:** um estado de interação (mouse em cima, pressionado) muda para outra cor sólida registrada, nunca para a mesma cor transparente.
