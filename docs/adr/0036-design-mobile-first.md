@@ -282,3 +282,12 @@ Num diálogo com formulário, quem já tinha digitado algo e fechava sem querer 
   - um diálogo com mais de um formulário (o orçamento e as metas) pergunta se qualquer um deles mudou;
   - os botões do próprio formulário fecham pelo `open`, e por isso nunca perguntam.
 - **Onde vale:** os diálogos com formulário (lançamento, recebimento parcial, orçamento e metas, recorrência, parcelamento, categoria, estabelecimento e apelidos, pessoa, novo espaço, os da conta e a linha da importação). As confirmações curtas ficam como estão, porque não têm nada digitado.
+
+## Nota (onde fica a ação ocasional da página, 2026-10-28)
+
+Uma revisão das telas mostrou que três páginas punham o mesmo tipo de botão em três lugares: "Copiar de outro espaço" (Categorias) numa linha própria abaixo do título, "Pagar fatura" (Lançamentos) à direita da linha do mês e "Filtros" (Análise, no celular) ao lado do título. O tamanho já era padronizado pelo componente (44 px no celular em todos os tamanhos), mas a posição não.
+
+- **A ação ocasional da página** é um botão de contorno, de tamanho padrão, na primeira linha abaixo do título e da descrição (depois da navegação da página, como o mês), sozinha na linha e alinhada à esquerda, antes da busca e dos filtros. É a posição que Categorias já usava, igual no celular e no computador.
+- **O canto ao lado do título** é só da ação principal (o botão que flutua no celular). Nenhuma outra ação fica ali, nem à direita de outra linha.
+- **Os outros casos continuam como estavam:** uma ação dentro de um cartão ou de uma linha usa o tamanho pequeno; uma ação dentro de uma seção fica à esquerda, depois do texto que a explica.
+- **"Pagar fatura" e "Filtros"** passam para essa posição. A regra está na skill de interface do projeto, para as próximas telas.

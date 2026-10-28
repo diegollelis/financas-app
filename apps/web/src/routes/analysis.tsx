@@ -352,22 +352,24 @@ export function AnalysisPage() {
             )}
           </>
         }
-        action={
-          !desktop && (
-            <Button
-              ref={filtersButton}
-              variant="outline"
-              onClick={() => setFiltersOpen(true)}
-              disabled={!categories.isSuccess}
-            >
-              <SlidersHorizontal aria-hidden />
-              {/* Says a filter is on before the sheet is opened. */}
-              Filtros
-              {activeFilterCount(settings) > 0 && ` (${activeFilterCount(settings)})`}
-            </Button>
-          )
-        }
-      />
+      >
+        {/* The page's occasional action (ADR 0036 note): on a row of its own, at the left; the
+            corner beside the title is the main action's on every page. */}
+        {!desktop && (
+          <Button
+            ref={filtersButton}
+            variant="outline"
+            className="justify-self-start"
+            onClick={() => setFiltersOpen(true)}
+            disabled={!categories.isSuccess}
+          >
+            <SlidersHorizontal aria-hidden />
+            {/* Says a filter is on before the sheet is opened. */}
+            Filtros
+            {activeFilterCount(settings) > 0 && ` (${activeFilterCount(settings)})`}
+          </Button>
+        )}
+      </PageHeader>
       {desktop ? (
         <section aria-label="Filtros" className="bg-card rounded-xl border p-4">
           {panel('bar')}
