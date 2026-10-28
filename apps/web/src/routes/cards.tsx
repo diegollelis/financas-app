@@ -34,6 +34,7 @@ import {
 import { CardForm } from '@/features/cards/card-form';
 import { bankLabel } from '@/features/cards/card-label';
 import { LinkCardsDialog } from '@/features/cards/link-cards-dialog';
+import { PayBillDialog } from '@/features/cards/pay-bill-dialog';
 import {
   fetchUnlinked,
   useCards,
@@ -108,6 +109,7 @@ function CardItem({
   canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [payingBill, setPayingBill] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateCard(workspaceId);
@@ -167,6 +169,11 @@ function CardItem({
               ) : (
                 <>
                   <DropdownMenuItem onSelect={() => setEditing(true)}>Editar</DropdownMenuItem>
+                  {card.functions.includes('CREDIT') && (
+                    <DropdownMenuItem onSelect={() => setPayingBill(true)}>
+                      Pagar fatura
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem disabled={update.isPending} onSelect={() => setArchived(true)}>
                     Arquivar
                   </DropdownMenuItem>
@@ -183,6 +190,16 @@ function CardItem({
           >
             <EditCardForm workspaceId={workspaceId} card={card} onDone={() => setEditing(false)} />
           </ResponsiveDialog>
+          {payingBill && (
+            <PayBillDialog
+              workspaceId={workspaceId}
+              cards={[card]}
+              fixedCardId={card.id}
+              open
+              onOpenChange={setPayingBill}
+              returnFocusTo={actionsRef}
+            />
+          )}
           <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
             <AlertDialogContent
               onCloseAutoFocus={(event) => {

@@ -119,3 +119,22 @@ A decisão de deixar o cartão opcional foi revista na prévia da tela: o dono q
   - Sem escolha, o botão de importar diz "Escolha o cartão do Débito" e leva até o campo.
   - Um seletor por linha foi descartado: um extrato é de um banco, e trocar o cartão de um lançamento fica para "Editar", depois de importar.
 - **As importações antigas** ficam como estão.
+
+## Nota (o "Pagar fatura", 2026-10-28)
+
+- **As faturas a pagar:** `GET …/cards/bills` lista os lançamentos pendentes no Crédito com cartão e vencimento, agrupados por cartão e vencimento, a fatura mais antiga primeiro. Cada fatura traz os seus lançamentos, de qualquer mês, e o total, compras menos estornos (`cardBillTotal`).
+- **Pagar:** `POST …/cards/:cardId/bills/pay { dueDate, settledAt }` quita numa transação só todos os pendentes daquela fatura, naquele dia. Um mês de recorrência com valor estimado fica confirmado. A rota devolve os ids quitados e o total.
+  - Um dia no futuro é recusado com 400 `INVALID_INPUT`.
+  - Uma fatura sem pendentes é recusada com 409 `NOTHING_TO_PAY`.
+- **Desfazer:** `POST …/cards/:cardId/bills/undo { transactionIds, settledAt }` volta a pendentes só os lançamentos daquele cartão que continuam quitados naquele dia.
+- **Na tela, num diálogo só** (`features/cards/pay-bill-dialog.tsx`), aberto de dois lugares, decididos na prévia:
+  - em Lançamentos, por um botão de contorno "Pagar fatura" na linha do mês, para quem edita, quando há fatura a pagar;
+  - em Cartões, por "Pagar fatura" no menu ⋯ de um cartão com Crédito, com o cartão já definido.
+  - O Painel fica de fora por enquanto.
+- **O diálogo:**
+  - o cartão (já escolhido quando só um tem fatura) e a fatura, com uma vencida dita em vermelho;
+  - a lista dos lançamentos com sinal e o total;
+  - "Pago em" com hoje, nunca no futuro;
+  - o botão "Pagar R$ X (N lançamentos)";
+  - o aviso "Fatura do … paga", com "Desfazer".
+- **Pagar só uma parte da fatura** (o mínimo, um valor menor) fica para depois: o diálogo sempre paga tudo o que está pendente nela.

@@ -90,7 +90,8 @@ import { CARD_LIST, CARD_ROW, STRIPED_ROW, TABLE_BOX } from '@/features/view-mod
 import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { paymentMethodText } from '@/features/cards/card-label';
-import { useCards } from '@/features/cards/use-cards';
+import { useCardBills, useCards } from '@/features/cards/use-cards';
+import { PayBillDialog } from '@/features/cards/pay-bill-dialog';
 import { apiErrorMessage } from '@/lib/error-message';
 
 const sections = (['CREDIT', 'DEBIT'] as const).map((type) => ({
@@ -884,6 +885,10 @@ export function TransactionsPage() {
   const merchants = useMerchants(workspaceId);
   // Only to name the card beside the method (ADR 0062): the page does not wait for it.
   const cards = useCards(workspaceId);
+  // Whether a card has a bill to pay, for "Pagar fatura" (ADR 0062).
+  const bills = useCardBills(workspaceId, canEdit);
+  const [payingBill, setPayingBill] = useState(false);
+  const payBillButton = useRef<HTMLButtonElement>(null);
   // Only to fill a new transaction's category: the page does not wait for it (ADR 0053).
   const hints = useCategoryHints(workspaceId);
   const ready =
@@ -967,7 +972,21 @@ export function TransactionsPage() {
           )
         }
       >
-        <PeriodNav period={period} />
+        {/* An occasional action beside the month (ADR 0062): paying a card's bill at once. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <PeriodNav period={period} />
+          {canEdit && (bills.data?.length ?? 0) > 0 && (
+            <Button
+              ref={payBillButton}
+              variant="outline"
+              size="sm"
+              className="h-11 md:h-8"
+              onClick={() => setPayingBill(true)}
+            >
+              Pagar fatura
+            </Button>
+          )}
+        </div>
         <ViewModeToggle page="lancamentos" />
         {ready && transactions.data.length > 0 && (
           <MonthTotals
@@ -1060,6 +1079,17 @@ export function TransactionsPage() {
             );
           })
         ))}
+      {canEdit && (
+        <PayBillDialog
+          // A new one per opening: no choice or error left over.
+          key={String(payingBill)}
+          workspaceId={workspaceId}
+          cards={cards.data ?? []}
+          open={payingBill}
+          onOpenChange={setPayingBill}
+          returnFocusTo={payBillButton}
+        />
+      )}
       {canEdit && ready && (
         <>
           <TransactionDialog

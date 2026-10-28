@@ -1,11 +1,17 @@
 import {
+  cardBillTotal,
   cardFunctionLabels,
   normalizeName,
+  todayIso,
+  type CardBill,
   type Card,
   type CardFunction,
   type CreateCardInput,
   type LinkCardInput,
   type LinkCardResponse,
+  type PayCardBillInput,
+  type PayCardBillResponse,
+  type UndoCardBillInput,
   type UnlinkedCardTransactions,
   type UpdateCardInput,
 } from '@financas/shared';
@@ -18,6 +24,8 @@ import {
 import { z } from 'zod';
 import { Prisma, type Card as CardRow } from '../generated/prisma/client.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
+import { toDate } from '../transactions/dates.js';
+import { toTransactionResponse, withOrigin } from '../transactions/transactions.service.js';
 
 /** Sorts names as a Brazilian reader expects. */
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
@@ -48,6 +56,13 @@ const unlinkedWhere = (workspaceId: string, role: CardFunction) => ({
   cardId: null,
   paymentMethod: METHOD_OF[role],
   ...(role === 'CREDIT' && { settledAt: null }),
+});
+
+/** What a bill holds: pending, in Crédito, never a share of a split (shares have no card). */
+const billWhere = (workspaceId: string) => ({
+  workspaceId,
+  paymentMethod: 'CREDIT_CARD' as const,
+  settledAt: null,
 });
 
 function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
@@ -215,6 +230,91 @@ export class CardsService {
       return count;
     });
     return { linked };
+  }
+
+  /**
+   * Every bill still to pay (ADR 0062): the pending transactions in Crédito with a card and a due
+   * date, by card and due date, oldest first. A bill is not a table: it is these.
+   */
+  async bills(workspaceId: string): Promise<CardBill[]> {
+    const pending = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+      where: { ...billWhere(workspaceId), cardId: { not: null }, dueDate: { not: null } },
+      include: withOrigin,
+      orderBy: [{ dueDate: 'asc' }, { occurredOn: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
+    });
+    const bills = new Map<string, CardBill>();
+    for (const row of pending) {
+      const transaction = toTransactionResponse(row);
+      const key = `${row.cardId}|${transaction.dueDate}`;
+      const bill = bills.get(key) ?? {
+        cardId: row.cardId!,
+        dueDate: transaction.dueDate!,
+        totalCents: 0,
+        transactions: [],
+      };
+      bill.transactions.push(transaction);
+      bills.set(key, bill);
+    }
+    return [...bills.values()].map((bill) => ({
+      ...bill,
+      totalCents: cardBillTotal(bill.transactions),
+    }));
+  }
+
+  /**
+   * "Pagar fatura": settles every pending transaction of that bill on that day, in one
+   * transaction, and says which, for "Desfazer". Paying confirms an estimated amount (ADR 0038).
+   */
+  async payBill(
+    workspaceId: string,
+    cardId: string,
+    input: PayCardBillInput,
+  ): Promise<PayCardBillResponse> {
+    await this.find(workspaceId, cardId);
+    if (input.settledAt > todayIso()) {
+      throw new BadRequestException({
+        code: 'INVALID_INPUT',
+        message: 'O pagamento não pode ser numa data futura.',
+      });
+    }
+    const where = { ...billWhere(workspaceId), cardId, dueDate: toDate(input.dueDate) };
+    const paid = await this.prisma.$transaction(async (tx) => {
+      await setWorkspaceContext(tx, workspaceId);
+      const rows = await tx.transaction.findMany({
+        where,
+        select: { id: true, type: true, amountCents: true },
+      });
+      if (rows.length === 0) return rows;
+      await tx.transaction.updateMany({
+        where: { workspaceId, id: { in: rows.map((row) => row.id) }, settledAt: null },
+        data: { settledAt: toDate(input.settledAt), amountEstimated: false },
+      });
+      return rows;
+    });
+    if (paid.length === 0) {
+      throw new ConflictException({
+        code: 'NOTHING_TO_PAY',
+        message: 'Esta fatura não tem lançamentos pendentes.',
+      });
+    }
+    return { transactionIds: paid.map((row) => row.id), totalCents: cardBillTotal(paid) };
+  }
+
+  /**
+   * "Desfazer" of a payment: back to pending, only the transactions of this card it settled that
+   * are still settled on that day (one settled again since keeps the new day).
+   */
+  async undoBill(workspaceId: string, cardId: string, input: UndoCardBillInput): Promise<void> {
+    await this.find(workspaceId, cardId);
+    await this.prisma.forWorkspace(workspaceId).transaction.updateMany({
+      where: {
+        workspaceId,
+        cardId,
+        id: { in: input.transactionIds },
+        settledAt: toDate(input.settledAt),
+      },
+      data: { settledAt: null },
+    });
   }
 
   /** One that is used can only be archived: the foreign keys refuse the delete. */

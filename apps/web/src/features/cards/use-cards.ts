@@ -1,14 +1,19 @@
 import {
+  cardBillListResponseSchema,
   cardListResponseSchema,
   cardSchema,
   linkCardResponseSchema,
+  payCardBillResponseSchema,
   unlinkedCardTransactionsSchema,
   type CreateCardInput,
   type LinkCardInput,
   type PaymentMethod,
+  type PayCardBillInput,
+  type UndoCardBillInput,
   type UpdateCardInput,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
@@ -60,6 +65,46 @@ export function usePaymentMethodText() {
   const cards = useCards(workspaceId).data ?? [];
   return (paymentMethod: PaymentMethod | null, cardId: string | null) =>
     paymentMethod ? paymentMethodText(paymentMethod, cardId, cards) : null;
+}
+
+/** ['workspaces', id, 'cards', 'bills']: under the cards, so a change of them reloads it. */
+export const cardBillsKey = (workspaceId: string) => [...cardsKey(workspaceId), 'bills'] as const;
+
+/** Every bill still to pay (ADR 0062): what "Pagar fatura" offers. */
+export function useCardBills(workspaceId: string, enabled = true) {
+  return useQuery({
+    queryKey: cardBillsKey(workspaceId),
+    queryFn: () => apiGet(`/api/workspaces/${workspaceId}/cards/bills`, cardBillListResponseSchema),
+    enabled,
+  });
+}
+
+/**
+ * "Pagar fatura" and its "Desfazer": transactions of any month change, and with them the
+ * dashboard, the analysis and the people, so every list of the workspace is fetched again.
+ */
+export function usePayBill(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, ...input }: PayCardBillInput & { cardId: string }) =>
+      apiPost(
+        `/api/workspaces/${workspaceId}/cards/${cardId}/bills/pay`,
+        input,
+        payCardBillResponseSchema,
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [...workspacesQueryKey, workspaceId] }),
+  });
+}
+
+export function useUndoBill(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cardId, ...input }: UndoCardBillInput & { cardId: string }) =>
+      apiPost(`/api/workspaces/${workspaceId}/cards/${cardId}/bills/undo`, input, z.undefined()),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [...workspacesQueryKey, workspaceId] }),
+  });
 }
 
 /** The transactions with no card the first card offers to take (ADR 0062 note). */
