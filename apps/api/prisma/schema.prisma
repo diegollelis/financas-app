@@ -36,6 +36,7 @@ model Workspace {
   recurrenceShares   RecurrenceShare[]
   merchants          Merchant[]
   merchantAliases    MerchantAlias[]
+  cards              Card[]
   createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -344,6 +345,10 @@ model Transaction {
   // How it is paid or received (ADR 0054); a split's shares do not inherit it.
   paymentMethod      PaymentMethod?        @map("payment_method")
   merchant           Merchant?             @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  // The card of a Crédito or Débito one (ADR 0062); CHECK in the migration: only with those
+  // methods. A split's shares do not inherit it.
+  cardId             String?               @map("card_id") @db.Uuid
+  card               Card?                 @relation(fields: [cardId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([installmentPlanId, installmentNumber])
   @@unique([workspaceId, externalId])
@@ -354,6 +359,7 @@ model Transaction {
   @@index([personId])
   @@index([splitOfId])
   @@index([merchantId])
+  @@index([cardId])
   @@map("transactions")
 }
 
@@ -424,6 +430,34 @@ model MerchantAlias {
   @@map("merchant_aliases")
 }
 
+// Cartão (ADR 0062): a card of the workspace, a detail of the Crédito and Débito methods, with
+// no limit and no balance. A multiple card has both functions; with credit it has the days of
+// its bill (CHECKs in the migration). Archived, not deleted, once something uses it.
+model Card {
+  id               String              @id @default(uuid(7)) @db.Uuid
+  workspaceId      String              @map("workspace_id") @db.Uuid
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String              @db.VarChar(100)
+  // From the list of statements (ADR 0060); null for a bank the app does not read.
+  bank             StatementBank?
+  credit           Boolean             @default(false)
+  debit            Boolean             @default(false)
+  closingDay       Int?                @map("closing_day") @db.SmallInt
+  dueDay           Int?                @map("due_day") @db.SmallInt
+  archivedAt       DateTime?           @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions     Transaction[]
+  recurrences      Recurrence[]
+  installmentPlans InstallmentPlan[]
+  imports          TransactionImport[]
+
+  @@unique([workspaceId, name])
+  // Target of the composite foreign keys of transactions, recurrences, plans and imports.
+  @@unique([id, workspaceId])
+  @@map("cards")
+}
+
 // What an import brought (ADR 0060): the app's spreadsheet, or a bank's card or account statement.
 enum ImportKind {
   TEMPLATE
@@ -457,6 +491,9 @@ model TransactionImport {
   restoreData      Json?             @map("restore_data")
   kind             ImportKind        @default(TEMPLATE)
   bank             StatementBank?
+  // The card whose statement it is (ADR 0062).
+  cardId           String?           @map("card_id") @db.Uuid
+  card             Card?             @relation(fields: [cardId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   firstPeriod      String            @map("first_period") @db.Char(7)
   lastPeriod       String            @map("last_period") @db.Char(7)
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -504,6 +541,9 @@ model InstallmentPlan {
   // How it is paid or received (ADR 0054); a split's shares do not inherit it.
   paymentMethod        PaymentMethod?     @map("payment_method")
   merchant             Merchant?          @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  // The card of a Crédito or Débito one (ADR 0062), copied to every installment.
+  cardId               String?            @map("card_id") @db.Uuid
+  card                 Card?              @relation(fields: [cardId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   endedAt              DateTime?          @map("ended_at") @db.Timestamptz(3)
   // "Tornar parcelado" (ADR 0038 note): the transaction it adopted and its amount before, given
   // back as launched once when the plan is ended or deleted while it is pending.
@@ -547,6 +587,9 @@ model Recurrence {
   // How it is paid or received (ADR 0054); a split's shares do not inherit it.
   paymentMethod        PaymentMethod?         @map("payment_method")
   merchant             Merchant?              @relation(fields: [merchantId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  // The card of a Crédito or Débito one (ADR 0062), copied to every month it generates.
+  cardId               String?                @map("card_id") @db.Uuid
+  card                 Card?                  @relation(fields: [cardId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
   startPeriod          String                 @map("start_period") @db.Char(7)
   endPeriod            String?                @map("end_period") @db.Char(7)
   // "Tornar recorrente" (ADR 0038 note): the transaction it adopted, which existed before it.

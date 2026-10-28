@@ -54,6 +54,8 @@ const exportTransactionSchema = z.object({
   /** Where it was bought or who paid it (ADR 0053). */
   merchantId: z.uuid().nullable(),
   paymentMethod: paymentMethodSchema.nullable(),
+  /** The card it was paid or received with (ADR 0062). */
+  cardId: z.uuid().nullable().default(null),
   splitOfId: z.uuid().nullable(),
   createdAt: instant,
   updatedAt: instant,
@@ -75,6 +77,18 @@ const exportMerchantSchema = z.object({
   archivedAt: instant.nullable(),
   /** How it appears in card statements (ADR 0055). */
   aliases: z.array(z.string()),
+  createdAt: instant,
+});
+
+/** The cards of the Crédito and Débito methods (ADR 0062), with the days of the bill. */
+const exportCardSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  bank: z.enum(['NUBANK']).nullable(),
+  functions: z.array(z.enum(['CREDIT', 'DEBIT'])),
+  closingDay: z.number().int().nullable(),
+  dueDay: z.number().int().nullable(),
+  archivedAt: instant.nullable(),
   createdAt: instant,
 });
 
@@ -111,6 +125,7 @@ const exportRecurrenceSchema = z.object({
   personId: z.uuid().nullable(),
   merchantId: z.uuid().nullable(),
   paymentMethod: paymentMethodSchema.nullable(),
+  cardId: z.uuid().nullable().default(null),
   startPeriod: period,
   endPeriod: period.nullable(),
   /** The competências it already generated a transaction for. */
@@ -143,6 +158,7 @@ const exportInstallmentPlanSchema = z.object({
   personId: z.uuid().nullable(),
   merchantId: z.uuid().nullable(),
   paymentMethod: paymentMethodSchema.nullable(),
+  cardId: z.uuid().nullable().default(null),
   endedAt: instant.nullable(),
   createdAt: instant,
 });
@@ -155,6 +171,8 @@ const exportImportSchema = z.object({
   /** What it brought and from which bank (ADR 0060). */
   kind: z.enum(['TEMPLATE', 'CARD_STATEMENT', 'ACCOUNT_STATEMENT']).default('TEMPLATE'),
   bank: z.enum(['NUBANK']).nullable().default(null),
+  /** The card whose statement it was (ADR 0062). */
+  cardId: z.uuid().nullable().default(null),
   firstPeriod: period,
   lastPeriod: period,
   createdAt: instant,
@@ -190,6 +208,7 @@ const ownedWorkspaceSchema = z.object({
   categories: z.array(exportCategorySchema),
   people: z.array(exportPersonSchema),
   merchants: z.array(exportMerchantSchema),
+  cards: z.array(exportCardSchema).default([]),
   transactions: z.array(exportTransactionSchema),
   budgets: z.array(exportBudgetSchema),
   budgetDestinations: z.array(exportBudgetDestinationSchema),

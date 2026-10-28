@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { TransactionType } from './category.ts';
 
 // Meio de pagamento (ADR 0054): how a transaction was paid or received, from a fixed list. Not an
-// account nor a card with a balance and a bill: that, if it comes, has an ADR of its own.
+// account with a balance; the card of Crédito and Débito is a detail of its own (ADR 0062).
 
 export const paymentMethodSchema = z.enum(
   ['PIX', 'DEBIT_CARD', 'CREDIT_CARD', 'MEAL_VOUCHER', 'CASH', 'BOLETO', 'TRANSFER', 'AUTO_DEBIT'],

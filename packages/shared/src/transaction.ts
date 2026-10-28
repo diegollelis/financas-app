@@ -48,6 +48,8 @@ export const transactionFieldsSchema = z.object({
   merchantId: z.uuid().nullable().optional(),
   /** How it was paid or received (ADR 0054). */
   paymentMethod: paymentMethodSchema.nullable().optional(),
+  /** The card of a Crédito or Débito one (ADR 0062), with that function. */
+  cardId: z.uuid().nullable().optional(),
 });
 
 /**
@@ -155,6 +157,8 @@ export const transactionSchema = z.object({
   merchantId: z.uuid().nullable().default(null),
   /** How it was paid or received (ADR 0054); null when not given. */
   paymentMethod: paymentMethodSchema.nullable().default(null),
+  /** The card it was paid or received with (ADR 0062); null when not given. */
+  cardId: z.uuid().nullable().default(null),
   /** The debit this share was split from (ADR 0042); null otherwise. */
   splitOfId: z.uuid().nullable().default(null),
 });

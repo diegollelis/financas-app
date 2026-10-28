@@ -58,6 +58,7 @@ const transaction = (n: number, fields: Partial<Transaction>): Transaction => ({
   personId: null,
   merchantId: null,
   paymentMethod: null,
+  cardId: null,
   splitOfId: null,
   ...fields,
 });
@@ -152,6 +153,7 @@ describe('startStatementReview', () => {
       personId: null,
       merchantId: loja.id,
       paymentMethod: 'CREDIT_CARD',
+      cardId: null,
       isSplit: false,
       endedAt: null,
       adoptedTransactionId: null,
