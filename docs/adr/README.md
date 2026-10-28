@@ -65,3 +65,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0059](0059-peguei-emprestado-de.md)                             | Peguei emprestado de: a categoria de entrada marcada escolhe a categoria da dívida            | Aceita |
 | [0060](0060-extratos-do-banco.md)                                | Extratos do banco: duas páginas de importação, o banco e o tipo de cada importação            | Aceita |
 | [0061](0061-extrato-da-conta-e-conferencia.md)                   | Extrato da conta: o identificador de cada movimento e a conferência com o que já está lançado | Aceita |
+| [0062](0062-cartoes-e-pagar-fatura.md)                           | Cartões (crédito e débito) e "Pagar fatura": a fatura é o cartão mais o vencimento            | Aceita |

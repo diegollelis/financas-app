@@ -90,3 +90,7 @@ Escolhidos com o dono do projeto: **lista fixa (opção 1)**, **sete meios (opç
 - **Lida pelo rótulo da tela,** ignorando maiúsculas e acentos ("credito", "PIX"), e por alguns sinônimos comuns: "Cartão de crédito", "Cartão de débito", "VA", "VR", "Vale-alimentação", "Vale-refeição", "TED" e "DOC". Um valor fora da lista vira um aviso na linha, e o lançamento entra sem meio, como previsto na Decisão.
 - **A planilha baixada ganha a aba "Meios de pagamento",** com os rótulos aceitos, como a aba "Categorias" faz com as categorias. A linha de exemplo usa "Boleto".
 - **Na revisão,** o meio aparece nos detalhes da linha, e "Editar" ou "Corrigir" tem o mesmo campo do formulário do lançamento. Um lançamento importado leva o meio só quando há um.
+
+## Nota (os cartões, 2026-10-28)
+
+O cadastro de cartões foi decidido no [ADR 0062](0062-cartoes-e-pagar-fatura.md): a fatura e o "Pagar fatura" dão a ele o uso que faltava aqui. O cartão é um detalhe dos meios Crédito e Débito, que continuam na lista fixa. Contas, com saldo e transferências, continuam fora.

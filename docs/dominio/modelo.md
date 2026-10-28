@@ -74,7 +74,13 @@ Apelidos (`MerchantAlias`, [ADR 0055](../adr/0055-importacao-da-fatura-do-cartao
 
 ### PaymentMethod (Meio de pagamento) — fase 5 ([ADR 0054](../adr/0054-meio-de-pagamento.md))
 
-Como se pagou ou recebeu, numa lista fixa: Pix, Débito, Crédito, Vale-alimentação/refeição, Dinheiro, Boleto, Transferência e Débito automático. Lançamentos, recorrências e parcelamentos têm um `payment_method` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Na tela, "Meio de pagamento" numa saída e "Meio de recebimento" numa entrada. Não é uma conta nem um cartão com saldo e fatura: isso, se vier, terá um ADR próprio.
+Como se pagou ou recebeu, numa lista fixa: Pix, Débito, Crédito, Vale-alimentação/refeição, Dinheiro, Boleto, Transferência e Débito automático. Lançamentos, recorrências e parcelamentos têm um `payment_method` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Na tela, "Meio de pagamento" numa saída e "Meio de recebimento" numa entrada. Não é uma conta com saldo; o cartão de Crédito e Débito é o cadastro abaixo.
+
+### Card (Cartão) — fase 5 ([ADR 0062](../adr/0062-cartoes-e-pagar-fatura.md))
+
+Um cartão do espaço: nome (único no espaço, ignorando maiúsculas e acentos), banco (opcional, da lista dos extratos) e funções, Crédito, Débito ou as duas. Só com Crédito ele tem o dia do fechamento e o dia do vencimento. Não tem limite nem saldo. Lançamentos, recorrências, parcelamentos e importações têm um `card_id` opcional, aceito só com o meio Crédito ou Débito e de um cartão com essa função; cada mês gerado e cada parcela o herdam, e as partes de uma divisão não. Arquiva-se em vez de excluir; só um arquivado sem uso é excluído.
+
+A **fatura** é o cartão mais o vencimento: os lançamentos daquele cartão no Crédito que vencem naquele dia. "Pagar fatura" quita numa vez os pendentes dela, compras e estornos (que abatem do total), num só dia, e o "Desfazer" volta a pendentes só o que aquele pagamento quitou.
 
 ## Indicadores do painel (por espaço e competência)
 
