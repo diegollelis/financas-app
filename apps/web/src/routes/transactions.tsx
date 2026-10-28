@@ -972,21 +972,20 @@ export function TransactionsPage() {
           )
         }
       >
-        {/* An occasional action beside the month (ADR 0062): paying a card's bill at once. */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <PeriodNav period={period} />
-          {canEdit && (bills.data?.length ?? 0) > 0 && (
-            <Button
-              ref={payBillButton}
-              variant="outline"
-              size="sm"
-              className="h-11 md:h-8"
-              onClick={() => setPayingBill(true)}
-            >
-              Pagar fatura
-            </Button>
-          )}
-        </div>
+        <PeriodNav period={period} />
+        {/* The page's occasional action (ADR 0036 note): on a row of its own, at the left, as in
+            Categorias. Paying a card's bill at once (ADR 0062). */}
+        {canEdit && (bills.data?.length ?? 0) > 0 && (
+          <Button
+            ref={payBillButton}
+            variant="outline"
+            className="justify-self-start"
+            onClick={() => setPayingBill(true)}
+          >
+            <CreditCard aria-hidden />
+            Pagar fatura
+          </Button>
+        )}
         <ViewModeToggle page="lancamentos" />
         {ready && transactions.data.length > 0 && (
           <MonthTotals
