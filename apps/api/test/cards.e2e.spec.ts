@@ -1,9 +1,11 @@
 import {
+  cardBillListResponseSchema,
   cardListResponseSchema,
   cardSchema,
   categoryListResponseSchema,
   currentPeriod,
   importSchema,
+  payCardBillResponseSchema,
   shiftPeriod,
   todayIso,
   transactionListResponseSchema,
@@ -36,6 +38,17 @@ const cardRoutes: WorkspaceRoute[] = [
   },
   { method: 'delete', path: (id) => `/api/workspaces/${id}/cards/${SOME_ID}` },
   { method: 'get', path: (id) => `/api/workspaces/${id}/cards/unlinked` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/cards/bills` },
+  {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/cards/${SOME_ID}/bills/pay`,
+    body: { dueDate: '2026-11-04', settledAt: '2026-10-28' },
+  },
+  {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/cards/${SOME_ID}/bills/undo`,
+    body: { transactionIds: [SOME_ID], settledAt: '2026-10-28' },
+  },
   {
     method: 'post',
     path: (id) => `/api/workspaces/${id}/cards/${SOME_ID}/link`,
@@ -505,6 +518,104 @@ describe('cards', () => {
         paymentMethod: 'PIX',
         cardId: null,
       });
+    });
+  });
+
+  describe('"Pagar fatura" (ADR 0062)', () => {
+    async function withBills() {
+      const signedUp = await setup();
+      const { browser, base, addCard, launch } = signedUp;
+      const card = await addCard();
+      const categories = categoryListResponseSchema.parse(
+        (await browser.get(`${base}/categories`).expect(200)).body,
+      );
+      const credit = categories.find((c) => c.type === 'CREDIT')!;
+      const due = `${next}-04`;
+      const onCard = { paymentMethod: 'CREDIT_CARD', cardId: card.id, dueDate: due };
+      const pizza = await launch({ ...onCard, description: 'Pizzaria', amountCents: 6_500 });
+      const market = await launch({ ...onCard, description: 'Mercado', amountCents: 23_140 });
+      const refund = transactionSchema.parse(
+        (
+          await browser
+            .post(`${base}/transactions`)
+            .send({
+              type: 'CREDIT',
+              description: 'Estorno',
+              categoryId: credit.id,
+              amountCents: 1_500,
+              period,
+              ...onCard,
+            })
+            .expect(201)
+        ).body,
+      );
+      // Left out: another bill, a paid one and a purchase in Débito.
+      await launch({ ...onCard, description: 'Posto', dueDate: `${period}-04` });
+      await launch({ ...onCard, description: 'Pago', settledAt: todayIso() });
+      await launch({ paymentMethod: 'DEBIT_CARD', cardId: card.id, dueDate: due });
+      return { ...signedUp, card, due, pizza, market, refund };
+    }
+
+    it('lists each pending bill by card and due date, purchases less refunds, oldest first', async () => {
+      const { browser, base, card, due, pizza, market, refund } = await withBills();
+
+      const bills = cardBillListResponseSchema.parse(
+        (await browser.get(`${base}/cards/bills`).expect(200)).body,
+      );
+      expect(bills.map((bill) => [bill.cardId, bill.dueDate, bill.transactions.length])).toEqual([
+        [card.id, `${period}-04`, 1],
+        [card.id, due, 3],
+      ]);
+      expect(bills[1]?.totalCents).toBe(6_500 + 23_140 - 1_500);
+      expect(bills[1]?.transactions.map((row) => row.id).sort()).toEqual(
+        [pizza.id, market.id, refund.id].sort(),
+      );
+    });
+
+    it('pays a bill at once on a day, never ahead, and undoes only what it paid', async () => {
+      const { browser, base, card, due, pizza } = await withBills();
+      const pay = (body: object) => browser.post(`${base}/cards/${card.id}/bills/pay`).send(body);
+      const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+
+      await pay({ dueDate: due, settledAt: tomorrow }).expect(400);
+      const paid = await pay({ dueDate: due, settledAt: todayIso() }).expect(200);
+      const { transactionIds, totalCents } = payCardBillResponseSchema.parse(paid.body);
+      expect(transactionIds).toHaveLength(3);
+      expect(totalCents).toBe(28_140);
+      const refused = await pay({ dueDate: due, settledAt: todayIso() }).expect(409);
+      expect(refused.body).toMatchObject({ code: 'NOTHING_TO_PAY' });
+      expect(
+        (await transactions(browser, base)).find((row) => row.id === pizza.id)?.settledAt,
+      ).toBe(todayIso());
+
+      await browser
+        .post(`${base}/cards/${card.id}/bills/undo`)
+        .send({ transactionIds, settledAt: todayIso() })
+        .expect(204);
+      const bills = cardBillListResponseSchema.parse(
+        (await browser.get(`${base}/cards/bills`).expect(200)).body,
+      );
+      expect(bills.find((bill) => bill.dueDate === due)?.transactions).toHaveLength(3);
+    });
+
+    it('lets a VIEWER see the bills but not pay them', async () => {
+      const owner = await t.signUp(maria);
+      const created = await owner.browser
+        .post('/api/workspaces')
+        .send({ name: 'Casa' })
+        .expect(201);
+      const workspaceId = workspaceSchema.parse(created.body).id;
+      const viewer = await t.signUp(joao);
+      await t.prisma.member.create({
+        data: { workspaceId, userId: viewer.userId, role: 'VIEWER' },
+      });
+      const base = `/api/workspaces/${workspaceId}`;
+
+      await viewer.browser.get(`${base}/cards/bills`).expect(200);
+      await viewer.browser
+        .post(`${base}/cards/${SOME_ID}/bills/pay`)
+        .send({ dueDate: `${next}-04`, settledAt: todayIso() })
+        .expect(403);
     });
   });
 

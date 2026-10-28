@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { statementBankSchema } from './import.ts';
-import { shiftPeriod } from './money-and-dates.ts';
+import { isoDateSchema, shiftPeriod } from './money-and-dates.ts';
 import type { PaymentMethod } from './payment-method.ts';
 import { dueDateFor } from './recurrence.ts';
+import { transactionSchema, type Transaction } from './transaction.ts';
 
 // Cartão (ADR 0062): a card of the workspace, a detail of the Crédito and Débito payment
 // methods. No limit and no balance; with the credit function it has the days of its bill.
@@ -163,6 +164,59 @@ export function cardBillDueDate(
   const month = purchasedOn.slice(0, 7);
   const closesIn = purchasedOn <= dueDateFor(month, closingDay, 0) ? month : shiftPeriod(month, 1);
   return dueDateFor(closesIn, dueDay, dueDay > closingDay ? 0 : 1);
+}
+
+/**
+ * A card's bill still to pay (ADR 0062): the card plus a due date, its pending transactions in
+ * Crédito (purchases, and refunds that take from the total, of any month), oldest first.
+ */
+export const cardBillSchema = z.object({
+  cardId: z.uuid(),
+  dueDate: isoDateSchema,
+  /** Purchases less refunds, in cents. */
+  totalCents: z.number().int(),
+  transactions: z.array(transactionSchema),
+});
+
+export type CardBill = z.infer<typeof cardBillSchema>;
+
+/** `GET /workspaces/:workspaceId/cards/bills`: every pending bill, by card, oldest first. */
+export const cardBillListResponseSchema = z.array(cardBillSchema);
+
+/** "Pagar fatura": settles every pending transaction of that bill on that day, never ahead. */
+export const payCardBillInputSchema = z.object({
+  dueDate: isoDateSchema,
+  settledAt: isoDateSchema,
+});
+
+export type PayCardBillInput = z.infer<typeof payCardBillInputSchema>;
+
+export const payCardBillResponseSchema = z.object({
+  /** What this payment settled: what "Desfazer" takes back. */
+  transactionIds: z.array(z.uuid()),
+  totalCents: z.number().int(),
+});
+
+export type PayCardBillResponse = z.infer<typeof payCardBillResponseSchema>;
+
+/**
+ * "Desfazer" of a payment: back to pending, only the transactions it settled that are still
+ * settled on that day.
+ */
+export const undoCardBillInputSchema = z.object({
+  transactionIds: z.array(z.uuid()).min(1).max(2000),
+  settledAt: isoDateSchema,
+});
+
+export type UndoCardBillInput = z.infer<typeof undoCardBillInputSchema>;
+
+/** A bill's total: purchases less refunds (credits in Crédito). */
+export function cardBillTotal(transactions: readonly Pick<Transaction, 'type' | 'amountCents'>[]) {
+  return transactions.reduce(
+    (sum, transaction) =>
+      sum + (transaction.type === 'DEBIT' ? transaction.amountCents : -transaction.amountCents),
+    0,
+  );
 }
 
 /** The card function a payment method uses; null for a method that is not a card's. */

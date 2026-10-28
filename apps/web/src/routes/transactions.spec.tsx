@@ -1,3 +1,4 @@
+import { formatCents } from '@financas/shared';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -2579,6 +2580,83 @@ describe('TransactionsPage', () => {
         paymentMethod: 'CREDIT_CARD',
         cardId: exampleCard.id,
       }),
+    });
+  });
+
+  it('pays a card bill at once, and undoes it from the toast (ADR 0062)', async () => {
+    const onCard = { paymentMethod: 'CREDIT_CARD', cardId: exampleCard.id, dueDate: '2026-11-04' };
+    const pizza = {
+      ...shopping,
+      id: '01920000-0000-7000-8000-0000000007b1',
+      description: 'Pizzaria Exemplo',
+      amountCents: 6_500,
+      occurredOn: '2026-10-03',
+      ...onCard,
+    };
+    const refund = {
+      ...salary,
+      id: '01920000-0000-7000-8000-0000000007b2',
+      description: 'Estorno da loja',
+      amountCents: 1_500,
+      occurredOn: '2026-10-10',
+      ...onCard,
+    };
+    const transactionIds = [pizza.id, refund.id];
+    const fetchMock = mockTransactions({
+      [`GET /api/workspaces/${houseId}/cards`]: { body: [exampleCard] },
+      [`GET /api/workspaces/${houseId}/cards/bills`]: {
+        body: [
+          {
+            cardId: exampleCard.id,
+            dueDate: '2026-11-04',
+            totalCents: 5_000,
+            transactions: [pizza, refund],
+          },
+        ],
+      },
+      [`POST /api/workspaces/${houseId}/cards/${exampleCard.id}/bills/pay`]: {
+        body: { transactionIds, totalCents: 5_000 },
+      },
+      [`POST /api/workspaces/${houseId}/cards/${exampleCard.id}/bills/undo`]: {
+        status: 204,
+        body: null,
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Pagar fatura' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Pagar fatura' });
+    // The only card with a bill and its only bill come chosen.
+    expect(within(dialog).getByRole('combobox', { name: 'Cartão' })).toHaveTextContent(
+      'Cartão Exemplo',
+    );
+    expect(within(dialog).getByRole('combobox', { name: 'Fatura' })).toHaveTextContent(
+      'Vence em 04/11/2026',
+    );
+    expect(
+      within(within(dialog).getByRole('region', { name: 'Lançamentos' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      `Pizzaria ExemploMercadoCompra em 03/10− ${formatCents(6_500)}`,
+      `Estorno da lojaSalárioEm 10/10+ ${formatCents(1_500)}`,
+    ]);
+    expect(within(dialog).getByLabelText('Pago em')).toHaveValue('2026-10-15');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: `Pagar ${formatCents(5_000)} (2 lançamentos)` }),
+    );
+
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/cards/${exampleCard.id}/bills/pay`, {
+      method: 'POST',
+      body: JSON.stringify({ dueDate: '2026-11-04', settledAt: '2026-10-15' }),
+    });
+    expect(
+      await screen.findByText('Fatura do Cartão Exemplo paga: 2 lançamentos'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Desfazer' }));
+    await expectCall(fetchMock, `/api/workspaces/${houseId}/cards/${exampleCard.id}/bills/undo`, {
+      method: 'POST',
+      body: JSON.stringify({ transactionIds, settledAt: '2026-10-15' }),
     });
   });
 

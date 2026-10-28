@@ -109,7 +109,9 @@ describe('CardsPage', () => {
     mockCards();
     renderApp(page);
 
-    expect(await menuOf('Cartão Exemplo')).toEqual(['Editar', 'Arquivar']);
+    // "Pagar fatura" only on a card with Crédito (ADR 0062).
+    expect(await menuOf('Cartão Exemplo')).toEqual(['Editar', 'Pagar fatura', 'Arquivar']);
+    expect(await menuOf('Débito Exemplo')).toEqual(['Editar', 'Arquivar']);
     expect(await menuOf('Cartão Antigo')).toEqual(['Reativar']);
     expect(await menuOf('Cartão Sem Uso')).toEqual(['Reativar', 'Excluir']);
   });

@@ -1,4 +1,12 @@
 import {
+  cardBillListResponseSchema,
+  payCardBillInputSchema,
+  payCardBillResponseSchema,
+  undoCardBillInputSchema,
+  type CardBill,
+  type PayCardBillInput,
+  type PayCardBillResponse,
+  type UndoCardBillInput,
   cardListResponseSchema,
   cardSchema,
   createCardInputSchema,
@@ -63,6 +71,49 @@ export class CardsController {
     @CurrentMembership() membership: WorkspaceMembership,
   ): Promise<UnlinkedCardTransactions> {
     return this.cards.unlinked(membership.workspaceId);
+  }
+
+  @Get('bills')
+  @ApiOkResponse({
+    description:
+      'Every bill still to pay (ADR 0062): the pending transactions in Crédito by card and due date, oldest first.',
+    schema: openApi(cardBillListResponseSchema),
+  })
+  bills(@CurrentMembership() membership: WorkspaceMembership): Promise<CardBill[]> {
+    return this.cards.bills(membership.workspaceId);
+  }
+
+  @Post(':cardId/bills/pay')
+  @RequireRole('EDITOR')
+  @HttpCode(200)
+  @ApiBody({ schema: openApi(payCardBillInputSchema) })
+  @ApiOkResponse({
+    description: 'The bill paid: what was settled, for "Desfazer".',
+    schema: openApi(payCardBillResponseSchema),
+  })
+  @ApiBadRequestResponse({ description: 'INVALID_INPUT: a day in the future.' })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  @ApiConflictResponse({ description: 'NOTHING_TO_PAY: the bill has nothing pending.' })
+  payBill(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('cardId') cardId: string,
+    @Body({ schema: payCardBillInputSchema }) input: PayCardBillInput,
+  ): Promise<PayCardBillResponse> {
+    return this.cards.payBill(membership.workspaceId, cardId, input);
+  }
+
+  @Post(':cardId/bills/undo')
+  @RequireRole('EDITOR')
+  @HttpCode(204)
+  @ApiBody({ schema: openApi(undoCardBillInputSchema) })
+  @ApiNoContentResponse({ description: 'Back to pending, what that payment settled.' })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  undoBill(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('cardId') cardId: string,
+    @Body({ schema: undoCardBillInputSchema }) input: UndoCardBillInput,
+  ): Promise<void> {
+    return this.cards.undoBill(membership.workspaceId, cardId, input);
   }
 
   @Post(':cardId/link')
