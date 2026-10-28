@@ -1,5 +1,6 @@
 import {
   plainTransactionInputSchema,
+  cardBillDueDate,
   currentPeriod,
   installmentCountSchema,
   loanCategoryLabels,
@@ -16,6 +17,7 @@ import {
   suggestCategory,
   suggestPaymentMethod,
   todayIso,
+  type Card,
   type Category,
   type CategoryHints,
   type Merchant,
@@ -26,7 +28,7 @@ import {
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
-import { Controller, useForm, useWatch, type Control } from 'react-hook-form';
+import { Controller, useForm, useWatch, type Control, type UseFormSetValue } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { SegmentedControl } from '@/components/segmented-control';
@@ -35,6 +37,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { NotesTextarea } from '@/components/notes-textarea';
 import { useCurrentUser } from '@/features/auth/use-me';
+import { CardField } from '@/features/cards/card-field';
+import {
+  requireCard,
+  useCardFollowsMethod,
+  type CardFormFields,
+} from '@/features/cards/card-rules';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { findMerchant } from '@/features/merchants/use-merchants';
@@ -100,6 +108,10 @@ const transactionFormSchema = plainTransactionInputSchema
     paymentMethod: z.union([z.literal(''), paymentMethodSchema]),
     /** The method the history filled in (ADR 0054); '' when none. Never sent. */
     suggestedPaymentMethod: z.string(),
+    /** The card of a Crédito or Débito one (ADR 0062), required with them; '' for none. */
+    cardId: z.string(),
+    /** The due date the card's bill filled in (ADR 0062); '' when none. Never sent. */
+    suggestedDueDate: z.string(),
     /** A receber de / a pagar para (ADR 0042): a name; a new one becomes a person on save. */
     person: z
       .string()
@@ -111,6 +123,7 @@ const transactionFormSchema = plainTransactionInputSchema
     shares: z.array(z.object({ name: z.string(), value: z.string() })),
   })
   .superRefine((values, ctx) => {
+    requireCard(values, ctx);
     // Settled is something that happened: a day ahead is what the due date is for.
     if (values.settledAt && values.settledAt > todayIso()) {
       ctx.addIssue({
@@ -251,6 +264,7 @@ export function TransactionForm({
   categories,
   people = [],
   merchants = [],
+  cards = [],
   hints,
   initial,
   preset,
@@ -270,6 +284,8 @@ export function TransactionForm({
   people?: Person[];
   /** The workspace's merchants, offered in "Estabelecimento" (ADR 0053). */
   merchants?: Merchant[];
+  /** The workspace's cards, asked for with Crédito and Débito (ADR 0062). */
+  cards?: Card[];
   /** The history's categories (ADR 0053): a new transaction's empty category is filled from it. */
   hints?: CategoryHints;
   initial?: Transaction;
@@ -324,6 +340,8 @@ export function TransactionForm({
       merchant: merchants.find((merchant) => merchant.id === initial?.merchantId)?.name ?? '',
       paymentMethod: initial?.paymentMethod ?? '',
       suggestedPaymentMethod: '',
+      cardId: initial?.cardId ?? '',
+      suggestedDueDate: '',
       person: people.find((person) => person.id === initial?.personId)?.name ?? '',
       splitOn: false,
       shareMode: 'REAIS',
@@ -449,6 +467,31 @@ export function TransactionForm({
       setValue('suggestedPaymentMethod', methodSuggestion);
     }
   }, [methodSuggestion, paymentMethod, suggestedMethod, setValue]);
+  // The card follows the method (ADR 0062); its fields are a slice of this form.
+  const cardControl = control as unknown as Control<CardFormFields>;
+  const role = useCardFollowsMethod(
+    cardControl,
+    setValue as unknown as UseFormSetValue<CardFormFields>,
+    cards,
+    initial?.cardId ?? '',
+  );
+  const cardId = useWatch({ control, name: 'cardId' });
+  // The due date of a new one from the card's bill (ADR 0062), by the day of the purchase (today
+  // when not given): fills an empty due date, or replaces one it filled itself; never a typed one.
+  const occurredOn = useWatch({ control, name: 'occurredOn' });
+  const suggestedDue = useWatch({ control, name: 'suggestedDueDate' });
+  const card = cards.find((item) => item.id === cardId);
+  const billDue =
+    !initial && role === 'CREDIT' && card
+      ? cardBillDueDate(card, isoDateSchema.safeParse(occurredOn).data ?? todayIso())
+      : null;
+  useEffect(() => {
+    if (!billDue || billDue === typedDueDate) return;
+    if (typedDueDate === '' || typedDueDate === suggestedDue) {
+      setValue('dueDate', billDue);
+      setValue('suggestedDueDate', billDue);
+    }
+  }, [billDue, typedDueDate, suggestedDue, setValue]);
   // Opened from the start when the transaction being edited uses one of them.
   const [moreOpen, setMoreOpen] = useState(
     Boolean(initial?.notes || initial?.personId || initial?.merchantId),
@@ -576,6 +619,11 @@ export function TransactionForm({
         <FormField
           id={id('due-date')}
           label="Vencimento (opcional)"
+          hint={
+            card && typedDueDate !== '' && typedDueDate === suggestedDue
+              ? `Sugerido pela fatura do ${card.name}.`
+              : undefined
+          }
           error={formState.errors.dueDate?.message}
         >
           <Input type="date" {...register('dueDate')} />
@@ -619,6 +667,16 @@ export function TransactionForm({
             </div>
           )}
         />
+        {/* Right after the method, only with Crédito or Débito: then required (ADR 0062 note). */}
+        {role && (
+          <CardField
+            control={cardControl}
+            id={id('card')}
+            cards={cards}
+            role={role}
+            className="sm:col-span-2"
+          />
+        )}
       </div>
       {allowRepeat && (
         <div className="grid gap-2">

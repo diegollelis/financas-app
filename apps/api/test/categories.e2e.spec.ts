@@ -307,8 +307,8 @@ describe('categories', () => {
           })
           .expect(201);
 
-      await add({ description: 'Compras', merchantId: merchant, paymentMethod: 'CREDIT_CARD' });
-      await add({ description: 'compras', merchantId: merchant, paymentMethod: 'CREDIT_CARD' });
+      await add({ description: 'Compras', merchantId: merchant, paymentMethod: 'CASH' });
+      await add({ description: 'compras', merchantId: merchant, paymentMethod: 'CASH' });
       await add({ description: 'Compras', merchantId: merchant, paymentMethod: 'PIX' });
       // Without a method: says nothing.
       await add({ description: 'Feira' });
@@ -318,8 +318,8 @@ describe('categories', () => {
       );
 
       expect(hints.paymentMethods).toEqual({
-        merchants: [{ merchantId: merchant, type: 'DEBIT', paymentMethod: 'CREDIT_CARD' }],
-        descriptions: [{ description: 'compras', type: 'DEBIT', paymentMethod: 'CREDIT_CARD' }],
+        merchants: [{ merchantId: merchant, type: 'DEBIT', paymentMethod: 'CASH' }],
+        descriptions: [{ description: 'compras', type: 'DEBIT', paymentMethod: 'CASH' }],
       });
     });
   });

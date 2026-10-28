@@ -363,14 +363,14 @@ describe('installments', () => {
         .send({
           description: 'Geladeira nova',
           categoryId: categoryId('Compras', 'DEBIT'),
-          paymentMethod: 'CREDIT_CARD',
+          paymentMethod: 'BOLETO',
           dueDay: 20,
         })
         .expect(200);
 
       expect(installmentPlanSchema.parse(response.body)).toMatchObject({
         description: 'Geladeira nova',
-        paymentMethod: 'CREDIT_CARD',
+        paymentMethod: 'BOLETO',
         dueDay: 20,
         settledCount: 1,
       });
@@ -381,7 +381,7 @@ describe('installments', () => {
       expect((await transactionsOf(month(1)))[0]).toMatchObject({
         description: 'Geladeira nova',
         categoryId: categoryId('Compras', 'DEBIT'),
-        paymentMethod: 'CREDIT_CARD',
+        paymentMethod: 'BOLETO',
         dueDate: `${month(1)}-20`,
       });
     });

@@ -12,18 +12,25 @@ import {
   transactionNotesSchema,
   type Category,
   type InstallmentPlan,
+  type Card,
   type Merchant,
   type Person,
   type UpdateInstallmentPlanInput,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, type Control, type UseFormSetValue } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NotesTextarea } from '@/components/notes-textarea';
+import { CardField } from '@/features/cards/card-field';
+import {
+  requireCard,
+  useCardFollowsMethod,
+  type CardFormFields,
+} from '@/features/cards/card-rules';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PersonSelect } from '@/features/people/person-picker';
@@ -70,11 +77,14 @@ const planFormSchema = z
       .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
     /** A receber de / a pagar para: a name, resolved to a person on save. */
     person: z.string().trim(),
+    /** The card of a Crédito or Débito one (ADR 0062), required with them; '' for none. */
+    cardId: z.string(),
   })
   .refine((values) => values.firstNumber <= values.installments, {
     message: 'Use um número de 1 até o total de parcelas.',
     path: ['firstNumber'],
-  });
+  })
+  .superRefine(requireCard);
 
 type FormInput = z.input<typeof planFormSchema>;
 type FormValues = z.output<typeof planFormSchema>;
@@ -100,6 +110,8 @@ function planChanges(plan: InstallmentPlan, values: FormValues, amountsLocked: b
   if (dueMonthOffset !== plan.dueMonthOffset) changes.dueMonthOffset = dueMonthOffset;
   const paymentMethod = values.paymentMethod || null;
   if (paymentMethod !== plan.paymentMethod) changes.paymentMethod = paymentMethod;
+  const cardId = values.cardId || null;
+  if (cardId !== plan.cardId) changes.cardId = cardId;
   if (values.occurredOn !== plan.occurredOn) changes.occurredOn = values.occurredOn;
   if (!amountsLocked) {
     const installmentsChanged = values.installments !== plan.installments;
@@ -119,6 +131,7 @@ export function PlanForm({
   categories,
   people,
   merchants,
+  cards = [],
   userId,
   pending,
   error,
@@ -130,6 +143,8 @@ export function PlanForm({
   people: Person[];
   /** The workspace's merchants, for "Estabelecimento" (ADR 0053). */
   merchants: Merchant[];
+  /** The workspace's cards, asked for with Crédito and Débito (ADR 0062). */
+  cards?: Card[];
   userId: string;
   pending: boolean;
   error: unknown;
@@ -149,7 +164,11 @@ export function PlanForm({
   const currentMerchant = merchants.find((merchant) => merchant.id === plan.merchantId)?.name ?? '';
   // Paid installments are history, and a split's shares follow the amounts (ADR 0038 note).
   const amountsLocked = plan.settledCount > 0 || plan.isSplit;
-  const { register, handleSubmit, formState, control } = useForm<FormInput, unknown, FormValues>({
+  const { register, handleSubmit, formState, control, setValue } = useForm<
+    FormInput,
+    unknown,
+    FormValues
+  >({
     resolver: zodResolver(planFormSchema),
     defaultValues: {
       description: plan.description,
@@ -164,10 +183,19 @@ export function PlanForm({
       paymentMethod: plan.paymentMethod ?? '',
       person: currentPerson,
       merchant: currentMerchant,
+      cardId: plan.cardId ?? '',
     },
   });
   // Closing the dialog by mistake with something typed asks first.
   useDialogDirty(formState.isDirty);
+  // The card follows the method (ADR 0062); its fields are a slice of this form.
+  const cardControl = control as unknown as Control<CardFormFields>;
+  const role = useCardFollowsMethod(
+    cardControl,
+    setValue as unknown as UseFormSetValue<CardFormFields>,
+    cards,
+    plan.cardId ?? '',
+  );
   // Only categories of its type; an archived one only if it is already the current one.
   const options = categories.filter(
     (category) =>
@@ -324,6 +352,7 @@ export function PlanForm({
           </FormField>
         )}
       />
+      {role && <CardField control={cardControl} id={id('card')} cards={cards} role={role} />}
       <Controller
         control={control}
         name="merchant"

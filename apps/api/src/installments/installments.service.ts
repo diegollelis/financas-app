@@ -22,7 +22,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { ensureCardFits, ensureUsableCard } from '../cards/ensure-card.js';
+import { ensureCardFits, ensureNewCard, ensureUsableCard } from '../cards/ensure-card.js';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
 import type { Prisma, InstallmentPlan as PlanRow } from '../generated/prisma/client.js';
@@ -144,9 +144,7 @@ export class InstallmentsService {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
-    if (input.cardId) {
-      await ensureUsableCard(this.prisma, workspaceId, input.cardId, input.paymentMethod);
-    }
+    await ensureNewCard(this.prisma, workspaceId, input);
     const totalCents = installmentPlanTotal(input);
     // From the first number on (ADR 0055): a purchase at 3/10 gets installments 3 to 10.
     const firstNumber = input.firstNumber ?? 1;

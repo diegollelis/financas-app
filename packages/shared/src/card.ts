@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { statementBankSchema } from './import.ts';
+import { shiftPeriod } from './money-and-dates.ts';
 import type { PaymentMethod } from './payment-method.ts';
+import { dueDateFor } from './recurrence.ts';
 
 // Cartão (ADR 0062): a card of the workspace, a detail of the Crédito and Débito payment
 // methods. No limit and no balance; with the credit function it has the days of its bill.
@@ -116,6 +118,52 @@ export type Card = z.infer<typeof cardSchema>;
 
 /** `GET /workspaces/:workspaceId/cards`: all of them, archived too, by name. */
 export const cardListResponseSchema = z.array(cardSchema);
+
+/**
+ * `GET /workspaces/:workspaceId/cards/unlinked` (ADR 0062 note): the transactions with no card in
+ * the methods of each function, which the first card offers to take: the Crédito ones still to
+ * pay (the paid ones stay as they are) and every Débito one.
+ */
+export const unlinkedCardTransactionsSchema = z.object({
+  credit: z.number().int(),
+  debit: z.number().int(),
+});
+
+export type UnlinkedCardTransactions = z.infer<typeof unlinkedCardTransactionsSchema>;
+
+/**
+ * `POST /workspaces/:workspaceId/cards/:cardId/link`: gives the card to those transactions, and
+ * to the running recurrences and installment plans of those methods with no card, for the
+ * functions chosen (the card must have them).
+ */
+export const linkCardInputSchema = z.object({ functions: cardFunctionsSchema });
+
+export type LinkCardInput = z.infer<typeof linkCardInputSchema>;
+
+export const linkCardResponseSchema = z.object({
+  /** The transactions that got the card. */
+  linked: z.number().int(),
+});
+
+export type LinkCardResponse = z.infer<typeof linkCardResponseSchema>;
+
+/**
+ * The due date of the bill a purchase on `purchasedOn` falls in (ADR 0062): the bill closes on
+ * the closing day (the month's last day when it is shorter), so a purchase after it goes to the
+ * next one; the bill is due on its due day after closing, in the same month when that day comes
+ * later, else in the next. Null for a card without the credit function.
+ * `cardBillDueDate({ closingDay: 27, dueDay: 4 }, '2026-10-28')` → '2026-12-04'.
+ */
+export function cardBillDueDate(
+  card: Pick<Card, 'closingDay' | 'dueDay'>,
+  purchasedOn: string,
+): string | null {
+  const { closingDay, dueDay } = card;
+  if (closingDay === null || dueDay === null) return null;
+  const month = purchasedOn.slice(0, 7);
+  const closesIn = purchasedOn <= dueDateFor(month, closingDay, 0) ? month : shiftPeriod(month, 1);
+  return dueDateFor(closesIn, dueDay, dueDay > closingDay ? 0 : 1);
+}
 
 /** The card function a payment method uses; null for a method that is not a card's. */
 export function cardFunctionOf(

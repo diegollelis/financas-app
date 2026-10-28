@@ -12,7 +12,7 @@ import {
 } from '@financas/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp } from './app.js';
-import { resetDatabase } from './db.js';
+import { ownerClient, resetDatabase } from './db.js';
 import { expectHiddenFromOutsiders, type WorkspaceRoute } from './isolation.js';
 
 // Cards: a detail of the Crédito and Débito payment methods (ADR 0062).
@@ -35,6 +35,12 @@ const cardRoutes: WorkspaceRoute[] = [
     body: { archived: true },
   },
   { method: 'delete', path: (id) => `/api/workspaces/${id}/cards/${SOME_ID}` },
+  { method: 'get', path: (id) => `/api/workspaces/${id}/cards/unlinked` },
+  {
+    method: 'post',
+    path: (id) => `/api/workspaces/${id}/cards/${SOME_ID}/link`,
+    body: { functions: ['DEBIT'] },
+  },
 ];
 
 /** A multiple card, closing on the 27th and due on the 4th. */
@@ -308,6 +314,127 @@ describe('cards', () => {
         .send({ amountCents: 4_000, settledAt: todayIso() })
         .expect(201);
       expect(parted.body).toMatchObject({ settled: { cardId: card.id } });
+    });
+  });
+
+  describe('required with Crédito and Débito (ADR 0062 note)', () => {
+    /** A transaction from before cards: a card method with no card, written as the owner. */
+    async function fromBefore(
+      workspaceId: string,
+      categoryId: string,
+      paymentMethod: 'CREDIT_CARD' | 'DEBIT_CARD',
+      settledAt: Date | null = null,
+    ) {
+      const owner = ownerClient();
+      try {
+        return await owner.transaction.create({
+          data: {
+            workspaceId,
+            type: 'DEBIT',
+            description: 'Compra antiga',
+            categoryId,
+            amountCents: 3_000,
+            period,
+            paymentMethod,
+            settledAt,
+          },
+        });
+      } finally {
+        await owner.$disconnect();
+      }
+    }
+
+    it('refuses Crédito or Débito with no card on what is created', async () => {
+      const { browser, base, debit, fields } = await setup();
+
+      for (const paymentMethod of ['CREDIT_CARD', 'DEBIT_CARD']) {
+        const refused = await browser
+          .post(`${base}/transactions`)
+          .send(debit({ paymentMethod }))
+          .expect(400);
+        expect(refused.body).toMatchObject({ code: 'CARD_REQUIRED' });
+      }
+      await browser
+        .post(`${base}/recurrences`)
+        .send({ ...fields({}), startPeriod: period, paymentMethod: 'CREDIT_CARD' })
+        .expect(400);
+      await browser
+        .post(`${base}/installments`)
+        .send({
+          ...fields({}),
+          installments: 2,
+          amountIs: 'TOTAL',
+          firstPeriod: period,
+          paymentMethod: 'DEBIT_CARD',
+        })
+        .expect(400);
+      await browser
+        .post(`${base}/transactions`)
+        .send(debit({ paymentMethod: 'PIX' }))
+        .expect(201);
+    });
+
+    it('keeps one from before valid until its method or card is changed', async () => {
+      const { browser, base, lazer, personalWorkspaceId, addCard } = await setup();
+      const old = await fromBefore(personalWorkspaceId, lazer.id, 'CREDIT_CARD');
+      const card = await addCard();
+      const path = `${base}/transactions/${old.id}`;
+
+      await browser.patch(path).send({ description: 'Compra de antes' }).expect(200);
+      const refused = await browser.patch(path).send({ paymentMethod: 'CREDIT_CARD' }).expect(400);
+      expect(refused.body).toMatchObject({ code: 'CARD_REQUIRED' });
+      await browser.patch(path).send({ paymentMethod: 'CREDIT_CARD', cardId: card.id }).expect(200);
+      await browser.patch(path).send({ cardId: null }).expect(400);
+    });
+
+    it('counts and links the ones from before: Crédito still to pay, and every Débito', async () => {
+      const { browser, base, lazer, personalWorkspaceId, addCard } = await setup();
+      const workspaceId = personalWorkspaceId;
+      const pending = await fromBefore(workspaceId, lazer.id, 'CREDIT_CARD');
+      const paid = await fromBefore(workspaceId, lazer.id, 'CREDIT_CARD', new Date());
+      const debitOne = await fromBefore(workspaceId, lazer.id, 'DEBIT_CARD', new Date());
+      const owner = ownerClient();
+      await owner.recurrence.create({
+        data: {
+          workspaceId,
+          type: 'DEBIT',
+          description: 'Streaming',
+          categoryId: lazer.id,
+          amountCents: 4_000,
+          startPeriod: next,
+          paymentMethod: 'CREDIT_CARD',
+        },
+      });
+      await owner.$disconnect();
+
+      const counts = await browser.get(`${base}/cards/unlinked`).expect(200);
+      expect(counts.body).toEqual({ credit: 1, debit: 1 });
+
+      const credit = await addCard({ ...both, name: 'Só crédito', functions: ['CREDIT'] });
+      await browser
+        .post(`${base}/cards/${credit.id}/link`)
+        .send({ functions: ['DEBIT'] })
+        .expect(400);
+      const linked = await browser
+        .post(`${base}/cards/${credit.id}/link`)
+        .send({ functions: ['CREDIT'] })
+        .expect(200);
+      expect(linked.body).toEqual({ linked: 1 });
+
+      const rows = await transactions(browser, base);
+      const cardOf = (id: string) => rows.find((row) => row.id === id)?.cardId;
+      expect(cardOf(pending.id)).toBe(credit.id);
+      expect(cardOf(paid.id)).toBeNull();
+      expect(cardOf(debitOne.id)).toBeNull();
+      // The running recurrence takes it too, and its next months come with it.
+      expect((await transactions(browser, base, next))[0]).toMatchObject({
+        description: 'Streaming',
+        cardId: credit.id,
+      });
+      expect((await browser.get(`${base}/cards/unlinked`).expect(200)).body).toEqual({
+        credit: 0,
+        debit: 1,
+      });
     });
   });
 

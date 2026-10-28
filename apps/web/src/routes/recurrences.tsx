@@ -5,7 +5,6 @@ import {
   formatPeriod,
   hasRole,
   nextRecurrencePeriod,
-  paymentMethodLabels,
   settledLabels,
   installmentsCreated,
   shiftPeriod,
@@ -64,6 +63,7 @@ import {
   useUpdateInstallmentPlan,
 } from '@/features/installments/use-installments';
 import { useMerchants, useResolveMerchant } from '@/features/merchants/use-merchants';
+import { useCards, usePaymentMethodText } from '@/features/cards/use-cards';
 import { usePeople, useResolvePerson } from '@/features/people/use-people';
 import { dueDayLabel, frequencyLabel, monthNameOf } from '@/features/recurrences/due';
 import { RecurrenceForm } from '@/features/recurrences/recurrence-form';
@@ -299,14 +299,18 @@ function dueCell(dueDay: number | null, dueMonthOffset: number) {
 function CategoryAndMethod({
   category,
   method,
+  cardId,
 }: {
   category: string | undefined;
   method: PaymentMethod | null;
+  /** Named beside the method (ADR 0062). */
+  cardId: string | null;
 }) {
+  const methodText = usePaymentMethodText()(method, cardId);
   return (
     <span className="grid">
       <span>{category ?? 'Categoria'}</span>
-      {method && <span className="text-muted-foreground">{paymentMethodLabels[method]}</span>}
+      {methodText && <span className="text-muted-foreground">{methodText}</span>}
     </span>
   );
 }
@@ -338,6 +342,8 @@ function EditRecurrence({
   onDone: () => void;
 }) {
   const user = useCurrentUser();
+  // Asked for with Crédito and Débito (ADR 0062); the page's cache.
+  const cards = useCards(workspaceId).data ?? [];
   const update = useUpdateRecurrence(workspaceId);
   const person = useResolvePerson(workspaceId, people);
   const merchant = useResolveMerchant(workspaceId, merchants);
@@ -390,6 +396,7 @@ function EditRecurrence({
       categories={categories}
       people={people}
       merchants={merchants}
+      cards={cards}
       userId={user.id}
       pending={update.isPending || person.isPending || merchant.isPending || category.isPending}
       error={category.error ?? person.error ?? merchant.error ?? update.error}
@@ -416,6 +423,8 @@ function EditPlan({
   onDone: () => void;
 }) {
   const user = useCurrentUser();
+  // Asked for with Crédito and Débito (ADR 0062); the page's cache.
+  const cards = useCards(workspaceId).data ?? [];
   const update = useUpdateInstallmentPlan(workspaceId);
   const person = useResolvePerson(workspaceId, people);
   const merchant = useResolveMerchant(workspaceId, merchants);
@@ -465,6 +474,7 @@ function EditPlan({
       categories={categories}
       people={people}
       merchants={merchants}
+      cards={cards}
       userId={user.id}
       pending={update.isPending || person.isPending || merchant.isPending || category.isPending}
       error={category.error ?? person.error ?? merchant.error ?? update.error}
@@ -517,6 +527,7 @@ function RecurrenceItem({
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const end = useEndRecurrence(workspaceId);
+  const methodText = usePaymentMethodText();
   const { description } = recurrence;
   const ended = recurrence.endPeriod !== null;
   const category = categories.find((item) => item.id === recurrence.categoryId);
@@ -588,7 +599,11 @@ function RecurrenceItem({
         <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
         <TableCell>{typeLabel[recurrence.type]}</TableCell>
         <TableCell className="whitespace-normal">
-          <CategoryAndMethod category={category?.name} method={recurrence.paymentMethod} />
+          <CategoryAndMethod
+            category={category?.name}
+            method={recurrence.paymentMethod}
+            cardId={recurrence.cardId}
+          />
         </TableCell>
         <TableCell className="whitespace-normal">{who ?? '—'}</TableCell>
         <TableCell className="whitespace-normal">
@@ -627,7 +642,7 @@ function RecurrenceItem({
         typeLabel[recurrence.type],
         frequency,
         category?.name ?? 'Categoria',
-        recurrence.paymentMethod && paymentMethodLabels[recurrence.paymentMethod],
+        methodText(recurrence.paymentMethod, recurrence.cardId),
         personLine(recurrence.type, recurrence.personId, people),
         splitLine(recurrence.split, people),
         recurrence.dueDay === null
@@ -665,6 +680,7 @@ function PlanItem({
   const [editing, setEditing] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const end = useEndInstallmentPlan(workspaceId);
+  const methodText = usePaymentMethodText();
   const { description } = plan;
   const over = planIsOver(plan);
   // Nothing paid: no history to keep, so it is deleted rather than ended (ADR 0038 note).
@@ -755,7 +771,11 @@ function PlanItem({
         <TableCell className="font-medium break-words whitespace-normal">{description}</TableCell>
         <TableCell>{typeLabel[plan.type]}</TableCell>
         <TableCell className="whitespace-normal">
-          <CategoryAndMethod category={category?.name} method={plan.paymentMethod} />
+          <CategoryAndMethod
+            category={category?.name}
+            method={plan.paymentMethod}
+            cardId={plan.cardId}
+          />
         </TableCell>
         <TableCell className="whitespace-normal">
           {personLine(plan.type, plan.personId, people) ?? '—'}
@@ -787,7 +807,7 @@ function PlanItem({
       meta={[
         typeLabel[plan.type],
         category?.name ?? 'Categoria',
-        plan.paymentMethod && paymentMethodLabels[plan.paymentMethod],
+        methodText(plan.paymentMethod, plan.cardId),
         personLine(plan.type, plan.personId, people),
         `${paidCount(plan)} de ${plan.installments} pagas`,
         which,

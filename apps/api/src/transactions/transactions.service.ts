@@ -16,7 +16,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { ensureCardFits, ensureUsableCard } from '../cards/ensure-card.js';
+import { ensureCardFits, ensureNewCard } from '../cards/ensure-card.js';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
@@ -104,9 +104,7 @@ export class TransactionsService {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
-    if (input.cardId) {
-      await ensureUsableCard(this.prisma, workspaceId, input.cardId, input.paymentMethod);
-    }
+    await ensureNewCard(this.prisma, workspaceId, input);
     const shares = input.split ? await this.shares(workspaceId, input, input.split) : [];
     const transaction = await this.prisma.forWorkspace(workspaceId).transaction.create({
       data: {

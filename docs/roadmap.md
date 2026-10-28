@@ -240,7 +240,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - [ ] **Cartões e "Pagar fatura"** ([ADR 0062](adr/0062-cartoes-e-pagar-fatura.md)): um cadastro de cartões (crédito e débito, sem limite nem saldo) e a fatura, o cartão mais o vencimento, quitada numa vez
   - [x] ADR: o cartão com as funções e os dias do fechamento e do vencimento, o cartão no lançamento só com Crédito ou Débito, a fatura sem tabela própria, "Pagar fatura" com "Desfazer", no glossário e no modelo
   - [x] API: a tabela de cartões e as rotas, o `cardId` nos lançamentos, recorrências, parcelamentos e importações, e a exportação
-  - [ ] Tela: a página "Cartões" (no Mais) e o cartão no formulário, com a sugestão do vencimento e a oferta de ligar os lançamentos sem cartão
+  - [x] Tela: a página "Cartões" (no Mais) e o cartão no formulário, com a sugestão do vencimento e a oferta de ligar os lançamentos sem cartão; o cartão passa a ser obrigatório no Crédito e no Débito (nota no ADR)
   - [ ] Importação: "Qual cartão?" na fatura e o cartão de débito no extrato da conta
   - [ ] API e tela de "Pagar fatura" (com prévia)
   - [ ] O pagamento da fatura no extrato da conta quitando a fatura do cartão

@@ -348,6 +348,47 @@ describe('RecurrencesPage', () => {
     });
   });
 
+  it('asks the card with Crédito, sending it with the method, and names it on the row (ADR 0062)', async () => {
+    const card = {
+      id: '01920000-0000-7000-8000-0000000008a1',
+      name: 'Cartão Exemplo',
+      bank: 'NUBANK',
+      functions: ['CREDIT'],
+      closingDay: 27,
+      dueDay: 4,
+      archived: false,
+      inUse: true,
+    };
+    const fetchMock = mockRecurrences({
+      [`GET ${base}/recurrences`]: {
+        body: [aluguel, { ...energia, paymentMethod: 'CREDIT_CARD', cardId: card.id }, academia],
+      },
+      [`GET ${base}/cards`]: { body: [card] },
+      [`PATCH ${base}/recurrences/${aluguel.id}`]: {
+        body: { ...aluguel, paymentMethod: 'CREDIT_CARD', cardId: card.id },
+      },
+    });
+    renderApp(page);
+
+    expect(await screen.findByText(/Crédito no Cartão Exemplo/)).toBeInTheDocument();
+    await choose('Aluguel', 'Editar');
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
+    await userEvent.click(
+      within(dialog).getByRole('combobox', { name: 'Meio de pagamento (opcional)' }),
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Crédito' }));
+    // The only card with Crédito comes chosen.
+    expect(within(dialog).getByRole('combobox', { name: 'Cartão' })).toHaveTextContent(
+      'Cartão Exemplo',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+
+    await expectCall(fetchMock, `${base}/recurrences/${aluguel.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ paymentMethod: 'CREDIT_CARD', cardId: card.id }),
+    });
+  });
+
   it('changes the person of a recurrence, a new name becoming a person first', async () => {
     const carla = person(3, 'Carla');
     const fetchMock = mockRecurrences({
