@@ -7,6 +7,7 @@ import {
   parseNubankCsv,
   statementBanks,
   type AccountLine,
+  type Card,
   type Import,
   type StatementBank,
   type StatementLine,
@@ -44,6 +45,10 @@ import { useMerchants } from '@/features/merchants/use-merchants';
 import { usePeople } from '@/features/people/use-people';
 import { useTransactions } from '@/features/transactions/use-transactions';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
+import { cardsFor } from '@/features/cards/card-rules';
+import { CardSelect } from '@/features/cards/card-select';
+import { useCards } from '@/features/cards/use-cards';
+import { FormField } from '@/components/form-field';
 import { cn } from '@/lib/utils';
 
 /** A statement read. */
@@ -64,6 +69,7 @@ type ReadFile =
 function AccountReview({
   workspaceId,
   bank,
+  cards,
   file,
   previousImports,
   onChooseAnother,
@@ -71,6 +77,8 @@ function AccountReview({
 }: {
   workspaceId: string;
   bank: { bank: StatementBank; label: string };
+  /** For the purchases in Débito (ADR 0062 note): the bank's only one comes chosen. */
+  cards: Card[];
   file: AccountFile;
   previousImports: Import[];
   onChooseAnother: () => void;
@@ -146,6 +154,7 @@ function AccountReview({
             : [],
       }}
       source={{ kind: 'ACCOUNT_STATEMENT', bank: bank.bank }}
+      cards={{ list: cards }}
       heading={{
         title: 'Revisar extrato da conta',
         subtitle: `${bank.label} · ${file.lines.length} ${file.lines.length === 1 ? 'movimento' : 'movimentos'}`,
@@ -166,6 +175,7 @@ function AccountReview({
 function StatementReview({
   workspaceId,
   bank,
+  card,
   statement,
   previousImports,
   onChooseAnother,
@@ -173,6 +183,8 @@ function StatementReview({
 }: {
   workspaceId: string;
   bank: { bank: StatementBank; label: string };
+  /** The card whose bill it is (ADR 0062): every line goes to it. */
+  card: Card;
   statement: StatementFile;
   previousImports: Import[];
   onChooseAnother: () => void;
@@ -249,11 +261,12 @@ function StatementReview({
         notices,
       }}
       source={{ kind: 'CARD_STATEMENT', bank: bank.bank }}
+      cards={{ list: [card], fixed: { CREDIT: card.id } }}
       heading={{
         title: 'Revisar fatura do cartão',
-        subtitle: `${bank.label} · ${statement.lines.length} ${statement.lines.length === 1 ? 'linha' : 'linhas'}`,
+        subtitle: `${card.name} (${bank.label}) · ${statement.lines.length} ${statement.lines.length === 1 ? 'linha' : 'linhas'}`,
       }}
-      defaultLabel={`Fatura ${bank.label}`}
+      defaultLabel={card.name}
       onChooseAnother={onChooseAnother}
       onImported={onImported}
     />
@@ -278,7 +291,18 @@ export function StatementImportPage() {
   const [readError, setReadError] = useState<string | null>(null);
   const [statement, setStatement] = useState<ReadFile | null>(null);
   const account = kind === 'ACCOUNT_STATEMENT';
-  const ready = categories.isSuccess && imports.isSuccess;
+  // A card's bill asks the card instead of the bank (ADR 0062): the ones with Crédito of a bank
+  // the app reads; the bank, and so the reader, comes from it.
+  const cards = useCards(workspace.id);
+  const billCards = cardsFor(cards.data ?? [], 'CREDIT').filter((card) =>
+    statementBanks.some((item) => item.bank === card.bank),
+  );
+  const [cardId, setCardId] = useState('');
+  const billCard =
+    billCards.find((card) => card.id === cardId) ??
+    (billCards.length === 1 ? billCards[0] : undefined);
+  const billBank = billCard && statementBanks.find((item) => item.bank === billCard.bank);
+  const ready = categories.isSuccess && imports.isSuccess && cards.isSuccess;
   const unavailable = bank.sources.filter((source) => !source.available);
   const imported = (firstPeriod: string) =>
     void navigate(`/espacos/${workspace.id}/lancamentos?competencia=${firstPeriod}`);
@@ -323,39 +347,10 @@ export function StatementImportPage() {
     <>
       {/* While a file is reviewed, the review is the page's step (its own title and Cancelar). */}
       {!statement && <ImportHeader workspaceId={workspace.id} />}
-      <QueryState queries={[categories, imports]} />
+      <QueryState queries={[categories, imports, cards]} />
       {ready && canEdit && !statement && (
         <SectionCard title="Nova importação">
-          <div className="grid gap-1.5 sm:max-w-xs">
-            <label htmlFor="import-bank" className="text-sm font-medium">
-              Banco
-            </label>
-            <Select
-              value={bankId}
-              onValueChange={(next) => {
-                setBankId(next as StatementBank);
-                setReadError(null);
-              }}
-            >
-              <SelectTrigger
-                id="import-bank"
-                aria-describedby="import-bank-note"
-                className="w-full"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                {statementBanks.map((item) => (
-                  <SelectItem key={item.bank} value={item.bank}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p id="import-bank-note" className="text-muted-foreground text-sm">
-              Por enquanto, só o Nubank. Outros bancos virão.
-            </p>
-          </div>
+          {/* The kind first: a card's bill asks the card, an account statement the bank. */}
           <div className="grid gap-1.5">
             <p aria-hidden className="text-sm font-medium">
               Qual extrato?
@@ -382,6 +377,60 @@ export function StatementImportPage() {
               </p>
             )}
           </div>
+          {account ? (
+            <div className="grid gap-1.5 sm:max-w-xs">
+              <label htmlFor="import-bank" className="text-sm font-medium">
+                Banco
+              </label>
+              <Select
+                value={bankId}
+                onValueChange={(next) => {
+                  setBankId(next as StatementBank);
+                  setReadError(null);
+                }}
+              >
+                <SelectTrigger
+                  id="import-bank"
+                  aria-describedby="import-bank-note"
+                  className="w-full"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {statementBanks.map((item) => (
+                    <SelectItem key={item.bank} value={item.bank}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p id="import-bank-note" className="text-muted-foreground text-sm">
+                Por enquanto, só o Nubank. Outros bancos virão.
+              </p>
+            </div>
+          ) : (
+            <div className="sm:max-w-xs">
+              <FormField
+                id="import-card"
+                label="Qual cartão?"
+                hint={
+                  billCards.length > 0
+                    ? 'Os cartões com Crédito de um banco que o app lê.'
+                    : 'Nenhum cartão com Crédito de um banco que o app lê. Cadastre o da fatura em “Novo cartão”: as compras entram nele.'
+                }
+              >
+                <CardSelect
+                  cards={billCards}
+                  role="CREDIT"
+                  value={billCard?.id ?? ''}
+                  onChange={(next) => {
+                    setCardId(next);
+                    setReadError(null);
+                  }}
+                />
+              </FormField>
+            </div>
+          )}
           <section aria-labelledby="import-step-statement" className="grid gap-2">
             <div className="flex items-center">
               <h3 id="import-step-statement" className="font-medium">
@@ -390,7 +439,7 @@ export function StatementImportPage() {
               <InfoTip term={`Baixe ${account ? 'o extrato' : 'a fatura'} em CSV`}>
                 {account
                   ? `No app do ${bank.label}, abra o extrato da conta, escolha o período e exporte em CSV. Na revisão, cada movimento é conferido com o que já está lançado, e o que já existe não entra de novo. Do Pix e da transferência, o app guarda só o nome da outra parte: CPF, CNPJ, banco, agência e conta ficam de fora.`
-                  : `No app ou no site do ${bank.label}, abra a fatura do cartão e exporte em CSV. Na revisão, você confirma o mês da fatura e o vencimento, e as compras parceladas viram parcelamentos.`}
+                  : `No app ou no site do ${billBank?.label ?? bank.label}, abra a fatura do cartão e exporte em CSV. Na revisão, você confirma o mês da fatura e o vencimento, e as compras parceladas viram parcelamentos.`}
               </InfoTip>
             </div>
           </section>
@@ -402,7 +451,8 @@ export function StatementImportPage() {
               id="import-statement-input"
               type="file"
               accept=".csv,text/csv"
-              disabled={reading}
+              // A card's bill waits for its card (ADR 0062).
+              disabled={reading || (!account && !billCard)}
               className="peer sr-only"
               aria-describedby={readError ? 'import-file-error' : undefined}
               onChange={(event) => {
@@ -436,16 +486,18 @@ export function StatementImportPage() {
         <AccountReview
           workspaceId={workspace.id}
           bank={bank}
+          cards={cards.data}
           file={statement}
           previousImports={imports.data}
           onChooseAnother={() => setStatement(null)}
           onImported={imported}
         />
       )}
-      {ready && statement?.kind === 'CARD_STATEMENT' && (
+      {ready && statement?.kind === 'CARD_STATEMENT' && billCard && billBank && (
         <StatementReview
           workspaceId={workspace.id}
-          bank={bank}
+          bank={billBank}
+          card={billCard}
           statement={statement}
           previousImports={imports.data}
           onChooseAnother={() => setStatement(null)}

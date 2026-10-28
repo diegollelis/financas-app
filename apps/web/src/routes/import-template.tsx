@@ -12,6 +12,7 @@ import { ImportHeader } from '@/features/import/import-tabs';
 import { PreviousImports } from '@/features/import/previous-imports';
 import { startReview, type ReviewRow } from '@/features/import/review';
 import { useImports } from '@/features/import/use-imports';
+import { useCards } from '@/features/cards/use-cards';
 import { downloadTemplate, readTemplate, TemplateReadError } from '@/features/import/workbook';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,8 @@ export function TemplateImportPage() {
   const workspace = useCurrentWorkspace();
   const categories = useCategories(workspace.id);
   const imports = useImports(workspace.id);
+  // The cards of the lines in Crédito and Débito (ADR 0062 note); the review asks when it must.
+  const cards = useCards(workspace.id);
   const navigate = useNavigate();
   const canEdit = hasRole(workspace.role, 'EDITOR');
   const [review, setReview] = useState<{ rows: ReviewRow[]; openings: number } | null>(null);
@@ -145,6 +148,7 @@ export function TemplateImportPage() {
           categories={categories.data}
           previousImports={imports.data}
           source={{ kind: 'TEMPLATE', bank: null }}
+          cards={{ list: cards.data ?? [] }}
           heading={{
             title: 'Revisar planilha',
             subtitle: `Planilha modelo · ${review.rows.length} ${review.rows.length === 1 ? 'linha' : 'linhas'}`,

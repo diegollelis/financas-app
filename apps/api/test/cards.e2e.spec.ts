@@ -562,5 +562,52 @@ describe('cards', () => {
         .expect(400);
       expect(refused.body).toMatchObject({ code: 'INVALID_CARD' });
     });
+
+    it('asks the card of a line in Crédito or Débito (ADR 0062 note)', async () => {
+      const { browser, base, lazer } = await setup();
+
+      const refused = await browser
+        .post(`${base}/imports`)
+        .send({
+          kind: 'TEMPLATE',
+          transactions: [
+            {
+              type: 'DEBIT',
+              description: 'Pizzaria Exemplo',
+              categoryId: lazer.id,
+              amountCents: 6_500,
+              period,
+              paymentMethod: 'DEBIT_CARD',
+            },
+          ],
+        })
+        .expect(400);
+      expect(refused.body).toMatchObject({ code: 'CARD_REQUIRED' });
+    });
+
+    it("puts a purchase found in the app on the statement's card, in Crédito", async () => {
+      const { browser, base, addCard, launch } = await setup();
+      const card = await addCard();
+      // Launched by hand before, with no method: the bill shows it was on the card.
+      const found = await launch({ description: 'Streaming' });
+
+      await browser
+        .post(`${base}/imports`)
+        .send({
+          kind: 'CARD_STATEMENT',
+          bank: 'NUBANK',
+          cardId: card.id,
+          statementDueDate: `${next}-04`,
+          transactions: [],
+          matches: [{ transactionId: found.id, dueDate: `${next}-04` }],
+        })
+        .expect(201);
+
+      expect((await transactions(browser, base)).find((row) => row.id === found.id)).toMatchObject({
+        paymentMethod: 'CREDIT_CARD',
+        cardId: card.id,
+        dueDate: `${next}-04`,
+      });
+    });
   });
 });

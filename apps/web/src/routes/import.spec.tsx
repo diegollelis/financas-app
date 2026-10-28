@@ -77,12 +77,26 @@ const groceryRow = [
   null,
 ];
 
+// A multiple card of Nubank, the only one: chosen without asking (ADR 0062).
+const nubankCard = {
+  id: '01920000-0000-7000-8000-0000000008c1',
+  name: 'Cartão Exemplo',
+  bank: 'NUBANK',
+  functions: ['CREDIT', 'DEBIT'],
+  closingDay: 27,
+  dueDay: 4,
+  archived: false,
+  inUse: true,
+};
+
 function mockImport(overrides: Record<string, { status?: number; body: unknown }> = {}) {
   return mockApi({
     'GET /api/me': { body: verifiedUser },
     [`GET ${base}`]: { body: house },
     [`GET ${base}/categories`]: { body: [salario, mercado, moradia] },
     [`GET ${base}/imports`]: { body: [] },
+    // The card of a Nubank bill, and of the lines in Crédito and Débito (ADR 0062).
+    [`GET ${base}/cards`]: { body: [nubankCard] },
     ...overrides,
   });
 }
@@ -293,9 +307,46 @@ describe('ImportPage', () => {
     expect(within(august).getByRole('listitem')).toHaveTextContent('Crédito');
     await userEvent.click(screen.getByRole('button', { name: 'Importar 1 lançamento' }));
 
+    // The only card with Crédito goes with it, without asking (ADR 0062 note).
+    expect(
+      within(screen.getByRole('region', { name: 'Cartões' })).getByRole('combobox', {
+        name: 'Cartão do Crédito',
+      }),
+    ).toHaveTextContent('Cartão Exemplo');
     await expectCall(fetchMock, `${base}/imports`, {
       method: 'POST',
-      body: expect.stringContaining('"paymentMethod":"CREDIT_CARD"') as unknown,
+      body: expect.stringContaining(
+        `"paymentMethod":"CREDIT_CARD","cardId":"${nubankCard.id}"`,
+      ) as unknown,
+    });
+  });
+
+  it('asks the card of the lines in Crédito when two cards have it (ADR 0062 note)', async () => {
+    const otherCard = {
+      ...nubankCard,
+      id: '01920000-0000-7000-8000-0000000008c2',
+      name: 'Cartão da Casa',
+      bank: null,
+    };
+    const fetchMock = mockImport({ [`GET ${base}/cards`]: { body: [nubankCard, otherCard] } });
+    renderApp(page);
+
+    await choose(
+      await spreadsheet([
+        ['2026-08', 'Saída', 'Supermercado', 'mercado', null, 'crédito', 640.35, null, null],
+      ]),
+    );
+
+    const cards = await screen.findByRole('region', { name: 'Cartões' });
+    expect(within(cards).getByText('Para a linha no Crédito. Escolha qual.')).toBeInTheDocument();
+    expect(screen.getAllByText('Escolha o cartão do Crédito.').length).toBeGreaterThan(0);
+    await userEvent.click(within(cards).getByRole('combobox', { name: 'Cartão do Crédito' }));
+    await userEvent.click(await screen.findByRole('option', { name: /Cartão da Casa/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Importar 1 lançamento' }));
+
+    await expectCall(fetchMock, `${base}/imports`, {
+      method: 'POST',
+      body: expect.stringContaining(`"cardId":"${otherCard.id}"`) as unknown,
     });
   });
 
@@ -758,7 +809,8 @@ describe('ImportPage', () => {
       expect(pizza).toHaveTextContent('No extrato: Ifd*Pizzaria Exemplo');
       expect(payment).toHaveTextContent('Pagamento da fatura anterior: não é uma entrada.');
       expect(within(payment!).getByRole('checkbox')).not.toBeChecked();
-      expect(screen.getByLabelText('Origem (opcional)')).toHaveValue('Fatura Nubank');
+      // The card's name, chosen before the file (ADR 0062).
+      expect(screen.getByLabelText('Origem (opcional)')).toHaveValue('Cartão Exemplo');
 
       // A line without a category picks it on its card.
       await userEvent.click(
@@ -798,7 +850,7 @@ describe('ImportPage', () => {
       await expectCall(fetchMock, `${base}/imports`, {
         method: 'POST',
         body: expect.stringContaining(
-          '"aliases":[{"merchantName":"Spaceship","alias":"Spaceship.Com"}],"label":"Fatura Nubank","kind":"CARD_STATEMENT","bank":"NUBANK","statementDueDate":"2026-11-04"',
+          '"aliases":[{"merchantName":"Spaceship","alias":"Spaceship.Com"}],"label":"Cartão Exemplo","kind":"CARD_STATEMENT","bank":"NUBANK","cardId":"01920000-0000-7000-8000-0000000008c1","statementDueDate":"2026-11-04"',
         ) as unknown,
       });
       await expectCall(fetchMock, `${base}/imports`, {
@@ -959,14 +1011,29 @@ describe('ImportPage', () => {
       );
     });
 
-    it('asks the bank first, then the card or the account statement (ADRs 0060, 0061)', async () => {
+    it('asks the kind first, then the card of a bill or the bank of an account (ADRs 0060, 0062)', async () => {
       mockStatement();
       renderApp(statementPage);
 
-      expect(await screen.findByRole('combobox', { name: 'Banco' })).toHaveTextContent('Nubank');
-      expect(screen.getByRole('radio', { name: 'Fatura' })).toBeChecked();
-      expect(screen.getByRole('radio', { name: 'Conta' })).toBeEnabled();
+      expect(await screen.findByRole('radio', { name: 'Fatura' })).toBeChecked();
+      // The only card with Crédito of a bank the app reads comes chosen.
+      expect(screen.getByRole('combobox', { name: 'Qual cartão?' })).toHaveTextContent(
+        'Cartão Exemplo',
+      );
+      expect(screen.queryByRole('combobox', { name: 'Banco' })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('radio', { name: 'Conta' }));
+      expect(screen.getByRole('combobox', { name: 'Banco' })).toHaveTextContent('Nubank');
       expect(screen.queryByText(/chega no próximo passo/)).not.toBeInTheDocument();
+    });
+
+    it('waits for the card of a bill when the workspace has none (ADR 0062)', async () => {
+      mockStatement({ [`GET ${base}/cards`]: { body: [] } });
+      renderApp(statementPage);
+
+      expect(
+        await screen.findByText(/Nenhum cartão com Crédito de um banco que o app lê/),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Escolher fatura (.csv)')).toBeDisabled();
     });
 
     it('names a past import by its origin and due date', async () => {

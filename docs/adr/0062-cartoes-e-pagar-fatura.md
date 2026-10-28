@@ -105,3 +105,17 @@ A decisão de deixar o cartão opcional foi revista na prévia da tela: o dono q
   - **No lançamento, na recorrência e no parcelamento,** "Cartão" aparece logo depois do meio, só com Crédito ou Débito. Ele já vem escolhido quando um só cartão tem a função, e o seletor tem "Novo cartão", que cadastra um sem sair do formulário.
   - **O vencimento sugerido:** com Crédito, num lançamento novo, o vencimento vazio é preenchido pela fatura do cartão (`cardBillDueDate`, pela data da compra, ou por hoje), com "Sugerido pela fatura do …". Ele nunca troca uma data digitada.
   - **Na linha e na tabela,** o meio aparece com o nome do cartão: "Crédito no Cartão Exemplo".
+
+## Nota (o cartão na importação, 2026-10-28)
+
+- **A importação também exige o cartão:** uma linha ou um parcelamento no Crédito ou no Débito sem cartão é recusado com 400 `CARD_REQUIRED`. Assim fecha a exceção deixada na nota anterior.
+- **Fatura do cartão:** "Nova importação" pergunta "Qual extrato?" primeiro.
+  - Na fatura vem "Qual cartão?", com os cartões com Crédito de um banco que o app lê. O banco, e com ele o leitor do arquivo, vem do cartão. Sem cartão, o arquivo espera, e o seletor tem "Novo cartão".
+  - Na conta, continua "Banco".
+  - A importação grava o cartão (`imports.card_id`), a revisão o mostra no subtítulo, e a "Origem" sugerida passa a ser o nome dele.
+  - Cada compra e cada parcelamento recebe o cartão. Um lançamento já no app que a fatura confere passa a ser Crédito nele, mesmo que estivesse sem meio (o mês de uma recorrência lançada à mão, por exemplo).
+- **Extrato da conta e planilha modelo:** a revisão ganha o bloco "Cartões", com um seletor para cada função que as linhas marcadas usam. Esse cartão vale para todas as linhas daquela função no arquivo.
+  - Por padrão vem o único cartão ativo com a função do banco do extrato, ou o único que existe com ela.
+  - Sem escolha, o botão de importar diz "Escolha o cartão do Débito" e leva até o campo.
+  - Um seletor por linha foi descartado: um extrato é de um banco, e trocar o cartão de um lançamento fica para "Editar", depois de importar.
+- **As importações antigas** ficam como estão.
