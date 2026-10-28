@@ -78,7 +78,7 @@ Como se pagou ou recebeu, numa lista fixa: Pix, Débito, Crédito, Vale-alimenta
 
 ### Card (Cartão) — fase 5 ([ADR 0062](../adr/0062-cartoes-e-pagar-fatura.md))
 
-Um cartão do espaço: nome (único no espaço, ignorando maiúsculas e acentos), banco (opcional, da lista dos extratos) e funções, Crédito, Débito ou as duas. Só com Crédito ele tem o dia do fechamento e o dia do vencimento. Não tem limite nem saldo. Lançamentos, recorrências, parcelamentos e importações têm um `card_id` opcional, aceito só com o meio Crédito ou Débito e de um cartão com essa função; cada mês gerado e cada parcela o herdam, e as partes de uma divisão não. Arquiva-se em vez de excluir; só um arquivado sem uso é excluído.
+Um cartão do espaço: nome (único no espaço, ignorando maiúsculas e acentos), banco (opcional, da lista dos extratos) e funções, Crédito, Débito ou as duas. Só com Crédito ele tem o dia do fechamento e o dia do vencimento. Não tem limite nem saldo. Lançamentos, recorrências, parcelamentos e importações têm um `card_id`, aceito só com o meio Crédito ou Débito e de um cartão com essa função, e obrigatório com esses meios daqui em diante (os lançamentos de antes continuam válidos até serem editados); cada mês gerado e cada parcela o herdam, e as partes de uma divisão não. Arquiva-se em vez de excluir; só um arquivado sem uso é excluído.
 
 A **fatura** é o cartão mais o vencimento: os lançamentos daquele cartão no Crédito que vencem naquele dia. "Pagar fatura" quita numa vez os pendentes dela, compras e estornos (que abatem do total), num só dia, e o "Desfazer" volta a pendentes só o que aquele pagamento quitou.
 

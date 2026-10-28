@@ -27,6 +27,7 @@ import { AccountPage } from '@/routes/account';
 import { AccountDeletedPage } from '@/routes/account-deleted';
 import { DeleteAccountPage } from '@/routes/delete-account';
 import { MerchantsPage } from '@/routes/merchants';
+import { CardsPage } from '@/routes/cards';
 import { PeoplePage } from '@/routes/people';
 import { PrivacyPage } from '@/routes/privacy';
 import { TermsPage } from '@/routes/terms';
@@ -90,6 +91,7 @@ export const routes: RouteObject[] = [
               { path: 'pessoas', element: <PeoplePage /> },
               // Where a transaction was bought or who paid it (ADR 0053).
               { path: 'estabelecimentos', element: <MerchantsPage /> },
+              { path: 'cartoes', element: <CardsPage /> },
               // The file is read in the browser; only confirmed rows go out (ADR 0040). The bank's
               // statements and the app's spreadsheet on pages of their own (ADR 0060).
               {

@@ -89,6 +89,18 @@ const ana = {
 };
 const peopleBase = `/api/workspaces/${houseId}/people`;
 
+// A card with both functions, closing on the 27th and due on the 4th (ADR 0062).
+const exampleCard = {
+  id: '01920000-0000-7000-8000-0000000007a1',
+  name: 'Cartão Exemplo',
+  bank: 'NUBANK',
+  functions: ['CREDIT', 'DEBIT'],
+  closingDay: 27,
+  dueDay: 4,
+  archived: false,
+  inUse: true,
+};
+
 // Intl separates "R$" from the number with a non-breaking space.
 function nbsp(text: string | null | undefined) {
   return text?.replaceAll(String.fromCharCode(0xa0), ' ');
@@ -781,7 +793,7 @@ describe('TransactionsPage', () => {
     await expectCall(fetchMock, `${base}/${light.id}`, {
       method: 'PATCH',
       body: expect.stringContaining(
-        `"personId":null,"merchantId":null,"paymentMethod":null,"split":[{"personId":"${ana.id}","amountCents":7995}]`,
+        `"personId":null,"merchantId":null,"paymentMethod":null,"cardId":null,"split":[{"personId":"${ana.id}","amountCents":7995}]`,
       ) as unknown,
     });
     expect(await screen.findByText('Lançamento salvo, dividido com 1 pessoa')).toBeInTheDocument();
@@ -1799,6 +1811,7 @@ describe('TransactionsPage', () => {
         personId: null,
         merchantId: null,
         paymentMethod: null,
+        cardId: null,
       }),
     });
     expect(await screen.findByText('Lançamento salvo')).toBeInTheDocument();
@@ -2521,6 +2534,7 @@ describe('TransactionsPage', () => {
   it('records how it was paid, shows it on the row and finds it by it (ADR 0054)', async () => {
     const fetchMock = mockTransactions({
       [`GET ${base}`]: { body: [salary, light, { ...shopping, paymentMethod: 'PIX' }] },
+      [`GET /api/workspaces/${houseId}/cards`]: { body: [exampleCard] },
       [`POST ${base}`]: { status: 201, body: { ...shopping, paymentMethod: 'CREDIT_CARD' } },
     });
     renderApp(`/espacos/${houseId}/lancamentos`);
@@ -2541,6 +2555,13 @@ describe('TransactionsPage', () => {
       within(form).getByRole('combobox', { name: 'Meio de pagamento (opcional)' }),
     );
     await userEvent.click(await screen.findByRole('option', { name: 'Crédito' }));
+    // The only card with Crédito comes chosen, and the due date is its bill's (ADR 0062): bought
+    // on the 15th, before the closing on the 27th, due on November 4th.
+    expect(within(form).getByRole('combobox', { name: 'Cartão' })).toHaveTextContent(
+      'Cartão Exemplo',
+    );
+    expect(within(form).getByLabelText('Vencimento (opcional)')).toHaveValue('2026-11-04');
+    expect(within(form).getByText('Sugerido pela fatura do Cartão Exemplo.')).toBeInTheDocument();
     await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
 
     await expectCall(fetchMock, base, {
@@ -2551,13 +2572,52 @@ describe('TransactionsPage', () => {
         notes: null,
         categoryId: marketCategory.id,
         amountCents: 2_500,
-        dueDate: null,
+        dueDate: '2026-11-04',
         occurredOn: '2026-10-15',
         period: '2026-10',
         personId: null,
         paymentMethod: 'CREDIT_CARD',
+        cardId: exampleCard.id,
       }),
     });
+  });
+
+  it('names the card beside the method, and asks for one with Crédito (ADR 0062)', async () => {
+    const otherCard = {
+      ...exampleCard,
+      id: '01920000-0000-7000-8000-0000000007a2',
+      name: 'Cartão da Casa',
+    };
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [
+          salary,
+          light,
+          { ...shopping, paymentMethod: 'CREDIT_CARD', cardId: exampleCard.id },
+        ],
+      },
+      [`GET /api/workspaces/${houseId}/cards`]: { body: [exampleCard, otherCard] },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    expect(row(await section('Saídas'), 'Compras da semana')).toHaveTextContent(
+      'Crédito no Cartão Exemplo',
+    );
+    const form = await openNewTransaction();
+    await userEvent.type(within(form).getByLabelText('Descrição'), 'Padaria');
+    await chooseCategory(form, 'Mercado');
+    await userEvent.type(within(form).getByLabelText('Valor (R$)'), '25,00');
+    await userEvent.click(
+      within(form).getByRole('combobox', { name: 'Meio de pagamento (opcional)' }),
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Crédito' }));
+    // Two cards with Crédito: none comes chosen, and it is required.
+    await userEvent.click(within(form).getByRole('button', { name: 'Adicionar' }));
+    expect(await within(form).findByText('Escolha o cartão do Crédito.')).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('combobox', { name: 'Cartão' }));
+    expect(await screen.findByRole('option', { name: /Novo cartão/ })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('option', { name: /Cartão da Casa/ }));
+    expect(within(form).queryByText('Escolha o cartão do Crédito.')).not.toBeInTheDocument();
   });
 
   it('shows the day it happened, and starts a new one of this month on today (ADR 0055)', async () => {

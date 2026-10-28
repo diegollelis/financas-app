@@ -2,6 +2,7 @@ import {
   formatPeriod,
   normalizeName,
   parsePercent,
+  type Card,
   type Category,
   type CategoryHints,
   type Merchant,
@@ -36,6 +37,7 @@ export function TransactionDialog({
   categories,
   people,
   merchants = [],
+  cards = [],
   hints,
   editing,
   editingIsSplit = false,
@@ -50,6 +52,8 @@ export function TransactionDialog({
   people: Person[];
   /** The workspace's merchants (ADR 0053); none for an application to a destination. */
   merchants?: Merchant[];
+  /** The workspace's cards (ADR 0062), asked for with Crédito and Débito. */
+  cards?: Card[];
   /** The history's categories (ADR 0053), to fill a new transaction's category. */
   hints?: CategoryHints;
   /** The transaction being edited; null to create one. */
@@ -137,9 +141,12 @@ export function TransactionDialog({
     // A new one names its merchant and its payment method (ADR 0054) only when there is one; an
     // edit always does (null takes it away).
     const paymentMethod = values.paymentMethod || null;
+    // The card goes with Crédito and Débito (ADR 0062), the same way.
+    const cardId = values.cardId || null;
     const withMerchant = {
       ...(merchantId && { merchantId }),
       ...(paymentMethod && { paymentMethod }),
+      ...(cardId && { cardId }),
     };
     // The day it happened (ADR 0055), on a new one only when there is one; also on an
     // installment purchase (ADR 0055 note), never on a recurrence.
@@ -158,6 +165,7 @@ export function TransactionDialog({
           personId,
           merchantId,
           paymentMethod,
+          cardId,
           // Split now (ADR 0052 note): its shares come pending with what it is after this change.
           ...(splitting && { split }),
         },
@@ -276,6 +284,7 @@ export function TransactionDialog({
         categories={categories}
         people={people}
         merchants={merchants}
+        cards={cards}
         hints={hints}
         initial={editing ?? undefined}
         preset={editing ? undefined : preset}

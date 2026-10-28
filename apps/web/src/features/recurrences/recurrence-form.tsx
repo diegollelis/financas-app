@@ -6,6 +6,7 @@ import {
   paymentMethodFieldLabels,
   paymentMethodSchema,
   reaisInputSchema,
+  type Card,
   type Category,
   type Merchant,
   type Person,
@@ -13,13 +14,19 @@ import {
   type UpdateRecurrenceInput,
 } from '@financas/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch, type Control, type UseFormSetValue } from 'react-hook-form';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NotesTextarea } from '@/components/notes-textarea';
+import { CardField } from '@/features/cards/card-field';
+import {
+  requireCard,
+  useCardFollowsMethod,
+  type CardFormFields,
+} from '@/features/cards/card-rules';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { MerchantSelect } from '@/features/merchants/merchant-picker';
 import { PersonSelect } from '@/features/people/person-picker';
@@ -51,7 +58,10 @@ const recurrenceFormSchema = recurrenceFieldsSchema
       .max(MERCHANT_NAME_MAX_LENGTH, `Use no máximo ${MERCHANT_NAME_MAX_LENGTH} caracteres.`),
     /** A receber de / a pagar para (ADR 0052): a name, resolved to a person on save. */
     person: z.string().trim(),
-  });
+    /** The card of a Crédito or Débito one (ADR 0062), required with them; '' for none. */
+    cardId: z.string(),
+  })
+  .superRefine(requireCard);
 
 type FormInput = z.input<typeof recurrenceFormSchema>;
 type FormValues = z.output<typeof recurrenceFormSchema>;
@@ -83,6 +93,8 @@ function recurrenceChanges(recurrence: Recurrence, values: FormValues) {
   if (dueMonthOffset !== recurrence.dueMonthOffset) changes.dueMonthOffset = dueMonthOffset;
   const paymentMethod = values.paymentMethod || null;
   if (paymentMethod !== recurrence.paymentMethod) changes.paymentMethod = paymentMethod;
+  const cardId = values.cardId || null;
+  if (cardId !== recurrence.cardId) changes.cardId = cardId;
   const variableAmount = values.amountKind === 'VARIABLE';
   if (variableAmount !== recurrence.variableAmount) changes.variableAmount = variableAmount;
   return changes;
@@ -93,6 +105,7 @@ export function RecurrenceForm({
   categories,
   people,
   merchants,
+  cards = [],
   userId,
   pending,
   error,
@@ -105,6 +118,8 @@ export function RecurrenceForm({
   people: Person[];
   /** The workspace's merchants, for "Estabelecimento" (ADR 0053). */
   merchants: Merchant[];
+  /** The workspace's cards, asked for with Crédito and Débito (ADR 0062). */
+  cards?: Card[];
   /** The signed-in user, left out of the people offered. */
   userId: string;
   pending: boolean;
@@ -124,7 +139,11 @@ export function RecurrenceForm({
   // Archived or not: the current one stays as it is unless another is picked.
   const currentMerchant =
     merchants.find((merchant) => merchant.id === recurrence.merchantId)?.name ?? '';
-  const { register, handleSubmit, formState, control } = useForm<FormInput, unknown, FormValues>({
+  const { register, handleSubmit, formState, control, setValue } = useForm<
+    FormInput,
+    unknown,
+    FormValues
+  >({
     resolver: zodResolver(recurrenceFormSchema),
     defaultValues: {
       description: recurrence.description,
@@ -137,10 +156,19 @@ export function RecurrenceForm({
       paymentMethod: recurrence.paymentMethod ?? '',
       person: currentPerson,
       merchant: currentMerchant,
+      cardId: recurrence.cardId ?? '',
     },
   });
   // Closing the dialog by mistake with something typed asks first.
   useDialogDirty(formState.isDirty);
+  // The card follows the method (ADR 0062); its fields are a slice of this form.
+  const cardControl = control as unknown as Control<CardFormFields>;
+  const role = useCardFollowsMethod(
+    cardControl,
+    setValue as unknown as UseFormSetValue<CardFormFields>,
+    cards,
+    recurrence.cardId ?? '',
+  );
   const variable = useWatch({ control, name: 'amountKind' }) === 'VARIABLE';
   // Only categories of its type; an archived one only if it is already the current one.
   const options = categories.filter(
@@ -265,6 +293,7 @@ export function RecurrenceForm({
           </FormField>
         )}
       />
+      {role && <CardField control={cardControl} id={id('card')} cards={cards} role={role} />}
       <p className="text-muted-foreground text-sm">
         {variable
           ? 'Um valor novo substitui as estimativas pendentes; os meses cujo valor já foi informado ficam como estão. Os meses seguintes começam pela média dos 3 últimos pagos.'

@@ -90,3 +90,18 @@ Opção 2.
   - Numa edição, o cartão e o meio são conferidos juntos: trocar só o meio para Pix, mantendo o cartão, é recusado.
 - **Numa recorrência ou num parcelamento,** mudar o cartão ou o meio leva os dois juntos aos meses e às parcelas pendentes, para que continuem combinando.
 - **O cartão vai junto** para "Tornar recorrente", "Tornar parcelado" e o recebimento ou pagamento parcial, e entra na exportação de dados. As partes de uma divisão não o recebem.
+
+## Nota (o cartão obrigatório e a tela, 2026-10-28)
+
+A decisão de deixar o cartão opcional foi revista na prévia da tela: o dono quer mais controle, e um lançamento no Crédito ou no Débito sem cartão ficaria fora da fatura e da Análise por cartão.
+
+- **Com Crédito ou Débito, o cartão é obrigatório daqui em diante.** A API recusa com 400 `CARD_REQUIRED` o que é criado (lançamento, recorrência, parcelamento) e toda mudança que envia o meio ou o cartão. Um lançamento de antes dos cartões continua válido até ser editado. Como o formulário sempre envia o meio, editá-lo pede o cartão.
+- **Ficam de fora, por enquanto,** as importações (o passo 4 dá o cartão à planilha modelo e aos extratos), "Tornar recorrente", "Tornar parcelado" e o recebimento ou pagamento parcial, que copiam o que já existe.
+- **Ligar os de antes:** `GET …/cards/unlinked` conta os lançamentos sem cartão de cada função (no Crédito, só os ainda a pagar). `POST …/cards/:cardId/link { functions }` dá o cartão a esses lançamentos e às recorrências e parcelamentos em andamento daqueles meios sem cartão, numa só transação. Só vale para as funções que o cartão tem.
+- **Na tela:**
+  - **A página "Cartões"** fica no Mais, como Estabelecimentos: busca pelo nome ou pelo banco, um cartão compacto por cartão, com as funções em selos e "Nubank. Fecha no dia 27 e vence no dia 4.", e "Novo cartão" fixo acima da barra de abas no celular. O menu ⋯ tem Editar e Arquivar; num arquivado, Reativar e, sem uso, Excluir.
+  - **O formulário do cartão** tem nome, banco ("Outro banco" para um que o app ainda não lê), as funções numa escolha entre três ("Crédito | Débito | Crédito e débito") e, com Crédito, "Fecha no dia" e "Vence no dia", com uma frase que mostra o efeito ("Uma compra hoje, 28/10/2026, entra na fatura que vence em 04/12/2026.").
+  - **Depois do primeiro cartão,** quando há lançamentos sem cartão nas funções dele, a página oferece ligá-los, com os grupos já marcados. "Agora não" deixa como está.
+  - **No lançamento, na recorrência e no parcelamento,** "Cartão" aparece logo depois do meio, só com Crédito ou Débito. Ele já vem escolhido quando um só cartão tem a função, e o seletor tem "Novo cartão", que cadastra um sem sair do formulário.
+  - **O vencimento sugerido:** com Crédito, num lançamento novo, o vencimento vazio é preenchido pela fatura do cartão (`cardBillDueDate`, pela data da compra, ou por hoje), com "Sugerido pela fatura do …". Ele nunca troca uma data digitada.
+  - **Na linha e na tabela,** o meio aparece com o nome do cartão: "Crédito no Cartão Exemplo".

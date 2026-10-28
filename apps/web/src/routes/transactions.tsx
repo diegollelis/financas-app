@@ -6,7 +6,6 @@ import {
   loanCategoryLabels,
   occurredOnRowLabels,
   partiallySettleable,
-  paymentMethodLabels,
   settleActionLabels,
   settlePartLabels,
   todayIso,
@@ -90,6 +89,8 @@ import { useShowsTable } from '@/features/view-mode/view-mode';
 import { CARD_LIST, CARD_ROW, STRIPED_ROW, TABLE_BOX } from '@/features/view-mode/row-styles';
 import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
+import { paymentMethodText } from '@/features/cards/card-label';
+import { useCards } from '@/features/cards/use-cards';
 import { apiErrorMessage } from '@/lib/error-message';
 
 const sections = (['CREDIT', 'DEBIT'] as const).map((type) => ({
@@ -400,6 +401,8 @@ type RowProps = {
   category: Category | undefined;
   /** Where it was bought or who paid it (ADR 0053), when given. */
   merchantName: string | null;
+  /** How it was paid, with the card's name (ADR 0062): "Crédito no Cartão Exemplo". */
+  methodText: string | null;
   /** The person it is linked to (ADR 0042), when any. */
   personName: string | null;
   /** The people its shares are owed by, when it is a split debit. */
@@ -659,7 +662,16 @@ function Amount({ transaction, estimated }: { transaction: Transaction; estimate
  * action ("Pagar" / "Receber") plus the rest in a menu (ADR 0036).
  */
 function TransactionItem(props: RowProps) {
-  const { transaction, category, merchantName, personName, sharedWith, canEdit, today } = props;
+  const {
+    transaction,
+    category,
+    merchantName,
+    methodText,
+    personName,
+    sharedWith,
+    canEdit,
+    today,
+  } = props;
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
@@ -669,9 +681,7 @@ function TransactionItem(props: RowProps) {
         <p className="text-muted-foreground flex flex-wrap gap-x-3 text-sm">
           <span>{category?.name ?? 'Categoria'}</span>
           {merchantName && <span>{merchantName}</span>}
-          {transaction.paymentMethod && (
-            <span>{paymentMethodLabels[transaction.paymentMethod]}</span>
-          )}
+          {methodText && <span>{methodText}</span>}
           {/* The day it happened (ADR 0055), before when it is due. */}
           {transaction.occurredOn && (
             <span>
@@ -716,7 +726,16 @@ function TransactionItem(props: RowProps) {
 
 /** One transaction as a table row, from xl ("Ver como: Tabela"): the same data and actions. */
 function TransactionRow(props: RowProps) {
-  const { transaction, category, merchantName, personName, sharedWith, canEdit, today } = props;
+  const {
+    transaction,
+    category,
+    merchantName,
+    methodText,
+    personName,
+    sharedWith,
+    canEdit,
+    today,
+  } = props;
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
 
   return (
@@ -762,11 +781,7 @@ function TransactionRow(props: RowProps) {
             "Onde / Meio" names; a dash only when there is neither. */}
         <span className="grid">
           {merchantName && <span>{merchantName}</span>}
-          {transaction.paymentMethod && (
-            <span className="text-muted-foreground">
-              {paymentMethodLabels[transaction.paymentMethod]}
-            </span>
-          )}
+          {methodText && <span className="text-muted-foreground">{methodText}</span>}
           {!merchantName && !transaction.paymentMethod && <span>—</span>}
         </span>
       </TableCell>
@@ -867,12 +882,18 @@ export function TransactionsPage() {
   const transactions = useTransactions(workspaceId, period);
   const people = usePeople(workspaceId);
   const merchants = useMerchants(workspaceId);
+  // Only to name the card beside the method (ADR 0062): the page does not wait for it.
+  const cards = useCards(workspaceId);
   // Only to fill a new transaction's category: the page does not wait for it (ADR 0053).
   const hints = useCategoryHints(workspaceId);
   const ready =
     categories.isSuccess && transactions.isSuccess && people.isSuccess && merchants.isSuccess;
   const merchantName = (merchantId: string | null) =>
     (merchantId && merchants.data?.find((item) => item.id === merchantId)?.name) || null;
+  const methodText = (transaction: Transaction) =>
+    transaction.paymentMethod
+      ? paymentMethodText(transaction.paymentMethod, transaction.cardId, cards.data ?? [])
+      : null;
   const personName = (personId: string | null) =>
     (personId && people.data?.find((item) => item.id === personId)?.name) || null;
   const [form, setForm] = useState({
@@ -906,6 +927,7 @@ export function TransactionsPage() {
       transaction={transaction}
       category={categories.data?.find((item) => item.id === transaction.categoryId)}
       merchantName={merchantName(transaction.merchantId)}
+      methodText={methodText(transaction)}
       personName={personName(transaction.personId)}
       // The shares of a split debit are credits of the same competência.
       sharedWith={sharesOf(transaction).map((share) => share.name)}
@@ -924,7 +946,7 @@ export function TransactionsPage() {
       categories.data?.find((item) => item.id === transaction.categoryId)?.name,
       personName(transaction.personId),
       merchantName(transaction.merchantId),
-      transaction.paymentMethod && paymentMethodLabels[transaction.paymentMethod],
+      methodText(transaction),
       transaction.notes,
     ) ||
       matchesAmount(search, transaction.amountCents));
@@ -1047,6 +1069,7 @@ export function TransactionsPage() {
             categories={categories.data}
             people={people.data}
             merchants={merchants.data}
+            cards={cards.data}
             hints={hints.data}
             editing={form.editing}
             editingIsSplit={Boolean(form.editing && sharesOf(form.editing).length > 0)}

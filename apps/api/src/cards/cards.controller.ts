@@ -2,9 +2,15 @@ import {
   cardListResponseSchema,
   cardSchema,
   createCardInputSchema,
+  linkCardInputSchema,
+  linkCardResponseSchema,
+  unlinkedCardTransactionsSchema,
   updateCardInputSchema,
   type Card,
   type CreateCardInput,
+  type LinkCardInput,
+  type LinkCardResponse,
+  type UnlinkedCardTransactions,
   type UpdateCardInput,
 } from '@financas/shared';
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
@@ -45,6 +51,37 @@ export class CardsController {
   })
   list(@CurrentMembership() membership: WorkspaceMembership): Promise<Card[]> {
     return this.cards.list(membership.workspaceId);
+  }
+
+  @Get('unlinked')
+  @ApiOkResponse({
+    description:
+      'Transactions with no card in the Crédito (still to pay) and Débito methods, which the first card offers to take (ADR 0062 note).',
+    schema: openApi(unlinkedCardTransactionsSchema),
+  })
+  unlinked(
+    @CurrentMembership() membership: WorkspaceMembership,
+  ): Promise<UnlinkedCardTransactions> {
+    return this.cards.unlinked(membership.workspaceId);
+  }
+
+  @Post(':cardId/link')
+  @RequireRole('EDITOR')
+  @HttpCode(200)
+  @ApiBody({ schema: openApi(linkCardInputSchema) })
+  @ApiOkResponse({
+    description:
+      'The card given to those transactions, and to the running recurrences and plans of those methods with no card.',
+    schema: openApi(linkCardResponseSchema),
+  })
+  @ApiBadRequestResponse({ description: 'INVALID_CARD: archived, or without a function chosen.' })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  link(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('cardId') cardId: string,
+    @Body({ schema: linkCardInputSchema }) input: LinkCardInput,
+  ): Promise<LinkCardResponse> {
+    return this.cards.link(membership.workspaceId, cardId, input);
   }
 
   @Post()

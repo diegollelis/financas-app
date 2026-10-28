@@ -4,6 +4,9 @@ import {
   type Card,
   type CardFunction,
   type CreateCardInput,
+  type LinkCardInput,
+  type LinkCardResponse,
+  type UnlinkedCardTransactions,
   type UpdateCardInput,
 } from '@financas/shared';
 import {
@@ -14,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma, type Card as CardRow } from '../generated/prisma/client.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 
 /** Sorts names as a Brazilian reader expects. */
 const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
@@ -38,6 +41,14 @@ type CardWithUses = CardRow & {
 
 /** The payment method of each function, to find what uses it. */
 const METHOD_OF = { CREDIT: 'CREDIT_CARD', DEBIT: 'DEBIT_CARD' } as const;
+
+/** No card yet, in the method of the function: the Crédito ones only while still to pay. */
+const unlinkedWhere = (workspaceId: string, role: CardFunction) => ({
+  workspaceId,
+  cardId: null,
+  paymentMethod: METHOD_OF[role],
+  ...(role === 'CREDIT' && { settledAt: null }),
+});
 
 function isPrismaError(error: unknown, code: 'P2002' | 'P2003' | 'P2025') {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -147,6 +158,63 @@ export class CardsService {
       if (isPrismaError(error, 'P2025')) throw new NotFoundException();
       throw error;
     }
+  }
+
+  /**
+   * The transactions with no card the first card offers to take (ADR 0062 note): the Crédito ones
+   * still to pay, and every Débito one.
+   */
+  async unlinked(workspaceId: string): Promise<UnlinkedCardTransactions> {
+    const db = this.prisma.forWorkspace(workspaceId);
+    const [credit, debit] = await Promise.all([
+      db.transaction.count({ where: unlinkedWhere(workspaceId, 'CREDIT') }),
+      db.transaction.count({ where: unlinkedWhere(workspaceId, 'DEBIT') }),
+    ]);
+    return { credit, debit };
+  }
+
+  /**
+   * Gives the card to those transactions, and to the running recurrences and installment plans of
+   * those methods with no card, so their next months come with it. Only functions the card has.
+   */
+  async link(workspaceId: string, cardId: string, input: LinkCardInput): Promise<LinkCardResponse> {
+    const card = await this.find(workspaceId, cardId);
+    if (card.archivedAt) {
+      throw new BadRequestException({
+        code: 'INVALID_CARD',
+        message: 'Este cartão está arquivado. Reative-o antes de ligar lançamentos a ele.',
+      });
+    }
+    for (const role of input.functions) {
+      if (!functionsOf(card).includes(role)) {
+        throw new BadRequestException({
+          code: 'INVALID_CARD',
+          message: `Este cartão não tem a função ${cardFunctionLabels[role]}.`,
+        });
+      }
+    }
+    const linked = await this.prisma.$transaction(async (tx) => {
+      await setWorkspaceContext(tx, workspaceId);
+      let count = 0;
+      for (const role of input.functions) {
+        const paymentMethod = METHOD_OF[role];
+        const result = await tx.transaction.updateMany({
+          where: unlinkedWhere(workspaceId, role),
+          data: { cardId },
+        });
+        count += result.count;
+        await tx.recurrence.updateMany({
+          where: { workspaceId, paymentMethod, cardId: null, endPeriod: null },
+          data: { cardId },
+        });
+        await tx.installmentPlan.updateMany({
+          where: { workspaceId, paymentMethod, cardId: null, endedAt: null },
+          data: { cardId },
+        });
+      }
+      return count;
+    });
+    return { linked };
   }
 
   /** One that is used can only be archived: the foreign keys refuse the delete. */

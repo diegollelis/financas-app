@@ -70,9 +70,9 @@ describe('payment method', () => {
 
     const changed = await browser
       .patch(`${base}/transactions/${created.id}`)
-      .send({ paymentMethod: 'CREDIT_CARD' })
+      .send({ paymentMethod: 'BOLETO' })
       .expect(200);
-    expect(transactionSchema.parse(changed.body).paymentMethod).toBe('CREDIT_CARD');
+    expect(transactionSchema.parse(changed.body).paymentMethod).toBe('BOLETO');
     const removed = await browser
       .patch(`${base}/transactions/${created.id}`)
       .send({ paymentMethod: null })
@@ -119,7 +119,7 @@ describe('payment method', () => {
       (
         await browser
           .post(`${base}/transactions`)
-          .send({ ...fields({ paymentMethod: 'CREDIT_CARD' }), period })
+          .send({ ...fields({ paymentMethod: 'BOLETO' }), period })
           .expect(201)
       ).body,
     );
@@ -129,7 +129,7 @@ describe('payment method', () => {
       .send({ transactionId: launched.id })
       .expect(201);
 
-    expect((await transactionsOf(next))[0]?.paymentMethod).toBe('CREDIT_CARD');
+    expect((await transactionsOf(next))[0]?.paymentMethod).toBe('BOLETO');
   });
 
   it('gives it to every installment, and never to the shares of a split', async () => {
@@ -140,7 +140,7 @@ describe('payment method', () => {
         await browser
           .post(`${base}/installments`)
           .send({
-            ...fields({ description: 'Geladeira', paymentMethod: 'CREDIT_CARD' }),
+            ...fields({ description: 'Geladeira', paymentMethod: 'BOLETO' }),
             installments: 2,
             amountIs: 'TOTAL',
             firstPeriod: period,
@@ -150,10 +150,10 @@ describe('payment method', () => {
       ).body,
     );
 
-    expect(plan.paymentMethod).toBe('CREDIT_CARD');
+    expect(plan.paymentMethod).toBe('BOLETO');
     for (const month of [period, next]) {
       const items = await transactionsOf(month);
-      expect(items.find((item) => item.installment)?.paymentMethod).toBe('CREDIT_CARD');
+      expect(items.find((item) => item.installment)?.paymentMethod).toBe('BOLETO');
       expect(items.find((item) => item.splitOfId)?.paymentMethod).toBeNull();
     }
   });

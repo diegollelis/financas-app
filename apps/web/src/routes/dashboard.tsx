@@ -22,6 +22,7 @@ import { CreditsBar } from '@/features/summary/credits-bar';
 import { BudgetDialog } from '@/features/budget/budget-dialog';
 import { useCategories } from '@/features/categories/use-categories';
 import { usePeople } from '@/features/people/use-people';
+import { useCards } from '@/features/cards/use-cards';
 import { TransactionDialog } from '@/features/transactions/transaction-dialog';
 import type { TransactionPreset } from '@/features/transactions/transaction-form';
 import { ExpensesMeter } from '@/features/summary/expenses-meter';
@@ -565,6 +566,8 @@ function ApplyDialog({
 }) {
   const categories = useCategories(workspaceId);
   const people = usePeople(workspaceId);
+  // With Crédito or Débito the form asks the card (ADR 0062); it does not wait for them.
+  const cards = useCards(workspaceId);
   if (!categories.isSuccess || !people.isSuccess) return null;
   return (
     <TransactionDialog
@@ -572,6 +575,7 @@ function ApplyDialog({
       period={period}
       categories={categories.data}
       people={people.data}
+      cards={cards.data}
       editing={null}
       preset={preset}
       open
