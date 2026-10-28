@@ -210,3 +210,7 @@ Um teste do dono com uma fatura real mostrou que a revisão escondia o que já t
 - **O apelido vale já nesta fatura:** ao salvar uma linha com "Lembrar como apelido", as outras linhas sem estabelecimento cujo título começa com o apelido recebem o estabelecimento, e a categoria se estiverem sem uma, como a próxima fatura as leria (`applyToSameTitle`). Essas linhas não oferecem outro apelido. O formulário conta, enquanto o apelido é digitado, quantas linhas recebem a escolha.
 - **"Editar" salva sem a categoria** numa linha da fatura: dá para escolher só o estabelecimento, e a categoria continua pedida no cartão antes de importar. Na planilha modelo, a categoria segue obrigatória ao corrigir uma linha.
 - **Um aviso antes de importar:** "N saídas vão sem estabelecimento", perto do botão, só informativo, porque o estabelecimento continua opcional.
+
+## Nota (o cartão da fatura, 2026-10-28)
+
+A fatura deixa de ser só a origem dos lançamentos: o [ADR 0062](0062-cartoes-e-pagar-fatura.md) cria os cartões, e a fatura passa a ser o cartão mais o vencimento. A importação da fatura vai perguntar "Qual cartão?" em vez do banco, e as compras recebem o cartão.

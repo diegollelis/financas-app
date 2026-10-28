@@ -237,6 +237,13 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Meio "Vale-alimentação/refeição" (o vale do empregador, também o de um só estabelecimento) e "Bônus" entre as categorias padrão de entrada dos espaços novos (nota no [ADR 0024](adr/0024-espacos-membros-e-espaco-pessoal.md))
   - [x] Análise "Despesas por meio de pagamento" (ou "Entradas por meio de recebimento"), com os mesmos filtros das categorias e "Sem meio" por último
   - [x] Coluna opcional "Meio de pagamento" na planilha modelo (lida pelo rótulo ou por sinônimos comuns, um valor fora da lista vira aviso; a aba "Meios de pagamento" na planilha baixada)
+- [ ] **Cartões e "Pagar fatura"** ([ADR 0062](adr/0062-cartoes-e-pagar-fatura.md)): um cadastro de cartões (crédito e débito, sem limite nem saldo) e a fatura, o cartão mais o vencimento, quitada numa vez
+  - [x] ADR: o cartão com as funções e os dias do fechamento e do vencimento, o cartão no lançamento só com Crédito ou Débito, a fatura sem tabela própria, "Pagar fatura" com "Desfazer", no glossário e no modelo
+  - [ ] API: a tabela de cartões e as rotas, o `cardId` nos lançamentos, recorrências, parcelamentos e importações, e a exportação
+  - [ ] Tela: a página "Cartões" (no Mais) e o cartão no formulário, com a sugestão do vencimento e a oferta de ligar os lançamentos sem cartão
+  - [ ] Importação: "Qual cartão?" na fatura e o cartão de débito no extrato da conta
+  - [ ] API e tela de "Pagar fatura" (com prévia)
+  - [ ] O pagamento da fatura no extrato da conta quitando a fatura do cartão
 - [x] **Empréstimo devolvido aos poucos** ([ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md)): "Receber parte" / "Pagar parte" de um lançamento pendente, em Lançamentos e em Pessoas, e o que está a receber sem data numa categoria "Nem renda nem gasto" fora do Saldo previsto
 - [x] **Emprestado para** ([ADR 0058](adr/0058-emprestado-para.md)): a categoria de saída marcada escolhe a categoria de entrada marcada da volta, em Categorias; a divisão de uma saída dela vira "Emprestado para", e as partes já lançadas acompanham a escolha
 - [x] **Peguei emprestado de** ([ADR 0059](adr/0059-peguei-emprestado-de.md)): a categoria de entrada marcada escolhe a categoria da dívida; a divisão de uma entrada dela vira "Peguei emprestado de", com a parte a pagar fora do limite de gastos
