@@ -24,7 +24,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { ensureUsableCard } from '../cards/ensure-card.js';
+import { ensureCardGiven, ensureUsableCard } from '../cards/ensure-card.js';
 import { ensureUsableCategories } from '../categories/ensure-category.js';
 import { Prisma, type TransactionImport } from '../generated/prisma/client.js';
 import { PeopleService } from '../people/people.service.js';
@@ -90,6 +90,10 @@ const readRestoreData = (value: unknown): RestoreData | null => {
   const parsed = restoreDataSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 };
+
+/** The purchases of a card statement already in the app: matches without a bank movement. */
+const cardMatches = (input: CreateImportInput) =>
+  (input.matches ?? []).filter((match) => !match.externalId);
 
 /** A part of a loan that cannot be taken: settled, split, a share, a month or an installment. */
 const partRefused = (message: string) =>
@@ -347,6 +351,9 @@ export class ImportsService {
               dueDate: match.dueDate ? toDate(match.dueDate) : undefined,
               occurredOn: match.occurredOn ? toDate(match.occurredOn) : undefined,
               amountCents: match.amountCents,
+              // A purchase of the card's bill is on its card, in Crédito (ADR 0062 note).
+              ...(input.cardId &&
+                !match.externalId && { paymentMethod: 'CREDIT_CARD', cardId: input.cardId }),
               // Settling, or giving the amount, confirms an estimate (ADR 0038).
               amountEstimated:
                 (wasPending && match.settledAt) || match.amountCents !== undefined
@@ -460,10 +467,17 @@ export class ImportsService {
 
   /**
    * The cards an import names (ADR 0062), checked before anything is written: the statement's,
-   * of this workspace and not archived, and each transaction's and plan's with its method.
+   * of this workspace and not archived (with Crédito, when it finds purchases already in the
+   * app), and each transaction's and plan's with its method, required with Crédito and Débito
+   * (ADR 0062 note).
    */
   private async checkCards(workspaceId: string, input: CreateImportInput) {
-    if (input.cardId) {
+    for (const item of [...input.transactions, ...(input.plans ?? [])]) {
+      ensureCardGiven(item.paymentMethod, item.cardId);
+    }
+    if (input.cardId && cardMatches(input).length > 0) {
+      await ensureUsableCard(this.prisma, workspaceId, input.cardId, 'CREDIT_CARD');
+    } else if (input.cardId) {
       const card = await this.prisma
         .forWorkspace(workspaceId)
         .card.findFirst({ where: { id: input.cardId, workspaceId } });

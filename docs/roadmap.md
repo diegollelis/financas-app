@@ -242,7 +242,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] ADR: o cartão com as funções e os dias do fechamento e do vencimento, o cartão no lançamento só com Crédito ou Débito, a fatura sem tabela própria, "Pagar fatura" com "Desfazer", no glossário e no modelo
   - [x] API: a tabela de cartões e as rotas, o `cardId` nos lançamentos, recorrências, parcelamentos e importações, e a exportação
   - [x] Tela: a página "Cartões" (no Mais) e o cartão no formulário, com a sugestão do vencimento e a oferta de ligar os lançamentos sem cartão; o cartão passa a ser obrigatório no Crédito e no Débito (nota no ADR)
-  - [ ] Importação: "Qual cartão?" na fatura e o cartão de débito no extrato da conta
+  - [x] Importação: "Qual cartão?" na fatura, o bloco "Cartões" no extrato da conta e na planilha modelo, e o cartão obrigatório também na importação (nota no ADR)
   - [ ] API e tela de "Pagar fatura" (com prévia)
   - [ ] O pagamento da fatura no extrato da conta quitando a fatura do cartão
 - [x] **Empréstimo devolvido aos poucos** ([ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md)): "Receber parte" / "Pagar parte" de um lançamento pendente, em Lançamentos e em Pessoas, e o que está a receber sem data numa categoria "Nem renda nem gasto" fora do Saldo previsto

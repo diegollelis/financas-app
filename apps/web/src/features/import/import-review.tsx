@@ -1,4 +1,6 @@
 import {
+  cardFunctionLabels,
+  cardFunctionSchema,
   formatCents,
   formatIsoDate,
   formatPeriod,
@@ -6,6 +8,7 @@ import {
   paymentMethodLabels,
   PENDING_LABEL,
   settledLabels,
+  type Card,
   type Category,
   type Import,
   type ImportKind,
@@ -89,6 +92,13 @@ export type StatementReviewProps = {
   notices: string[];
 };
 import { useCreateImport } from './use-imports';
+import {
+  cardLinesByFunction,
+  defaultImportCard,
+  withImportCards,
+  type ImportCards,
+} from './import-cards';
+import { CardSelect } from '@/features/cards/card-select';
 
 const typeLabel = { CREDIT: 'entrada', DEBIT: 'saída' } as const;
 
@@ -361,6 +371,7 @@ export function ImportReview({
   statement,
   account,
   source,
+  cards,
   defaultLabel,
   heading,
   onChooseAnother,
@@ -381,6 +392,11 @@ export function ImportReview({
   account?: { knownCount: number; notices: string[] };
   /** What it imports and from which bank (ADR 0060), recorded with the import. */
   source: { kind: ImportKind; bank: StatementBank | null };
+  /**
+   * The workspace's cards, for the lines in Crédito and Débito (ADR 0062 note): one card per
+   * function for the whole file, `fixed` when chosen before (a card statement's).
+   */
+  cards: { list: Card[]; fixed?: ImportCards };
   /** The "Origem" it starts with ("Fatura Nubank", "Planilha modelo"). */
   defaultLabel: string;
   /** The step's title and what it reviews ("Revisar fatura do cartão", "Nubank · 50 linhas"). */
@@ -406,6 +422,22 @@ export function ImportReview({
 
   const ready = readyImport(rows, categories, matches);
   const readyCount = ready.transactions.length + ready.plans.length;
+  // The card of each function the lines going in use (ADR 0062 note): chosen here, chosen
+  // before (a card statement's), or the only one there is.
+  const [pickedCards, setPickedCards] = useState<ImportCards>({});
+  // Of every checked line that creates something, complete or not: the card is asked up front.
+  const cardLines = cardLinesByFunction(
+    rows.filter((row) => row.included && !takesMatch(row) && !takesPart(row)),
+  );
+  const cardFunctions = cardFunctionSchema.options.filter((role) => (cardLines[role] ?? 0) > 0);
+  const chosenCards: ImportCards = Object.fromEntries(
+    cardFunctionSchema.options.map((role) => [
+      role,
+      pickedCards[role] ?? cards.fixed?.[role] ?? defaultImportCard(cards.list, role, source.bank),
+    ]),
+  );
+  const askedCards = cardFunctions.filter((role) => !cards.fixed?.[role]);
+  const missingCard = cardFunctions.find((role) => !chosenCards[role]);
   // Optional, but worth a word before importing (ADR 0055 note).
   const withoutMerchant =
     statement || account
@@ -508,14 +540,17 @@ export function ImportReview({
     });
     create.mutate(
       {
-        transactions: ready.transactions.map(real),
-        ...(ready.plans.length > 0 && { plans: ready.plans.map(real) }),
+        transactions: withImportCards(ready.transactions.map(real), chosenCards),
+        ...(ready.plans.length > 0 && {
+          plans: withImportCards(ready.plans.map(real), chosenCards),
+        }),
         ...(ready.aliases.length > 0 && { aliases: ready.aliases }),
         ...(ready.matches.length > 0 && { matches: ready.matches }),
         ...(ready.parts.length > 0 && { parts: ready.parts }),
         label,
         kind: source.kind,
         bank: source.bank,
+        ...(cards.fixed?.CREDIT && { cardId: cards.fixed.CREDIT }),
         ...(statement?.dueDate && { statementDueDate: statement.dueDate }),
       },
       {
@@ -566,11 +601,16 @@ export function ImportReview({
   const firstToFix = rows.find((row) => row.included && check(row).problems.length > 0);
   const missing = missingDueDate
     ? { label: 'Informe o vencimento da fatura', target: 'import-due-date' }
-    : marked === 0
-      ? { label: 'Marque ao menos uma linha', target: 'import-all' }
-      : nothingReady && firstToFix
-        ? { label: 'Complete as linhas marcadas', target: `import-row-${firstToFix.line}` }
-        : null;
+    : missingCard
+      ? {
+          label: `Escolha o cartão do ${cardFunctionLabels[missingCard]}`,
+          target: `import-card-${missingCard}`,
+        }
+      : marked === 0
+        ? { label: 'Marque ao menos uma linha', target: 'import-all' }
+        : nothingReady && firstToFix
+          ? { label: 'Complete as linhas marcadas', target: `import-row-${firstToFix.line}` }
+          : null;
   const goTo = (id: string) => {
     const target = document.getElementById(id);
     target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -579,6 +619,7 @@ export function ImportReview({
   // What keeps "Importar" off, together beside it.
   const blockers = [
     ...(missingDueDate ? ['Informe o vencimento da fatura.'] : []),
+    ...(missingCard ? [`Escolha o cartão do ${cardFunctionLabels[missingCard]}.`] : []),
     ...(marked === 0 ? ['Marque ao menos uma linha.'] : []),
   ];
   const stats: [string, string, string?][] = [
@@ -676,6 +717,38 @@ export function ImportReview({
         </div>
       </SectionCard>
 
+      {/* One card per function for the whole file (ADR 0062 note), asked only for what goes in. */}
+      {askedCards.length > 0 && (
+        <SectionCard
+          title="Cartões"
+          help="As linhas no Crédito ou no Débito vão para o cartão escolhido aqui, um para cada função. Para trocar o de uma linha só, edite o lançamento depois de importar."
+        >
+          <div className="grid items-start gap-4 sm:grid-cols-2">
+            {askedCards.map((role) => {
+              const count = cardLines[role] ?? 0;
+              const what = `Para ${count === 1 ? 'a linha' : `as ${count} linhas`} no ${cardFunctionLabels[role]}.`;
+              return (
+                <FormField
+                  key={role}
+                  id={`import-card-${role}`}
+                  label={`Cartão do ${cardFunctionLabels[role]}`}
+                  hint={chosenCards[role] ? what : undefined}
+                  error={chosenCards[role] ? undefined : `${what} Escolha qual.`}
+                >
+                  <CardSelect
+                    cards={cards.list}
+                    role={role}
+                    value={chosenCards[role] ?? ''}
+                    onChange={(cardId) =>
+                      setPickedCards((current) => ({ ...current, [role]: cardId }))
+                    }
+                  />
+                </FormField>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
       {statement && !statement.baseRows && <p role="status">Atualizando a revisão…</p>}
       {/* What could count twice or stay out, in the warning colors: never behind an "ⓘ". */}
       {account && found && (

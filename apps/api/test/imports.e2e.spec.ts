@@ -407,7 +407,7 @@ describe('imports', () => {
       firstPeriod: statementPeriod,
       occurredOn: '2026-08-28',
       dueDay: 4,
-      paymentMethod: 'CREDIT_CARD',
+      paymentMethod: 'BOLETO',
       merchantName: 'Loja Exemplo',
       ...overrides,
     });
@@ -478,7 +478,7 @@ describe('imports', () => {
         amountCents: 5_000,
         dueDate: '2026-11-04',
         occurredOn: '2026-08-28',
-        paymentMethod: 'CREDIT_CARD',
+        paymentMethod: 'BOLETO',
         merchantId: loja?.id,
       });
       const last = (await transactionsOf('2027-06')).find((t) => t.installment);
@@ -602,7 +602,7 @@ describe('imports', () => {
         period: '2026-10',
         settledAt: '2026-10-08',
         occurredOn: '2026-10-08',
-        paymentMethod: 'DEBIT_CARD' as const,
+        paymentMethod: 'PIX' as const,
         externalId: id(1),
       };
       return { ...user, launch, energy, sweets, newOne };
