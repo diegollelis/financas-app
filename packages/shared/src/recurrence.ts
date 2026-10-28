@@ -67,6 +67,8 @@ export const recurrenceFieldsSchema = z.object({
   merchantId: z.uuid().nullable().optional(),
   /** How it is paid or received (ADR 0054): copied to every month it generates. */
   paymentMethod: paymentMethodSchema.nullable().optional(),
+  /** The card of a Crédito or Débito one (ADR 0062): copied to every month it generates. */
+  cardId: z.uuid().nullable().optional(),
   /** The first competência; its transaction is created right away. */
   startPeriod: periodSchema,
 });
@@ -169,6 +171,7 @@ export const recurrenceSchema = z.object({
   personId: z.uuid().nullable().default(null),
   merchantId: z.uuid().nullable().default(null),
   paymentMethod: paymentMethodSchema.nullable().default(null),
+  cardId: z.uuid().nullable().default(null),
   startPeriod: periodSchema,
   /** The last competência it generated; null while active. */
   endPeriod: periodSchema.nullable(),

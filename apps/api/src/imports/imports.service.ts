@@ -24,6 +24,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { ensureUsableCard } from '../cards/ensure-card.js';
 import { ensureUsableCategories } from '../categories/ensure-category.js';
 import { Prisma, type TransactionImport } from '../generated/prisma/client.js';
 import { PeopleService } from '../people/people.service.js';
@@ -76,6 +77,8 @@ const restoreDataSchema = z.object({
         personId: z.uuid().nullable(),
         merchantId: z.uuid().nullable(),
         paymentMethod: z.string().nullable(),
+        // Kept since cards came (ADR 0062); an import made before has none.
+        cardId: z.uuid().nullable().default(null),
       }),
     }),
   ),
@@ -123,6 +126,7 @@ function toResponse(row: ImportRow, dependents = noDependents): Import {
     statementDueDate: row.statementDueDate && toIsoDate(row.statementDueDate),
     kind: row.kind,
     bank: row.bank,
+    cardId: row.cardId,
     firstPeriod: row.firstPeriod,
     lastPeriod: row.lastPeriod,
     createdAt: row.createdAt.toISOString(),
@@ -229,6 +233,7 @@ export class ImportsService {
     const matches = input.matches ?? [];
     const parts = input.parts ?? [];
     await ensureUsableCategories(this.prisma, workspaceId, [...input.transactions, ...plans]);
+    await this.checkCards(workspaceId, input);
     const found = await this.checkMovements(
       workspaceId,
       input.transactions,
@@ -313,6 +318,7 @@ export class ImportsService {
               personId: loan.personId,
               merchantId: loan.merchantId,
               paymentMethod: loan.paymentMethod as Prisma.TransactionCreateInput['paymentMethod'],
+              cardId: loan.cardId,
               externalId: part.externalId,
               importId: row.id,
             },
@@ -405,6 +411,7 @@ export class ImportsService {
       label: input.label ?? null,
       statementDueDate: input.statementDueDate ? toDate(input.statementDueDate) : null,
       ...kindOf(input),
+      cardId: input.cardId ?? null,
       firstPeriod: made.covered[0] ?? '',
       lastPeriod: made.covered.at(-1) ?? '',
       installmentPlans: {
@@ -422,6 +429,7 @@ export class ImportsService {
           dueDay: plan.dueDay ?? null,
           dueMonthOffset: plan.dueMonthOffset ?? 0,
           paymentMethod: plan.paymentMethod ?? null,
+          cardId: plan.cardId ?? null,
           merchantId: merchantOf(plan.merchantName),
           transactions: { create: installmentsOf[index]! },
         })),
@@ -440,6 +448,7 @@ export class ImportsService {
             settledAt: transaction.settledAt ? toDate(transaction.settledAt) : null,
             occurredOn: transaction.occurredOn ? toDate(transaction.occurredOn) : null,
             paymentMethod: transaction.paymentMethod ?? null,
+            cardId: transaction.cardId ?? null,
             merchantId: merchantOf(transaction.merchantName),
             personId: personOf(transaction.personName),
             externalId: transaction.externalId ?? null,
@@ -447,6 +456,32 @@ export class ImportsService {
         },
       },
     } satisfies Prisma.TransactionImportUncheckedCreateInput;
+  }
+
+  /**
+   * The cards an import names (ADR 0062), checked before anything is written: the statement's,
+   * of this workspace and not archived, and each transaction's and plan's with its method.
+   */
+  private async checkCards(workspaceId: string, input: CreateImportInput) {
+    if (input.cardId) {
+      const card = await this.prisma
+        .forWorkspace(workspaceId)
+        .card.findFirst({ where: { id: input.cardId, workspaceId } });
+      if (!card || card.archivedAt) {
+        throw new BadRequestException({
+          code: 'INVALID_CARD',
+          message: 'O cartão desta importação não foi encontrado ou está arquivado.',
+        });
+      }
+    }
+    const checked = new Set<string>();
+    for (const item of [...input.transactions, ...(input.plans ?? [])]) {
+      if (!item.cardId) continue;
+      const key = `${item.cardId}|${item.paymentMethod ?? ''}`;
+      if (checked.has(key)) continue;
+      checked.add(key);
+      await ensureUsableCard(this.prisma, workspaceId, item.cardId, item.paymentMethod);
+    }
   }
 
   /**
@@ -554,6 +589,7 @@ export class ImportsService {
           personId: loan.personId,
           merchantId: loan.merchantId,
           paymentMethod: loan.paymentMethod,
+          cardId: loan.cardId,
         },
       })),
     };
@@ -585,6 +621,7 @@ export class ImportsService {
           dueDay === null ? null : toDate(dueDateFor(period, dueDay, plan.dueMonthOffset ?? 0)),
         occurredOn: plan.occurredOn ? toDate(plan.occurredOn) : null,
         paymentMethod: plan.paymentMethod ?? null,
+        cardId: plan.cardId ?? null,
         merchantId,
         installmentNumber: firstNumber + index,
       };
@@ -726,6 +763,7 @@ export class ImportsService {
             personId: loan.personId,
             merchantId: loan.merchantId,
             paymentMethod: loan.paymentMethod as Prisma.TransactionCreateInput['paymentMethod'],
+            cardId: loan.cardId,
           },
         });
       }

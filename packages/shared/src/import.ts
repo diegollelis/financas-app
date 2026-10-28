@@ -74,6 +74,8 @@ export const importInstallmentPlanInputSchema = z
     dueDay: dueDaySchema.nullable().optional(),
     dueMonthOffset: dueMonthOffsetSchema.optional(),
     paymentMethod: paymentMethodSchema.nullable().optional(),
+    /** The card of the statement (ADR 0062), copied to every installment. */
+    cardId: z.uuid().nullable().optional(),
     merchantName: merchantNameSchema.optional(),
   })
   .refine((plan) => (plan.firstNumber ?? 1) <= plan.installments, {
@@ -141,6 +143,8 @@ export const createImportInputSchema = z
      */
     kind: importKindSchema.optional(),
     bank: statementBankSchema.nullable().optional(),
+    /** The card whose statement it is (ADR 0062). */
+    cardId: z.uuid().nullable().optional(),
     transactions: z
       .array(importTransactionInputSchema)
       .max(
@@ -226,6 +230,8 @@ export const importSchema = z.object({
   /** What it brought and from which bank (ADR 0060); null bank for the template. */
   kind: importKindSchema.default('TEMPLATE'),
   bank: statementBankSchema.nullable().default(null),
+  /** The card whose statement it was (ADR 0062); null otherwise. */
+  cardId: z.uuid().nullable().default(null),
   firstPeriod: periodSchema,
   lastPeriod: periodSchema,
   createdAt: z.iso.datetime(),

@@ -22,6 +22,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { ensureCardFits, ensureUsableCard } from '../cards/ensure-card.js';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
 import type { Prisma, InstallmentPlan as PlanRow } from '../generated/prisma/client.js';
@@ -61,6 +62,7 @@ function toResponse(
     personId: plan.personId,
     merchantId: plan.merchantId,
     paymentMethod: plan.paymentMethod,
+    cardId: plan.cardId,
     isSplit,
     endedAt: plan.endedAt?.toISOString() ?? null,
     adoptedTransactionId: plan.adoptedTransactionId,
@@ -142,6 +144,9 @@ export class InstallmentsService {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
+    if (input.cardId) {
+      await ensureUsableCard(this.prisma, workspaceId, input.cardId, input.paymentMethod);
+    }
     const totalCents = installmentPlanTotal(input);
     // From the first number on (ADR 0055): a purchase at 3/10 gets installments 3 to 10.
     const firstNumber = input.firstNumber ?? 1;
@@ -151,6 +156,7 @@ export class InstallmentsService {
     const personId = input.personId ?? null;
     const merchantId = input.merchantId ?? null;
     const paymentMethod = input.paymentMethod ?? null;
+    const cardId = input.cardId ?? null;
     // The day of the purchase, the same on every installment and share (ADR 0055 note).
     const occurredOn = optionalDate(input.occurredOn) ?? null;
     const sharesOf = input.split ? await this.shares(workspaceId, input, input.split) : () => [];
@@ -171,6 +177,7 @@ export class InstallmentsService {
         personId,
         merchantId,
         paymentMethod,
+        cardId,
         transactions: {
           create: amounts.map((amountCents, index) => {
             const period = shiftPeriod(input.firstPeriod, index);
@@ -185,6 +192,7 @@ export class InstallmentsService {
               personId,
               merchantId,
               paymentMethod,
+              cardId,
               amountCents,
               period,
               dueDate,
@@ -256,6 +264,14 @@ export class InstallmentsService {
     if (transaction.merchantId) {
       await ensureUsableMerchant(this.prisma, workspaceId, transaction.merchantId);
     }
+    if (transaction.cardId) {
+      await ensureUsableCard(
+        this.prisma,
+        workspaceId,
+        transaction.cardId,
+        transaction.paymentMethod,
+      );
+    }
     const firstNumber = input.firstNumber ?? 1;
     const created = installmentsCreated({ installments: input.installments, firstNumber });
     const totalCents =
@@ -274,6 +290,7 @@ export class InstallmentsService {
         personId: transaction.personId,
         merchantId: transaction.merchantId,
         paymentMethod: transaction.paymentMethod,
+        cardId: transaction.cardId,
         amountCents,
         period,
         dueDate: dueDay === null ? null : toDate(dueDateFor(period, dueDay, dueMonthOffset)),
@@ -302,6 +319,7 @@ export class InstallmentsService {
           personId: transaction.personId,
           merchantId: transaction.merchantId,
           paymentMethod: transaction.paymentMethod,
+          cardId: transaction.cardId,
           // Given back as launched once, with this amount, if the plan is ended or deleted.
           adoptedTransactionId: transaction.id,
           adoptedAmountCents: transaction.amountCents,
@@ -400,6 +418,8 @@ export class InstallmentsService {
     if (input.merchantId && input.merchantId !== plan.merchantId) {
       await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     }
+    // The card and the method after the change go together (ADR 0062).
+    await ensureCardFits(this.prisma, workspaceId, plan, input);
     const [settledCount, sharesCount] = await Promise.all([
       db.transaction.count({
         where: { workspaceId, installmentPlanId: planId, settledAt: { not: null } },
@@ -423,6 +443,7 @@ export class InstallmentsService {
       personId: input.personId === undefined ? plan.personId : input.personId,
       merchantId: input.merchantId === undefined ? plan.merchantId : input.merchantId,
       paymentMethod: input.paymentMethod === undefined ? plan.paymentMethod : input.paymentMethod,
+      cardId: input.cardId === undefined ? plan.cardId : input.cardId,
       occurredOn: input.occurredOn === undefined ? plan.occurredOn : optionalDate(input.occurredOn),
     };
     const dueDateIn = (period: string) =>
@@ -491,6 +512,7 @@ export class InstallmentsService {
                 personId: merged.personId,
                 merchantId: merged.merchantId,
                 paymentMethod: merged.paymentMethod,
+                cardId: merged.cardId,
                 amountCents,
                 period,
                 dueDate: dueDateIn(period),
@@ -513,6 +535,8 @@ export class InstallmentsService {
       data: merged,
     });
     const dueChanged = input.dueDay !== undefined || input.dueMonthOffset !== undefined;
+    // A change of either the card or the method reaches the installments with both (ADR 0062).
+    const cardChanged = input.cardId !== undefined || input.paymentMethod !== undefined;
     const pending = await db.transaction.findMany({
       where: { workspaceId, installmentPlanId: planId, settledAt: null },
       select: { id: true, period: true, installmentNumber: true },
@@ -527,7 +551,8 @@ export class InstallmentsService {
           categoryId: input.categoryId,
           personId: input.personId,
           merchantId: input.merchantId,
-          paymentMethod: input.paymentMethod,
+          paymentMethod: cardChanged ? merged.paymentMethod : undefined,
+          cardId: cardChanged ? merged.cardId : undefined,
           dueDate,
           occurredOn: optionalDate(input.occurredOn),
         },

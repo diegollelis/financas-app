@@ -75,3 +75,18 @@ Opção 2.
   4. Importação: "Qual cartão?" na fatura e o cartão de débito no extrato da conta.
   5. API e tela de "Pagar fatura", com prévia antes da tela.
   6. O pagamento da fatura no extrato da conta quitando a fatura.
+
+## Nota (a API dos cartões, 2026-10-28)
+
+- **A tabela `cards`** (com RLS) guarda as funções em duas colunas, `credit` e `debit`. Na API, elas aparecem como a lista `functions`. Dois CHECKs garantem as regras: o cartão tem ao menos uma função, e o dia do fechamento e o do vencimento (de 1 a 31) existem só com Crédito, os dois juntos.
+- **Rotas** `GET/POST /workspaces/:workspaceId/cards` e `PATCH/DELETE …/cards/:cardId`, como as dos estabelecimentos. Os erros:
+  - nome repetido, ignorando maiúsculas e acentos: 409 `CARD_EXISTS`;
+  - tirar uma função que algum lançamento, recorrência ou parcelamento usa com aquele meio: 409 `CARD_FUNCTION_IN_USE`;
+  - excluir um cartão em uso: 409 `CARD_IN_USE`. Uma importação também conta como uso.
+  - Tirar o Crédito apaga os dias. Dar o Crédito exige os dias.
+- **O `cardId`** de lançamentos, recorrências, parcelamentos e importações tem chave composta.
+  - Um CHECK no banco só o aceita com o meio Crédito ou Débito.
+  - A API confere a função do cartão e responde 400 `INVALID_CARD`. Um cartão arquivado só é recusado quando está sendo escolhido.
+  - Numa edição, o cartão e o meio são conferidos juntos: trocar só o meio para Pix, mantendo o cartão, é recusado.
+- **Numa recorrência ou num parcelamento,** mudar o cartão ou o meio leva os dois juntos aos meses e às parcelas pendentes, para que continuem combinando.
+- **O cartão vai junto** para "Tornar recorrente", "Tornar parcelado" e o recebimento ou pagamento parcial, e entra na exportação de dados. As partes de uma divisão não o recebem.

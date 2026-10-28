@@ -58,6 +58,8 @@ export const createInstallmentPlanInputSchema = z
     merchantId: z.uuid().nullable().optional(),
     /** How it is paid or received (ADR 0054): copied to every installment. */
     paymentMethod: paymentMethodSchema.nullable().optional(),
+    /** The card of a Crédito or Débito one (ADR 0062): copied to every installment. */
+    cardId: z.uuid().nullable().optional(),
     /**
      * Splits it with other people (ADR 0052): each share in the same meaning as `amountCents`
      * (of the total, or of each installment). Every installment gets one pending share per
@@ -125,6 +127,7 @@ export const installmentPlanSchema = z.object({
   personId: z.uuid().nullable().default(null),
   merchantId: z.uuid().nullable().default(null),
   paymentMethod: paymentMethodSchema.nullable().default(null),
+  cardId: z.uuid().nullable().default(null),
   /** Split with other people (ADR 0052): its amounts do not change (ADR 0038 note). */
   isSplit: z.boolean().default(false),
   /** When it was ended; null while it runs. */
@@ -209,6 +212,7 @@ export const updateInstallmentPlanInputSchema = z
     personId: z.uuid().nullable(),
     merchantId: z.uuid().nullable(),
     paymentMethod: paymentMethodSchema.nullable(),
+    cardId: z.uuid().nullable(),
     installments: installmentCountSchema,
     firstNumber: z.number().int().min(1),
     amountCents: amountCentsSchema,

@@ -21,6 +21,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { ensureCardFits, ensureUsableCard } from '../cards/ensure-card.js';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
 import {
@@ -51,6 +52,7 @@ function toResponse(recurrence: RecurrenceWithShares): Recurrence {
     personId: recurrence.personId,
     merchantId: recurrence.merchantId,
     paymentMethod: recurrence.paymentMethod,
+    cardId: recurrence.cardId,
     startPeriod: recurrence.startPeriod,
     endPeriod: recurrence.endPeriod,
     adoptedTransactionId: recurrence.adoptedTransactionId,
@@ -104,6 +106,9 @@ export class RecurrencesService {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
+    if (input.cardId) {
+      await ensureUsableCard(this.prisma, workspaceId, input.cardId, input.paymentMethod);
+    }
     // Who shares it (ADR 0052): each person resolved, or created, before the write.
     const people = await Promise.all(
       (input.split ?? []).map((share) => resolveSplitPerson(this.prisma, workspaceId, share)),
@@ -123,6 +128,7 @@ export class RecurrencesService {
         personId: input.personId ?? null,
         merchantId: input.merchantId ?? null,
         paymentMethod: input.paymentMethod ?? null,
+        cardId: input.cardId ?? null,
         startPeriod: input.startPeriod,
         shares: {
           create: (input.split ?? []).map((share, index) => ({
@@ -196,6 +202,14 @@ export class RecurrencesService {
     if (transaction.merchantId) {
       await ensureUsableMerchant(this.prisma, workspaceId, transaction.merchantId);
     }
+    if (transaction.cardId) {
+      await ensureUsableCard(
+        this.prisma,
+        workspaceId,
+        transaction.cardId,
+        transaction.paymentMethod,
+      );
+    }
     const recurrence = await db.recurrence
       .create({
         data: {
@@ -212,6 +226,7 @@ export class RecurrencesService {
           personId: transaction.personId,
           merchantId: transaction.merchantId,
           paymentMethod: transaction.paymentMethod,
+          cardId: transaction.cardId,
           startPeriod: transaction.period,
           // Given back as launched once if it is ended while this one is pending.
           adoptedTransactionId: transaction.id,
@@ -250,6 +265,8 @@ export class RecurrencesService {
     if (input.merchantId && input.merchantId !== current.merchantId) {
       await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     }
+    // The card and the method after the change go together (ADR 0062).
+    await ensureCardFits(this.prisma, workspaceId, current, input);
     // The shares in reais must still fit, and a variable amount is shared in percentages only.
     const fixedShares = current.shares.filter((share) => share.amountCents !== null);
     if (input.variableAmount && fixedShares.length > 0) {
@@ -275,10 +292,13 @@ export class RecurrencesService {
         personId: input.personId,
         merchantId: input.merchantId,
         paymentMethod: input.paymentMethod,
+        cardId: input.cardId,
       },
       include: { shares: true },
     });
 
+    // A change of either the card or the method reaches the months with both, so they still fit.
+    const cardChanged = input.cardId !== undefined || input.paymentMethod !== undefined;
     const dueChanged = input.dueDay !== undefined || input.dueMonthOffset !== undefined;
     const pending = await db.transaction.findMany({
       where: this.pendingFromThisMonth(workspaceId, recurrenceId),
@@ -298,7 +318,8 @@ export class RecurrencesService {
           categoryId: input.categoryId,
           personId: input.personId,
           merchantId: input.merchantId,
-          paymentMethod: input.paymentMethod,
+          paymentMethod: cardChanged ? recurrence.paymentMethod : undefined,
+          cardId: cardChanged ? recurrence.cardId : undefined,
           amountCents: keepsAmount ? undefined : input.amountCents,
           // Turned fixed: what was an estimate becomes the amount.
           amountEstimated: input.variableAmount === false ? false : undefined,
@@ -470,6 +491,7 @@ export class RecurrencesService {
               personId: recurrence.personId,
               merchantId: recurrence.merchantId,
               paymentMethod: recurrence.paymentMethod,
+              cardId: recurrence.cardId,
               amountCents,
               amountEstimated: recurrence.variableAmount,
               period,

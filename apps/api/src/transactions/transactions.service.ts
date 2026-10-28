@@ -16,6 +16,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { ensureCardFits, ensureUsableCard } from '../cards/ensure-card.js';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
@@ -61,6 +62,7 @@ export function toTransactionResponse(transaction: TransactionRow): Transaction 
     personId: transaction.personId,
     merchantId: transaction.merchantId,
     paymentMethod: transaction.paymentMethod,
+    cardId: transaction.cardId,
     splitOfId: transaction.splitOfId,
   };
 }
@@ -102,6 +104,9 @@ export class TransactionsService {
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
+    if (input.cardId) {
+      await ensureUsableCard(this.prisma, workspaceId, input.cardId, input.paymentMethod);
+    }
     const shares = input.split ? await this.shares(workspaceId, input, input.split) : [];
     const transaction = await this.prisma.forWorkspace(workspaceId).transaction.create({
       data: {
@@ -118,6 +123,7 @@ export class TransactionsService {
         personId: input.personId ?? null,
         merchantId: input.merchantId ?? null,
         paymentMethod: input.paymentMethod ?? null,
+        cardId: input.cardId ?? null,
         ...(shares.length > 0 && { shares: { create: shares } }),
       },
       include: withOrigin,
@@ -164,6 +170,8 @@ export class TransactionsService {
     if (input.merchantId && input.merchantId !== current.merchantId) {
       await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
     }
+    // The card and the method after the change go together (ADR 0062).
+    await ensureCardFits(this.prisma, workspaceId, current, input);
     if (input.type !== undefined && input.type !== current.type) {
       await this.ensureTypeMayChange(workspaceId, current);
     }
@@ -194,6 +202,7 @@ export class TransactionsService {
           personId: input.personId,
           merchantId: input.merchantId,
           paymentMethod: input.paymentMethod,
+          cardId: input.cardId,
           ...(shares.length > 0 && { shares: { create: shares } }),
           // Giving the amount, or settling, confirms an estimate (ADR 0038). Undoing a settlement
           // does not make it an estimate again.
@@ -328,6 +337,7 @@ export class TransactionsService {
           personId: current.personId,
           merchantId: current.merchantId,
           paymentMethod: current.paymentMethod,
+          cardId: current.cardId,
         },
         include: withOrigin,
       });

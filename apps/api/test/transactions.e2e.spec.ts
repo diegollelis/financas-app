@@ -123,6 +123,7 @@ describe('transactions', () => {
         personId: null,
         merchantId: null,
         paymentMethod: null,
+        cardId: null,
         splitOfId: null,
       });
       expect(await list(browser, workspaceId, '2026-10')).toEqual([light]);
