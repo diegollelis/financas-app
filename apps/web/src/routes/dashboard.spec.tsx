@@ -315,10 +315,49 @@ describe('DashboardPage', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['Saídas pagas', 'Saídas a pagar']);
-    // The goals are a share of the income: they stay.
-    expect(nbsp(goal(await section('Metas'), 'Investimentos')?.textContent)).toContain(
-      'Falta lançar R$ 500,00.',
+    // Nothing left: the goals of the month are zero, the plan is not (ADR 0064 note).
+    const savings = await section('Metas');
+    expect(nbsp(goal(savings, 'Investimentos')?.textContent)).toContain('Sem valor este mês.');
+    expect(nbsp(goal(savings, 'Investimentos')?.textContent)).toContain(
+      'Reduzida pela sobra do mês (plano: R$ 1.000,00).',
     );
+    const plan = within(await section('Orçamento do mês')).getByRole('list', {
+      name: 'Divisão da renda líquida',
+    });
+    expect(nbsp(within(plan).getAllByRole('listitem')[1]?.textContent)).toBe(
+      'Investimentos20%R$ 1.000,00',
+    );
+  });
+
+  it('cuts the goals to what is left, and "Guardar" offers only that (ADR 0064 note)', async () => {
+    stubPrefersDark(false, { desktop: true });
+    const reserva = testDestinations[2]!.categoryId!;
+    // 2.490,10 more spent: 1.000,00 left for 2.000,00 of goals, half of each.
+    mockApi({
+      'GET /api/me': { body: verifiedUser },
+      [`GET /api/workspaces/${houseId}`]: { body: { ...house, role: 'EDITOR' } },
+      [`GET /api/workspaces/${houseId}/summary/2026-10`]: {
+        body: summarizePeriod([...october, debit(249_010, null)], budget, today),
+      },
+      [`GET /api/workspaces/${houseId}/categories`]: {
+        body: [{ id: reserva, name: 'Reserva de emergência', type: 'DEBIT', archived: false }],
+      },
+      [`GET /api/workspaces/${houseId}/people`]: { body: [] },
+    });
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    const savings = await section('Metas');
+    expect(nbsp(figure('Metas', 'Sobra prevista')?.nextElementSibling?.textContent)).toBe(
+      'Não cobre as metas do plano: elas ficam em R$ 1.000,00.',
+    );
+    expect(nbsp(goal(savings, 'Reserva de emergência')?.textContent)).toBe(
+      'Reserva de emergência 12% da rendaGuardar em Reserva de emergênciaR$ 0,00 de R$ 300,00 (0%)Falta lançar R$ 300,00.Reduzida pela sobra do mês (plano: R$ 600,00).',
+    );
+    await userEvent.click(
+      within(savings).getByRole('button', { name: 'Guardar em Reserva de emergência' }),
+    );
+    const form = await screen.findByRole('dialog', { name: 'Registrar valor guardado' });
+    expect(within(form).getByLabelText('Valor (R$)')).toHaveValue('300,00');
   });
 
   it('keeps the reference month of the screenshots in place (regression)', async () => {

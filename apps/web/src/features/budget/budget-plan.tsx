@@ -113,7 +113,7 @@ export function BudgetPlan({ summary }: { summary: Summary }) {
           <PlanLine
             label="Limite de gastos"
             basisPoints={limit.basisPoints}
-            cents={limit.targetCents}
+            cents={limit.plannedCents ?? limit.targetCents}
           />
         )}
         {goals.map((goal) => (
@@ -121,7 +121,7 @@ export function BudgetPlan({ summary }: { summary: Summary }) {
             key={goal.destinationId}
             label={goal.name}
             basisPoints={goal.basisPoints}
-            cents={goal.targetCents}
+            cents={goal.plannedCents ?? goal.targetCents}
           />
         ))}
         <PlanLine label="Sem meta" basisPoints={free.basisPoints} cents={free.targetCents}>
