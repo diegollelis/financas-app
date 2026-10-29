@@ -224,8 +224,9 @@ describe('Budget dialog (on the dashboard)', () => {
     });
     renderApp(`/espacos/${houseId}/painel`);
 
-    const dialog = await openDialog();
-    await userEvent.click(within(dialog).getByText('Gerenciar metas'));
+    // Apart from the budget, from the goals card (ADR 0064).
+    await userEvent.click(await screen.findByRole('button', { name: 'Gerenciar metas' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Gerenciar metas' });
     // Despesas is fixed: only the saving destinations are listed.
     expect(await within(dialog).findByText('Investimentos')).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Ações de Despesas' })).toBeNull();
@@ -288,8 +289,9 @@ describe('Budget dialog (on the dashboard)', () => {
     });
     renderApp(`/espacos/${houseId}/painel`);
 
-    const dialog = await openDialog();
-    await userEvent.click(within(dialog).getByText('Gerenciar metas'));
+    // Apart from the budget, from the goals card (ADR 0064).
+    await userEvent.click(await screen.findByRole('button', { name: 'Gerenciar metas' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Gerenciar metas' });
     await userEvent.click(
       await within(dialog).findByRole('button', { name: 'Ações de Investimentos' }),
     );

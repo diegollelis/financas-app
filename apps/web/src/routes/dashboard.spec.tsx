@@ -200,7 +200,7 @@ describe('DashboardPage', () => {
     // to launch, 50% of the goal.
     const savings = await section('Metas');
     expect(nbsp(goal(savings, 'Investimentos')?.textContent)).toBe(
-      'Investimentos 20%R$ 500,00 de R$ 1.000,00 (50%)Falta lançar R$ 500,00.',
+      'Investimentos 20% da rendaR$ 500,00 de R$ 1.000,00 (50%)Falta lançar R$ 500,00.',
     );
     expect(
       nbsp(
@@ -218,6 +218,33 @@ describe('DashboardPage', () => {
     expect(within(savings).queryByRole('table')).not.toBeInTheDocument();
     // The limit and the goals add up to 100%: nothing is left without a destination.
     expect(savings).not.toHaveTextContent('Sem meta');
+  });
+
+  it('shows the goals as a table from xl, sorted by the column clicked (ADR 0064)', async () => {
+    stubPrefersDark(false, { wide: true });
+    mockDashboard(summarizePeriod(october, budget, today));
+    renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
+
+    const savings = await section('Metas');
+    await userEvent.click(within(savings).getByRole('radio', { name: 'Tabela' }));
+
+    const table = within(savings).getByRole('table');
+    const names = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+    expect(within(table).getByRole('row', { name: /Investimentos/ })).toHaveTextContent(
+      /Investimentos.*20%.*R\$.1\.000,00.*R\$.500,00.*R\$.0,00.*R\$.500,00/,
+    );
+    // In the budget's order at first; by the share, largest first, after two clicks.
+    expect(names()).toEqual(['Investimentos', 'Reserva de emergência', 'Viagens']);
+    const share = within(table).getByRole('columnheader', { name: /% da renda/ });
+    await userEvent.click(within(share).getByRole('button', { name: /% da renda/ }));
+    await userEvent.click(within(share).getByRole('button', { name: /% da renda/ }));
+    expect(names()).toEqual(['Investimentos', 'Reserva de emergência', 'Viagens']);
+    await userEvent.click(within(share).getByRole('button', { name: /% da renda/ }));
+    expect(names()).toEqual(['Viagens', 'Reserva de emergência', 'Investimentos']);
   });
 
   it('says what is pending on a goal and what is left to launch', async () => {
@@ -243,13 +270,27 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    const savings = await section('Metas');
-    // 5% of the income, 250,00, has no destination.
-    const unallocated = within(savings).getByText(/^Sem meta/, { selector: 'dt' });
-    expect(unallocated).toHaveTextContent('Sem meta (5%)');
-    expect(nbsp(unallocated.nextElementSibling?.textContent)).toBe('R$ 250,00');
+    // The plan in the budget card (ADR 0064): one line per share of the income, down to 100%.
+    const budgetCard = await section('Orçamento do mês');
+    const plan = within(budgetCard).getByRole('list', { name: 'Divisão da renda líquida' });
+    expect(
+      within(plan)
+        .getAllByRole('listitem')
+        .map((line) => nbsp(line.textContent)),
+    ).toEqual([
+      'Limite de gastos60%R$ 3.000,00',
+      'Investimentos20%R$ 1.000,00',
+      'Reserva de emergência12%R$ 600,00',
+      'Viagens3%R$ 150,00',
+      'Sem meta5%R$ 250,00',
+      'Total100%R$ 5.000,00',
+    ]);
+    expect(within(budgetCard).getByRole('img')).toHaveAttribute(
+      'aria-label',
+      'Divisão da renda líquida: gastos 60%, metas 35%, sem meta 5%.',
+    );
     // Never read as money to spend (ADR 0051): said behind the "ⓘ" on its line.
-    await userEvent.click(within(savings).getByRole('button', { name: 'Sobre Sem meta' }));
+    await userEvent.click(within(plan).getByRole('button', { name: 'Sobre Sem meta' }));
     expect(await screen.findByRole('dialog', { name: 'Sem meta' })).toHaveTextContent(
       'Parte da renda líquida que nem o limite de gastos nem uma meta recebeu. É uma divisão do orçamento, não um saldo.',
     );

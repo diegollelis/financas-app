@@ -22,6 +22,21 @@ import { useIsClosed } from '@/features/periods/use-closing';
 import { usePeriod } from '@/features/periods/use-period';
 import { CreditsBar } from '@/features/summary/credits-bar';
 import { BudgetDialog } from '@/features/budget/budget-dialog';
+import { BudgetPlan } from '@/features/budget/budget-plan';
+import { DestinationsDialog } from '@/features/budget/destination-manager';
+import { STRIPED_ROW, TABLE_BOX } from '@/features/view-mode/row-styles';
+import { SortableHead } from '@/features/view-mode/sortable-head';
+import { sortRows, useSort, type SortValue } from '@/features/view-mode/sort';
+import { useShowsTable } from '@/features/view-mode/view-mode';
+import { ViewModeToggle } from '@/features/view-mode/view-mode-toggle';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useCategories } from '@/features/categories/use-categories';
 import { usePeople } from '@/features/people/use-people';
 import { useCards } from '@/features/cards/use-cards';
@@ -313,8 +328,8 @@ function GoalRow({ destination, onApply }: { destination: DestinationSummary; on
       <div className="flex min-h-8 items-center justify-between gap-3">
         <p className="font-medium">
           {destination.name}{' '}
-          <span className="text-muted-foreground text-sm font-normal">
-            {formatBasisPoints(destination.basisPoints)}
+          <span className="text-muted-foreground text-sm font-normal whitespace-nowrap">
+            {formatBasisPoints(destination.basisPoints)} da renda
           </span>
         </p>
         <ApplyButton destination={destination} onApply={onApply} />
@@ -332,18 +347,125 @@ function GoalRow({ destination, onApply }: { destination: DestinationSummary; on
   );
 }
 
+type GoalSortKey = 'name' | 'share' | 'target' | 'applied' | 'pending' | 'missing';
+
+const goalSortValues: Record<GoalSortKey, (destination: DestinationSummary) => SortValue> = {
+  name: (destination) => destination.name,
+  share: (destination) => destination.basisPoints,
+  target: (destination) => destination.targetCents,
+  applied: (destination) => destination.appliedCents,
+  pending: (destination) => destination.pendingCents,
+  missing: missingCents,
+};
+
 /**
- * The saving destinations, each a share of what is left after expenses (ADR 0047), under what is
- * left to set aside and what was set aside this month.
+ * The goals as a table, from xl ("Ver como: Tabela", ADR 0064): the same facts as the rows, one
+ * column each, sorted by the column clicked.
  */
-function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }) {
+function GoalsTable({ goals, onApply }: { goals: DestinationSummary[]; onApply?: OnApply }) {
+  const sort = useSort<GoalSortKey>('name');
+  const rows =
+    sort.key === 'name' && sort.direction === 'asc'
+      ? goals
+      : sortRows(goals, goalSortValues[sort.key], sort.direction);
+  const head = (key: GoalSortKey, label: string, align: 'left' | 'right' = 'right') => (
+    <SortableHead
+      label={label}
+      active={sort.key === key}
+      direction={sort.direction}
+      onSort={() => sort.toggle(key)}
+      align={align}
+    />
+  );
+  return (
+    <div className={TABLE_BOX}>
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            {head('name', 'Meta', 'left')}
+            {head('share', '% da renda')}
+            {head('target', 'Valor')}
+            {head('applied', 'Guardado')}
+            {head('pending', 'Pendente')}
+            {head('missing', 'Falta lançar')}
+            <TableHead>Progresso</TableHead>
+            {onApply && (
+              <TableHead>
+                <span className="sr-only">Ações</span>
+              </TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((destination) => (
+            <TableRow key={destination.destinationId} className={STRIPED_ROW}>
+              <TableCell className="font-medium whitespace-normal">{destination.name}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatBasisPoints(destination.basisPoints)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatCents(destination.targetCents)}
+              </TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">
+                {formatCents(destination.appliedCents)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatCents(destination.pendingCents)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatCents(missingCents(destination))}
+              </TableCell>
+              <TableCell className="w-36">
+                {destination.targetCents > 0 ? (
+                  <GoalProgress destination={destination} />
+                ) : (
+                  <span className="text-muted-foreground">Sem valor</span>
+                )}
+              </TableCell>
+              {onApply && (
+                <TableCell className="text-right">
+                  <ApplyButton destination={destination} onApply={onApply} />
+                </TableCell>
+              )}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+/**
+ * The goals, each a share of the net income (ADR 0064), under what was set aside of them and what
+ * is left in the month. "Gerenciar metas" creates and renames them; from xl they can be a table.
+ */
+function GoalsCard({
+  summary,
+  onApply,
+  onManageGoals,
+}: {
+  summary: Summary;
+  onApply?: OnApply;
+  onManageGoals?: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const asTable = useShowsTable('painel-metas');
   const savings = summary.destinations.filter((destination) => destination.kind === 'SAVINGS');
   if (savings.length === 0) return null;
-  const { unallocated } = summary;
+  const goalsTotal = savings.reduce((sum, destination) => sum + destination.targetCents, 0);
   return (
     <Card
       title="Metas"
       className="xl:col-span-2"
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          <ViewModeToggle page="painel-metas" />
+          {onManageGoals && (
+            <Button variant="outline" size="sm" onClick={onManageGoals}>
+              Gerenciar metas
+            </Button>
+          )}
+        </div>
+      }
       help={
         <>
           <p>
@@ -357,7 +479,15 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
         </>
       }
     >
-      <dl className="grid grid-cols-2 gap-4">
+      {/* One above the other on the phone, where their lines under the value would wrap. */}
+      <dl className="grid gap-4 sm:grid-cols-2">
+        <Figure
+          label="Guardado"
+          help={<p>O que já foi para as metas neste mês: lançado e pago.</p>}
+          sub={`de ${formatCents(goalsTotal)} das metas`}
+        >
+          {formatCents(summary.applied.settledCents)}
+        </Figure>
         <Figure
           label="Sobra prevista"
           help={
@@ -379,37 +509,23 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
           {/* Never negative (ADR 0064): the line under it says how far the expenses went. */}
           {formatCents(Math.max(0, summary.available.plannedCents))}
         </Figure>
-        <Figure
-          label="Guardado"
-          help={<p>O que já foi para as metas neste mês: lançado e pago.</p>}
-        >
-          {formatCents(summary.applied.settledCents)}
-        </Figure>
       </dl>
-      {/* Two goals side by side only when the card itself is wide enough (a container query):
-          at 768 and 1024px, beside the sidebar, they would wrap every amount. */}
-      <div className="@container">
-        <ul className="grid gap-x-8 @3xl:grid-cols-2">
-          {savings.map((destination) => (
-            <GoalRow key={destination.destinationId} destination={destination} onApply={onApply} />
-          ))}
-        </ul>
-      </div>
-      {unallocated.basisPoints > 0 && (
-        // A forecast share of what is left, never money in the account (ADR 0051): a plain line,
-        // with what it is behind its "ⓘ".
-        <dl className="text-muted-foreground flex items-center justify-between gap-3 border-t pt-3 tabular-nums">
-          <dt className="flex items-center">
-            Sem meta ({formatBasisPoints(unallocated.basisPoints)})
-            <InfoTip term="Sem meta">
-              <p>
-                Parte da renda líquida que nem o limite de gastos nem uma meta recebeu. É uma
-                divisão do orçamento, não um saldo.
-              </p>
-            </InfoTip>
-          </dt>
-          <dd>{formatCents(unallocated.targetCents)}</dd>
-        </dl>
+      {asTable ? (
+        <GoalsTable goals={savings} onApply={onApply} />
+      ) : (
+        // Two goals side by side only when the card itself is wide enough (a container query):
+        // at 768 and 1024px, beside the sidebar, they would wrap every amount.
+        <div className="@container">
+          <ul className="grid gap-x-8 @3xl:grid-cols-2">
+            {savings.map((destination) => (
+              <GoalRow
+                key={destination.destinationId}
+                destination={destination}
+                onApply={onApply}
+              />
+            ))}
+          </ul>
+        </div>
       )}
     </Card>
   );
@@ -482,6 +598,8 @@ function BudgetCard({
           {formatCents(income)}
         </Figure>
       </dl>
+      {/* The whole plan (ADR 0064): where each part of the net income goes, down to 100%. */}
+      <BudgetPlan summary={summary} />
     </Card>
   );
 }
@@ -523,10 +641,13 @@ function Dashboard({
   links,
   onEditBudget,
   onApply,
+  onManageGoals,
   children,
 }: {
   summary: Summary;
   links: PageLinks;
+  /** Opens "Gerenciar metas" (ADR 0064); absent for a VIEWER and in a closed month. */
+  onManageGoals?: (event: MouseEvent<HTMLButtonElement>) => void;
   /** What closes the page: the month's closing (ADR 0063). */
   children?: ReactNode;
   /** Opens the budget dialog; absent for a VIEWER, who cannot change it. */
@@ -545,7 +666,7 @@ function Dashboard({
         {hasBudget ? (
           <>
             <LimitCard summary={summary} />
-            <GoalsCard summary={summary} onApply={onApply} />
+            <GoalsCard summary={summary} onApply={onApply} onManageGoals={onManageGoals} />
           </>
         ) : (
           <NoBudgetCard onEditBudget={onEditBudget} />
@@ -647,6 +768,16 @@ export function DashboardPage() {
           setBudgetOpen(true);
         }
       : undefined;
+  // "Gerenciar metas", apart from the budget (ADR 0064), with the focus back on its button.
+  const [goalsOpener, setGoalsOpener] = useState<HTMLElement | null>(null);
+  const [goalsOpen, setGoalsOpen] = useState(false);
+  const manageGoals =
+    canEdit && !closed
+      ? (event: MouseEvent<HTMLButtonElement>) => {
+          setGoalsOpener(event.currentTarget);
+          setGoalsOpen(true);
+        }
+      : undefined;
   const [application, setApplication] = useState<{
     preset: TransactionPreset;
     opener: HTMLElement;
@@ -667,7 +798,13 @@ export function DashboardPage() {
       </PageHeader>
       <QueryState queries={[summary]} skeleton={<DashboardSkeleton />} />
       {summary.isSuccess && (
-        <Dashboard summary={summary.data} links={links} onEditBudget={editBudget} onApply={apply}>
+        <Dashboard
+          summary={summary.data}
+          links={links}
+          onEditBudget={editBudget}
+          onApply={apply}
+          onManageGoals={manageGoals}
+        >
           <ClosingCard
             workspaceId={workspace.id}
             period={period}
@@ -687,6 +824,14 @@ export function DashboardPage() {
           open={budgetOpen}
           onOpenChange={setBudgetOpen}
           returnFocusTo={budgetOpener}
+        />
+      )}
+      {manageGoals && (
+        <DestinationsDialog
+          workspaceId={workspace.id}
+          open={goalsOpen}
+          onOpenChange={setGoalsOpen}
+          returnFocusTo={goalsOpener}
         />
       )}
       {application && (
