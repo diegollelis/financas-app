@@ -77,3 +77,14 @@ O que a implementação ajustou no que foi decidido:
 - **"Ligar ao cartão"** deixa de fora os lançamentos de um mês fechado, e a contagem dos sem cartão também.
 - **O resumo e a lista de lançamentos não ganharam `closed`.** A lista é um array, e mudar o formato dela mexeria em todas as telas. A tela lê `GET …/periods/:period/closing`, que traz o fechamento em vigor, o histórico e o que falta para fechar.
 - **Fica para a tela:** a revisão de um extrato com linhas de um mês fechado. Hoje a importação inteira é recusada com `PERIOD_CLOSED`; a revisão deve deixar essas linhas desmarcadas, com o motivo.
+
+## Nota (a tela, 2026-10-29)
+
+- **No Painel, "Fechamento do mês" é o último card.** Fechar é um passo de fim de mês, e o cadeado ao lado do mês em `PeriodNav` já avisa no topo. O card mostra:
+  - com pendências, quantas e quais (até cinco), com "Ver pendentes", que abre Lançamentos filtrado;
+  - sem pendências, "Fechar mês", que confirma o que trava, que o orçamento herdado passa a ser do mês, que o empréstimo sem vencimento ainda aceita parte, e que renomear ou marcar categorias ainda muda o que o mês mostra;
+  - fechado, "Fechado em … por …", "Reabrir mês" com o motivo obrigatório e as reaberturas anteriores, cada uma com o motivo.
+- **Num mês fechado,** o Painel esconde "Editar orçamento", "Definir orçamento" e "Guardar". Lançamentos mostra o aviso com "Reabrir mês" e tira "Novo lançamento", "Pagar"/"Receber" e o menu ⋯; o empréstimo sem vencimento mantém o menu só com o recebimento ou pagamento parcial.
+- **"Pagar fatura" continua em Lançamentos:** a fatura junta lançamentos de vários meses, e a API recusa a parte num mês fechado.
+- **A revisão de uma importação** lê o estado de cada mês das linhas e deixa desmarcadas as de um mês fechado, com o motivo. Marcada de novo à mão, a API recusa e diz por quê.
+- **A marcação "Nem renda nem gasto"** avisa, ao marcar, que vale também para os meses fechados. Não há rota que liste os meses fechados, então o aviso não depende de existir algum.

@@ -360,8 +360,9 @@ function CategoryItem({
                         : 'os lançamentos desta categoria continuam no saldo e diminuem a sobra para guardar, mas saem do limite de gastos e dos gastos da Análise.'}
                     </p>
                     <p>
-                      Vale para todos os meses, inclusive os que já passaram. Dá para desfazer no
-                      mesmo menu.
+                      {/* Even a closed month: the mark is not locked by closing (ADR 0063). */}
+                      Vale para todos os meses, inclusive os que já passaram e os fechados. Dá para
+                      desfazer no mesmo menu.
                     </p>
                   </div>
                 </AlertDialogDescription>
