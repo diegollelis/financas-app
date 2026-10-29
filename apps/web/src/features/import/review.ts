@@ -1,4 +1,5 @@
 import {
+  formatPeriod,
   importInstallmentPlanInputSchema,
   plainTransactionInputSchema,
   normalizeName,
@@ -72,6 +73,8 @@ export type ReviewRow = {
    * checked, importing pays that bill; it never comes in as a transaction.
    */
   bill?: AccountBill;
+  /** Its competência is closed (ADR 0063): unchecked, saying so, once. */
+  inClosedPeriod?: boolean;
 };
 
 /** A card bill still open that an account statement's bill payment paid (ADR 0062 note). */
@@ -420,3 +423,28 @@ export function groupTotals(rows: ReviewRow[]) {
   }
   return { credits, debits };
 }
+
+/**
+ * The rows of a closed competência (ADR 0063) come unchecked, with the reason, as the API would
+ * refuse the whole import for them. Marked once: checked again by hand, the API answers why not.
+ */
+export function uncheckClosedPeriods(rows: ReviewRow[], closed: ReadonlySet<string>): ReviewRow[] {
+  return rows.map((row) =>
+    row.period && closed.has(row.period) && !row.inClosedPeriod
+      ? {
+          ...row,
+          included: false,
+          skipped: true,
+          inClosedPeriod: true,
+          warnings: [
+            ...row.warnings,
+            `O mês de ${formatPeriod(row.period)} está fechado: reabra o mês para importar esta linha.`,
+          ],
+        }
+      : row,
+  );
+}
+
+/** Whether some row of a closed competência was not unchecked yet. */
+export const hasUncheckedClosed = (rows: ReviewRow[], closed: ReadonlySet<string>) =>
+  rows.some((row) => row.period && closed.has(row.period) && !row.inClosedPeriod);

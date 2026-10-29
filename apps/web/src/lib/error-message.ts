@@ -28,6 +28,11 @@ const ptBrCodes = new Set([
   'PLAN_ENDED',
   'PLAN_HAS_PAYMENTS',
   'PLAN_IS_SPLIT',
+  // Month closing (ADR 0063).
+  'PERIOD_CLOSED',
+  'PERIOD_HAS_PENDING',
+  'PERIOD_ALREADY_CLOSED',
+  'PERIOD_NOT_CLOSED',
 ]);
 
 /** Turns an error from our own API routes (not /api/auth) into a message for the user. */

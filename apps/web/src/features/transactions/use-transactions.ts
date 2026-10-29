@@ -11,6 +11,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { analysisKey } from '@/features/analysis/use-analysis';
 import { cardBillsKey } from '@/features/cards/use-cards';
 import { peopleKey } from '@/features/people/use-people';
+import { closingKey } from '@/features/periods/use-closing';
 import { summaryKey } from '@/features/summary/use-summary';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
@@ -42,6 +43,8 @@ export function useInvalidateTransactions(workspaceId: string) {
       queryClient.invalidateQueries({ queryKey: peopleKey(workspaceId) }),
       // A card's bill is its pending transactions in Crédito (ADR 0062 note).
       queryClient.invalidateQueries({ queryKey: cardBillsKey(workspaceId) }),
+      // What keeps a month from closing is its pending transactions (ADR 0063).
+      queryClient.invalidateQueries({ queryKey: closingKey(workspaceId) }),
     ]);
 }
 

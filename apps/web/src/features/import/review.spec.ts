@@ -8,6 +8,8 @@ import {
   resolveCategory,
   startReview,
   toTransaction,
+  hasUncheckedClosed,
+  uncheckClosedPeriods,
   unmatchedCategories,
   type ReviewRow,
 } from './review';
@@ -208,5 +210,24 @@ describe('groups', () => {
         reviewRow({ amountCents: 10_000, included: false }),
       ]),
     ).toEqual({ credits: 520_000, debits: 64_035 });
+  });
+});
+
+describe('closed competências (ADR 0063)', () => {
+  it('unchecks the rows of a closed month once, saying why', () => {
+    const rows = [reviewRow({ line: 2 }), reviewRow({ line: 3, period: '2026-10' })];
+    const closed = new Set(['2026-09']);
+
+    const unchecked = uncheckClosedPeriods(rows, closed);
+
+    expect(unchecked[0]).toMatchObject({ included: false, skipped: true, inClosedPeriod: true });
+    expect(unchecked[0]!.warnings).toEqual([
+      'O mês de setembro de 2026 está fechado: reabra o mês para importar esta linha.',
+    ]);
+    expect(unchecked[1]).toBe(rows[1]);
+    expect(hasUncheckedClosed(rows, closed)).toBe(true);
+    expect(hasUncheckedClosed(unchecked, closed)).toBe(false);
+    const checkedAgain = [{ ...unchecked[0]!, included: true }];
+    expect(uncheckClosedPeriods(checkedAgain, closed)[0]!.included).toBe(true);
   });
 });

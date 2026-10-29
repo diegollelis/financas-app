@@ -1,5 +1,5 @@
 import { currentPeriod, formatPeriod, shiftPeriod } from '@financas/shared';
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
@@ -13,9 +13,10 @@ import { usePeriodLink } from './use-period';
  * Previous / next competência on the same page, and the month itself opens a picker to jump far
  * (ADR 0036). Only `?competencia=` changes, so the address can be shared and the browser's back
  * button goes to the month seen before. The row never changes shape: "Ir para o mês atual" lives
- * in the picker, and a dot beside the name tells that this is not this month.
+ * in the picker, and a dot beside the name tells that this is not this month. A lock beside it
+ * tells that the month is closed (ADR 0063).
  */
-export function PeriodNav({ period }: { period: string }) {
+export function PeriodNav({ period, closed = false }: { period: string; closed?: boolean }) {
   const thisMonth = currentPeriod();
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const [open, setOpen] = useState(false);
@@ -29,7 +30,7 @@ export function PeriodNav({ period }: { period: string }) {
     <Button
       ref={triggerRef}
       variant="ghost"
-      className="min-w-0 flex-1 gap-2 text-base font-medium sm:w-44 sm:flex-none md:text-sm"
+      className="min-w-0 flex-1 gap-2 text-base font-medium sm:w-52 sm:flex-none md:text-sm"
       onClick={desktop ? undefined : () => setOpen(true)}
     >
       {/* The name holds the visible month (WCAG 2.5.3): the rest is screen-reader text. */}
@@ -37,13 +38,19 @@ export function PeriodNav({ period }: { period: string }) {
       <span className="truncate first-letter:uppercase">{formatPeriod(period)}</span>
       {away && <span className="sr-only">, fora do mês atual</span>}
       {away && <span aria-hidden className="bg-primary size-1.5 shrink-0 rounded-full" />}
+      {closed && (
+        <>
+          <span className="sr-only">, mês fechado</span>
+          <Lock aria-hidden className="text-muted-foreground" />
+        </>
+      )}
       <ChevronDown aria-hidden className="text-muted-foreground" />
     </Button>
   );
   const picker = <PeriodPicker period={period} onPick={() => setOpen(false)} />;
 
   return (
-    <nav aria-label="Mês" className="flex items-center gap-2">
+    <nav aria-label="Mês" className="flex min-w-0 items-center gap-2">
       <Button asChild variant="outline" size="icon">
         <Link to={to(previous)} aria-label={`Mês anterior: ${formatPeriod(previous)}`}>
           <ChevronLeft aria-hidden />

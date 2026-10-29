@@ -5,7 +5,8 @@ import { summaryKey } from '@/features/summary/use-summary';
 import { workspacesQueryKey } from '@/features/workspaces/use-workspaces';
 
 /** ['workspaces', id, 'budget', period]. */
-const budgetKey = (workspaceId: string) => [...workspacesQueryKey, workspaceId, 'budget'] as const;
+export const budgetKey = (workspaceId: string) =>
+  [...workspacesQueryKey, workspaceId, 'budget'] as const;
 
 export function useBudget(workspaceId: string, period: string) {
   return useQuery({

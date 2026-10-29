@@ -60,7 +60,10 @@ import {
   type AccountMatch,
   type AccountPart,
   type ReviewRow,
+  hasUncheckedClosed,
+  uncheckClosedPeriods,
 } from './review';
+import { useClosedPeriods } from '@/features/periods/use-closing';
 import {
   accountGroup,
   accountSummary,
@@ -444,6 +447,13 @@ export function ImportReview({
     const previousPeriod = base?.[0]?.period ?? null;
     setBase(statement.baseRows);
     setRows((current) => mergeStatementRows(current, statement.baseRows!, previousPeriod));
+  }
+  // A closed month's rows come unchecked, saying so (ADR 0063), once its state is known.
+  const closedPeriods = useClosedPeriods(workspaceId, [
+    ...new Set(rows.flatMap((row) => (row.period ? [row.period] : []))),
+  ]);
+  if (hasUncheckedClosed(rows, closedPeriods)) {
+    setRows((current) => uncheckClosedPeriods(current, closedPeriods));
   }
   const missingDueDate = Boolean(statement) && !statement?.dueDate;
   const [matches, setMatches] = useState<ReadonlyMap<string, string>>(new Map());

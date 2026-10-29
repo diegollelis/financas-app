@@ -73,7 +73,9 @@ import {
 import { MovePeriodDialog } from '@/features/transactions/move-period-dialog';
 import { SettlePartDialog } from '@/features/transactions/settle-part-dialog';
 import { SettleWithAmount } from '@/features/transactions/settle-with-amount';
+import { ClosedNotice } from '@/features/periods/closing';
 import { PeriodNav } from '@/features/periods/period-nav';
+import { useIsClosed } from '@/features/periods/use-closing';
 import { usePeriod } from '@/features/periods/use-period';
 import { TransactionDialog } from '@/features/transactions/transaction-dialog';
 import { SettleButton } from '@/features/transactions/settle-button';
@@ -412,6 +414,8 @@ type RowProps = {
   /** Its shares with their amounts, for "Tornar recorrente" (ADR 0052 note). */
   shares: { name: string; amountCents: number }[];
   canEdit: boolean;
+  /** The month is closed (ADR 0063): only a loan with no due date takes a part settled. */
+  locked: boolean;
   today: string;
   onEdit: (transaction: Transaction, returnFocusTo: HTMLElement | null) => void;
 };
@@ -425,9 +429,13 @@ function useRowActions({
   transaction,
   sharedWith,
   shares,
+  locked,
   today,
   onEdit,
-}: Pick<RowProps, 'workspaceId' | 'transaction' | 'sharedWith' | 'shares' | 'today' | 'onEdit'>) {
+}: Pick<
+  RowProps,
+  'workspaceId' | 'transaction' | 'sharedWith' | 'shares' | 'locked' | 'today' | 'onEdit'
+>) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [repeating, setRepeating] = useState(false);
@@ -497,6 +505,43 @@ function useRowActions({
             onError: showError,
           },
         );
+
+  if (locked) {
+    // A closed month: only the part of a loan with no due date, which goes to the month of its day.
+    return {
+      estimated,
+      settleRef,
+      settleButton: null,
+      menu: partable && (
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                ref={actionsRef}
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Ações de ${description}`}
+              >
+                <Ellipsis aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-max">
+              <DropdownMenuItem onSelect={() => setSettlingPart(true)}>
+                {settlePartLabels[transaction.type].action}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <SettlePartDialog
+            workspaceId={workspaceId}
+            transaction={transaction}
+            open={settlingPart}
+            onOpenChange={setSettlingPart}
+            returnFocusTo={actionsRef}
+          />
+        </>
+      ),
+    };
+  }
 
   return {
     estimated,
@@ -690,6 +735,7 @@ function TransactionItem(props: RowProps) {
     personName,
     sharedWith,
     canEdit,
+    locked,
     today,
   } = props;
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
@@ -720,7 +766,7 @@ function TransactionItem(props: RowProps) {
           />
         )}
         <span className="flex flex-wrap gap-1.5">
-          <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
+          <StatusBadge transaction={transaction} today={today} canEdit={canEdit && !locked} />
           <LinkBadges
             transaction={transaction}
             personName={personName}
@@ -731,11 +777,13 @@ function TransactionItem(props: RowProps) {
       </div>
       <div className="grid shrink-0 justify-items-end gap-2">
         <Amount transaction={transaction} estimated={estimated} />
-        {canEdit && (
+        {canEdit && (!locked || menu) && (
           // The date can be fixed later by editing.
           // Stacked on the phone, so the description keeps its width; side by side from md.
           <div className="flex flex-col items-end gap-2 md:flex-row md:items-center md:gap-1">
-            {!transaction.settledAt && <SettleButton ref={settleRef} {...settleButton} />}
+            {settleButton && !transaction.settledAt && (
+              <SettleButton ref={settleRef} {...settleButton} />
+            )}
             {menu}
           </div>
         )}
@@ -754,6 +802,7 @@ function TransactionRow(props: RowProps) {
     personName,
     sharedWith,
     canEdit,
+    locked,
     today,
   } = props;
   const { estimated, settleRef, settleButton, menu } = useRowActions(props);
@@ -771,7 +820,7 @@ function TransactionRow(props: RowProps) {
           <span className="tabular-nums">
             {transaction.dueDate ? formatIsoDate(transaction.dueDate) : '—'}
           </span>
-          <StatusBadge transaction={transaction} today={today} canEdit={canEdit} />
+          <StatusBadge transaction={transaction} today={today} canEdit={canEdit && !locked} />
         </div>
       </TableCell>
       <TableCell className="whitespace-normal">
@@ -811,7 +860,9 @@ function TransactionRow(props: RowProps) {
       {canEdit && (
         <TableCell>
           <div className="flex items-center justify-end gap-1">
-            {!transaction.settledAt && <SettleButton ref={settleRef} {...settleButton} />}
+            {settleButton && !transaction.settledAt && (
+              <SettleButton ref={settleRef} {...settleButton} />
+            )}
             {menu}
           </div>
         </TableCell>
@@ -897,6 +948,8 @@ export function TransactionsPage() {
   const workspaceId = workspace.id;
   const canEdit = hasRole(workspace.role, 'EDITOR');
   const period = usePeriod();
+  // A closed month is only seen (ADR 0063).
+  const closed = useIsClosed(workspaceId, period);
   const today = todayIso();
   const categories = useCategories(workspaceId);
   const transactions = useTransactions(workspaceId, period);
@@ -957,6 +1010,7 @@ export function TransactionsPage() {
       sharedWith={sharesOf(transaction).map((share) => share.name)}
       shares={sharesOf(transaction)}
       canEdit={canEdit}
+      locked={closed}
       today={today}
       onEdit={openForm}
     />
@@ -981,6 +1035,7 @@ export function TransactionsPage() {
         title="Lançamentos"
         action={
           canEdit &&
+          !closed &&
           ready && (
             // Fixed above the tab bar on the phone, within reach of the thumb; in the header
             // from md (ADR 0036).
@@ -991,7 +1046,8 @@ export function TransactionsPage() {
           )
         }
       >
-        <PeriodNav period={period} />
+        <PeriodNav period={period} closed={closed} />
+        {closed && <ClosedNotice workspaceId={workspaceId} period={period} canEdit={canEdit} />}
         {/* The page's occasional action (ADR 0036 note): on a row of its own, at the left, as in
             Categorias. Paying a card's bill at once (ADR 0062). */}
         {canEdit && (bills.data?.length ?? 0) > 0 && (
@@ -1044,7 +1100,7 @@ export function TransactionsPage() {
           // does not repeat the button (ADR 0036).
           <div className="grid gap-1 rounded-xl border border-dashed p-5">
             <p>Nenhum lançamento em {formatPeriod(period)}.</p>
-            {canEdit && (
+            {canEdit && !closed && (
               <p className="text-muted-foreground">
                 Use Novo lançamento para adicionar o primeiro.
               </p>

@@ -16,7 +16,9 @@ import { QueryState } from '@/components/query-state';
 import { SectionCard as Card } from '@/components/section-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ClosingCard } from '@/features/periods/closing';
 import { PeriodNav } from '@/features/periods/period-nav';
+import { useIsClosed } from '@/features/periods/use-closing';
 import { usePeriod } from '@/features/periods/use-period';
 import { CreditsBar } from '@/features/summary/credits-bar';
 import { BudgetDialog } from '@/features/budget/budget-dialog';
@@ -507,9 +509,12 @@ function Dashboard({
   links,
   onEditBudget,
   onApply,
+  children,
 }: {
   summary: Summary;
   links: PageLinks;
+  /** What closes the page: the month's closing (ADR 0063). */
+  children?: ReactNode;
   /** Opens the budget dialog; absent for a VIEWER, who cannot change it. */
   onEditBudget?: (event: MouseEvent<HTMLButtonElement>) => void;
   onApply?: OnApply;
@@ -532,6 +537,7 @@ function Dashboard({
           <NoBudgetCard onEditBudget={onEditBudget} />
         )}
       </div>
+      {children}
     </div>
   );
 }
@@ -618,18 +624,21 @@ export function DashboardPage() {
   const [budgetOpener, setBudgetOpener] = useState<HTMLElement | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const canEdit = hasRole(workspace.role, 'EDITOR');
-  const editBudget = canEdit
-    ? (event: MouseEvent<HTMLButtonElement>) => {
-        setBudgetOpener(event.currentTarget);
-        setBudgetOpen(true);
-      }
-    : undefined;
+  // A closed month takes no change (ADR 0063): its budget and goals are only seen.
+  const closed = useIsClosed(workspace.id, period);
+  const editBudget =
+    canEdit && !closed
+      ? (event: MouseEvent<HTMLButtonElement>) => {
+          setBudgetOpener(event.currentTarget);
+          setBudgetOpen(true);
+        }
+      : undefined;
   const [application, setApplication] = useState<{
     preset: TransactionPreset;
     opener: HTMLElement;
   } | null>(null);
   const apply: OnApply | undefined =
-    canEdit && summary.isSuccess
+    canEdit && !closed && summary.isSuccess
       ? (destination, event) =>
           setApplication({
             preset: applicationPreset(summary.data, destination),
@@ -640,11 +649,21 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader title="Painel">
-        <PeriodNav period={period} />
+        <PeriodNav period={period} closed={closed} />
       </PageHeader>
       <QueryState queries={[summary]} skeleton={<DashboardSkeleton />} />
       {summary.isSuccess && (
-        <Dashboard summary={summary.data} links={links} onEditBudget={editBudget} onApply={apply} />
+        <Dashboard summary={summary.data} links={links} onEditBudget={editBudget} onApply={apply}>
+          <ClosingCard
+            workspaceId={workspace.id}
+            period={period}
+            canEdit={canEdit}
+            inheritedFrom={
+              summary.data.budget.source === 'INHERITED' ? summary.data.budget.inheritedFrom : null
+            }
+            pendingLink={`/espacos/${workspace.id}/lancamentos?competencia=${period}&situacao=pendentes`}
+          />
+        </Dashboard>
       )}
       {editBudget && (
         <BudgetDialog
