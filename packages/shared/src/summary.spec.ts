@@ -225,7 +225,8 @@ describe('summarizePeriod', () => {
     // R$ 3.333,33 at 60%, 20%, 12% and 8%: rounded one by one, 3.333,34.
     const { destinations } = summarizePeriod([], { ...budget, netIncomeCents: 333_333 }, today);
 
-    const goals = destinations.map((destination) => destination.targetCents);
+    // The plan: an empty month leaves nothing, so the goals of the month are zero (ADR 0064 note).
+    const goals = destinations.map((destination) => destination.plannedCents ?? 0);
     expect(goals).toEqual([200_000, 66_666, 40_000, 26_667]);
     expect(goals.reduce((sum, goal) => sum + goal, 0)).toBe(333_333);
   });
@@ -244,12 +245,49 @@ describe('summarizePeriod', () => {
     );
   });
 
-  it('keeps the goals when expenses pass the credits: the leftover only says so', () => {
+  it('keeps the planned goals while the leftover covers them (ADR 0064 note)', () => {
+    // 349.010 left, 200.000 of goals.
+    const { destinations } = summarizePeriod(month, budget, today);
+
+    expect(destinations.slice(1).map((d) => [d.targetCents, d.plannedCents])).toEqual([
+      [100_000, 100_000],
+      [60_000, 60_000],
+      [40_000, 40_000],
+    ]);
+  });
+
+  it('cuts the goals in proportion when the leftover does not cover them, never the plan', () => {
+    // 249.010 more spent: 100.000 left for 200.000 of goals, half of each.
+    const summary = summarizePeriod([...month, debit(249_010, null)], budget, today);
+
+    expect(summary.available.plannedCents).toBe(100_000);
+    expect(summary.destinations.map((d) => [d.targetCents, d.plannedCents])).toEqual([
+      [300_000, 300_000],
+      [50_000, 100_000],
+      [30_000, 60_000],
+      [20_000, 40_000],
+    ]);
+    expect(summary.unallocated).toEqual({ basisPoints: 0, targetCents: 0 });
+  });
+
+  it('adds up the cut goals to the leftover, to the cent', () => {
+    // 333,33 left for 1.000,00, 600,00 and 400,00 of goals.
+    const summary = summarizePeriod([...month, debit(315_677, null)], budget, today);
+
+    const goals = summary.destinations.slice(1).map((d) => d.targetCents);
+    expect(summary.available.plannedCents).toBe(33_333);
+    expect(goals).toEqual([16_666, 10_000, 6_667]);
+    expect(goals.reduce((sum, goal) => sum + goal, 0)).toBe(33_333);
+  });
+
+  it('sets the goals to zero with nothing left, the plan unchanged', () => {
     const summary = summarizePeriod([...month, debit(400_000, null)], budget, today);
 
     expect(summary.available.plannedCents).toBe(-50_990);
-    expect(summary.destinations.slice(1).map((d) => d.targetCents)).toEqual([
-      100_000, 60_000, 40_000,
+    expect(summary.destinations.slice(1).map((d) => [d.targetCents, d.plannedCents])).toEqual([
+      [0, 100_000],
+      [0, 60_000],
+      [0, 40_000],
     ]);
   });
 

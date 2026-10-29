@@ -266,11 +266,25 @@ function leftoverNote(summary: Summary) {
   const leftover = summary.available.plannedCents;
   const goals = summary.destinations
     .filter((destination) => destination.kind === 'SAVINGS')
-    .reduce((sum, destination) => sum + destination.targetCents, 0);
+    .reduce((sum, destination) => sum + plannedOf(destination), 0);
   if (leftover < 0) return `Os gastos passaram as entradas em ${formatCents(-leftover)}.`;
   if (goals === 0) return undefined;
-  if (leftover < goals) return `Faltam ${formatCents(goals - leftover)} para cumprir as metas.`;
+  // The plan is a ceiling (ADR 0064 note): the goals were cut to what is left.
+  if (leftover < goals)
+    return `Não cobre as metas do plano: elas ficam em ${formatCents(leftover)}.`;
   return `Cobre as metas e ainda sobram ${formatCents(leftover - goals)}.`;
+}
+
+/** The plan's amount of a goal; an API from before ADR 0064's note sends only the target. */
+const plannedOf = (destination: DestinationSummary) =>
+  destination.plannedCents ?? destination.targetCents;
+
+/** A goal cut by the month's leftover, in words with its planned amount; null when it is not. */
+function cutNote(destination: DestinationSummary) {
+  const planned = plannedOf(destination);
+  return destination.targetCents < planned
+    ? `Reduzida pela sobra do mês (plano: ${formatCents(planned)}).`
+    : null;
 }
 
 /** What is still to be launched for the goal: neither applied nor scheduled. */
@@ -343,6 +357,9 @@ function GoalRow({ destination, onApply }: { destination: DestinationSummary; on
       </p>
       {destination.targetCents > 0 && <GoalProgress destination={destination} />}
       <p className="text-muted-foreground text-sm tabular-nums">{goalNote(destination)}</p>
+      {cutNote(destination) && (
+        <p className="text-muted-foreground text-sm tabular-nums">{cutNote(destination)}</p>
+      )}
     </li>
   );
 }
@@ -405,6 +422,12 @@ function GoalsTable({ goals, onApply }: { goals: DestinationSummary[]; onApply?:
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatCents(destination.targetCents)}
+                {destination.targetCents < plannedOf(destination) && (
+                  // Cut by the month's leftover (ADR 0064 note): the plan under it.
+                  <span className="text-muted-foreground block text-sm">
+                    plano {formatCents(plannedOf(destination))}
+                  </span>
+                )}
               </TableCell>
               <TableCell className="text-right font-semibold tabular-nums">
                 {formatCents(destination.appliedCents)}
@@ -471,6 +494,10 @@ function GoalsCard({
           <p>
             Quanto da renda líquida vai para cada meta. O limite de gastos e as metas somam até 100%
             da renda.
+          </p>
+          <p>
+            O plano é o máximo: quando a sobra prevista do mês não cobre as metas, cada uma diminui
+            na mesma proporção, e &quot;Guardar&quot; sugere só o que cabe.
           </p>
           <p>
             Guardado: lançado e pago. Pendente: lançado, ainda não pago. Falta lançar: o que ainda

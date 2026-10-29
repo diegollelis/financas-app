@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { budgetInputSchema, budgetSharesTotal, shareOfIncome } from './budget.ts';
+import { budgetInputSchema, budgetSharesTotal, shareOfIncome, splitByWeights } from './budget.ts';
+
+describe('splitByWeights', () => {
+  it('splits in proportion, adding up to the amount to the cent', () => {
+    expect(splitByWeights(100_000, [100_000, 60_000, 40_000])).toEqual([50_000, 30_000, 20_000]);
+    // 333,33 by 5:3:2: 166,665 + 99,999 + 66,666; the two cents left go to the largest remainders.
+    expect(splitByWeights(33_333, [5, 3, 2])).toEqual([16_666, 10_000, 6_667]);
+  });
+
+  it('gives zero to every part when the weights are all zero', () => {
+    expect(splitByWeights(10_000, [0, 0])).toEqual([0, 0]);
+  });
+});
 
 // Fictitious data (ADR 0019).
 const despesas = '01920000-0000-7000-8000-0000000000d1';

@@ -38,6 +38,28 @@ export function splitShares(amountCents: number, basisPoints: readonly number[])
   return parts;
 }
 
+/**
+ * Splits an amount in proportion to whole weights, adding up to it to the cent: each part is
+ * rounded down and the cents left go to the largest remainders (the first one on a tie), as in
+ * `splitShares`. All weights zero: every part is zero.
+ */
+export function splitByWeights(amountCents: number, weights: readonly number[]): number[] {
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  if (total <= 0) return weights.map(() => 0);
+  const exact = weights.map((weight) => amountCents * weight);
+  const parts = exact.map((value) => Math.floor(value / total));
+  let left = amountCents - parts.reduce((sum, part) => sum + part, 0);
+  const byRemainder = exact
+    .map((value, index) => ({ index, remainder: value % total }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+  for (const { index } of byRemainder) {
+    if (left <= 0) break;
+    parts[index] = (parts[index] ?? 0) + 1;
+    left -= 1;
+  }
+  return parts;
+}
+
 export const basisPointsSchema = z
   .number('Informe o percentual.')
   .int('Use no máximo duas casas decimais no percentual.')

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { budgetDestinationKindSchema } from './budget-destination.ts';
-import { budgetSchema, FULL_BASIS_POINTS, splitShares, type Budget } from './budget.ts';
+import {
+  budgetSchema,
+  FULL_BASIS_POINTS,
+  splitByWeights,
+  splitShares,
+  type Budget,
+} from './budget.ts';
 import { periodSchema } from './money-and-dates.ts';
 import {
   transactionStatus,
@@ -37,8 +43,17 @@ const destinationSummarySchema = z.object({
   name: z.string(),
   kind: budgetDestinationKindSchema,
   basisPoints: z.number().int(),
-  /** Despesas: net income × %. A saving destination: what is left after expenses (planned) × %. */
+  /**
+   * The goal of the month (ADR 0064). Despesas: net income × %. A saving destination: its planned
+   * amount, cut in proportion when the planned leftover does not cover every goal ("Teto pela
+   * sobra"), and zero with nothing left.
+   */
   targetCents: z.number().int(),
+  /**
+   * The plan: net income × % (ADR 0064). Optional because the web and the API are deployed apart;
+   * read it as `plannedCents ?? targetCents`.
+   */
+  plannedCents: z.number().int().optional(),
   /** Paid: expenses for Despesas; transactions in the destination's category for the others. */
   appliedCents: z.number().int(),
   /** Pending, scheduled for this competência (recurrences and installments included). */
@@ -211,8 +226,20 @@ export function summarizePeriod(
     budget.netIncomeCents,
     budget.shares.map((share) => share.basisPoints),
   );
-  const targets = new Map(
+  const planned = new Map(
     budget.shares.map((share, index) => [share.destinationId, parts[index] ?? 0]),
+  );
+  // The plan is the ceiling of the goals (ADR 0064 note): when the planned leftover does not cover
+  // them, each one is cut in proportion, adding up to the leftover to the cent.
+  const savingShares = budget.shares.filter((share) => share.kind === 'SAVINGS');
+  const plannedGoals = savingShares.map((share) => planned.get(share.destinationId) ?? 0);
+  const leftover = Math.max(0, available.plannedCents);
+  const capped =
+    leftover < plannedGoals.reduce((sum, goal) => sum + goal, 0)
+      ? splitByWeights(leftover, plannedGoals)
+      : plannedGoals;
+  const goalTargets = new Map(
+    savingShares.map((share, index) => [share.destinationId, capped[index] ?? 0]),
   );
 
   const destinations = budget.shares.map((share) => {
@@ -222,7 +249,8 @@ export function summarizePeriod(
         name: share.name,
         kind: share.kind,
         basisPoints: share.basisPoints,
-        targetCents: targets.get(share.destinationId) ?? 0,
+        targetCents: planned.get(share.destinationId) ?? 0,
+        plannedCents: planned.get(share.destinationId) ?? 0,
         appliedCents: expenses.settledCents,
         pendingCents: expenses.pendingCents,
       };
@@ -236,7 +264,8 @@ export function summarizePeriod(
       name: share.name,
       kind: share.kind,
       basisPoints: share.basisPoints,
-      targetCents: targets.get(share.destinationId) ?? 0,
+      targetCents: goalTargets.get(share.destinationId) ?? 0,
+      plannedCents: planned.get(share.destinationId) ?? 0,
       appliedCents: own.settledCents,
       pendingCents: own.pendingCents,
     };
@@ -279,8 +308,7 @@ export function summarizePeriod(
       basisPoints: unallocatedBasisPoints,
       targetCents:
         unallocatedBasisPoints > 0
-          ? budget.netIncomeCents -
-            destinations.reduce((sum, destination) => sum + destination.targetCents, 0)
+          ? budget.netIncomeCents - parts.reduce((sum, part) => sum + part, 0)
           : 0,
     },
     expensesLeftCents: expensesTarget - expenses.totalCents,
