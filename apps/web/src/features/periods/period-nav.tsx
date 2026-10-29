@@ -30,14 +30,18 @@ export function PeriodNav({ period, closed = false }: { period: string; closed?:
     <Button
       ref={triggerRef}
       variant="ghost"
-      className="min-w-0 flex-1 gap-2 text-base font-medium sm:w-52 sm:flex-none md:text-sm"
+      className="min-w-0 flex-1 gap-1.5 px-2 text-base font-medium sm:w-60 sm:flex-none sm:px-4 md:w-52 md:text-sm"
       onClick={desktop ? undefined : () => setOpen(true)}
     >
       {/* The name holds the visible month (WCAG 2.5.3): the rest is screen-reader text. */}
       <span className="sr-only">Escolher mês:</span>{' '}
       <span className="truncate first-letter:uppercase">{formatPeriod(period)}</span>
       {away && <span className="sr-only">, fora do mês atual</span>}
-      {away && <span aria-hidden className="bg-primary size-1.5 shrink-0 rounded-full" />}
+      {/* A closed month shows the lock in the dot's place, so the name keeps its room at 360px:
+          a closed month has started, so it is this one or a past one anyway. */}
+      {away && !closed && (
+        <span aria-hidden className="bg-primary size-1.5 shrink-0 rounded-full" />
+      )}
       {closed && (
         <>
           <span className="sr-only">, mês fechado</span>
