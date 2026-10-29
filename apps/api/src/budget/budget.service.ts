@@ -7,6 +7,7 @@ import {
 } from '@financas/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { BudgetDestination } from '../generated/prisma/client.js';
+import { ensureOpenPeriods } from '../periods/period-lock.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 
 /**
@@ -75,6 +76,7 @@ export class BudgetService {
    * up to at most 100% of what is left after expenses.
    */
   async save(workspaceId: string, period: string, input: BudgetInput): Promise<Budget> {
+    await ensureOpenPeriods(this.prisma, workspaceId, [period]);
     const destinations = await this.destinations(workspaceId);
     const byId = new Map(destinations.map((destination) => [destination.id, destination]));
     const shares = input.shares.map((share) => {

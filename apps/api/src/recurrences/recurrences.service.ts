@@ -31,6 +31,7 @@ import {
 } from '../generated/prisma/client.js';
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
+import { closedPeriodOf, closedPeriods, ensureOpenPeriods } from '../periods/period-lock.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toDate, toIsoDate } from '../transactions/dates.js';
 import { followDescription, followDueDate } from '../transactions/share-description.js';
@@ -103,6 +104,8 @@ export class RecurrencesService {
 
   /** Creates it and its transaction in the first competência right away. */
   async create(workspaceId: string, input: CreateRecurrenceInput): Promise<Recurrence> {
+    // Its first month is created right away (ADR 0063: never in a closed one).
+    await ensureOpenPeriods(this.prisma, workspaceId, [input.startPeriod]);
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
@@ -161,6 +164,7 @@ export class RecurrencesService {
       },
     });
     if (!transaction) throw new NotFoundException();
+    await ensureOpenPeriods(this.prisma, workspaceId, [transaction.period]);
     const refuse = (message: string) => new ConflictException({ code: 'NOT_REPEATABLE', message });
     if (transaction.occurrence) throw refuse('Este lançamento já é de uma recorrência.');
     if (transaction.installmentPlanId)
@@ -254,6 +258,7 @@ export class RecurrencesService {
     input: UpdateRecurrenceInput,
   ): Promise<Recurrence> {
     const current = await this.find(workspaceId, recurrenceId);
+    await this.ensurePendingOpen(workspaceId, recurrenceId);
     if (input.categoryId && input.categoryId !== current.categoryId) {
       await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, current.type);
     }
@@ -385,6 +390,7 @@ export class RecurrencesService {
     const recurrence = await this.find(workspaceId, recurrenceId);
     const thisMonth = currentPeriod();
     if (recurrence.endPeriod !== null && recurrence.endPeriod < thisMonth) return;
+    await this.ensurePendingOpen(workspaceId, recurrenceId);
     const db = this.prisma.forWorkspace(workspaceId);
     // The transaction it adopted ("Tornar recorrente") existed before it: still pending, it goes
     // back to being launched once, with its shares, instead of being removed (ADR 0038 note).
@@ -429,6 +435,8 @@ export class RecurrencesService {
     const sorted = [...periods].sort();
     const first = sorted[0] as string;
     const last = sorted.at(-1) as string;
+    // A closed month is never generated (ADR 0063); reopened, it is generated when opened again.
+    const closed = await closedPeriods(this.prisma, workspaceId, sorted);
     const db = this.prisma.forWorkspace(workspaceId);
     const recurrences = await db.recurrence.findMany({
       where: {
@@ -447,6 +455,7 @@ export class RecurrencesService {
       const missing = sorted.filter(
         (period) =>
           !done.has(period) &&
+          !closed.has(period) &&
           // Only the months of its cycle: a yearly one, the month of its start (ADR 0038 note).
           isRecurrenceMonth(recurrence.startPeriod, recurrence.intervalMonths, period) &&
           (recurrence.endPeriod === null || period <= recurrence.endPeriod),
@@ -513,11 +522,25 @@ export class RecurrencesService {
             },
           });
         } catch (error) {
-          // Created by a request that opened the same month at the same time.
-          if (!isDuplicate(error)) throw error;
+          // Created by a request that opened the same month at the same time, or closed meanwhile.
+          if (!isDuplicate(error) && !closedPeriodOf(error)) throw error;
         }
       }
     }
+  }
+
+  /** What a change or an end touches, and the shares of it, must be in open months (ADR 0063). */
+  private async ensurePendingOpen(workspaceId: string, recurrenceId: string) {
+    const pending = this.pendingFromThisMonth(workspaceId, recurrenceId);
+    const rows = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+      where: { OR: [pending, { workspaceId, settledAt: null, splitOf: { is: pending } }] },
+      select: { period: true },
+    });
+    await ensureOpenPeriods(
+      this.prisma,
+      workspaceId,
+      rows.map((row) => row.period),
+    );
   }
 
   /** Not settled, of this month or later: what a change or an end may touch. */

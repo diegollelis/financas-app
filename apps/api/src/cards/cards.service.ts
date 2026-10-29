@@ -23,6 +23,7 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma, type Card as CardRow } from '../generated/prisma/client.js';
+import { allClosedPeriods } from '../periods/period-lock.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
 import { toTransactionResponse, withOrigin } from '../transactions/transactions.service.js';
@@ -50,12 +51,16 @@ type CardWithUses = CardRow & {
 /** The payment method of each function, to find what uses it. */
 const METHOD_OF = { CREDIT: 'CREDIT_CARD', DEBIT: 'DEBIT_CARD' } as const;
 
-/** No card yet, in the method of the function: the Crédito ones only while still to pay. */
-const unlinkedWhere = (workspaceId: string, role: CardFunction) => ({
+/**
+ * No card yet, in the method of the function: the Crédito ones only while still to pay. Those of
+ * a closed month stay as they are (ADR 0063).
+ */
+const unlinkedWhere = (workspaceId: string, role: CardFunction, closed: string[]) => ({
   workspaceId,
   cardId: null,
   paymentMethod: METHOD_OF[role],
   ...(role === 'CREDIT' && { settledAt: null }),
+  ...(closed.length > 0 && { period: { notIn: closed } }),
 });
 
 /** What a bill holds: pending, in Crédito, never a share of a split (shares have no card). */
@@ -181,9 +186,10 @@ export class CardsService {
    */
   async unlinked(workspaceId: string): Promise<UnlinkedCardTransactions> {
     const db = this.prisma.forWorkspace(workspaceId);
+    const closed = await allClosedPeriods(this.prisma, workspaceId);
     const [credit, debit] = await Promise.all([
-      db.transaction.count({ where: unlinkedWhere(workspaceId, 'CREDIT') }),
-      db.transaction.count({ where: unlinkedWhere(workspaceId, 'DEBIT') }),
+      db.transaction.count({ where: unlinkedWhere(workspaceId, 'CREDIT', closed) }),
+      db.transaction.count({ where: unlinkedWhere(workspaceId, 'DEBIT', closed) }),
     ]);
     return { credit, debit };
   }
@@ -208,13 +214,14 @@ export class CardsService {
         });
       }
     }
+    const closed = await allClosedPeriods(this.prisma, workspaceId);
     const linked = await this.prisma.$transaction(async (tx) => {
       await setWorkspaceContext(tx, workspaceId);
       let count = 0;
       for (const role of input.functions) {
         const paymentMethod = METHOD_OF[role];
         const result = await tx.transaction.updateMany({
-          where: unlinkedWhere(workspaceId, role),
+          where: unlinkedWhere(workspaceId, role, closed),
           data: { cardId },
         });
         count += result.count;

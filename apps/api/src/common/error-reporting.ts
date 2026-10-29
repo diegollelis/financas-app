@@ -2,6 +2,7 @@ import { scrubBreadcrumb, scrubReportedEvent } from '@financas/shared';
 import { type ArgumentsHost, Catch } from '@nestjs/common';
 import type { ErrorEvent, EventHint, NodeOptions } from '@sentry/nestjs';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
+import { closedPeriodOf, periodClosed } from '../periods/period-lock.js';
 
 const REDACTED = 'Mensagem omitida: pode conter dados da consulta';
 
@@ -42,11 +43,14 @@ export function scrubApiEvent(event: ErrorEvent, hint: EventHint): ErrorEvent {
 /**
  * Nest's last stop for errors (ADR 0034): Sentry's filter reports unexpected errors (not
  * HttpExceptions such as 400/404) and logs them as Nest would, after the Prisma message is gone,
- * so neither the log nor Sentry get the data of a query.
+ * so neither the log nor Sentry get the data of a query. A write the period lock trigger refused
+ * is not unexpected: it answers 409 PERIOD_CLOSED, as the services' own check does (ADR 0063).
  */
 @Catch()
 export class AppExceptionFilter extends SentryGlobalFilter {
   override catch(exception: unknown, host: ArgumentsHost) {
+    const closed = closedPeriodOf(exception);
+    if (closed) return super.catch(periodClosed(closed), host);
     redactPrismaError(exception);
     return super.catch(exception, host);
   }

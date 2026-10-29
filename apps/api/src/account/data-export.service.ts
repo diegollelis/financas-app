@@ -29,6 +29,7 @@ export const EXPORTED_TABLES: Record<string, string> = {
   recurrence_shares: 'recurrences[].split',
   installment_plans: 'installmentPlans',
   imports: 'imports',
+  period_closings: 'periodClosings',
 };
 
 const iso = (date: Date) => date.toISOString();
@@ -114,6 +115,7 @@ export class DataExportService {
       recurrences,
       installmentPlans,
       imports,
+      periodClosings,
     ] = await Promise.all([
       this.prisma.member.findMany({
         where,
@@ -149,6 +151,11 @@ export class DataExportService {
       }),
       db.installmentPlan.findMany({ where, orderBy: { createdAt: 'asc' } }),
       db.transactionImport.findMany({ where, orderBy: { createdAt: 'asc' } }),
+      db.periodClosing.findMany({
+        where,
+        include: { closedBy: { select: { name: true } }, reopenedBy: { select: { name: true } } },
+        orderBy: [{ period: 'asc' }, { closedAt: 'asc' }],
+      }),
     ]);
 
     return {
@@ -310,6 +317,14 @@ export class DataExportService {
         firstPeriod: item.firstPeriod,
         lastPeriod: item.lastPeriod,
         createdAt: iso(item.createdAt),
+      })),
+      periodClosings: periodClosings.map((closing) => ({
+        period: closing.period,
+        closedAt: iso(closing.closedAt),
+        closedBy: closing.closedBy?.name ?? null,
+        reopenedAt: isoOrNull(closing.reopenedAt),
+        reopenedBy: closing.reopenedBy?.name ?? null,
+        reopenReason: closing.reopenReason,
       })),
     };
   }

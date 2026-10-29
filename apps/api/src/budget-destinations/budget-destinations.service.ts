@@ -1,5 +1,6 @@
 import {
   currentPeriod,
+  shiftPeriod,
   type BudgetDestination,
   type CreateBudgetDestinationInput,
   type UpdateBudgetDestinationInput,
@@ -8,6 +9,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { z } from 'zod';
 import { Prisma, type BudgetDestination as DestinationRow } from '../generated/prisma/client.js';
 import { categoriesInUse } from '../categories/categories-in-use.js';
+import { allClosedPeriods } from '../periods/period-lock.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 
 function toResponse(destination: DestinationRow, inUse?: boolean): BudgetDestination {
@@ -116,6 +118,7 @@ export class BudgetDestinationsService {
     input: UpdateBudgetDestinationInput,
   ): Promise<BudgetDestination> {
     if (!z.uuid().safeParse(destinationId).success) throw new NotFoundException();
+    const closed = new Set(await allClosedPeriods(this.prisma, workspaceId));
     try {
       const destination = await this.prisma.$transaction(async (tx) => {
         await setWorkspaceContext(tx, workspaceId);
@@ -130,7 +133,10 @@ export class BudgetDestinationsService {
         let archivedAt: Date | null | undefined;
         if (input.archived === true) archivedAt = current.archivedAt ?? new Date();
         if (input.archived === true && current.archivedAt === null) {
-          await this.releaseShares(tx, workspaceId, destinationId, currentPeriod());
+          // From the first open month on: a closed one keeps its budget (ADR 0063).
+          let from = currentPeriod();
+          while (closed.has(from)) from = shiftPeriod(from, 1);
+          await this.releaseShares(tx, workspaceId, destinationId, from);
         }
         if (input.archived === false) archivedAt = null;
         await tx.category.update({

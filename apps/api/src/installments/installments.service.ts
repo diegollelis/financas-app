@@ -28,6 +28,7 @@ import { shareCategoryId } from '../categories/share-category.js';
 import type { Prisma, InstallmentPlan as PlanRow } from '../generated/prisma/client.js';
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
+import { ensureOpenPeriods } from '../periods/period-lock.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { optionalDate, toDate, toIsoDate } from '../transactions/dates.js';
 import {
@@ -149,6 +150,12 @@ export class InstallmentsService {
     // From the first number on (ADR 0055): a purchase at 3/10 gets installments 3 to 10.
     const firstNumber = input.firstNumber ?? 1;
     const amounts = splitInstallments(totalCents, installmentsCreated(input));
+    // Every installment is created now, each in its month (ADR 0063: none closed).
+    await ensureOpenPeriods(
+      this.prisma,
+      workspaceId,
+      amounts.map((_, index) => shiftPeriod(input.firstPeriod, index)),
+    );
     const dueDay = input.dueDay ?? null;
     const dueMonthOffset = input.dueMonthOffset ?? 0;
     const personId = input.personId ?? null;
@@ -276,6 +283,12 @@ export class InstallmentsService {
       input.amountIs === 'TOTAL' ? transaction.amountCents : transaction.amountCents * created;
     if (totalCents < created) throw refuse('O valor não dá um centavo por parcela.');
     const amounts = splitInstallments(totalCents, created);
+    // This one is adopted in its month and the next ones created after it (ADR 0063).
+    await ensureOpenPeriods(
+      this.prisma,
+      workspaceId,
+      amounts.map((_, index) => shiftPeriod(transaction.period, index)),
+    );
     const dueDay = dueIso ? Number(dueIso.slice(8)) : null;
     const next = amounts.slice(1).map((amountCents, index) => {
       const period = shiftPeriod(transaction.period, index + 1);
@@ -485,7 +498,10 @@ export class InstallmentsService {
         });
       }
       // Nothing is settled: the installments are made again from scratch, the adopted one too
-      // (it is no longer the transaction that existed before).
+      // (it is no longer the transaction that existed before). Old and new months must be open.
+      await this.ensureInstallmentsOpen(workspaceId, { installmentPlanId: planId }, [
+        ...Array.from({ length: created }, (_, index) => shiftPeriod(firstPeriod, index)),
+      ]);
       await db.transaction.deleteMany({ where: { workspaceId, installmentPlanId: planId } });
       const amounts = splitInstallments(totalCents, created);
       const updated = await db.installmentPlan.update({
@@ -528,6 +544,7 @@ export class InstallmentsService {
       });
     }
 
+    await this.ensureInstallmentsOpen(workspaceId, { installmentPlanId: planId, settledAt: null });
     const updated = await db.installmentPlan.update({
       where: { id: planId, workspaceId },
       data: merged,
@@ -593,6 +610,11 @@ export class InstallmentsService {
     const settled = await db.transaction.count({
       where: { workspaceId, installmentPlanId: planId, settledAt: { not: null } },
     });
+    await this.ensureInstallmentsOpen(workspaceId, {
+      installmentPlanId: planId,
+      settledAt: null,
+      ...(settled > 0 && { period: { gte: currentPeriod() } }),
+    });
     // The transaction it adopted ("Tornar parcelado") existed before it: still pending, it goes
     // back to being launched once, with its amount (ADR 0038 note). Ending a plan with payments
     // keeps its past months as history, so then only from this month on.
@@ -637,6 +659,27 @@ export class InstallmentsService {
       where: { id: planId, workspaceId },
       data: { endedAt: new Date() },
     });
+  }
+
+  /**
+   * The installments a change, a remake or an end reaches, with their pending shares, and the
+   * months it creates installments in, must all be open (ADR 0063). Checked first: the plan
+   * and each installment are written one after the other.
+   */
+  private async ensureInstallmentsOpen(
+    workspaceId: string,
+    reached: Prisma.TransactionWhereInput,
+    newPeriods: string[] = [],
+  ) {
+    const scope = { workspaceId, ...reached };
+    const rows = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+      where: { OR: [scope, { workspaceId, settledAt: null, splitOf: { is: scope } }] },
+      select: { period: true },
+    });
+    await ensureOpenPeriods(this.prisma, workspaceId, [
+      ...rows.map((row) => row.period),
+      ...newPeriods,
+    ]);
   }
 
   private async find(workspaceId: string, planId: string): Promise<PlanRow> {

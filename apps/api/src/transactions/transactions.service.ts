@@ -21,6 +21,7 @@ import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { shareCategoryId } from '../categories/share-category.js';
 import { ensureUsableMerchant } from '../merchants/ensure-merchant.js';
 import { ensureUsablePerson, resolveSplitPerson } from '../people/ensure-person.js';
+import { ensureOpenPeriods } from '../periods/period-lock.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
@@ -101,6 +102,7 @@ export class TransactionsService {
    * become people first.
    */
   async create(workspaceId: string, input: CreateTransactionInput): Promise<Transaction> {
+    await ensureOpenPeriods(this.prisma, workspaceId, [input.period]);
     await ensureUsableCategory(this.prisma, workspaceId, input.categoryId, input.type);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     if (input.merchantId) await ensureUsableMerchant(this.prisma, workspaceId, input.merchantId);
@@ -163,6 +165,7 @@ export class TransactionsService {
     input: UpdateTransactionInput,
   ): Promise<Transaction> {
     const current = await this.find(workspaceId, transactionId);
+    await this.ensureEditOpen(workspaceId, current, input);
     if (input.personId) await ensureUsablePerson(this.prisma, workspaceId, input.personId);
     // Only a change is checked, as with the category: it may keep a merchant archived later.
     if (input.merchantId && input.merchantId !== current.merchantId) {
@@ -274,12 +277,19 @@ export class TransactionsService {
    */
   async remove(workspaceId: string, transactionId: string, withShares = false): Promise<void> {
     if (!z.uuid().safeParse(transactionId).success) throw new NotFoundException();
-    const { count } = await this.prisma.forWorkspace(workspaceId).transaction.deleteMany({
-      where: {
-        workspaceId,
-        OR: [{ id: transactionId }, ...(withShares ? [{ splitOfId: transactionId }] : [])],
-      },
-    });
+    const where = {
+      workspaceId,
+      OR: [{ id: transactionId }, ...(withShares ? [{ splitOfId: transactionId }] : [])],
+    };
+    const db = this.prisma.forWorkspace(workspaceId);
+    const going = await db.transaction.findMany({ where, select: { period: true } });
+    if (going.length === 0) throw new NotFoundException();
+    await ensureOpenPeriods(
+      this.prisma,
+      workspaceId,
+      going.map((row) => row.period),
+    );
+    const { count } = await db.transaction.deleteMany({ where });
     if (count === 0) throw new NotFoundException();
   }
 
@@ -322,6 +332,8 @@ export class TransactionsService {
       throw invalid(`O valor passa do que está pendente (${formatCents(current.amountCents)}).`);
     }
 
+    // The part goes to the month of its day; a loan's own month may be closed (ADR 0063).
+    await ensureOpenPeriods(this.prisma, workspaceId, [input.settledAt.slice(0, 7)]);
     const all = input.amountCents === current.amountCents;
     const result = await this.prisma.$transaction(async (tx) => {
       await setWorkspaceContext(tx, workspaceId);
@@ -357,6 +369,30 @@ export class TransactionsService {
       settled: toTransactionResponse(result.settled),
       remaining: result.remaining && toTransactionResponse(result.remaining),
     };
+  }
+
+  /**
+   * An edit reaches the transaction's month, the one it moves to and, when what it changes
+   * follows to its shares, their months too; all must be open (ADR 0063). It is checked first,
+   * since the shares are written after the transaction itself.
+   */
+  private async ensureEditOpen(
+    workspaceId: string,
+    current: Awaited<ReturnType<TransactionsService['find']>>,
+    input: UpdateTransactionInput,
+  ) {
+    const periods = [current.period, ...(input.period ? [input.period] : [])];
+    const reachesShares = (
+      ['amountCents', 'description', 'categoryId', 'dueDate', 'occurredOn', 'period'] as const
+    ).some((field) => input[field] !== undefined);
+    if (reachesShares) {
+      const shares = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+        where: { workspaceId, splitOfId: current.id },
+        select: { period: true },
+      });
+      periods.push(...shares.map((share) => share.period));
+    }
+    await ensureOpenPeriods(this.prisma, workspaceId, periods);
   }
 
   /** An id that is not a uuid, or that belongs to another workspace, is simply not found. */
