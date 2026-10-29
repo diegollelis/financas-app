@@ -1,6 +1,6 @@
 # 0047 — Orçamento real por destino: duas bases, destinos personalizados e aplicações
 
-- **Status:** Aceita
+- **Status:** Aceita; a seção "Duas bases" foi substituída pelo [ADR 0064](0064-metas-como-parte-da-renda.md)
 - **Data:** 2026-10-09
 
 ## Contexto
@@ -39,6 +39,8 @@ Por exemplo: com R$ 5.000 recebidos, o Painel diz "Investimentos efetivado: R$ 1
 **Opção 3 para as aplicações, opção 2 para os destinos.**
 
 ### Duas bases
+
+> Substituída pelo [ADR 0064](0064-metas-como-parte-da-renda.md): o limite e as metas passam a ser % da renda líquida e somam até 100%; a sobra continua só como fato do mês ("Sobra prevista").
 
 | Destino                                                                | Base da meta                                                             |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------ |

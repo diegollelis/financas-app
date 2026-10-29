@@ -57,10 +57,9 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 
 ### BudgetConfig (Configuração de orçamento)
 
-- `workspace_id`, `period`, `net_income_cents`, `gross_income_cents?`
-- Percentuais em pontos-base ([ADR 0010](../adr/0010-dinheiro-e-datas.md)): despesas, investimentos, reserva de emergência, viagens — soma ≤ 10000.
-- Uma competência sem configuração salva herda a última salva antes dela; sem nenhuma, valem 60/20/15/5 e renda 0 ([ADR 0030](../adr/0030-orcamento-por-competencia-com-heranca.md)).
-- Evolução possível: destinos de orçamento configuráveis (lista em vez de quatro campos fixos).
+- `workspace_id`, `period`, `net_income_cents`; uma fatia (`BudgetShare`) por destino (`BudgetDestination`: Despesas, fixo, e as metas de guardar, cada uma com a sua categoria de saída), em pontos-base ([ADR 0010](../adr/0010-dinheiro-e-datas.md), [ADR 0047](../adr/0047-orcamento-real-por-destino.md)).
+- **Toda fatia é um % da renda líquida** ([ADR 0064](../adr/0064-metas-como-parte-da-renda.md)): o limite de gastos e as metas somam até 10000; o que falta é "Sem meta". O valor de cada meta é `renda × %`, fixo no mês. A sobra (entradas − gastos) é só um fato do mês.
+- Uma competência sem configuração salva herda a última salva antes dela; sem nenhuma, o orçamento vem vazio ([ADR 0030](../adr/0030-orcamento-por-competencia-com-heranca.md), ADR 0047).
 
 ### PeriodClosing (Fechamento do mês) — fase 5 ([ADR 0063](../adr/0063-fechamento-do-mes.md))
 
