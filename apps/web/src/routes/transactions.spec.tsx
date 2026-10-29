@@ -913,6 +913,129 @@ describe('TransactionsPage', () => {
     }
   });
 
+  it("moves a purchase to the next month, due on the card's next bill, and undoes it (ADR 0029 note)", async () => {
+    // Bought on the 27th, before the closing, but the bank put it on the next bill.
+    const purchase = transaction(8, {
+      type: 'DEBIT',
+      description: 'Restaurante Exemplo',
+      categoryId: marketCategory.id,
+      amountCents: 8_640,
+      dueDate: '2026-11-04',
+      occurredOn: '2026-10-27',
+      paymentMethod: 'CREDIT_CARD',
+      cardId: exampleCard.id,
+    });
+    const fetchMock = mockTransactions({
+      [`GET ${base}`]: { body: [salary, purchase] },
+      [`GET /api/workspaces/${houseId}/cards`]: { body: [exampleCard] },
+      [`PATCH ${base}/${purchase.id}`]: {
+        body: { ...purchase, period: '2026-11', dueDate: '2026-12-04' },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Restaurante Exemplo');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Mover para outro mês' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Mover para outro mês: Restaurante Exemplo',
+    });
+    expect(dialog).toHaveTextContent('Hoje em outubro de 2026, com vencimento em 04/11/2026.');
+    expect(
+      await within(dialog).findByText('Sugerido pela fatura do Cartão Exemplo.'),
+    ).toBeVisible();
+    expect(within(dialog).getByLabelText('Vencimento')).toHaveValue('2026-12-04');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Mover para novembro' }));
+
+    await expectCall(fetchMock, `${base}/${purchase.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ period: '2026-11', dueDate: '2026-12-04' }),
+    });
+    expect(
+      await screen.findByText('Restaurante Exemplo movido para novembro de 2026'),
+    ).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Desfazer' }));
+    await expectCall(fetchMock, `${base}/${purchase.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ period: '2026-10', dueDate: '2026-11-04' }),
+    });
+    // The row has left October, and the dialog is closed: the toast still comes.
+    expect(
+      await screen.findByText('Restaurante Exemplo voltou para outubro de 2026'),
+    ).toBeInTheDocument();
+  });
+
+  it('chooses the month in the dialog, the due date and the shares following it', async () => {
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Parte da luz',
+      categoryId: salaryCategory.id,
+      amountCents: 6_000,
+      splitOfId: light.id,
+      personId: ana.id,
+    });
+    mockTransactions({
+      [`GET ${base}`]: { body: [light, share] },
+      [`GET ${peopleBase}`]: { body: [ana] },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Conta de luz');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Mover para outro mês' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Mover para outro mês: Conta de luz',
+    });
+    expect(within(dialog).getByLabelText('Vencimento')).toHaveValue('2026-11-10');
+    expect(within(dialog).getByText('O mesmo dia, no novo mês.')).toBeVisible();
+    expect(nbsp(dialog.textContent)).toContain(
+      'A parte de Ana (R$ 60,00) vai junto para novembro.',
+    );
+
+    // Back to the month it is in: nothing to move.
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Mês anterior: outubro de 2026' }),
+    );
+    expect(dialog).toHaveTextContent('Já está em outubro de 2026. Escolha outro mês.');
+    expect(within(dialog).getByRole('button', { name: 'Mover para outubro' })).toBeDisabled();
+
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'outubro de 2026, escolher o mês' }),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /^jan, janeiro de 2026/ }));
+    expect(within(dialog).getByLabelText('Vencimento')).toHaveValue('2026-01-10');
+    expect(within(dialog).getByRole('button', { name: 'Mover para janeiro' })).toBeEnabled();
+  });
+
+  it('offers "Mover para outro mês" only for one launched once, not a share', async () => {
+    const share = transaction(5, {
+      type: 'CREDIT',
+      description: 'Parte da luz',
+      categoryId: salaryCategory.id,
+      amountCents: 6_000,
+      splitOfId: light.id,
+    });
+    mockTransactions({
+      [`GET ${base}`]: {
+        body: [
+          share,
+          { ...light, recurrenceId: '01920000-0000-7000-8000-000000000309' },
+          {
+            ...shopping,
+            installment: { planId: '01920000-0000-7000-8000-000000000401', number: 2, count: 3 },
+          },
+        ],
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    for (const description of ['Parte da luz', 'Conta de luz', 'Compras da semana']) {
+      const menu = await openActions(description);
+      expect(
+        within(menu).queryByRole('menuitem', { name: 'Mover para outro mês' }),
+      ).not.toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+    }
+  });
+
   it('marks a transaction of a yearly recurrence as "Todo ano"', async () => {
     const recurrenceId = '01920000-0000-7000-8000-000000000309';
     mockTransactions({
