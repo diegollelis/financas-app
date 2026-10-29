@@ -1,6 +1,6 @@
 import { formatPeriod } from '@financas/shared';
 import { ConflictException } from '@nestjs/common';
-import type { Prisma } from '../generated/prisma/client.js';
+import type { PrismaService } from '../prisma/prisma.service.js';
 
 /** The SQLSTATE the period lock trigger raises (migration period_closings, ADR 0063). */
 export const PERIOD_CLOSED_SQLSTATE = 'FC001';
@@ -30,21 +30,35 @@ export function closedPeriodOf(error: unknown): string | null {
     : null;
 }
 
-type ClosingReader = { periodClosing: Pick<Prisma.TransactionClient['periodClosing'], 'findMany'> };
-
 /** Which of these competências of the workspace are closed now. */
 export async function closedPeriods(
-  db: ClosingReader,
+  prisma: PrismaService,
   workspaceId: string,
   periods: Iterable<string>,
 ): Promise<Set<string>> {
   const wanted = [...new Set(periods)];
   if (wanted.length === 0) return new Set();
-  const closings = await db.periodClosing.findMany({
+  // Through the workspace's RLS context: without it the policy hides every closing, and the
+  // check would let everything through. Called before an interactive transaction, never in one.
+  const closings = await prisma.forWorkspace(workspaceId).periodClosing.findMany({
     where: { workspaceId, period: { in: wanted }, reopenedAt: null },
     select: { period: true },
   });
   return new Set(closings.map((closing) => closing.period));
+}
+
+/** Every closed competência of the workspace, for a write that reaches any month. */
+export async function allClosedPeriods(
+  prisma: PrismaService,
+  workspaceId: string,
+): Promise<string[]> {
+  // Through the workspace's RLS context: without it the policy hides every closing, and the
+  // check would let everything through. Called before an interactive transaction, never in one.
+  const closings = await prisma.forWorkspace(workspaceId).periodClosing.findMany({
+    where: { workspaceId, reopenedAt: null },
+    select: { period: true },
+  });
+  return closings.map((closing) => closing.period);
 }
 
 /**
@@ -52,10 +66,10 @@ export async function closedPeriods(
  * The trigger would refuse it too; this answers first and names the earliest month.
  */
 export async function ensureOpenPeriods(
-  db: ClosingReader,
+  prisma: PrismaService,
   workspaceId: string,
   periods: Iterable<string>,
 ): Promise<void> {
-  const closed = [...(await closedPeriods(db, workspaceId, periods))].sort();
+  const closed = [...(await closedPeriods(prisma, workspaceId, periods))].sort();
   if (closed[0] !== undefined) throw periodClosed(closed[0]);
 }

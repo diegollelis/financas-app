@@ -21,6 +21,7 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma, type Category as CategoryRow } from '../generated/prisma/client.js';
+import { ensureOpenPeriods } from '../periods/period-lock.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { categoriesInUse, categoryInUse } from './categories-in-use.js';
 import { shareCategoryId } from './share-category.js';
@@ -340,6 +341,19 @@ export class CategoriesService {
     }
     // Unmarked, it is no loan any more: its shares go back to Reembolso or Repasse.
     if (!neutral && current.returnCategoryId) returnCategoryId = null;
+    // The shares that move must all be in open months (ADR 0063), checked before the category.
+    if (returnCategoryId !== undefined && returnCategoryId !== current.returnCategoryId) {
+      const shares = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+        where: this.loanSharesWhere(workspaceId, categoryId, opposite(current.type)),
+        select: { period: true },
+        distinct: ['period'],
+      });
+      await ensureOpenPeriods(
+        this.prisma,
+        workspaceId,
+        shares.map((share) => share.period),
+      );
+    }
 
     try {
       const db = this.prisma.forWorkspace(workspaceId);
@@ -440,9 +454,13 @@ export class CategoriesService {
   ) {
     const target = await shareCategoryId(this.prisma, workspaceId, shareType, categoryId);
     await this.prisma.forWorkspace(workspaceId).transaction.updateMany({
-      where: { workspaceId, type: shareType, splitOf: { is: { categoryId } } },
+      where: this.loanSharesWhere(workspaceId, categoryId, shareType),
       data: { categoryId: target },
     });
+  }
+
+  private loanSharesWhere(workspaceId: string, categoryId: string, shareType: TransactionType) {
+    return { workspaceId, type: shareType, splitOf: { is: { categoryId } } };
   }
 
   /** A saving destination's category is renamed, archived and deleted with it (ADR 0047). */

@@ -1,11 +1,12 @@
 import {
+  currentPeriod,
   undatedPayable,
   undatedReceivable,
   type PeriodClosing,
   type PeriodClosingState,
   type PeriodPending,
 } from '@financas/shared';
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
@@ -73,6 +74,12 @@ export class PeriodsService {
   }
 
   async close(workspaceId: string, period: string, userId: string): Promise<PeriodClosingState> {
+    if (period > currentPeriod()) {
+      throw new BadRequestException({
+        code: 'INVALID_INPUT',
+        message: 'Só dá para fechar um mês que já começou.',
+      });
+    }
     // A recurrence month not generated yet is pending too, as opening the month would show.
     await this.recurrences.materialize(workspaceId, [period]);
     await this.prisma.$transaction(async (tx) => {

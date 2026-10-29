@@ -29,6 +29,7 @@ import { ensureCardGiven, ensureUsableCard } from '../cards/ensure-card.js';
 import { ensureUsableCategories } from '../categories/ensure-category.js';
 import { Prisma, type TransactionImport } from '../generated/prisma/client.js';
 import { PeopleService } from '../people/people.service.js';
+import { ensureOpenPeriods } from '../periods/period-lock.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
 import { toDate, toIsoDate } from '../transactions/dates.js';
@@ -269,6 +270,22 @@ export class ImportsService {
     );
     const personOf = (name: string | undefined) =>
       name ? (personIds.get(normalizeName(name)) ?? null) : null;
+    const installmentsOf = plans.map((plan) =>
+      this.installments(workspaceId, plan, merchantOf(plan.merchantName)),
+    );
+    const periods = [
+      ...input.transactions.map((transaction) => transaction.period),
+      ...installmentsOf.flat().map((installment) => installment.period),
+      // Each part is launched in the month of its day (ADR 0057).
+      ...parts.map((part) => part.settledAt.slice(0, 7)),
+    ];
+    // Nothing goes into a closed month (ADR 0063): what it creates, what it found already in the
+    // app and the card bills it pays. A loan settled in part may be of a closed month.
+    await ensureOpenPeriods(this.prisma, workspaceId, [
+      ...periods,
+      ...matches.flatMap((match) => found.get(match.transactionId)?.period ?? []),
+      ...(await this.billPeriods(workspaceId, bills)),
+    ]);
     if (newAliases.size > 0) {
       await this.prisma.forWorkspace(workspaceId).merchantAlias.createMany({
         data: [...newAliases].map(([normalized, { alias, merchantName }]) => ({
@@ -279,15 +296,6 @@ export class ImportsService {
         })),
       });
     }
-    const installmentsOf = plans.map((plan) =>
-      this.installments(workspaceId, plan, merchantOf(plan.merchantName)),
-    );
-    const periods = [
-      ...input.transactions.map((transaction) => transaction.period),
-      ...installmentsOf.flat().map((installment) => installment.period),
-      // Each part is launched in the month of its day (ADR 0057).
-      ...parts.map((part) => part.settledAt.slice(0, 7)),
-    ];
     // The months it covers: what it created, and the days of the movements it found in the app.
     const covered = [
       ...periods,
@@ -438,6 +446,22 @@ export class ImportsService {
       }
     }
     return toResponse(created);
+  }
+
+  /** The months of the transactions the card bills it pays would settle. */
+  private async billPeriods(workspaceId: string, bills: CreateImportInput['bills']) {
+    if (!bills || bills.length === 0) return [];
+    const rows = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+      where: {
+        workspaceId,
+        paymentMethod: 'CREDIT_CARD',
+        settledAt: null,
+        OR: bills.map((bill) => ({ cardId: bill.cardId, dueDate: toDate(bill.dueDate) })),
+      },
+      select: { period: true },
+      distinct: ['period'],
+    });
+    return rows.map((row) => row.period);
   }
 
   /** The import's row with what it creates, in one nested write. */
