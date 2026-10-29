@@ -1,6 +1,7 @@
 import {
   FULL_BASIS_POINTS,
-  savingSharesTotal,
+  BUDGET_SHARES_OVER,
+  budgetSharesTotal,
   type Budget,
   type BudgetInput,
   type BudgetShare,
@@ -89,11 +90,9 @@ export class BudgetService {
       }
       return { ...share, kind: destination.kind };
     });
-    if (savingSharesTotal(shares) > FULL_BASIS_POINTS) {
-      throw new BadRequestException({
-        code: 'INVALID_INPUT',
-        message: 'A soma das metas não pode passar de 100%.',
-      });
+    // The limit and the goals are all of the net income (ADR 0064).
+    if (budgetSharesTotal(shares) > FULL_BASIS_POINTS) {
+      throw new BadRequestException({ code: 'INVALID_INPUT', message: BUDGET_SHARES_OVER });
     }
 
     await this.prisma.$transaction(async (tx) => {

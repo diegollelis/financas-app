@@ -243,6 +243,21 @@ function LimitCard({ summary }: { summary: Summary }) {
   );
 }
 
+/**
+ * Under "Sobra prevista" (ADR 0064): how far the expenses passed the credits, how much the goals
+ * still lack, or what is left beyond them.
+ */
+function leftoverNote(summary: Summary) {
+  const leftover = summary.available.plannedCents;
+  const goals = summary.destinations
+    .filter((destination) => destination.kind === 'SAVINGS')
+    .reduce((sum, destination) => sum + destination.targetCents, 0);
+  if (leftover < 0) return `Os gastos passaram as entradas em ${formatCents(-leftover)}.`;
+  if (goals === 0) return undefined;
+  if (leftover < goals) return `Faltam ${formatCents(goals - leftover)} para cumprir as metas.`;
+  return `Cobre as metas e ainda sobram ${formatCents(leftover - goals)}.`;
+}
+
 /** What is still to be launched for the goal: neither applied nor scheduled. */
 const missingCents = (destination: DestinationSummary) =>
   Math.max(0, destination.targetCents - destination.appliedCents - destination.pendingCents);
@@ -332,8 +347,8 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
       help={
         <>
           <p>
-            Como você divide o que sobra entre as suas metas. Cada uma é uma parte da sobra para
-            guardar, não da renda.
+            Quanto da renda líquida vai para cada meta. O limite de gastos e as metas somam até 100%
+            da renda.
           </p>
           <p>
             Guardado: lançado e pago. Pendente: lançado, ainda não pago. Falta lançar: o que ainda
@@ -344,23 +359,25 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
     >
       <dl className="grid grid-cols-2 gap-4">
         <Figure
-          label="Sobra para guardar"
+          label="Sobra prevista"
           help={
             <>
               <p>
-                As entradas previstas menos as despesas previstas: é sobre esse valor que as metas
-                são calculadas.
+                As entradas previstas menos os gastos previstos. Diz se o mês cobre as metas, que
+                são uma parte da renda líquida.
               </p>
               <p>
                 Nas categorias "Nem renda nem gasto", um empréstimo feito diminui a sobra, e o
                 dinheiro que volta ou que você pegou emprestado fica só no saldo. Uma dívida sem
                 vencimento só diminui a sobra quando é paga.
               </p>
-              <p>O que você guarda não entra na conta: guardar mais não diminui as metas.</p>
+              <p>O que você guarda não entra na conta.</p>
             </>
           }
+          sub={leftoverNote(summary)}
         >
-          <SignedCents cents={summary.available.plannedCents} />
+          {/* Never negative (ADR 0064): the line under it says how far the expenses went. */}
+          {formatCents(Math.max(0, summary.available.plannedCents))}
         </Figure>
         <Figure
           label="Guardado"
@@ -369,9 +386,6 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
           {formatCents(summary.applied.settledCents)}
         </Figure>
       </dl>
-      {summary.available.plannedCents <= 0 && (
-        <p>Nada sobrou para guardar este mês: as despesas previstas alcançaram as entradas.</p>
-      )}
       {/* Two goals side by side only when the card itself is wide enough (a container query):
           at 768 and 1024px, beside the sidebar, they would wrap every amount. */}
       <div className="@container">
@@ -389,8 +403,8 @@ function GoalsCard({ summary, onApply }: { summary: Summary; onApply?: OnApply }
             Sem meta ({formatBasisPoints(unallocated.basisPoints)})
             <InfoTip term="Sem meta">
               <p>
-                Parte da sobra para guardar que nenhuma meta recebeu. É uma divisão do orçamento,
-                não um saldo.
+                Parte da renda líquida que nem o limite de gastos nem uma meta recebeu. É uma
+                divisão do orçamento, não um saldo.
               </p>
             </InfoTip>
           </dt>

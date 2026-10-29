@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { budgetInputSchema, savingSharesTotal, shareOfIncome } from './budget.ts';
+import { budgetInputSchema, budgetSharesTotal, shareOfIncome } from './budget.ts';
 
 // Fictitious data (ADR 0019).
 const despesas = '01920000-0000-7000-8000-0000000000d1';
@@ -62,14 +62,10 @@ describe('budgetInputSchema', () => {
   });
 });
 
-describe('savingSharesTotal', () => {
-  it('adds up only the saving destinations: Despesas has a base of its own', () => {
+describe('budgetSharesTotal', () => {
+  it('adds up every share, the limit included: all of them are of the net income (ADR 0064)', () => {
     expect(
-      savingSharesTotal([
-        { kind: 'EXPENSES', basisPoints: 6_000 },
-        { kind: 'SAVINGS', basisPoints: 5_000 },
-        { kind: 'SAVINGS', basisPoints: 2_500 },
-      ]),
-    ).toBe(7_500);
+      budgetSharesTotal([{ basisPoints: 6_000 }, { basisPoints: 2_000 }, { basisPoints: 1_200 }]),
+    ).toBe(9_200);
   });
 });

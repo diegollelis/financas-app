@@ -61,9 +61,9 @@ export const budgetShareInputSchema = z.object({
 
 /**
  * `PUT /workspaces/:workspaceId/budget/:period`: the whole budget of one competência (ADR 0047):
- * the net income, base of the expenses goal, and the share of each destination. A destination
- * left out gets 0%. The API checks that every destination is the workspace's and that the saving
- * ones add up to at most 100% (the sum needs to know which are which).
+ * the net income and the share of it each destination gets (ADR 0064). A destination left out
+ * gets 0%. The API checks that every destination is the workspace's and that the shares add up
+ * to at most 100%.
  */
 export const budgetInputSchema = z.object({
   netIncomeCents: incomeCentsSchema,
@@ -114,9 +114,14 @@ export const budgetSchema = z.object({
 
 export type Budget = z.infer<typeof budgetSchema>;
 
-/** The saving destinations' shares add up to at most 100% of what is left after expenses. */
-export function savingSharesTotal(shares: Pick<BudgetShare, 'kind' | 'basisPoints'>[]): number {
-  return shares
-    .filter((share) => share.kind === 'SAVINGS')
-    .reduce((sum, share) => sum + share.basisPoints, 0);
+/**
+ * Every share of the budget, the spending limit and the goals, is of the net income and they add
+ * up to at most 100% (ADR 0064).
+ */
+export function budgetSharesTotal(shares: Pick<BudgetShare, 'basisPoints'>[]): number {
+  return shares.reduce((sum, share) => sum + share.basisPoints, 0);
 }
+
+/** The answer when the shares pass 100%, in the API and in the form. */
+export const BUDGET_SHARES_OVER =
+  'O limite de gastos e as metas somam no máximo 100% da renda líquida.';
