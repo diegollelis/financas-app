@@ -272,6 +272,10 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] DNS no Cloudflare, domínio no Pages e variáveis de produção
   - [x] E-mail com o domínio verificado no Resend
   - [x] Exigir a verificação de e-mail no cadastro
+- [ ] **Fechamento do mês** ([ADR 0063](adr/0063-fechamento-do-mes.md), levantamento em [docs/avaliacoes/fechamento-do-mes.md](avaliacoes/fechamento-do-mes.md)): fechar uma competência depois de tudo pago e recebido, para nada nela mudar por engano, e reabrir com um motivo para corrigir
+  - [x] Avaliação e ADR: mês a mês com histórico, fechar só sem pendências (fora o sem vencimento), EDITOR fecha e reabre, o orçamento herdado salvo ao fechar, a trava no serviço e no banco
+  - [ ] API: a tabela `period_closings`, as rotas de fechar e reabrir, a guarda em cada caminho que escreve numa competência e o trigger
+  - [ ] Tela (com prévia): "Fechamento do mês" no Painel, o cadeado no mês e Lançamentos só para leitura num mês fechado
 - [ ] **Assistente de IA** (em avaliação, [docs/avaliacoes/assistente-de-ia.md](avaliacoes/assistente-de-ia.md)): perguntas sobre as finanças e lançamentos por texto, de preferência com o app como conector (MCP) da IA do próprio usuário, sem custo de IA para o app
 
 ## Fase 6 — Identidade visual
