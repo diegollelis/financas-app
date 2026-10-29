@@ -61,3 +61,19 @@ Opção 3.
 - **Cada caminho novo que escreve numa competência precisa da guarda.** O trigger avisa com um erro quando ela foi esquecida, e os testes HTTP cobrem um caso por caminho.
 - **Não é uma foto:** renomear e marcar categorias ainda muda o que um mês fechado mostra. Se isso incomodar, a evolução é guardar o resumo no fechamento.
 - **Próximos passos:** a API (tabela, rotas, guarda e trigger) e depois a tela, um PR cada.
+
+## Nota (a API, 2026-10-29)
+
+O que a implementação ajustou no que foi decidido:
+
+- **Sem índice único parcial.** O Prisma só declara um índice parcial com um recurso em teste (`partialIndexes`). No lugar dele, fechar e reabrir travam a linha do espaço (`SELECT … FOR UPDATE`, como o [ADR 0024](0024-espacos-membros-e-espaco-pessoal.md) faz com a do usuário). Assim, dois fechamentos ao mesmo tempo esperam um pelo outro, e só um fica em vigor.
+- **Só fecha um mês que já começou** (400 `INVALID_INPUT`).
+- **Como o erro do trigger chega à API:** o Prisma o embrulha com um código diferente em cada tipo de chamada (`P2010` numa consulta crua, `P2039` numa de modelo). Por isso o filtro reconhece o erro pelo SQLSTATE próprio do trigger, `FC001`, e lê o mês no `DETAIL` (`closedPeriodOf` em `apps/api/src/periods/period-lock.ts`).
+- **O que o trigger deixa passar,** além do recebimento parcial e da cascata da exclusão do espaço:
+  - a mudança só de vínculos (`import_id`, `reconciled_import_id`, `split_of_id`): esquecer uma importação ou excluir o lançamento dividido não mexe em valores;
+  - a mudança sem nenhuma diferença.
+- **A guarda de serviço é mais estrita que o trigger:** num mês fechado, o sem vencimento só aceita o recebimento ou pagamento parcial, e não uma edição do valor. Ela confere antes de escrever nos fluxos de vários passos: editar um lançamento e as partes dele, mudar ou encerrar uma recorrência ou um parcelamento, importar, trocar a categoria da devolução.
+- **Arquivar uma meta com o mês atual fechado** tira a fatia dela a partir do primeiro mês aberto. O mês fechado guarda o orçamento que tinha.
+- **"Ligar ao cartão"** deixa de fora os lançamentos de um mês fechado, e a contagem dos sem cartão também.
+- **O resumo e a lista de lançamentos não ganharam `closed`.** A lista é um array, e mudar o formato dela mexeria em todas as telas. A tela lê `GET …/periods/:period/closing`, que traz o fechamento em vigor, o histórico e o que falta para fechar.
+- **Fica para a tela:** a revisão de um extrato com linhas de um mês fechado. Hoje a importação inteira é recusada com `PERIOD_CLOSED`; a revisão deve deixar essas linhas desmarcadas, com o motivo.
