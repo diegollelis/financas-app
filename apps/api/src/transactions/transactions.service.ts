@@ -173,6 +173,8 @@ export class TransactionsService {
     if (input.type !== undefined && input.type !== current.type) {
       await this.ensureTypeMayChange(workspaceId, current);
     }
+    const moves = input.period !== undefined && input.period !== current.period;
+    if (moves) await this.ensurePeriodMayChange(workspaceId, current);
     const type = input.type ?? current.type;
     const categoryId = input.categoryId ?? current.categoryId;
     // Only a change is checked: a transaction may keep a category archived after it was made.
@@ -244,13 +246,14 @@ export class TransactionsService {
           },
         });
       }
-      // And its due date (ADR 0052 note) and its day (ADR 0055).
+      // And its due date (ADR 0052 note), its day (ADR 0055) and its month (ADR 0029 note).
       const changed = (field: 'dueDate' | 'occurredOn') =>
         input[field] !== undefined && transaction[field]?.getTime() !== current[field]?.getTime();
-      if (changed('dueDate') || changed('occurredOn')) {
+      if (changed('dueDate') || changed('occurredOn') || moves) {
         await followShares(this.prisma, workspaceId, transactionId, {
           dueDate: changed('dueDate') ? transaction.dueDate : undefined,
           occurredOn: changed('occurredOn') ? transaction.occurredOn : undefined,
+          period: moves ? transaction.period : undefined,
         });
       }
       return toTransactionResponse(transaction);
@@ -443,6 +446,31 @@ export class TransactionsService {
       throw refuse(
         'Este lançamento está dividido: o tipo não muda, porque as partes ficam do outro lado.',
       );
+    }
+  }
+
+  /**
+   * Only a transaction launched once moves to another month (ADR 0029 note): a month of a
+   * recurrence is that month (its occurrence would be generated again), an installment keeps its
+   * place in the plan, and a share goes where the transaction it shares goes.
+   */
+  private async ensurePeriodMayChange(
+    workspaceId: string,
+    current: Awaited<ReturnType<TransactionsService['find']>>,
+  ) {
+    const refuse = (message: string) => new ConflictException({ code: 'NOT_MOVABLE', message });
+    if (current.splitOfId) {
+      throw refuse('Esta é a parte de uma divisão: mova o lançamento dividido, e ela vai junto.');
+    }
+    if (current.installmentPlanId) {
+      throw refuse('Uma parcela não muda de mês sozinha: edite o parcelamento.');
+    }
+    const origin = await this.prisma.forWorkspace(workspaceId).transaction.findFirstOrThrow({
+      where: { id: current.id, workspaceId },
+      select: { occurrence: { select: { recurrenceId: true } } },
+    });
+    if (origin.occurrence) {
+      throw refuse('Este é um mês de uma recorrência: ele não muda de mês. Mude o vencimento.');
     }
   }
 

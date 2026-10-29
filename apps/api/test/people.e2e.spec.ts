@@ -961,6 +961,71 @@ describe('people and splits', () => {
         .expect(200);
       expect(changed.body).toMatchObject({ type: 'CREDIT' });
     });
+
+    it('moves only one launched once to another month, its pending shares along (ADR 0029 note)', async () => {
+      const { browser, base, category } = await setup();
+      const ana = await addPerson(browser, base, 'Ana');
+      const moradia = category('Moradia', 'DEBIT').id;
+      const next = shiftPeriod(period, 1);
+      await browser
+        .post(`${base}/recurrences`)
+        .send({
+          type: 'DEBIT',
+          description: 'Internet',
+          categoryId: moradia,
+          amountCents: 10_000,
+          startPeriod: period,
+        })
+        .expect(201);
+      await browser
+        .post(`${base}/installments`)
+        .send({
+          type: 'DEBIT',
+          description: 'Geladeira',
+          categoryId: moradia,
+          amountCents: 300_000,
+          amountIs: 'TOTAL',
+          installments: 3,
+          firstPeriod: period,
+        })
+        .expect(201);
+      const split = await launch(browser, base, moradia);
+      await browser
+        .patch(`${base}/transactions/${split.id}`)
+        .send({ split: [{ personId: ana.id, amountCents: 1_000 }] })
+        .expect(200);
+      const list = await transactions(browser, base);
+      const share = list.find((t) => t.splitOfId === split.id)!;
+
+      for (const tied of [
+        list.find((t) => t.recurrenceId)!,
+        list.find((t) => t.installment)!,
+        share,
+      ]) {
+        const refused = await browser
+          .patch(`${base}/transactions/${tied.id}`)
+          .send({ period: next })
+          .expect(409);
+        expect(refused.body).toMatchObject({ code: 'NOT_MOVABLE' });
+      }
+      // The same month sent again is no move.
+      await browser
+        .patch(`${base}/transactions/${share.id}`)
+        .send({ period, description: 'Conta de luz' })
+        .expect(200);
+
+      const dueDate = `${next}-15`;
+      const moved = await browser
+        .patch(`${base}/transactions/${split.id}`)
+        .send({ period: next, dueDate })
+        .expect(200);
+      expect(moved.body).toMatchObject({ period: next, dueDate });
+      const later = transactionListResponseSchema.parse(
+        (await browser.get(`${base}/transactions?period=${next}`).expect(200)).body,
+      );
+      expect(later.find((t) => t.id === share.id)).toMatchObject({ period: next, dueDate });
+      expect((await transactions(browser, base)).some((t) => t.id === share.id)).toBe(false);
+    });
   });
 
   describe('splitting a credit (ADR 0052)', () => {

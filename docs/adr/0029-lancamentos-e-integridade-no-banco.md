@@ -82,3 +82,15 @@ O "Ver tudo" das observações abria o texto no próprio cartão ("Ver menos" fe
 - **O botão diz de qual lançamento é** ("Ver tudo: observações de Compra do mês"), porque uma lista tem vários; começa pelo texto que aparece (WCAG 2.5.3). Ao fechar, o foco volta a ele.
 - **Fecha pelo X da janela** (chamado "Fechar"), por Esc ou por um toque fora. Não há um segundo botão "Fechar", que repetiria o nome.
 - **Só leitura:** a janela não edita; o menu ⋯ do lançamento continua ao lado.
+
+## Nota (mudar a competência de um lançamento, 2026-10-29)
+
+Uma compra no cartão feita na véspera do fechamento pode cair na fatura seguinte, porque o banco decide pela data em que a compra é processada. A fatura importada antes do fechamento deixava essa compra no mês errado, e só trocar o vencimento a punha na próxima fatura, mas deixava o gasto contando no mês antigo. O `PATCH …/transactions/:id` sempre aceitou `period`, mas sem nenhuma regra. Agora:
+
+- **Só um lançamento lançado uma vez muda de mês.** A API recusa com 409 `NOT_MOVABLE`, com o motivo, nestes casos:
+  - **um mês de recorrência:** a ocorrência é daquele mês, e o mês antigo seria gerado de novo;
+  - **uma parcela:** ela tem o seu lugar no parcelamento;
+  - **uma parte de divisão:** ela vai para onde for o lançamento que divide.
+- **Mandar o mesmo mês de novo não é mudança** e passa, como com o tipo.
+- **Num lançamento dividido, as partes pendentes vão junto** para a nova competência (`followShares`), como já acontecia com o vencimento e com o dia da compra. As partes já pagas são histórico e ficam onde estão.
+- A competência e o vencimento continuam independentes: quem move manda os dois quando os dois mudam. A tela ("Mover para outro mês") vem num passo seguinte.
