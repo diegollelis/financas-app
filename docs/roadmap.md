@@ -276,10 +276,10 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Avaliação e ADR: mês a mês com histórico, fechar só sem pendências (fora o sem vencimento), EDITOR fecha e reabre, o orçamento herdado salvo ao fechar, a trava no serviço e no banco
   - [x] API: a tabela `period_closings`, as rotas de fechar e reabrir, a guarda em cada caminho que escreve numa competência e o trigger (nota no ADR)
   - [x] Tela (com prévia): "Fechamento do mês" no Painel, o cadeado no mês e Lançamentos só para leitura num mês fechado
-- [ ] **Metas como parte da renda e o plano no Painel** ([ADR 0064](adr/0064-metas-como-parte-da-renda.md)): o limite e as metas em % da renda líquida, somando 100%, e o Painel mostrando o plano inteiro
+- [x] **Metas como parte da renda e o plano no Painel** ([ADR 0064](adr/0064-metas-como-parte-da-renda.md)): o limite e as metas em % da renda líquida, somando 100%, e o Painel mostrando o plano inteiro
   - [x] ADR: uma base só, a sobra como fato do mês (nunca negativa), a conversão dos orçamentos salvos, "Gerenciar metas" fora do diálogo do orçamento
   - [x] A conta, a API, a conversão dos orçamentos salvos e o formulário do orçamento
-  - [ ] O Painel (com prévia): o plano em "Orçamento do mês", "20% da renda" em cada meta, "Gerenciar metas" no card e as metas em tabela a partir de xl
+  - [x] O Painel (com prévia): o plano em "Orçamento do mês", "20% da renda" em cada meta, "Gerenciar metas" no card e as metas em tabela a partir de xl
 - [ ] **Assistente de IA** (em avaliação, [docs/avaliacoes/assistente-de-ia.md](avaliacoes/assistente-de-ia.md)): perguntas sobre as finanças e lançamentos por texto, de preferência com o app como conector (MCP) da IA do próprio usuário, sem custo de IA para o app
 
 ## Fase 6 — Identidade visual

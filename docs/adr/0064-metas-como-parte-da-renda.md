@@ -55,3 +55,10 @@ Opção 2.
 - **Próximos passos:**
   1. a conta, a API, a conversão e o formulário do orçamento;
   2. o Painel, com a prévia aprovada.
+
+## Nota (o Painel, 2026-10-29)
+
+- **"Sem meta" saiu do card "Metas"** e passou a ser uma linha do plano em "Orçamento do mês", com o mesmo ⓘ, porque é uma parte da renda e não uma meta.
+- **No card "Metas", "Guardado" vem primeiro,** com "de R$ X das metas", e depois a "Sobra prevista". No celular, as duas ficam uma abaixo da outra, para as linhas de baixo não quebrarem.
+- **A tabela das metas** (a partir de xl, "Ver como", lembrada no navegador como as das outras páginas) tem as colunas Meta, % da renda, Valor, Guardado, Pendente, Falta lançar, Progresso e "Guardar". Fica na ordem do orçamento até alguém clicar numa coluna.
+- **"Gerenciar metas" é um diálogo próprio,** aberto pelo card "Metas", e some num mês fechado ([ADR 0063](0063-fechamento-do-mes.md)), como "Editar orçamento" e "Guardar".
