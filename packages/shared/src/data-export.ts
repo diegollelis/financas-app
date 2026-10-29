@@ -92,6 +92,19 @@ const exportCardSchema = z.object({
   createdAt: instant,
 });
 
+/**
+ * A closing of a competência (ADR 0063), with who closed and reopened it by name (null once that
+ * account is gone) and why it was reopened.
+ */
+const exportPeriodClosingSchema = z.object({
+  period: z.string(),
+  closedAt: instant,
+  closedBy: z.string().nullable(),
+  reopenedAt: instant.nullable(),
+  reopenedBy: z.string().nullable(),
+  reopenReason: z.string().nullable(),
+});
+
 /** A destination of the budget (ADR 0047), with the category of its applications. */
 const exportBudgetDestinationSchema = z.object({
   id: z.uuid(),
@@ -215,6 +228,7 @@ const ownedWorkspaceSchema = z.object({
   recurrences: z.array(exportRecurrenceSchema),
   installmentPlans: z.array(exportInstallmentPlanSchema),
   imports: z.array(exportImportSchema),
+  periodClosings: z.array(exportPeriodClosingSchema).default([]),
 });
 
 /** A workspace of someone else: only the participation; its data belongs to its owner. */

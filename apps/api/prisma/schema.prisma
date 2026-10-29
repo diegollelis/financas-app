@@ -37,6 +37,7 @@ model Workspace {
   merchants          Merchant[]
   merchantAliases    MerchantAlias[]
   cards              Card[]
+  periodClosings     PeriodClosing[]
   createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -90,6 +91,8 @@ model User {
   invitationsSent Invitation[]
   importsCreated  TransactionImport[]
   linkedPeople    Person[]
+  periodsClosed   PeriodClosing[]     @relation("ClosedBy")
+  periodsReopened PeriodClosing[]     @relation("ReopenedBy")
 
   @@map("users")
 }
@@ -658,6 +661,32 @@ model BudgetConfig {
 
   @@unique([workspaceId, period])
   @@map("budget_configs")
+}
+
+// Fechamento do mês (ADR 0063): while a row has no reopenedAt, nothing in that competência
+// changes (a trigger in the migration backs the services). Reopening fills the reopened_* fields
+// and closing again adds a row, so the rows are the history. At most one open row per period is
+// kept by the services, which lock the workspace row while closing or reopening. Who closed or
+// reopened becomes null if that account is deleted.
+model PeriodClosing {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  period       String    @db.Char(7)
+  closedAt     DateTime  @default(now()) @map("closed_at") @db.Timestamptz(3)
+  closedById   String?   @map("closed_by") @db.Uuid
+  closedBy     User?     @relation("ClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  reopenedAt   DateTime? @map("reopened_at") @db.Timestamptz(3)
+  reopenedById String?   @map("reopened_by") @db.Uuid
+  reopenedBy   User?     @relation("ReopenedBy", fields: [reopenedById], references: [id], onDelete: SetNull)
+  reopenReason String?   @map("reopen_reason") @db.VarChar(500)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([workspaceId, period])
+  @@index([closedById])
+  @@index([reopenedById])
+  @@map("period_closings")
 }
 
 // The share of one destination in one saved budget, in basis points (ADR 0047): Despesas of the
