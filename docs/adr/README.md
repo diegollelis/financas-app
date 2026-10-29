@@ -67,3 +67,4 @@ Decisões de arquitetura do projeto ([por que usamos ADRs](0001-registrar-deciso
 | [0061](0061-extrato-da-conta-e-conferencia.md)                   | Extrato da conta: o identificador de cada movimento e a conferência com o que já está lançado | Aceita |
 | [0062](0062-cartoes-e-pagar-fatura.md)                           | Cartões (crédito e débito) e "Pagar fatura": a fatura é o cartão mais o vencimento            | Aceita |
 | [0063](0063-fechamento-do-mes.md)                                | Fechamento do mês: fechar e reabrir uma competência, com a trava no serviço e no banco        | Aceita |
+| [0064](0064-metas-como-parte-da-renda.md)                        | Metas como parte da renda líquida: o limite e as metas somam 100%                             | Aceita |
