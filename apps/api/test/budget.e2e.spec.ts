@@ -75,15 +75,15 @@ describe('budget', () => {
     return { list, named };
   }
 
-  /** Despesas 50%; Investimentos 50%, Reserva 30%, Viagens 20% of what is left. */
+  /** Every share of the income (ADR 0064): Despesas 50%; Investimentos 25%, Reserva 15%, Viagens 10%. */
   function september(named: (name: string) => BudgetDestination) {
     return {
       netIncomeCents: 500_000,
       shares: [
         { destinationId: named('Despesas').id, basisPoints: 5_000 },
-        { destinationId: named('Investimentos').id, basisPoints: 5_000 },
-        { destinationId: named('Reserva de emergência').id, basisPoints: 3_000 },
-        { destinationId: named('Viagens').id, basisPoints: 2_000 },
+        { destinationId: named('Investimentos').id, basisPoints: 2_500 },
+        { destinationId: named('Reserva de emergência').id, basisPoints: 1_500 },
+        { destinationId: named('Viagens').id, basisPoints: 1_000 },
       ],
     };
   }
@@ -118,9 +118,9 @@ describe('budget', () => {
     expect(saved).toMatchObject({ netIncomeCents: 500_000, source: 'SAVED', inheritedFrom: null });
     expect(percentages(saved)).toEqual({
       Despesas: 5_000,
-      Investimentos: 5_000,
-      'Reserva de emergência': 3_000,
-      Viagens: 2_000,
+      Investimentos: 2_500,
+      'Reserva de emergência': 1_500,
+      Viagens: 1_000,
     });
     expect(await get(browser, id, '2026-12')).toMatchObject({
       period: '2026-12',
@@ -172,16 +172,16 @@ describe('budget', () => {
     expect(await t.prisma.forWorkspace(id).budgetConfig.count()).toBe(1);
   });
 
-  it('refuses saving destinations adding up to more than 100%; Despesas has its own base', async () => {
+  it('refuses the limit and the goals adding up to more than 100% of the income (ADR 0064)', async () => {
     const { browser, personalWorkspaceId: id } = await t.signUp(maria);
     const { named } = await destinations(browser, id);
 
-    // Despesas at 100% of the income and the saving ones at 100% of what is left: fine.
+    // 60% + 40%: the whole income, fine.
     await save(browser, id, '2026-10', {
       netIncomeCents: 500_000,
       shares: [
-        { destinationId: named('Despesas').id, basisPoints: 10_000 },
-        { destinationId: named('Investimentos').id, basisPoints: 10_000 },
+        { destinationId: named('Despesas').id, basisPoints: 6_000 },
+        { destinationId: named('Investimentos').id, basisPoints: 4_000 },
       ],
     });
     const response = await browser
@@ -189,7 +189,7 @@ describe('budget', () => {
       .send({
         netIncomeCents: 500_000,
         shares: [
-          { destinationId: named('Investimentos').id, basisPoints: 6_000 },
+          { destinationId: named('Despesas').id, basisPoints: 6_000 },
           { destinationId: named('Viagens').id, basisPoints: 4_001 },
         ],
       })
@@ -197,7 +197,7 @@ describe('budget', () => {
 
     expect(response.body).toMatchObject({
       code: 'INVALID_INPUT',
-      message: 'A soma das metas não pode passar de 100%.',
+      message: 'O limite de gastos e as metas somam no máximo 100% da renda líquida.',
     });
   });
 
@@ -255,14 +255,14 @@ describe('budget', () => {
     await browser.patch(viagens).send({ archived: true }).expect(200);
 
     // An earlier competência keeps its share: its dashboard does not change.
-    expect(percentages(await get(browser, id, before))).toMatchObject({ Viagens: 2_000 });
+    expect(percentages(await get(browser, id, before))).toMatchObject({ Viagens: 1_000 });
     // This one only inherited: it is saved now, the same budget without Viagens.
     const thisMonth = await get(browser, id, now);
     expect(thisMonth).toMatchObject({ source: 'SAVED', netIncomeCents: 500_000 });
     expect(percentages(thisMonth)).toEqual({
       Despesas: 5_000,
-      Investimentos: 5_000,
-      'Reserva de emergência': 3_000,
+      Investimentos: 2_500,
+      'Reserva de emergência': 1_500,
     });
     // A later saved one loses it too.
     expect(percentages(await get(browser, id, later))).not.toHaveProperty('Viagens');

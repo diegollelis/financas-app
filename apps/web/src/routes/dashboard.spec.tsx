@@ -11,13 +11,13 @@ const houseId = '01920000-0000-7000-8000-000000000002';
 const house = { id: houseId, name: 'Casa', isPersonal: false, role: 'VIEWER' };
 const today = '2026-10-15';
 
-// Despesas: 60% of R$ 5.000,00. Saving: 50%, 30% and 20% of what is left after expenses.
+// Every share of R$ 5.000,00 (ADR 0064): Despesas 60%, then 20%, 12% and 8%.
 const budget = testBudget({
   period: '2026-10',
   netIncomeCents: 500_000,
   source: 'INHERITED',
   inheritedFrom: '2026-09',
-  basisPoints: [6_000, 5_000, 3_000, 2_000],
+  basisPoints: [6_000, 2_000, 1_200, 800],
 });
 const expenseCategory = '01920000-0000-7000-8000-0000000000e1';
 const investimentos = testDestinations[1]!.categoryId!;
@@ -127,7 +127,11 @@ describe('DashboardPage', () => {
       'SaídasR$ 3.009,90R$ 850,00 pagos',
     );
     // Credits − expenses (the application is not an expense): 6.000,00 − 2.509,90.
-    expect(figure('Metas', 'Sobra para guardar')).toHaveTextContent('R$ 3.490,10');
+    expect(figure('Metas', 'Sobra prevista')).toHaveTextContent('R$ 3.490,10');
+    // The goals add up to 2.000,00 of the income: covered, with 1.490,10 beyond them.
+    expect(nbsp(figure('Metas', 'Sobra prevista')?.nextElementSibling?.textContent)).toBe(
+      'Cobre as metas e ainda sobram R$ 1.490,10.',
+    );
     expect(figure('Metas', 'Guardado')).toHaveTextContent('R$ 500,00');
     expect(nbsp(screen.getByRole('status').textContent)).toContain(
       '1 lançamento vencido (R$ 159,90).',
@@ -192,11 +196,11 @@ describe('DashboardPage', () => {
       'Sobram R$ 490,10 no limite. O limite é 60% da renda líquida.',
     );
     expect(nbsp(limit.textContent)).toContain('Gastos pagosR$ 350,00Gastos a pagarR$ 2.159,90');
-    // Investimentos: 50% of 3.490,10 = 1.745,05; 500,00 applied, nothing pending, 1.245,05
-    // still to launch, 28,65% of the goal.
+    // Investimentos: 20% of 5.000,00 = 1.000,00; 500,00 applied, nothing pending, 500,00 still
+    // to launch, 50% of the goal.
     const savings = await section('Metas');
     expect(nbsp(goal(savings, 'Investimentos')?.textContent)).toBe(
-      'Investimentos 50%R$ 500,00 de R$ 1.745,05 (28,65%)Falta lançar R$ 1.245,05.',
+      'Investimentos 20%R$ 500,00 de R$ 1.000,00 (50%)Falta lançar R$ 500,00.',
     );
     expect(
       nbsp(
@@ -204,7 +208,7 @@ describe('DashboardPage', () => {
           .getByRole('meter', { name: 'Progresso de Investimentos' })
           .getAttribute('aria-valuetext'),
       ),
-    ).toBe('R$ 500,00 guardados de R$ 1.745,05');
+    ).toBe('R$ 500,00 guardados de R$ 1.000,00');
     // Despesas is not one of the saving destinations.
     expect(
       within(savings)
@@ -212,7 +216,7 @@ describe('DashboardPage', () => {
         .map((item) => item.textContent?.match(/^\D+/)?.[0]?.trim()),
     ).toEqual(['Investimentos', 'Reserva de emergência', 'Viagens']);
     expect(within(savings).queryByRole('table')).not.toBeInTheDocument();
-    // Their shares add up to 100%: nothing is left without a destination.
+    // The limit and the goals add up to 100%: nothing is left without a destination.
     expect(savings).not.toHaveTextContent('Sem meta');
   });
 
@@ -222,32 +226,32 @@ describe('DashboardPage', () => {
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
-    // 1.745,05 − 500,00 applied − 300,00 pending.
+    // 1.000,00 − 500,00 applied − 300,00 pending.
     expect(nbsp(goal(await section('Metas'), 'Investimentos')?.textContent)).toContain(
-      'R$ 300,00 pendente. Falta lançar R$ 945,05.',
+      'R$ 300,00 pendente. Falta lançar R$ 200,00.',
     );
   });
 
-  it('shows what the saving shares leave without a destination', async () => {
+  it('shows what the limit and the goals leave without a destination', async () => {
     const ninety = testBudget({
       period: '2026-10',
       netIncomeCents: 500_000,
       source: 'SAVED',
-      basisPoints: [6_000, 5_000, 3_000, 1_000],
+      basisPoints: [6_000, 2_000, 1_200, 300],
     });
     mockDashboard(summarizePeriod(october, ninety, today));
 
     renderApp(`/espacos/${houseId}/painel?competencia=2026-10`);
 
     const savings = await section('Metas');
-    // 10% of 3.490,10 has no destination.
+    // 5% of the income, 250,00, has no destination.
     const unallocated = within(savings).getByText(/^Sem meta/, { selector: 'dt' });
-    expect(unallocated).toHaveTextContent('Sem meta (10%)');
-    expect(nbsp(unallocated.nextElementSibling?.textContent)).toBe('R$ 349,01');
+    expect(unallocated).toHaveTextContent('Sem meta (5%)');
+    expect(nbsp(unallocated.nextElementSibling?.textContent)).toBe('R$ 250,00');
     // Never read as money to spend (ADR 0051): said behind the "ⓘ" on its line.
     await userEvent.click(within(savings).getByRole('button', { name: 'Sobre Sem meta' }));
     expect(await screen.findByRole('dialog', { name: 'Sem meta' })).toHaveTextContent(
-      'Parte da sobra para guardar que nenhuma meta recebeu. É uma divisão do orçamento, não um saldo.',
+      'Parte da renda líquida que nem o limite de gastos nem uma meta recebeu. É uma divisão do orçamento, não um saldo.',
     );
   });
 
@@ -260,11 +264,9 @@ describe('DashboardPage', () => {
       await screen.findByText('As saídas passam das entradas em R$ 1.009,90.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Acima do limite em R$ 3.509,90.')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Nada sobrou para guardar este mês: as despesas previstas alcançaram as entradas.',
-      ),
-    ).toBeInTheDocument();
+    // Never a negative leftover (ADR 0064): zero, and how far the expenses went.
+    expect(figure('Metas', 'Sobra prevista')).toHaveTextContent('R$ 0,00');
+    expect(screen.getByText('Os gastos passaram as entradas em R$ 509,90.')).toBeInTheDocument();
     expect(tile('Saldo previsto')).toHaveTextContent('-R$ 1.009,90');
     // The legend leaves the balance out, never "Saldo previsto R$ 0,00" (ADR 0051 note).
     expect(
@@ -272,8 +274,10 @@ describe('DashboardPage', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['Saídas pagas', 'Saídas a pagar']);
-    // Nothing left: every goal is worth nothing this month.
-    expect(goal(await section('Metas'), 'Investimentos')).toHaveTextContent('Sem valor este mês.');
+    // The goals are a share of the income: they stay.
+    expect(nbsp(goal(await section('Metas'), 'Investimentos')?.textContent)).toContain(
+      'Falta lançar R$ 500,00.',
+    );
   });
 
   it('keeps the reference month of the screenshots in place (regression)', async () => {
@@ -350,7 +354,7 @@ describe('DashboardPage', () => {
       description: 'Aporte em Investimentos',
       notes: null,
       categoryId: investimentos,
-      amountCents: 124_505,
+      amountCents: 50_000,
       period: '2026-10',
       dueDate: null,
       settledAt: null,
@@ -382,8 +386,8 @@ describe('DashboardPage', () => {
     // The goal in the description: a record, not an investment the app makes (ADR 0051).
     expect(form).toHaveAccessibleDescription(/^Em Investimentos, no mês de outubro de 2026/);
     expect(within(form).getByLabelText('Descrição')).toHaveValue('Aporte em Investimentos');
-    // Goal 1.745,05 − 500,00 applied.
-    expect(within(form).getByLabelText('Valor (R$)')).toHaveValue('1.245,05');
+    // Goal 1.000,00 − 500,00 applied.
+    expect(within(form).getByLabelText('Valor (R$)')).toHaveValue('500,00');
     // Type and category are fixed: changing them would make it something else.
     // Said plainly: a record, not money moved.
     expect(within(form).getByText(/^Será lançada uma saída/)).toHaveTextContent(
@@ -409,7 +413,7 @@ describe('DashboardPage', () => {
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining(
-            `"type":"DEBIT","description":"Aporte em Investimentos","notes":null,"categoryId":"${investimentos}","amountCents":124505`,
+            `"type":"DEBIT","description":"Aporte em Investimentos","notes":null,"categoryId":"${investimentos}","amountCents":50000`,
           ) as string,
         }),
       ),

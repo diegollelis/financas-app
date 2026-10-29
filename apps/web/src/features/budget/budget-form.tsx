@@ -1,4 +1,6 @@
 import {
+  BUDGET_SHARES_OVER,
+  budgetSharesTotal,
   formatBasisPoints,
   formatCents,
   FULL_BASIS_POINTS,
@@ -36,8 +38,8 @@ const percent = { required: 'Informe o percentual.', invalid: 'Use um percentual
 
 /**
  * The fields hold text (reais and percentages as typed), one percentage per destination in the
- * budget's order. Once read, Despesas is a share of the net income and the saving destinations
- * share what is left after expenses, adding up to at most 100% (ADR 0047).
+ * budget's order. Once read, every one is a share of the net income, the limit and the goals
+ * alike, and they add up to at most 100% (ADR 0064).
  */
 const budgetFormSchema = z
   .object({
@@ -53,13 +55,10 @@ const budgetFormSchema = z
       }),
     ),
   })
-  .refine(
-    (form) =>
-      form.shares
-        .filter((share) => share.kind === 'SAVINGS')
-        .reduce((sum, share) => sum + share.basisPoints, 0) <= FULL_BASIS_POINTS,
-    { message: 'A soma das metas não pode passar de 100%.', path: ['shares'] },
-  )
+  .refine((form) => budgetSharesTotal(form.shares) <= FULL_BASIS_POINTS, {
+    message: BUDGET_SHARES_OVER,
+    path: ['shares'],
+  })
   .transform((form): BudgetInput => ({
     netIncomeCents: form.netIncomeCents,
     shares: form.shares.map(({ destinationId, basisPoints }) => ({ destinationId, basisPoints })),
@@ -114,16 +113,21 @@ export function BudgetForm({
   // The 100% rule is on the whole list: React Hook Form keeps such an error under `root`.
   const sumError =
     formState.errors.shares?.root?.message ?? formState.errors.shares?.message ?? null;
-  // A live preview from whatever is typed so far: Despesas in reais, the saving ones' sum.
+  // A live preview from whatever is typed so far: each share in reais, and the total.
   const typed = useWatch({ control });
   const netIncome = parseReais(typed.netIncomeCents ?? '');
   const typedShares = typed.shares ?? [];
-  const savingPercents = initial.shares.flatMap((share, index) =>
-    share.kind === 'SAVINGS' ? [parsePercent(typedShares[index]?.basisPoints ?? '')] : [],
+  const percents = initial.shares.map((_, index) =>
+    parsePercent(typedShares[index]?.basisPoints ?? ''),
   );
-  const savingTotal = savingPercents.every((value) => value !== null)
-    ? savingPercents.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+  const total = percents.every((value) => value !== null)
+    ? percents.reduce<number>((sum, value) => sum + (value ?? 0), 0)
     : null;
+  const inReais = (basisPoints: number | null) =>
+    netIncome !== null && basisPoints !== null
+      ? formatCents(shareOfIncome(netIncome, basisPoints))
+      : null;
+  const free = total !== null ? FULL_BASIS_POINTS - total : null;
 
   const submit = async (input: BudgetInput) => {
     try {
@@ -152,14 +156,10 @@ export function BudgetForm({
             {...register(`shares.${index}.basisPoints`)}
           />
         </FormField>
-        {share.kind === 'EXPENSES' && (
-          // Despesas is the only one with a known base when typing: the net income.
-          <span className="text-muted-foreground flex h-11 items-center tabular-nums md:h-8">
-            {netIncome !== null && typedPercent !== null
-              ? formatCents(shareOfIncome(netIncome, typedPercent))
-              : '—'}
-          </span>
-        )}
+        {/* Every share is of the net income (ADR 0064): its amount as it is typed. */}
+        <span className="text-muted-foreground flex h-11 items-center tabular-nums md:h-8">
+          {inReais(typedPercent) ?? '—'}
+        </span>
       </div>
     );
   };
@@ -206,30 +206,25 @@ export function BudgetForm({
       {savings.length > 0 && (
         <fieldset className="grid gap-3">
           <legend className="mb-1 font-medium">Metas</legend>
-          <p className="text-muted-foreground text-sm">
-            Percentual do que sobrar no mês depois das despesas. O que nenhuma meta receber aparece
-            como &quot;Sem meta&quot; no Painel.
-          </p>
+          <p className="text-muted-foreground text-sm">Percentual da renda líquida.</p>
           {savings.map(shareField)}
-          {savingTotal !== null && (
-            <p
-              className={
-                savingTotal > FULL_BASIS_POINTS
-                  ? 'text-destructive'
-                  : 'text-muted-foreground tabular-nums'
-              }
-            >
-              Soma: {formatBasisPoints(savingTotal)}
-              {savingTotal < FULL_BASIS_POINTS &&
-                `. Sem meta: ${formatBasisPoints(FULL_BASIS_POINTS - savingTotal)}`}
-            </p>
-          )}
-          {sumError && (
-            <p role="alert" className="text-destructive">
-              {sumError}
-            </p>
-          )}
         </fieldset>
+      )}
+      {/* The limit and the goals add up to 100% at most; what is left is "Sem meta". */}
+      {total !== null && free !== null && (
+        <p
+          aria-live="polite"
+          className={free < 0 ? 'text-destructive' : 'text-muted-foreground tabular-nums'}
+        >
+          Total: {formatBasisPoints(total)}
+          {free > 0 &&
+            `. Sem meta: ${formatBasisPoints(free)}${inReais(free) ? ` (${inReais(free)})` : ''}`}
+        </p>
+      )}
+      {sumError && (
+        <p role="alert" className="text-destructive">
+          {sumError}
+        </p>
       )}
       {Boolean(error) && (
         <p role="alert" className="text-destructive">

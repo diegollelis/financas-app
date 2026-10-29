@@ -1,12 +1,6 @@
 import { z } from 'zod';
 import { budgetDestinationKindSchema } from './budget-destination.ts';
-import {
-  budgetSchema,
-  FULL_BASIS_POINTS,
-  shareOfIncome,
-  splitShares,
-  type Budget,
-} from './budget.ts';
+import { budgetSchema, FULL_BASIS_POINTS, splitShares, type Budget } from './budget.ts';
 import { periodSchema } from './money-and-dates.ts';
 import {
   transactionStatus,
@@ -68,16 +62,17 @@ export const summarySchema = z.object({
   /** The debits in the saving destinations' categories: money put aside. */
   applied: twoViewsSchema,
   /**
-   * Credits − expenses, without the neutral credits and minus the neutral debits: the base of the
-   * saving destinations' goals (never minus applications). A loan lent leaves less to save; money
-   * coming back, or borrowed, is no new goal and stays in the balance only (ADR 0056 note).
+   * Credits − expenses, without the neutral credits and minus the neutral debits (never minus
+   * applications): "Sobra prevista", a fact of the month that tells whether the goals are
+   * covered, no longer their base (ADR 0064). A loan lent leaves less; money coming back, or
+   * borrowed, stays in the balance only (ADR 0056 note).
    */
   available: twoViewsSchema,
   budget: budgetSchema,
   destinations: z.array(destinationSummarySchema),
   /**
-   * What the saving destinations leave without a destination, when their shares add up to less
-   * than 100%: the missing share and what is available minus their goals, so the cents add up.
+   * The share of the net income that neither the limit nor a goal gets ("Sem meta", ADR 0064):
+   * 100% minus every share, and the income minus every goal, so the cents add up.
    */
   unallocated: z
     .object({ basisPoints: z.number().int(), targetCents: z.number().int() })
@@ -210,16 +205,14 @@ export function summarizePeriod(
       expenses.settledCents -
       neutralDebits.settledCents,
   };
-  // Nothing to set aside when expenses pass the credits: the goals are zero, not negative.
-  const savingBase = Math.max(0, available.plannedCents);
-  // Split together, so the goals add up to the cent (and the "Sem meta" rest is exact).
-  const savingShares = budget.shares.filter((share) => share.kind === 'SAVINGS');
-  const savingParts = splitShares(
-    savingBase,
-    savingShares.map((share) => share.basisPoints),
+  // Every share is of the net income (ADR 0064), split together so the goals add up to the cent
+  // (and the "Sem meta" rest is exact).
+  const parts = splitShares(
+    budget.netIncomeCents,
+    budget.shares.map((share) => share.basisPoints),
   );
-  const savingTargets = new Map(
-    savingShares.map((share, index) => [share.destinationId, savingParts[index] ?? 0]),
+  const targets = new Map(
+    budget.shares.map((share, index) => [share.destinationId, parts[index] ?? 0]),
   );
 
   const destinations = budget.shares.map((share) => {
@@ -229,7 +222,7 @@ export function summarizePeriod(
         name: share.name,
         kind: share.kind,
         basisPoints: share.basisPoints,
-        targetCents: shareOfIncome(budget.netIncomeCents, share.basisPoints),
+        targetCents: targets.get(share.destinationId) ?? 0,
         appliedCents: expenses.settledCents,
         pendingCents: expenses.pendingCents,
       };
@@ -243,7 +236,7 @@ export function summarizePeriod(
       name: share.name,
       kind: share.kind,
       basisPoints: share.basisPoints,
-      targetCents: savingTargets.get(share.destinationId) ?? 0,
+      targetCents: targets.get(share.destinationId) ?? 0,
       appliedCents: own.settledCents,
       pendingCents: own.pendingCents,
     };
@@ -251,10 +244,9 @@ export function summarizePeriod(
   const expensesTarget =
     destinations.find((destination) => destination.kind === 'EXPENSES')?.targetCents ?? 0;
   const appliedSide = side(applications, today);
-  const savings = destinations.filter((destination) => destination.kind === 'SAVINGS');
   const unallocatedBasisPoints = Math.max(
     0,
-    FULL_BASIS_POINTS - savings.reduce((sum, destination) => sum + destination.basisPoints, 0),
+    FULL_BASIS_POINTS - destinations.reduce((sum, destination) => sum + destination.basisPoints, 0),
   );
 
   const ownCredits = transactions.filter(
@@ -287,7 +279,8 @@ export function summarizePeriod(
       basisPoints: unallocatedBasisPoints,
       targetCents:
         unallocatedBasisPoints > 0
-          ? savingBase - savings.reduce((sum, destination) => sum + destination.targetCents, 0)
+          ? budget.netIncomeCents -
+            destinations.reduce((sum, destination) => sum + destination.targetCents, 0)
           : 0,
     },
     expensesLeftCents: expensesTarget - expenses.totalCents,

@@ -12,13 +12,13 @@ const house = { id: houseId, name: 'Casa', isPersonal: false, role: 'EDITOR' };
 const base = `/api/workspaces/${houseId}/budget`;
 const today = '2026-10-15';
 
-// Despesas 60% of the income; Investimentos 50%, Reserva 30%, Viagens 20% of what is left.
+// Every share of the income (ADR 0064): Despesas 60%, Investimentos 20%, Reserva 12%, Viagens 8%.
 const inherited = testBudget({
   period: '2026-10',
   netIncomeCents: 500_000,
   source: 'INHERITED',
   inheritedFrom: '2026-09',
-  basisPoints: [6_000, 5_000, 3_000, 2_000],
+  basisPoints: [6_000, 2_000, 1_200, 800],
 });
 
 /** The dashboard of a competência, and the budget the dialog loads for it. */
@@ -70,12 +70,12 @@ describe('Budget dialog (on the dashboard)', () => {
       ),
     ).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Renda líquida (R$)')).toHaveValue('5.000,00');
-    // Despesas: a share of the net income, shown in reais as it is typed.
+    // Every share is of the net income, shown in reais as it is typed.
     expect(within(dialog).getByLabelText('Despesas (%)')).toHaveValue('60');
     expect(within(dialog).getByText('R$ 3.000,00')).toBeInTheDocument();
-    // The saving destinations: shares of what is left after expenses.
-    expect(within(dialog).getByLabelText('Investimentos (%)')).toHaveValue('50');
-    expect(within(dialog).getByText('Soma: 100%')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Investimentos (%)')).toHaveValue('20');
+    expect(within(dialog).getByText('R$ 1.000,00')).toBeInTheDocument();
+    expect(within(dialog).getByText('Total: 100%')).toBeInTheDocument();
   });
 
   it('fills the net income with the month\'s credits on "Usar as entradas do mês"', async () => {
@@ -133,8 +133,10 @@ describe('Budget dialog (on the dashboard)', () => {
     const dialog = await openDialog();
     const travel = await within(dialog).findByLabelText('Viagens (%)');
     await userEvent.clear(travel);
-    await userEvent.type(travel, '10');
-    expect(within(dialog).getByText('Soma: 90%. Sem meta: 10%')).toBeInTheDocument();
+    await userEvent.type(travel, '3');
+    expect(
+      within(dialog).getByText(/^Total: 95%\. Sem meta: 5% \(R\$\s250,00\)$/),
+    ).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar orçamento' }));
 
     await vi.waitFor(() =>
@@ -146,9 +148,9 @@ describe('Budget dialog (on the dashboard)', () => {
             netIncomeCents: 500_000,
             shares: [
               { destinationId: despesas, basisPoints: 6_000 },
-              { destinationId: investimentos, basisPoints: 5_000 },
-              { destinationId: reserva, basisPoints: 3_000 },
-              { destinationId: viagens, basisPoints: 1_000 },
+              { destinationId: investimentos, basisPoints: 2_000 },
+              { destinationId: reserva, basisPoints: 1_200 },
+              { destinationId: viagens, basisPoints: 300 },
             ],
           }),
         }),
@@ -160,7 +162,7 @@ describe('Budget dialog (on the dashboard)', () => {
     expect(screen.getByRole('button', { name: 'Editar orçamento' })).toHaveFocus();
   });
 
-  it('refuses saving destinations adding up to more than 100% before calling the API', async () => {
+  it('refuses the limit and the goals adding up to more than 100% before calling the API', async () => {
     const fetchMock = mockBudget();
     renderApp(`/espacos/${houseId}/painel`);
 
@@ -168,11 +170,13 @@ describe('Budget dialog (on the dashboard)', () => {
     const travel = await within(dialog).findByLabelText('Viagens (%)');
     await userEvent.clear(travel);
     await userEvent.type(travel, '30');
-    expect(within(dialog).getByText('Soma: 110%')).toBeInTheDocument();
+    expect(within(dialog).getByText('Total: 122%')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Salvar orçamento' }));
 
     expect(
-      await within(dialog).findByText('A soma das metas não pode passar de 100%.'),
+      await within(dialog).findByText(
+        'O limite de gastos e as metas somam no máximo 100% da renda líquida.',
+      ),
     ).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith(
       expect.anything(),

@@ -10,7 +10,7 @@ const investimentosCategory = id(102);
 const reservaCategory = id(103);
 const viagensCategory = id(104);
 
-// Despesas: 60% of the net income. Saving: 50% + 30% + 20% of what is left after expenses.
+// Every share is of the net income (ADR 0064): Despesas 60%, then 20% + 12% + 8%, 100% in all.
 const budget: Budget = {
   period: '2026-10',
   netIncomeCents: 500_000,
@@ -29,21 +29,21 @@ const budget: Budget = {
       name: 'Investimentos',
       kind: 'SAVINGS',
       categoryId: investimentosCategory,
-      basisPoints: 5_000,
+      basisPoints: 2_000,
     },
     {
       destinationId: id(3),
       name: 'Reserva de emergência',
       kind: 'SAVINGS',
       categoryId: reservaCategory,
-      basisPoints: 3_000,
+      basisPoints: 1_200,
     },
     {
       destinationId: id(4),
       name: 'Viagens',
       kind: 'SAVINGS',
       categoryId: viagensCategory,
-      basisPoints: 2_000,
+      basisPoints: 800,
     },
   ],
 };
@@ -164,14 +164,14 @@ describe('summarizePeriod', () => {
     });
   });
 
-  it('gives what is available to set aside: credits − expenses, never minus applications', () => {
+  it('gives the leftover of the month: credits − expenses, never minus applications', () => {
     expect(summarizePeriod(month, budget, today).available).toEqual({
       plannedCents: 349_010,
       settledCents: 465_000,
     });
   });
 
-  it('sets the expenses goal on the net income and the saving goals on what is available', () => {
+  it('sets every goal on the net income, the expenses one included (ADR 0064)', () => {
     const { destinations } = summarizePeriod(month, budget, today);
 
     expect(destinations).toEqual([
@@ -182,53 +182,52 @@ describe('summarizePeriod', () => {
         appliedCents: 35_000,
         pendingCents: 215_990,
       }),
-      // 50% of 349.010.
+      // 20% of 500.000, whatever is left in the month.
       expect.objectContaining({
         name: 'Investimentos',
-        targetCents: 174_505,
+        targetCents: 100_000,
         appliedCents: 50_000,
         pendingCents: 0,
       }),
       expect.objectContaining({
         name: 'Reserva de emergência',
-        targetCents: 104_703,
+        targetCents: 60_000,
         appliedCents: 0,
         pendingCents: 20_000,
       }),
       expect.objectContaining({
         name: 'Viagens',
-        targetCents: 69_802,
+        targetCents: 40_000,
         appliedCents: 0,
         pendingCents: 0,
       }),
     ]);
   });
 
-  it('leaves nothing without a destination when the saving shares add up to 100%', () => {
+  it('leaves nothing without a destination when the shares add up to 100%', () => {
     expect(summarizePeriod(month, budget, today).unallocated).toEqual({
       basisPoints: 0,
       targetCents: 0,
     });
   });
 
-  it('says what the saving shares leave without a destination, adding up to what is available', () => {
+  it('says what the shares leave without a destination, adding up to the net income', () => {
     const shares = budget.shares.map((share) =>
-      share.name === 'Viagens' ? { ...share, basisPoints: 1_000 } : share,
+      share.name === 'Viagens' ? { ...share, basisPoints: 300 } : share,
     );
     const summary = summarizePeriod(month, { ...budget, shares }, today);
 
-    // 349.010 − (174.505 + 104.703 + 34.901): the goals and the rest are what is available.
-    expect(summary.unallocated).toEqual({ basisPoints: 1_000, targetCents: 34_901 });
+    // 500.000 − (300.000 + 100.000 + 60.000 + 15.000).
+    expect(summary.unallocated).toEqual({ basisPoints: 500, targetCents: 25_000 });
   });
 
-  it('splits what is available so the saving goals add up to the cent', () => {
-    // 2.214,85 left: 50%, 30% and 20% rounded one by one would add up to 2.214,86.
-    const tight = [credit(540_000), debit(318_515, null)];
-    const { destinations } = summarizePeriod(tight, budget, today);
+  it('splits the net income so the limit and the goals add up to the cent', () => {
+    // R$ 3.333,33 at 60%, 20%, 12% and 8%: rounded one by one, 3.333,34.
+    const { destinations } = summarizePeriod([], { ...budget, netIncomeCents: 333_333 }, today);
 
-    const goals = destinations.slice(1).map((destination) => destination.targetCents);
-    expect(goals).toEqual([110_743, 66_445, 44_297]);
-    expect(goals.reduce((sum, goal) => sum + goal, 0)).toBe(221_485);
+    const goals = destinations.map((destination) => destination.targetCents);
+    expect(goals).toEqual([200_000, 66_666, 40_000, 26_667]);
+    expect(goals.reduce((sum, goal) => sum + goal, 0)).toBe(333_333);
   });
 
   it('applying more never lowers the saving goals', () => {
@@ -245,11 +244,13 @@ describe('summarizePeriod', () => {
     );
   });
 
-  it('sets the saving goals to zero when expenses pass the credits', () => {
+  it('keeps the goals when expenses pass the credits: the leftover only says so', () => {
     const summary = summarizePeriod([...month, debit(400_000, null)], budget, today);
 
     expect(summary.available.plannedCents).toBe(-50_990);
-    expect(summary.destinations.slice(1).every((d) => d.targetCents === 0)).toBe(true);
+    expect(summary.destinations.slice(1).map((d) => d.targetCents)).toEqual([
+      100_000, 60_000, 40_000,
+    ]);
   });
 
   it('an empty month without a budget is all zeros, not an error', () => {

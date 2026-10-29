@@ -73,7 +73,7 @@ describe('summary', () => {
         netIncomeCents: 500_000,
         shares: [
           { destinationId: named('Despesas').id, basisPoints: 6_000 },
-          { destinationId: named('Investimentos').id, basisPoints: 5_000 },
+          { destinationId: named('Investimentos').id, basisPoints: 2_000 },
         ],
       })
       .expect(200);
@@ -127,8 +127,8 @@ describe('summary', () => {
     expect(october.budget).toMatchObject({ source: 'SAVED', netIncomeCents: 500_000 });
     expect(october.expensesLeftCents).toBe(300_000 - 15_990);
     expect(october.destinations.find((d) => d.name === 'Investimentos')).toMatchObject({
-      basisPoints: 5_000,
-      targetCents: 242_005, // 50% of 484.010
+      basisPoints: 2_000,
+      targetCents: 100_000, // 20% of the net income (ADR 0064)
       appliedCents: 100_000,
     });
   });
