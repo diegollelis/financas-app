@@ -280,6 +280,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] ADR: uma base só, a sobra como fato do mês (nunca negativa), a conversão dos orçamentos salvos, "Gerenciar metas" fora do diálogo do orçamento
   - [x] A conta, a API, a conversão dos orçamentos salvos e o formulário do orçamento
   - [x] O Painel (com prévia): o plano em "Orçamento do mês", "20% da renda" em cada meta, "Gerenciar metas" no card e as metas em tabela a partir de xl
+  - [x] O plano como teto: as metas diminuem na proporção quando a sobra prevista não as cobre, e "Guardar" sugere só o que cabe (nota no ADR 0064)
 - [ ] **Assistente de IA** (em avaliação, [docs/avaliacoes/assistente-de-ia.md](avaliacoes/assistente-de-ia.md)): perguntas sobre as finanças e lançamentos por texto, de preferência com o app como conector (MCP) da IA do próprio usuário, sem custo de IA para o app
 
 ## Fase 6 — Identidade visual

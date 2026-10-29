@@ -62,3 +62,16 @@ Opção 2.
 - **No card "Metas", "Guardado" vem primeiro,** com "de R$ X das metas", e depois a "Sobra prevista". No celular, as duas ficam uma abaixo da outra, para as linhas de baixo não quebrarem.
 - **A tabela das metas** (a partir de xl, "Ver como", lembrada no navegador como as das outras páginas) tem as colunas Meta, % da renda, Valor, Guardado, Pendente, Falta lançar, Progresso e "Guardar". Fica na ordem do orçamento até alguém clicar numa coluna.
 - **"Gerenciar metas" é um diálogo próprio,** aberto pelo card "Metas", e some num mês fechado ([ADR 0063](0063-fechamento-do-mes.md)), como "Editar orçamento" e "Guardar".
+
+## Nota (teto pela sobra, 2026-10-29)
+
+- **Por quê:** com a meta fixa em `renda × %`, "Guardar" sugeria o que faltava do plano mesmo quando o mês não deixou esse dinheiro, e o Painel pedia para guardar mais do que sobrou.
+- **A regra:** o plano é o teto da meta do mês.
+  - Se a sobra prevista (entradas − gastos) não cobre o total das metas, cada uma diminui na mesma proporção, e as metas somam a sobra no centavo (`splitByWeights`).
+  - Com a sobra em zero ou negativa, toda meta fica em R$ 0,00.
+  - Se a sobra cobre as metas, elas ficam como no plano, e o que passar fica livre.
+- **O que não muda:** o plano em % da renda, a soma de até 100%, "Sem meta" e as linhas do plano em "Orçamento do mês", que mostram o valor planejado (`plannedCents`).
+- **Na tela:**
+  - a meta reduzida diz "Reduzida pela sobra do mês (plano: R$ X)", e na tabela o plano aparece sob o valor;
+  - a "Sobra prevista" diz "Não cobre as metas do plano: elas ficam em R$ X.";
+  - "Guardar" sugere o que falta da meta já reduzida.
