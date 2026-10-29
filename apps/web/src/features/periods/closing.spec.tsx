@@ -160,6 +160,7 @@ describe('month closing', () => {
       screen.getByRole('button', { name: /Escolher mês: setembro de 2026.*mês fechado/i }),
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Editar orçamento' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Gerenciar metas' })).not.toBeInTheDocument();
 
     await userEvent.click(within(closing).getByRole('button', { name: 'Reabrir mês' }));
     const dialog = await screen.findByRole('dialog', { name: 'Reabrir setembro de 2026' });

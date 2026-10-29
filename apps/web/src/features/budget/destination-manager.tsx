@@ -11,6 +11,7 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { FormField } from '@/components/form-field';
+import { ResponsiveDialog } from '@/components/responsive-dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -247,35 +248,60 @@ export function DestinationManager({ workspaceId }: { workspaceId: string }) {
   const saving = destinations.data?.filter((destination) => destination.kind === 'SAVINGS') ?? [];
 
   return (
-    <details className="group rounded-xl border px-4 py-2">
-      <summary className="cursor-pointer py-2 font-medium">Gerenciar metas</summary>
-      <div className="grid gap-3 pb-2">
-        <p className="text-muted-foreground text-sm">
-          Cada meta tem uma categoria de saída com o mesmo nome: um lançamento nela é dinheiro
-          guardado na meta.
-        </p>
-        {saving.length > 0 && (
-          <ul className="divide-y">
-            {saving.map((destination) => (
-              <DestinationRow
-                key={destination.id}
-                workspaceId={workspaceId}
-                destination={destination}
-              />
-            ))}
-          </ul>
-        )}
-        <NameForm
-          id="new-destination"
-          label="Nova meta"
-          submitLabel={create.isPending ? 'Adicionando…' : 'Adicionar'}
-          pending={create.isPending}
-          error={create.error}
-          onSubmit={(name) =>
-            create.mutateAsync({ name }).then(() => toast.success('Meta adicionada'))
-          }
-        />
-      </div>
-    </details>
+    <div className="grid gap-3">
+      <p className="text-muted-foreground text-sm">
+        Cada meta tem uma categoria de saída com o mesmo nome: um lançamento nela é dinheiro
+        guardado na meta. O percentual de cada uma fica em &quot;Editar orçamento&quot;.
+      </p>
+      {saving.length > 0 && (
+        <ul className="divide-y">
+          {saving.map((destination) => (
+            <DestinationRow
+              key={destination.id}
+              workspaceId={workspaceId}
+              destination={destination}
+            />
+          ))}
+        </ul>
+      )}
+      <NameForm
+        id="new-destination"
+        label="Nova meta"
+        submitLabel={create.isPending ? 'Adicionando…' : 'Adicionar'}
+        pending={create.isPending}
+        error={create.error}
+        onSubmit={(name) =>
+          create.mutateAsync({ name }).then(() => toast.success('Meta adicionada'))
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * "Gerenciar metas" (ADR 0064): the goals are created, renamed and archived apart from the
+ * budget, from the goals card of the dashboard.
+ */
+export function DestinationsDialog({
+  workspaceId,
+  open,
+  onOpenChange,
+  returnFocusTo,
+}: {
+  workspaceId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  returnFocusTo: HTMLElement | null;
+}) {
+  return (
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      returnFocusTo={returnFocusTo}
+      title="Gerenciar metas"
+      description="Crie, renomeie e arquive as metas do espaço."
+    >
+      <DestinationManager workspaceId={workspaceId} />
+    </ResponsiveDialog>
   );
 }

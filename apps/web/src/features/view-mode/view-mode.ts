@@ -5,7 +5,7 @@ import { useMediaQuery } from '@/lib/use-media-query';
 export type ViewMode = 'LIST' | 'TABLE';
 
 /** The pages that offer a table, as the route's `handle: { table }` names them. */
-export type TablePage = 'lancamentos' | 'recorrencias';
+export type TablePage = 'lancamentos' | 'recorrencias' | 'painel-metas';
 
 /**
  * From Tailwind's `xl` (1280px): beside the sidebar, a narrower screen leaves the description a
