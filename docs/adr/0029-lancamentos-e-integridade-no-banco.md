@@ -93,4 +93,13 @@ Uma compra no cartão feita na véspera do fechamento pode cair na fatura seguin
   - **uma parte de divisão:** ela vai para onde for o lançamento que divide.
 - **Mandar o mesmo mês de novo não é mudança** e passa, como com o tipo.
 - **Num lançamento dividido, as partes pendentes vão junto** para a nova competência (`followShares`), como já acontecia com o vencimento e com o dia da compra. As partes já pagas são histórico e ficam onde estão.
-- A competência e o vencimento continuam independentes: quem move manda os dois quando os dois mudam. A tela ("Mover para outro mês") vem num passo seguinte.
+- A competência e o vencimento continuam independentes: quem move manda os dois quando os dois mudam.
+
+**Na tela:** "Mover para outro mês" fica no ⋯ de um lançamento feito uma vez que não seja parte de divisão, logo depois de "Marcar como pago". O diálogo (`MovePeriodDialog`) segue estas regras:
+
+- **O mês** abre no mês seguinte. Muda com ‹ › ou tocando no próprio mês, que abre a grade de meses do `PeriodPicker` (com `onSelect`, os meses viram botões de escolha em vez de links). Na tela, o campo se chama "Mês", como no glossário.
+- **O vencimento** anda o mesmo número de meses (`movedDueDate`). Num Crédito com cartão que tenha os dias da fatura, ele cai no dia de vencimento do cartão, com "Sugerido pela fatura do Cartão Exemplo"; um lançamento sem vencimento ganha o da fatura daquele mês. Nos outros casos fica o mesmo dia, com "O mesmo dia, no novo mês."; sem vencimento e sem cartão, continua sem. O vencimento acompanha o mês até ser digitado.
+- **Num lançamento dividido,** o diálogo avisa que as partes vão junto ("A parte de Ana (R$ 60,00) vai junto para novembro.").
+- **O botão diz para onde vai** ("Mover para novembro"; com outro ano, "Mover para janeiro de 2027"). No próprio mês do lançamento, o botão fica desativado e o diálogo diz "Já está em outubro de 2026. Escolha outro mês."
+- **O aviso de confirmação tem "Desfazer",** que volta o mês e o vencimento.
+- Toda mudança de lançamento também recarrega as faturas dos cartões, que são os lançamentos pendentes no Crédito.

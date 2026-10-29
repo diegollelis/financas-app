@@ -70,6 +70,7 @@ import {
   statusFilterOptions,
   useStatusFilter,
 } from '@/features/transactions/filters';
+import { MovePeriodDialog } from '@/features/transactions/move-period-dialog';
 import { SettlePartDialog } from '@/features/transactions/settle-part-dialog';
 import { SettleWithAmount } from '@/features/transactions/settle-with-amount';
 import { PeriodNav } from '@/features/periods/period-nav';
@@ -433,6 +434,7 @@ function useRowActions({
   const [installing, setInstalling] = useState(false);
   const [askingAmount, setAskingAmount] = useState(false);
   const [settlingPart, setSettlingPart] = useState(false);
+  const [moving, setMoving] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const settleRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateTransaction(workspaceId);
@@ -444,6 +446,8 @@ function useRowActions({
   // Launched once and not a share: it can become a recurrence ("Tornar recorrente"), a split one
   // with its shares (ADR 0052 note).
   const repeatable = !inSeries && !transaction.splitOfId;
+  // The same ones move to another month, a split one with its shares (ADR 0029 note).
+  const movable = repeatable;
   // Launched once, not split nor a share: it can become an installment plan (ADR 0038 note).
   const installable = repeatable && shares.length === 0;
   // Pending, launched once and not split: part of it can be received or paid (ADR 0057).
@@ -547,6 +551,11 @@ function useRowActions({
                 {labels.unsettle}
               </DropdownMenuItem>
             )}
+            {movable && (
+              <DropdownMenuItem onSelect={() => setMoving(true)}>
+                Mover para outro mês
+              </DropdownMenuItem>
+            )}
             {repeatable && (
               <DropdownMenuItem onSelect={() => setRepeating(true)}>
                 Tornar recorrente
@@ -604,6 +613,16 @@ function useRowActions({
             transaction={transaction}
             open={confirmingEnd}
             onOpenChange={setConfirmingEnd}
+            returnFocusTo={actionsRef}
+          />
+        )}
+        {movable && (
+          <MovePeriodDialog
+            workspaceId={workspaceId}
+            transaction={transaction}
+            shares={shares}
+            open={moving}
+            onOpenChange={setMoving}
             returnFocusTo={actionsRef}
           />
         )}

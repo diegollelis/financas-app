@@ -247,6 +247,9 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
   - [x] Importação: "Qual cartão?" na fatura, o bloco "Cartões" no extrato da conta e na planilha modelo, e o cartão obrigatório também na importação (nota no ADR)
   - [x] API e tela de "Pagar fatura" (com prévia): em Lançamentos e no menu de Cartões, a fatura inteira de uma vez, com "Desfazer"
   - [x] O pagamento da fatura no extrato da conta quitando a fatura do cartão (com o mesmo valor, marcado; com outro, para você decidir; desfazer devolve)
+- [x] **Mover para outro mês** (nota no [ADR 0029](adr/0029-lancamentos-e-integridade-no-banco.md)): uma compra que o banco pôs na fatura seguinte, ou outro lançamento feito uma vez, vai para outro mês com o vencimento junto e as partes de uma divisão; mês de recorrência, parcela e parte ficam onde estão
+  - [x] API: as regras da mudança de mês (`NOT_MOVABLE`) e as partes pendentes indo junto
+  - [x] Tela (com prévia): "Mover para outro mês" no ⋯ do lançamento, com o vencimento sugerido e "Desfazer"
 - [x] **Empréstimo devolvido aos poucos** ([ADR 0057](adr/0057-receber-parte-e-a-receber-sem-data.md)): "Receber parte" / "Pagar parte" de um lançamento pendente, em Lançamentos e em Pessoas, e o que está a receber sem data numa categoria "Nem renda nem gasto" fora do Saldo previsto
 - [x] **Emprestado para** ([ADR 0058](adr/0058-emprestado-para.md)): a categoria de saída marcada escolhe a categoria de entrada marcada da volta, em Categorias; a divisão de uma saída dela vira "Emprestado para", e as partes já lançadas acompanham a escolha
 - [x] **Peguei emprestado de** ([ADR 0059](adr/0059-peguei-emprestado-de.md)): a categoria de entrada marcada escolhe a categoria da dívida; a divisão de uma entrada dela vira "Peguei emprestado de", com a parte a pagar fora do limite de gastos

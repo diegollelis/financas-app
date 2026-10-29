@@ -17,12 +17,26 @@ const monthLabels = Array.from({ length: 12 }, (_, index) =>
  * Jump straight to any competência (ADR 0036): a year with its own arrows, and its 12 months.
  * The months are links (`?competencia=`), so the browser's back button returns to the month seen
  * before. Changing the year only changes the grid. Outside this month, "Ir para o mês atual".
+ * With `onSelect`, the months are buttons that choose a competência instead, as a form field
+ * ("Mover para outro mês", ADR 0029 note).
  */
-export function PeriodPicker({ period, onPick }: { period: string; onPick: () => void }) {
+export function PeriodPicker({
+  period,
+  onPick,
+  onSelect,
+}: {
+  period: string;
+  onPick: () => void;
+  onSelect?: (period: string) => void;
+}) {
   const thisMonth = currentPeriod();
   // Opens on the year of the competência on screen, not on this year.
   const [year, setYear] = useState(Number(period.slice(0, 4)));
   const to = usePeriodLink();
+  const choose = (target: string) => {
+    onSelect?.(target);
+    onPick();
+  };
 
   return (
     <div className="grid gap-4">
@@ -52,37 +66,59 @@ export function PeriodPicker({ period, onPick }: { period: string; onPick: () =>
           const target = `${year}-${String(index + 1).padStart(2, '0')}`;
           const open = target === period;
           const today = target === thisMonth;
+          const className = cn(
+            'focus-visible:ring-ring/50 flex h-11 w-full items-center justify-center rounded-lg text-base font-medium outline-none focus-visible:ring-3 md:h-9 md:text-sm',
+            open ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+            today && !open && 'border-primary border',
+          );
+          // "jan" on screen, "jan, janeiro de 2026" heard: the name starts with what is seen
+          // (WCAG 2.5.3).
+          const name = (
+            <>
+              {label}
+              <span className="sr-only">
+                , {formatPeriod(target)}
+                {today ? ', mês atual' : ''}
+              </span>
+            </>
+          );
           return (
             <li key={target}>
-              <Link
-                to={to(target)}
-                onClick={onPick}
-                aria-current={open ? 'true' : undefined}
-                className={cn(
-                  'focus-visible:ring-ring/50 flex h-11 items-center justify-center rounded-lg text-base font-medium outline-none focus-visible:ring-3 md:h-9 md:text-sm',
-                  open ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-                  today && !open && 'border-primary border',
-                )}
-              >
-                {/* "jan" on screen, "jan, janeiro de 2026" heard: the name starts with what
-                    is seen (WCAG 2.5.3). */}
-                {label}
-                <span className="sr-only">
-                  , {formatPeriod(target)}
-                  {today ? ', mês atual' : ''}
-                </span>
-              </Link>
+              {onSelect ? (
+                <button
+                  type="button"
+                  onClick={() => choose(target)}
+                  aria-pressed={open}
+                  className={className}
+                >
+                  {name}
+                </button>
+              ) : (
+                <Link
+                  to={to(target)}
+                  onClick={onPick}
+                  aria-current={open ? 'true' : undefined}
+                  className={className}
+                >
+                  {name}
+                </Link>
+              )}
             </li>
           );
         })}
       </ul>
-      {period !== thisMonth && (
-        <Button asChild variant="outline">
-          <Link to={to(thisMonth)} onClick={onPick}>
-            Ir para o mês atual
-          </Link>
-        </Button>
-      )}
+      {period !== thisMonth &&
+        (onSelect ? (
+          <Button type="button" variant="outline" onClick={() => choose(thisMonth)}>
+            Mês atual
+          </Button>
+        ) : (
+          <Button asChild variant="outline">
+            <Link to={to(thisMonth)} onClick={onPick}>
+              Ir para o mês atual
+            </Link>
+          </Button>
+        ))}
     </div>
   );
 }
