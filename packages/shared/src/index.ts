@@ -16,6 +16,7 @@ export * from './labels.ts';
 export * from './merchant.ts';
 export * from './merchant-alias.ts';
 export * from './payment-method.ts';
+export * from './period-closing.ts';
 export * from './invitation.ts';
 export * from './money-and-dates.ts';
 export * from './person.ts';

@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AccountModule } from './account/account.module.js';
 import { BudgetDestinationsModule } from './budget-destinations/budget-destinations.module.js';
 import { PeopleModule } from './people/people.module.js';
+import { PeriodsModule } from './periods/periods.module.js';
 import { MerchantsModule } from './merchants/merchants.module.js';
 import { CardsModule } from './cards/cards.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -42,6 +43,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     RecurrencesModule,
     InstallmentsModule,
     ImportsModule,
+    PeriodsModule,
     AccountModule,
     PeopleModule,
     MerchantsModule,
