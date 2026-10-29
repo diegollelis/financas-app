@@ -598,6 +598,37 @@ describe('cards', () => {
       expect(bills.find((bill) => bill.dueDate === due)?.transactions).toHaveLength(3);
     });
 
+    it('is paid by an account statement, and undoing the import takes it back (ADR 0062 note)', async () => {
+      const { browser, base, card, due, pizza } = await withBills();
+      const statement = (bills: object[]) => ({
+        kind: 'ACCOUNT_STATEMENT',
+        bank: 'NUBANK',
+        transactions: [],
+        bills,
+      });
+
+      const imported = await browser
+        .post(`${base}/imports`)
+        .send(statement([{ cardId: card.id, dueDate: due, settledAt: todayIso() }]))
+        .expect(201);
+      const created = importSchema.parse(imported.body);
+      expect(created.billCount).toBe(1);
+      const paid = (await transactions(browser, base)).find((row) => row.id === pizza.id);
+      expect(paid?.settledAt).toBe(todayIso());
+      // The bill is paid: nothing pending is left to pay again.
+      const again = await browser
+        .post(`${base}/imports`)
+        .send(statement([{ cardId: card.id, dueDate: due, settledAt: todayIso() }]))
+        .expect(409);
+      expect(again.body).toMatchObject({ code: 'STATEMENT_MATCH_CHANGED' });
+
+      await browser.delete(`${base}/imports/${created.id}`).expect(204);
+      const back = cardBillListResponseSchema.parse(
+        (await browser.get(`${base}/cards/bills`).expect(200)).body,
+      );
+      expect(back.find((bill) => bill.dueDate === due)?.transactions).toHaveLength(3);
+    });
+
     it('lets a VIEWER see the bills but not pay them', async () => {
       const owner = await t.signUp(maria);
       const created = await owner.browser

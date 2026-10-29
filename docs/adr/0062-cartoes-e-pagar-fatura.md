@@ -138,3 +138,19 @@ A decisão de deixar o cartão opcional foi revista na prévia da tela: o dono q
   - o botão "Pagar R$ X (N lançamentos)";
   - o aviso "Fatura do … paga", com "Desfazer".
 - **Pagar só uma parte da fatura** (o mínimo, um valor menor) fica para depois: o diálogo sempre paga tudo o que está pendente nela.
+
+## Nota (a fatura paga no extrato da conta, 2026-10-29)
+
+- **O "Pagamento de fatura"** do extrato da conta deixa de vir sempre desmarcado. Ele é conferido com a fatura aberta (`billPaidBy`, em `features/import/account-review.ts`):
+  - de um cartão com Crédito do banco do extrato;
+  - que vence entre 5 dias antes do pagamento e 15 dias depois dele;
+  - havendo mais de uma, a de vencimento mais próximo.
+- **Com o mesmo valor,** vem marcada, com o selo "Paga a fatura". Importar quita os lançamentos da fatura no dia do pagamento, como o "Pagar fatura", sem criar nada. "Não é esta" deixa a linha de fora.
+- **Com outro valor** (juros, IOF, um estorno que não chegou), vem desmarcada, dizendo quanto a fatura soma no app e quanto o banco pagou. Marcar quita a fatura assim mesmo, sem lançar a diferença.
+- **Sem fatura aberta** perto do dia (já paga, ou o cartão não está no app), a linha fica de fora, com o motivo de antes. Assim, um extrato importado de novo não paga a mesma fatura duas vezes.
+- **Na API,** a importação aceita `bills` (`{ cardId, dueDate, settledAt }`).
+  - Ela quita, na mesma transação do resto, os pendentes no Crédito daquele cartão e vencimento.
+  - Uma fatura sem pendentes recusa a importação com 409 `STATEMENT_MATCH_CHANGED`.
+  - O que cada fatura quitou fica em `imports.restore_data`. Desfazer a importação volta a pendentes só os lançamentos que continuam pagos naquele dia.
+  - A lista conta as faturas pagas em `billCount`.
+- **A "Conferência"** da revisão ganha a linha "Faturas de cartão pagas", e "Já no app" as soma.

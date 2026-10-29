@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   accountGroup,
   accountSummary,
+  billText,
   matchText,
   partText,
   startAccountReview,
@@ -232,6 +233,76 @@ describe('startAccountReview', () => {
     );
   });
 
+  describe('the bill payment (ADR 0062 note)', () => {
+    const card = {
+      id: '01920000-0000-7000-8000-0000000000e1',
+      name: 'Cartão Exemplo',
+      bank: 'NUBANK' as const,
+      functions: ['CREDIT' as const, 'DEBIT' as const],
+      closingDay: 27,
+      dueDay: 12,
+      archived: false,
+      inUse: true,
+    };
+    const purchase = transaction({
+      description: 'Mercado Exemplo',
+      categoryId: ids.market,
+      amountCents: 250_000,
+      dueDate: '2026-10-12',
+    });
+    const bill = (totalCents: number, dueDate = '2026-10-12') => ({
+      cardId: card.id,
+      dueDate,
+      totalCents,
+      transactions: [{ ...purchase, amountCents: totalCents, dueDate }],
+    });
+    const withBills = (bills: ReturnType<typeof bill>[]) =>
+      rowOf(
+        startAccountReview(lines, { ...context, bills, cards: [card], bank: 'NUBANK' }).rows,
+        5,
+      );
+
+    it('pays the open bill of the same amount, checked, never as a transaction', () => {
+      const row = withBills([bill(250_000)]);
+
+      expect(row).toMatchObject({
+        included: true,
+        bill: { cardId: card.id, dueDate: '2026-10-12', count: 1, sameAmount: true },
+      });
+      expect(accountGroup(row)).toBe('MATCHED');
+      expect(billText(row as never)).toBe(
+        'Fatura do Cartão Exemplo que vence em 12/10/2026: 1 lançamento, com o mesmo valor. Importar marca esses lançamentos como pagos em 10/10/2026, sem criar nada.',
+      );
+      expect(readyImport([row], categories, new Map())).toMatchObject({
+        transactions: [],
+        bills: [{ cardId: card.id, dueDate: '2026-10-12', settledAt: '2026-10-10' }],
+      });
+    });
+
+    it('leaves one of another amount unchecked, saying so, and pays it if checked', () => {
+      const row = withBills([bill(240_000)]);
+
+      expect(row).toMatchObject({ included: false, skipped: true, bill: { sameAmount: false } });
+      expect(billText(row as never)).toContain(
+        `soma ${formatCents(240_000)} (1 lançamento); o banco mostra ${formatCents(250_000)}. Marque para pagar a fatura assim mesmo`,
+      );
+      expect(readyImport([{ ...row, included: true }], categories, new Map()).bills).toHaveLength(
+        1,
+      );
+    });
+
+    it('leaves it out with no open bill near the day, or of another bank', () => {
+      const reason =
+        'As compras do cartão vêm da fatura: importar o pagamento contaria tudo duas vezes.';
+
+      expect(withBills([bill(250_000, '2026-11-12')]).warnings).toEqual([reason]);
+      expect(
+        withBills([{ ...bill(250_000), cardId: '01920000-0000-7000-8000-0000000000e2' }]).warnings,
+      ).toEqual([reason]);
+      expect(withBills([]).bill).toBeUndefined();
+    });
+  });
+
   it('takes money coming back from a person with a loan as a part of it (ADR 0061 note)', () => {
     const row = rowOf(review().rows, 8);
 
@@ -338,6 +409,7 @@ describe('startAccountReview', () => {
       settling: 1,
       different: 1,
       parts: 1,
+      bills: 0,
       fresh: 1,
       out: 4,
     });

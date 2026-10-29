@@ -125,6 +125,19 @@ export const importPartInputSchema = z.object({
 
 export type ImportPartInput = z.infer<typeof importPartInputSchema>;
 
+/**
+ * A card bill an account statement paid (ADR 0062 note): the movement "Pagamento de fatura"
+ * matched with the bill still open (the card plus a due date). Importing settles its pending
+ * transactions on the day of the payment, as "Pagar fatura" does; undoing gives them back.
+ */
+export const importBillInputSchema = z.object({
+  cardId: z.uuid(),
+  dueDate: isoDateSchema,
+  settledAt: isoDateSchema,
+});
+
+export type ImportBillInput = z.infer<typeof importBillInputSchema>;
+
 /** What an import brought (ADR 0060): the app's spreadsheet, or a bank's statement. */
 export const importKindSchema = z.enum(['TEMPLATE', 'CARD_STATEMENT', 'ACCOUNT_STATEMENT']);
 
@@ -157,6 +170,8 @@ export const createImportInputSchema = z
     matches: z.array(importMatchInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
     /** Movements that are parts of a loan still pending (ADR 0061 note). */
     parts: z.array(importPartInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
+    /** Card bills the account statement paid (ADR 0062 note). */
+    bills: z.array(importBillInputSchema).max(100).optional(),
     /** "Origem" (ADR 0055 note). */
     label: importLabelSchema.nullable().optional(),
     /** The due date of the card statement imported, when it is one. */
@@ -171,7 +186,8 @@ export const createImportInputSchema = z
       input.transactions.length +
         (input.plans?.length ?? 0) +
         (input.matches?.length ?? 0) +
-        (input.parts?.length ?? 0) >
+        (input.parts?.length ?? 0) +
+        (input.bills?.length ?? 0) >
       0,
     { message: 'Escolha ao menos um lançamento para importar.', path: ['transactions'] },
   )
@@ -223,6 +239,8 @@ export const importSchema = z.object({
    * gives the loans back what it took.
    */
   partCount: z.number().int().default(0),
+  /** Card bills it paid (ADR 0062 note); undoing it takes them back to pending. */
+  billCount: z.number().int().default(0),
   /** "Origem", as typed; null for an import made before it, or without one. */
   label: z.string().nullable().default(null),
   /** The due date of the card statement, when it was one. */
