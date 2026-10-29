@@ -30,12 +30,15 @@ export async function followDueDate(
   await followShares(prisma, workspaceId, splitOfId, { dueDate });
 }
 
-/** The pending shares take the new dates of the transaction they share (ADR 0052 note, 0055). */
+/**
+ * The pending shares take the new dates of the transaction they share (ADR 0052 note, 0055),
+ * and its competência when it moves to another month (ADR 0029 note).
+ */
 export async function followShares(
   prisma: PrismaService,
   workspaceId: string,
   splitOfId: string,
-  dates: { dueDate?: Date | null; occurredOn?: Date | null },
+  dates: { dueDate?: Date | null; occurredOn?: Date | null; period?: string },
 ): Promise<void> {
   await prisma.forWorkspace(workspaceId).transaction.updateMany({
     where: { workspaceId, splitOfId, settledAt: null },
