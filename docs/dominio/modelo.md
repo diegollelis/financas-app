@@ -62,6 +62,16 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 - Uma competência sem configuração salva herda a última salva antes dela; sem nenhuma, valem 60/20/15/5 e renda 0 ([ADR 0030](../adr/0030-orcamento-por-competencia-com-heranca.md)).
 - Evolução possível: destinos de orçamento configuráveis (lista em vez de quatro campos fixos).
 
+### PeriodClosing (Fechamento do mês) — fase 5 ([ADR 0063](../adr/0063-fechamento-do-mes.md))
+
+- `workspace_id`, `period`, `closed_at`, `closed_by`, `reopened_at?`, `reopened_by?`, `reopen_reason?`
+- No máximo um fechamento em vigor (`reopened_at` nulo) por espaço e competência; reabrir preenche `reopened_*`, e fechar de novo cria outra linha, que fica como histórico.
+- Regras:
+  - fecha só sem lançamentos pendentes no mês, fora o a receber ou a pagar sem vencimento numa categoria "Nem renda nem gasto", que num mês fechado só aceita o recebimento ou pagamento parcial;
+  - ao fechar, o orçamento herdado é salvo no próprio mês;
+  - num mês fechado, nada que escreva nele passa (409 `PERIOD_CLOSED`), conferido pelo serviço e por um trigger no banco; as recorrências não geram meses nele;
+  - EDITOR fecha e reabre; reabrir exige um motivo.
+
 ### Pessoa e rateio (fase 5)
 
 Pessoa (`Person`): um contato do espaço, só o nome, para quem usa ou não o app, opcionalmente ligado a um membro. Um lançamento pode ser ligado a uma pessoa (crédito = a receber de, débito = a pagar para), e dividir um gasto cria um crédito pendente "a receber" por pessoa, na categoria Reembolso ([ADR 0042](../adr/0042-pessoas-e-rateio.md)); dividir uma entrada cria um débito pendente "a pagar" por pessoa, na categoria Repasse ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)).

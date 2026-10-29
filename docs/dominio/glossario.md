@@ -91,16 +91,26 @@ O nome que a pessoa vê na tela e o nome no código são independentes ([ADR 005
 | A pagar sem vencimento                                      | `undatedPayableCents`, `undatedPayable`          | Saída pendente sem vencimento numa categoria "Nem renda nem gasto" (uma dívida sem prazo): fica nas Saídas, mas fora do Saldo previsto e da sobra prevista (nota no ADR 0057) |
 | Saldo atual                                                 | `balance.settledCents`                           | Recebido − pago até agora                                                                                                                                                     |
 
+### Fechamento do mês
+
+| Interface               | Código                                                     | Definição                                                                                                                                                              |
+| ----------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fechar mês              | `closePeriod`, `POST …/periods/:period/close`              | Trava a competência depois de tudo pago e recebido; só fecha sem pendências, fora o a receber ou a pagar sem vencimento ([ADR 0063](../adr/0063-fechamento-do-mes.md)) |
+| Mês fechado             | `PeriodClosing` (`period_closings`), `closed`              | A competência com um fechamento em vigor: nada nela muda (`PERIOD_CLOSED`)                                                                                             |
+| Reabrir mês             | `reopenPeriod`, `POST …/periods/:period/reopen { reason }` | Destrava a competência para uma correção, com o motivo guardado no histórico                                                                                           |
+| O que falta para fechar | `PERIOD_HAS_PENDING`                                       | Os lançamentos pendentes que impedem o fechamento                                                                                                                      |
+
 ## Pontes com o Protheus
 
-| Protheus                        | Neste projeto                                                                          |
-| ------------------------------- | -------------------------------------------------------------------------------------- |
-| Dicionário SX2/SX3, UPDDISTR    | `schema.prisma` e migrações Prisma                                                     |
-| `X3_CAMPO` × `X3_TITULO`        | Nome no código × termo da interface (as tabelas acima)                                 |
-| `xFilial()` / campo `_FILIAL`   | `workspace_id` + guard de espaço ([ADR 0008](../adr/0008-multi-tenancy-por-espaco.md)) |
-| Rotina MVC (ModelDef / ViewDef) | Módulo NestJS (controller, service, repository) + telas React                          |
-| X3_VALID, X3_OBRIGAT            | Schemas Zod em `packages/shared`                                                       |
-| Serviços REST (WSRESTFUL)       | Controllers REST do NestJS                                                             |
-| Pontos de entrada               | Eventos/hooks da aplicação                                                             |
-| Consulta padrão (SXB)           | Endpoints de listagem/busca + componentes de seleção                                   |
-| Job / schedule                  | GitHub Actions agendado ou cron do provedor                                            |
+| Protheus                                 | Neste projeto                                                                                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Dicionário SX2/SX3, UPDDISTR             | `schema.prisma` e migrações Prisma                                                                                                                           |
+| `X3_CAMPO` × `X3_TITULO`                 | Nome no código × termo da interface (as tabelas acima)                                                                                                       |
+| `xFilial()` / campo `_FILIAL`            | `workspace_id` + guard de espaço ([ADR 0008](../adr/0008-multi-tenancy-por-espaco.md))                                                                       |
+| Rotina MVC (ModelDef / ViewDef)          | Módulo NestJS (controller, service, repository) + telas React                                                                                                |
+| X3_VALID, X3_OBRIGAT                     | Schemas Zod em `packages/shared`                                                                                                                             |
+| Serviços REST (WSRESTFUL)                | Controllers REST do NestJS                                                                                                                                   |
+| Pontos de entrada                        | Eventos/hooks da aplicação                                                                                                                                   |
+| Consulta padrão (SXB)                    | Endpoints de listagem/busca + componentes de seleção                                                                                                         |
+| Job / schedule                           | GitHub Actions agendado ou cron do provedor                                                                                                                  |
+| `MV_DATAFIN` (data limite do Financeiro) | Fechamento do mês, mas por competência e não por uma data limite: reabrir março não reabre os meses seguintes ([ADR 0063](../adr/0063-fechamento-do-mes.md)) |
