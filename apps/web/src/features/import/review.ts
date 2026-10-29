@@ -3,6 +3,7 @@ import {
   plainTransactionInputSchema,
   normalizeName,
   type Category,
+  type ImportBillInput,
   type ImportInstallmentPlanInput,
   type ImportMatchInput,
   type ImportMerchantAliasInput,
@@ -66,7 +67,28 @@ export type ReviewRow = {
   part?: AccountPart;
   /** "Não é este" / "É outro": the movement comes in as a new transaction after all. */
   matchRefused?: boolean;
+  /**
+   * An account statement's bill payment matched with a card bill still open (ADR 0062 note):
+   * checked, importing pays that bill; it never comes in as a transaction.
+   */
+  bill?: AccountBill;
 };
+
+/** A card bill still open that an account statement's bill payment paid (ADR 0062 note). */
+export type AccountBill = {
+  cardId: string;
+  cardName: string;
+  dueDate: string;
+  /** Its pending transactions, and their total (purchases less refunds). */
+  count: number;
+  totalCents: number;
+  /** False: the bank paid another amount; checked anyway, the bill is paid all the same. */
+  sameAmount: boolean;
+};
+
+/** A bill payment checked: importing pays the bill it matched. */
+export const takesBill = (row: ReviewRow): row is ReviewRow & { bill: AccountBill } =>
+  Boolean(row.bill) && row.included;
 
 /** A loan still pending that an account statement's movement is a part of (ADR 0061 note). */
 export type AccountPart = {
@@ -261,8 +283,8 @@ export function toPlan(
 /** What still keeps a row out of the import: a transaction's problems, or a plan's. */
 export function rowProblems(row: ReviewRow, categoryId: string | null): string[] {
   // A movement already in the app creates nothing: it needs no category (ADR 0061); a part of a
-  // loan takes the loan's.
-  if (takesMatch(row) || takesPart(row)) return [];
+  // loan takes the loan's; a bill payment pays a bill (ADR 0062 note).
+  if (takesMatch(row) || takesPart(row) || row.bill) return [];
   const result = row.plan ? toPlan(row, categoryId) : toTransaction(row, categoryId);
   return result.ok ? [] : result.problems;
 }
@@ -276,6 +298,8 @@ export type ReadyImport = {
   matches: ImportMatchInput[];
   /** An account statement's movements that are parts of a loan (ADR 0061 note). */
   parts: ImportPartInput[];
+  /** The card bills an account statement paid (ADR 0062 note). */
+  bills: ImportBillInput[];
 };
 
 /** The checked rows that are ready, as the API takes them, with the aliases to remember. */
@@ -284,9 +308,27 @@ export function readyImport(
   categories: Category[],
   matches: ReadonlyMap<string, string>,
 ): ReadyImport {
-  const ready: ReadyImport = { transactions: [], plans: [], aliases: [], matches: [], parts: [] };
+  const ready: ReadyImport = {
+    transactions: [],
+    plans: [],
+    aliases: [],
+    matches: [],
+    parts: [],
+    bills: [],
+  };
   for (const row of rows) {
     if (!row.included) continue;
+    // A bill payment pays the bill it matched, on the movement's day; never a transaction.
+    if (row.bill) {
+      if (row.occurredOn) {
+        ready.bills.push({
+          cardId: row.bill.cardId,
+          dueDate: row.bill.dueDate,
+          settledAt: row.occurredOn,
+        });
+      }
+      continue;
+    }
     if (takesMatch(row)) {
       const amount =
         !row.match.sameAmount && row.amountCents ? { amountCents: row.amountCents } : {};

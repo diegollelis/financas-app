@@ -56,6 +56,7 @@ import {
   takesMatch,
   takesPart,
   unmatchedCategories,
+  type AccountBill,
   type AccountMatch,
   type AccountPart,
   type ReviewRow,
@@ -63,6 +64,7 @@ import {
 import {
   accountGroup,
   accountSummary,
+  billText,
   matchText,
   partText,
   type AccountGroup,
@@ -105,22 +107,35 @@ const typeLabel = { CREDIT: 'entrada', DEBIT: 'saída' } as const;
 /** A notice of what could count twice or stay out: the warning colors (ADR 0036 tokens). */
 const NOTICE_CLASS = 'border-warning/40 bg-warning-muted rounded-lg border p-3';
 
-/** "4 lançamentos novos e 6 conferidos": what an account statement's import did (ADR 0061). */
-function importedSummary(created: number, reconciled: number) {
-  const made = `${created} ${created === 1 ? 'lançamento novo' : 'lançamentos novos'}`;
-  if (reconciled === 0) return made;
-  return `${made} e ${reconciled} ${reconciled === 1 ? 'conferido' : 'conferidos'}`;
+/** "a, b e c": a list as written in Portuguese. */
+const listed = (parts: string[]) =>
+  parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} e ${parts.at(-1)}`;
+
+const faturas = (count: number) => (count === 1 ? '1 fatura' : `${count} faturas`);
+
+/**
+ * "4 lançamentos novos, 6 conferidos e 1 fatura paga": what an account statement's import did
+ * (ADR 0061), the card bills it paid too (ADR 0062 note).
+ */
+function importedSummary(created: number, reconciled: number, bills: number) {
+  return listed([
+    `${created} ${created === 1 ? 'lançamento novo' : 'lançamentos novos'}`,
+    ...(reconciled > 0 ? [`${reconciled} ${reconciled === 1 ? 'conferido' : 'conferidos'}`] : []),
+    ...(bills > 0 ? [`${faturas(bills)} ${bills === 1 ? 'paga' : 'pagas'}`] : []),
+  ]);
 }
 
-/** The button of an account statement (ADR 0061): what will be created, and what checked. */
-function accountButton(created: number, matched: number) {
-  const parts = [
-    ...(created > 0 ? [`${created} ${created === 1 ? 'novo' : 'novos'}`] : []),
+/**
+ * The button of an account statement (ADR 0061): what will be created, what checked and the card
+ * bills it pays (ADR 0062 note), the first verb capitalized: "Conferir 1 e pagar 1 fatura".
+ */
+function accountButton(created: number, matched: number, bills: number) {
+  const text = listed([
+    ...(created > 0 ? [`importar ${created} ${created === 1 ? 'novo' : 'novos'}`] : []),
     ...(matched > 0 ? [`conferir ${matched}`] : []),
-  ];
-  if (parts.length === 0) return 'Importar';
-  if (created === 0) return `Conferir ${matched}`;
-  return `Importar ${parts.join(' e ')}`;
+    ...(bills > 0 ? [`pagar ${faturas(bills)}`] : []),
+  ]);
+  return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : 'Importar';
 }
 
 const accountGroups = [
@@ -162,7 +177,7 @@ function RowItem({
 }) {
   const label = row.description || `Linha ${row.line}`;
   // A movement already in the app creates nothing: what it matched is said instead (ADR 0061).
-  const matched = takesMatch(row) || takesPart(row);
+  const matched = takesMatch(row) || takesPart(row) || Boolean(row.bill);
   // A statement's line without a category picks it right on the card, as most lines of a first
   // statement have none yet (ADR 0055 note).
   const picksCategory =
@@ -197,25 +212,26 @@ function RowItem({
             className={cn(
               'justify-self-start',
               matched &&
-                (row.part || row.match?.sameAmount) &&
+                (row.part || row.match?.sameAmount || row.bill?.sameAmount) &&
                 'border-transparent bg-success-muted',
               matched &&
-                row.match &&
-                !row.match.sameAmount &&
+                ((row.match && !row.match.sameAmount) || (row.bill && !row.bill.sameAmount)) &&
                 'border-transparent bg-warning-muted',
             )}
           >
             {!matched
               ? 'Novo'
-              : row.part
-                ? row.type === 'CREDIT'
-                  ? 'Recebimento parcial'
-                  : 'Pagamento parcial'
-                : !row.match!.sameAmount
-                  ? 'Valor diferente'
-                  : row.match!.pending && !row.match!.card
-                    ? 'Quita um pendente'
-                    : 'Já lançado'}
+              : row.bill
+                ? 'Paga a fatura'
+                : row.part
+                  ? row.type === 'CREDIT'
+                    ? 'Recebimento parcial'
+                    : 'Pagamento parcial'
+                  : !row.match!.sameAmount
+                    ? 'Valor diferente'
+                    : row.match!.pending && !row.match!.card
+                      ? 'Quita um pendente'
+                      : 'Já lançado'}
           </Badge>
         )}
         <p className="font-medium break-words">{label}</p>
@@ -230,6 +246,12 @@ function RowItem({
             {row.matchRefused
               ? `Não é parte de "${row.part.description}": entra como um lançamento novo.`
               : partText(row as ReviewRow & { part: AccountPart })}
+          </p>
+        )}
+        {/* The bill it pays (ADR 0062 note), checked or not: what importing does to it. */}
+        {row.bill && (
+          <p className="text-muted-foreground text-sm">
+            {billText(row as ReviewRow & { bill: AccountBill })}
           </p>
         )}
         {row.match && row.included && (
@@ -330,7 +352,17 @@ function RowItem({
         <span className="text-base font-semibold tabular-nums">
           {row.amountCents && row.amountCents > 0 ? formatCents(row.amountCents) : 'Sem valor'}
         </span>
-        {((row.match && row.match.sameAmount) || row.part) && row.included ? (
+        {row.bill && row.included ? (
+          // "Não é esta" leaves it out, as before bills were matched (ADR 0062 note).
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Não é esta: ${label}`}
+            onClick={() => onToggle(false)}
+          >
+            Não é esta
+          </Button>
+        ) : ((row.match && row.match.sameAmount) || row.part) && row.included ? (
           // "Não é este" turns it into a new transaction; "É este" takes it back (ADR 0061).
           <Button
             variant="ghost"
@@ -547,6 +579,7 @@ export function ImportReview({
         ...(ready.aliases.length > 0 && { aliases: ready.aliases }),
         ...(ready.matches.length > 0 && { matches: ready.matches }),
         ...(ready.parts.length > 0 && { parts: ready.parts }),
+        ...(ready.bills.length > 0 && { bills: ready.bills }),
         label,
         kind: source.kind,
         bank: source.bank,
@@ -560,6 +593,7 @@ export function ImportReview({
               ? importedSummary(
                   created.transactionCount - created.partCount,
                   created.reconciledCount + created.partCount,
+                  created.billCount,
                 )
               : `${created.transactionCount} ${created.transactionCount === 1 ? 'lançamento importado' : 'lançamentos importados'}${
                   created.reconciledCount > 0
@@ -597,7 +631,8 @@ export function ImportReview({
   };
   // What keeps the import from going, said on the button itself on the phone, where the list
   // beside it is out of sight; tapping it goes there (ADR 0060 note).
-  const nothingReady = readyCount + ready.matches.length + ready.parts.length === 0;
+  const nothingReady =
+    readyCount + ready.matches.length + ready.parts.length + ready.bills.length === 0;
   const firstToFix = rows.find((row) => row.included && check(row).problems.length > 0);
   const missing = missingDueDate
     ? { label: 'Informe o vencimento da fatura', target: 'import-due-date' }
@@ -624,7 +659,7 @@ export function ImportReview({
   ];
   const stats: [string, string, string?][] = [
     account
-      ? ['Já no app', String(ready.matches.length + ready.parts.length)]
+      ? ['Já no app', String(ready.matches.length + ready.parts.length + ready.bills.length)]
       : ['Prontas', `${readyCount + ready.matches.length} de ${rows.length}`],
     [account ? 'Saídas novas' : 'Saídas', formatCents(debits)],
     [
@@ -768,6 +803,7 @@ export function ImportReview({
                       ] as const,
                     ]
                   : []),
+                ...(found.bills > 0 ? [['Faturas de cartão pagas', found.bills] as const] : []),
                 ...(found.parts > 0
                   ? [['Recebimentos ou pagamentos parciais de empréstimos', found.parts] as const]
                   : []),
@@ -1024,6 +1060,7 @@ export function ImportReview({
                 ? accountButton(
                     ready.transactions.length,
                     ready.matches.length + ready.parts.length,
+                    ready.bills.length,
                   )
                 : readyCount === 0 && ready.matches.length > 0
                   ? `Conferir ${ready.matches.length}`

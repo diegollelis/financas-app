@@ -8,15 +8,20 @@ import {
   suggestCategory,
   TRANSACTION_DESCRIPTION_MAX_LENGTH,
   type AccountLine,
+  type Card,
+  type CardBill,
   type Category,
   type CategoryHints,
   type Merchant,
   type Person,
+  type StatementBank,
   type Transaction,
 } from '@financas/shared';
 import {
+  takesBill,
   takesMatch,
   takesPart,
+  type AccountBill,
   type AccountMatch,
   type AccountPart,
   type ReviewRow,
@@ -38,7 +43,55 @@ export type AccountContext = {
   hints: CategoryHints | undefined;
   /** The account's name: a movement to or from it is money between the person's accounts. */
   userName: string;
+  /**
+   * The card bills still open (ADR 0062 note), and the cards: a bill payment pays the open bill
+   * of a card with Crédito of the statement's bank. Absent: the bill payment stays out.
+   */
+  bills?: CardBill[];
+  cards?: Card[];
+  /** The bank of the statement. */
+  bank?: StatementBank;
 };
+
+/** A bill is paid from 15 days before its due date to 5 days after it (ADR 0062 note). */
+const BILL_DAYS_AFTER = 5;
+const BILL_DAYS_BEFORE = 15;
+
+/**
+ * The open bill an account statement's bill payment pays: of a card with Crédito of that bank,
+ * due between 5 days before the payment and 15 days after it, the closest due date.
+ */
+export function billPaidBy(
+  line: Pick<AccountLine, 'occurredOn' | 'amountCents'>,
+  bills: readonly CardBill[],
+  cards: readonly Card[],
+  bank: StatementBank | undefined,
+): AccountBill | null {
+  const ofBank = new Map(
+    cards
+      .filter((card) => card.bank === bank && card.functions.includes('CREDIT'))
+      .map((card) => [card.id, card]),
+  );
+  const open = bills.filter((bill) => {
+    if (!ofBank.has(bill.cardId)) return false;
+    const days = daysBetween(line.occurredOn, bill.dueDate);
+    return days >= -BILL_DAYS_AFTER && days <= BILL_DAYS_BEFORE;
+  });
+  const closest = [...open].sort(
+    (a, b) =>
+      Math.abs(daysBetween(line.occurredOn, a.dueDate)) -
+      Math.abs(daysBetween(line.occurredOn, b.dueDate)),
+  )[0];
+  if (!closest) return null;
+  return {
+    cardId: closest.cardId,
+    cardName: ofBank.get(closest.cardId)!.name,
+    dueDate: closest.dueDate,
+    count: closest.transactions.length,
+    totalCents: closest.totalCents,
+    sameAmount: closest.totalCents === line.amountCents,
+  };
+}
 
 /** Days from one ISO date to another, by the calendar (no time zone shift). */
 function daysBetween(a: string, b: string): number {
@@ -164,6 +217,11 @@ export function startAccountReview(
     });
 
     if (line.kind === 'CARD_BILL') {
+      // The bill it pays, still open in the app (ADR 0062 note): checked with the same amount;
+      // with another, unchecked, saying so, and paid all the same if checked.
+      const bill = billPaidBy(line, context.bills ?? [], context.cards ?? [], context.bank);
+      if (bill?.sameAmount) return { ...row, bill };
+      if (bill) return { ...row, bill, included: false, skipped: true };
       return skip(
         'As compras do cartão vêm da fatura: importar o pagamento contaria tudo duas vezes.',
       );
@@ -309,7 +367,7 @@ export type AccountGroup = 'NEW' | 'MATCHED' | 'OUT';
 
 /** Which group a row is in: already in the app (also with another amount), out, or new. */
 export function accountGroup(row: ReviewRow): AccountGroup {
-  if (takesMatch(row) || takesPart(row)) return 'MATCHED';
+  if (takesMatch(row) || takesPart(row) || takesBill(row)) return 'MATCHED';
   if (row.skipped && !row.included) return 'OUT';
   return 'NEW';
 }
@@ -322,9 +380,26 @@ export function accountSummary(rows: ReviewRow[]) {
     settling: matched.filter((row) => row.match.sameAmount && row.match.pending).length,
     different: matched.filter((row) => !row.match.sameAmount).length,
     parts: rows.filter(takesPart).length,
+    bills: rows.filter(takesBill).length,
     fresh: rows.filter((row) => accountGroup(row) === 'NEW').length,
     out: rows.filter((row) => accountGroup(row) === 'OUT').length,
   };
+}
+
+/** What a bill payment says on the card (ADR 0062 note): the bill, and what importing does. */
+export function billText(row: ReviewRow & { bill: AccountBill }): string {
+  const { bill } = row;
+  const which = `Fatura do ${bill.cardName} que vence em ${formatIsoDate(bill.dueDate)}`;
+  const items = bill.count === 1 ? '1 lançamento' : `${bill.count} lançamentos`;
+  const day = formatIsoDate(row.occurredOn ?? '');
+  if (bill.sameAmount) {
+    return row.included
+      ? `${which}: ${items}, com o mesmo valor. Importar marca esses lançamentos como pagos em ${day}, sem criar nada.`
+      : `${which}: ${items}, com o mesmo valor. Fica de fora; marque para pagar a fatura.`;
+  }
+  return row.included
+    ? `${which} soma ${formatCents(bill.totalCents)} (${items}); o banco mostra ${formatCents(row.amountCents ?? 0)}. Importar marca esses lançamentos como pagos em ${day}; a diferença não é lançada.`
+    : `${which} soma ${formatCents(bill.totalCents)} (${items}); o banco mostra ${formatCents(row.amountCents ?? 0)}. Marque para pagar a fatura assim mesmo: a diferença não é lançada.`;
 }
 
 /** What a part of a loan says on the card: the loan, and what is left after it. */

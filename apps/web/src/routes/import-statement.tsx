@@ -47,7 +47,7 @@ import { useTransactions } from '@/features/transactions/use-transactions';
 import { useCurrentWorkspace } from '@/features/workspaces/current-workspace';
 import { cardsFor } from '@/features/cards/card-rules';
 import { CardSelect } from '@/features/cards/card-select';
-import { useCards } from '@/features/cards/use-cards';
+import { useCardBills, useCards } from '@/features/cards/use-cards';
 import { FormField } from '@/components/form-field';
 import { cn } from '@/lib/utils';
 
@@ -98,6 +98,9 @@ function AccountReview({
     };
   }, [file.lines]);
   const candidates = useImportCandidates(workspaceId, range);
+  // The card bills still open: a bill payment of the statement pays one (ADR 0062 note). Only a
+  // help: a failure leaves the bill payment out, as before.
+  const bills = useCardBills(workspaceId);
   // The review opens once, with what was read; later loads do not reset the person's choices.
   const [review, setReview] = useState<ReturnType<typeof startAccountReview> | null>(null);
   if (
@@ -106,7 +109,8 @@ function AccountReview({
     merchants.data &&
     people.data &&
     candidates.data &&
-    !hints.isPending
+    !hints.isPending &&
+    !bills.isPending
   ) {
     setReview(
       startAccountReview(file.lines, {
@@ -117,6 +121,9 @@ function AccountReview({
         people: people.data,
         hints: hints.data,
         userName: user.name,
+        bills: bills.data ?? [],
+        cards,
+        bank: bank.bank,
       }),
     );
   }

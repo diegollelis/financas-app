@@ -8,6 +8,7 @@ import {
   type CreateImportInput,
   type Import,
   type ImportCandidatesInput,
+  type ImportBillInput,
   type ImportCandidatesResponse,
   type ImportInstallmentPlanInput,
   type ImportKind,
@@ -59,29 +60,35 @@ const matchChanged = () =>
  * undoing it gives each one back what it took, or creates it again if nothing was left.
  */
 const restoreDataSchema = z.object({
-  parts: z.number().int(),
-  loans: z.array(
-    z.object({
-      takenCents: z.number().int(),
-      row: z.object({
-        id: z.uuid(),
-        type: z.enum(['CREDIT', 'DEBIT']),
-        description: z.string(),
-        notes: z.string().nullable(),
-        categoryId: z.uuid(),
-        amountCents: z.number().int(),
-        period: z.string(),
-        dueDate: z.string().nullable(),
-        occurredOn: z.string().nullable(),
-        importId: z.uuid().nullable(),
-        personId: z.uuid().nullable(),
-        merchantId: z.uuid().nullable(),
-        paymentMethod: z.string().nullable(),
-        // Kept since cards came (ADR 0062); an import made before has none.
-        cardId: z.uuid().nullable().default(null),
+  parts: z.number().int().default(0),
+  // The card bills it paid (ADR 0062 note): what each one settled, and on which day.
+  bills: z
+    .array(z.object({ transactionIds: z.array(z.uuid()), settledAt: z.string() }))
+    .default([]),
+  loans: z
+    .array(
+      z.object({
+        takenCents: z.number().int(),
+        row: z.object({
+          id: z.uuid(),
+          type: z.enum(['CREDIT', 'DEBIT']),
+          description: z.string(),
+          notes: z.string().nullable(),
+          categoryId: z.uuid(),
+          amountCents: z.number().int(),
+          period: z.string(),
+          dueDate: z.string().nullable(),
+          occurredOn: z.string().nullable(),
+          importId: z.uuid().nullable(),
+          personId: z.uuid().nullable(),
+          merchantId: z.uuid().nullable(),
+          paymentMethod: z.string().nullable(),
+          // Kept since cards came (ADR 0062); an import made before has none.
+          cardId: z.uuid().nullable().default(null),
+        }),
       }),
-    }),
-  ),
+    )
+    .default([]),
 });
 
 type RestoreData = z.infer<typeof restoreDataSchema>;
@@ -126,6 +133,7 @@ function toResponse(row: ImportRow, dependents = noDependents): Import {
     planCount: row._count.installmentPlans,
     reconciledCount: row._count.reconciled,
     partCount: readRestoreData(row.restoreData)?.parts ?? 0,
+    billCount: readRestoreData(row.restoreData)?.bills.length ?? 0,
     label: row.label,
     statementDueDate: row.statementDueDate && toIsoDate(row.statementDueDate),
     kind: row.kind,
@@ -236,7 +244,9 @@ export class ImportsService {
     const aliases = input.aliases ?? [];
     const matches = input.matches ?? [];
     const parts = input.parts ?? [];
+    const bills = input.bills ?? [];
     await ensureUsableCategories(this.prisma, workspaceId, [...input.transactions, ...plans]);
+    await this.checkBillCards(workspaceId, bills);
     await this.checkCards(workspaceId, input);
     const found = await this.checkMovements(
       workspaceId,
@@ -281,6 +291,8 @@ export class ImportsService {
     // The months it covers: what it created, and the days of the movements it found in the app.
     const covered = [
       ...periods,
+      // A bill it paid: the month of the payment (ADR 0062 note).
+      ...bills.map((bill) => bill.settledAt.slice(0, 7)),
       // A card's match settles nothing: the month of the transaction it found (ADR 0061 note).
       ...matches.flatMap((match) => {
         const month = match.settledAt?.slice(0, 7) ?? found.get(match.transactionId)?.period;
@@ -362,7 +374,39 @@ export class ImportsService {
             },
           });
         }
-        return { ...row, _count: { ...row._count, reconciled: matches.length } };
+        // The card bills it paid (ADR 0062 note), as "Pagar fatura" settles them; what each one
+        // settled is kept with the import, for undoing it.
+        const paidBills: RestoreData['bills'] = [];
+        for (const bill of bills) {
+          const pending = await tx.transaction.findMany({
+            where: {
+              workspaceId,
+              cardId: bill.cardId,
+              paymentMethod: 'CREDIT_CARD',
+              settledAt: null,
+              dueDate: toDate(bill.dueDate),
+            },
+            select: { id: true },
+          });
+          if (pending.length === 0) throw matchChanged();
+          const transactionIds = pending.map((item) => item.id);
+          await tx.transaction.updateMany({
+            where: { workspaceId, id: { in: transactionIds } },
+            data: { settledAt: toDate(bill.settledAt), amountEstimated: false },
+          });
+          paidBills.push({ transactionIds, settledAt: bill.settledAt });
+        }
+        const withBills =
+          paidBills.length > 0
+            ? await tx.transactionImport.update({
+                where: { id: row.id, workspaceId },
+                data: {
+                  restoreData: { ...(restore ?? { parts: 0, loans: [] }), bills: paidBills },
+                },
+                include: withCreator,
+              })
+            : row;
+        return { ...withBills, _count: { ...withBills._count, reconciled: matches.length } };
       }, IMPORT_TRANSACTION)
       .catch((error: unknown) => {
         // Another import brought one of these movements meanwhile (the unique key).
@@ -463,6 +507,21 @@ export class ImportsService {
         },
       },
     } satisfies Prisma.TransactionImportUncheckedCreateInput;
+  }
+
+  /** The cards of the bills an account statement paid (ADR 0062 note): of this workspace. */
+  private async checkBillCards(workspaceId: string, bills: ImportBillInput[]) {
+    const ids = [...new Set(bills.map((bill) => bill.cardId))];
+    if (ids.length === 0) return;
+    const found = await this.prisma
+      .forWorkspace(workspaceId)
+      .card.count({ where: { workspaceId, id: { in: ids } } });
+    if (found !== ids.length) {
+      throw new BadRequestException({
+        code: 'INVALID_CARD',
+        message: 'Cartão não encontrado neste espaço.',
+      });
+    }
   }
 
   /**
@@ -587,6 +646,7 @@ export class ImportsService {
     }
     return {
       parts: parts.length,
+      bills: [],
       loans: loans.map((loan) => ({
         takenCents: taken.get(loan.id) ?? 0,
         row: {
@@ -739,6 +799,18 @@ export class ImportsService {
         select: { restoreData: true },
       });
       if (!row) return false;
+      // The bills it paid go back to pending, only what is still settled on that day (ADR 0062
+      // note): one settled again since keeps the new day.
+      for (const bill of readRestoreData(row.restoreData)?.bills ?? []) {
+        await tx.transaction.updateMany({
+          where: {
+            workspaceId,
+            id: { in: bill.transactionIds },
+            settledAt: toDate(bill.settledAt),
+          },
+          data: { settledAt: null },
+        });
+      }
       // Its parts of loans go with it (cascade); the loans get back what it took (ADR 0061 note).
       await tx.transactionImport.delete({ where: { id: importId, workspaceId } });
       for (const { takenCents, row: loan } of readRestoreData(row.restoreData)?.loans ?? []) {
