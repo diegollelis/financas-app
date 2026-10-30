@@ -24,6 +24,7 @@ import { Ellipsis } from 'lucide-react';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
+import { SearchInput } from '@/components/search-input';
 import { QueryState } from '@/components/query-state';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { TextLink } from '@/components/text-link';
@@ -67,6 +68,8 @@ import { useCards, usePaymentMethodText } from '@/features/cards/use-cards';
 import { usePeople, useResolvePerson } from '@/features/people/use-people';
 import { dueDayLabel, frequencyLabel, monthNameOf } from '@/features/recurrences/due';
 import { RecurrenceForm } from '@/features/recurrences/recurrence-form';
+import { matchesAmount, matchesSearch } from '@/features/transactions/filters';
+import { signedCents } from '@/features/transactions/row-format';
 import {
   useEndRecurrence,
   useRecurrences,
@@ -82,7 +85,17 @@ import { apiErrorMessage } from '@/lib/error-message';
 import { cn } from '@/lib/utils';
 
 const MONTHLY_TITLE_ID = 'recurrences-monthly';
+const YEARLY_TITLE_ID = 'recurrences-yearly';
+const ENDED_TITLE_ID = 'recurrences-ended';
 const PLANS_TITLE_ID = 'recurrences-plans';
+const SEARCH_ID = 'recurrences-search';
+
+/** Focus on the first of these still on the page, after a row moved or left. */
+const focusFirst = (...ids: string[]) =>
+  ids
+    .map((id) => document.getElementById(id))
+    .find(Boolean)
+    ?.focus();
 
 const typeLabel = { CREDIT: 'Entrada', DEBIT: 'Saída' } as const;
 
@@ -171,14 +184,49 @@ function EndDialog({
   );
 }
 
-/** The amount, and what it means under it ("Varia todo mês", "total em 10 de R$ 99,90"). */
-function SeriesAmount({ amount, note }: { amount: string; note: string | null }) {
+/** The amount, and what it means under it ("Média: R$ 198,00", "total em 10 de R$ 99,90"). */
+function SeriesAmount({ amount, notes }: { amount: string; notes: string[] }) {
   return (
     <span className="grid justify-items-end text-right">
       <span className="text-base font-semibold tabular-nums">{amount}</span>
-      {note && <span className="text-muted-foreground text-xs">{note}</span>}
+      {notes.map((note) => (
+        <span key={note} className="text-muted-foreground text-xs">
+          {note}
+        </span>
+      ))}
     </span>
   );
+}
+
+/** A month in this year by its name alone, "setembro"; another with its year. */
+const monthOrPeriod = (period: string) =>
+  period.slice(0, 4) === currentPeriod().slice(0, 4) ? monthNameOf(period) : formatPeriod(period);
+
+/**
+ * What a variable recurrence counts as in the totals (ADR 0038 note): what its next month starts
+ * from, never the amount typed when it was created. A fixed one, its amount.
+ */
+const expectedCents = (recurrence: Recurrence) =>
+  recurrence.variableAmount
+    ? (recurrence.estimateCents ?? recurrence.amountCents)
+    : recurrence.amountCents;
+
+/**
+ * The amount a row shows (ADR 0038 note). A variable one, the last one paid or received, with
+ * when and the average its next month starts from; with none yet, the estimate, said as one.
+ */
+function shownAmount(recurrence: Recurrence): { cents: number; notes: string[] } {
+  if (!recurrence.variableAmount) return { cents: recurrence.amountCents, notes: [] };
+  const last = recurrence.lastSettled;
+  const varies = recurrence.intervalMonths === 12 ? 'varia todo ano' : 'varia todo mês';
+  if (!last) return { cents: expectedCents(recurrence), notes: [`Estimado, ${varies}`] };
+  return {
+    cents: last.amountCents,
+    notes: [
+      `Último ${settledLabels[recurrence.type].toLocaleLowerCase('pt-BR')} em ${monthOrPeriod(last.period)}`,
+      `Média: ${formatCents(expectedCents(recurrence))}`,
+    ],
+  };
 }
 
 /**
@@ -190,20 +238,20 @@ function SeriesRow({
   title,
   meta,
   amount,
-  amountNote,
+  amountNotes,
   menu,
 }: {
   title: string;
   meta: (string | null)[];
   amount: string;
-  amountNote: string | null;
+  amountNotes: string[];
   menu: ReactNode;
 }) {
   return (
     <li className={`${CARD_ROW} grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1`}>
       <p className="font-medium break-words">{title}</p>
       <div className="flex items-start gap-2 md:row-span-2 md:gap-1">
-        <SeriesAmount amount={amount} note={amountNote} />
+        <SeriesAmount amount={amount} notes={amountNotes} />
         {menu}
       </div>
       <p className="text-muted-foreground col-span-2 flex flex-wrap gap-x-3 text-sm md:col-span-1">
@@ -535,7 +583,8 @@ function RecurrenceItem({
   const confirmEnd = () =>
     void end.mutateAsync(recurrence.id).then(() => {
       toast.success('Recorrência encerrada');
-      document.getElementById(MONTHLY_TITLE_ID)?.focus();
+      // It moved to "Encerradas"; its group may be gone.
+      focusFirst(ENDED_TITLE_ID, SEARCH_ID);
     }, showError);
 
   const who =
@@ -543,14 +592,10 @@ function RecurrenceItem({
   const period = ended
     ? periodRange(recurrence.startPeriod, recurrence.endPeriod ?? recurrence.startPeriod)
     : since(recurrence.startPeriod);
-  // A variable one: the amount typed is only the starting estimate (ADR 0038).
   const frequency = frequencyLabel(recurrence.intervalMonths, recurrence.startPeriod);
   const next = nextLine(recurrence);
-  const amountNote = recurrence.variableAmount
-    ? recurrence.intervalMonths === 12
-      ? 'Varia todo ano'
-      : 'Varia todo mês'
-    : null;
+  // A variable one: the last amount paid, not the one typed when it was created (ADR 0038 note).
+  const shown = shownAmount(recurrence);
   const menu = canEdit && !ended && (
     <>
       <DropdownMenu>
@@ -624,7 +669,7 @@ function RecurrenceItem({
           </span>
         </TableCell>
         <TableCell>
-          <SeriesAmount amount={formatCents(recurrence.amountCents)} note={amountNote} />
+          <SeriesAmount amount={formatCents(shown.cents)} notes={shown.notes} />
         </TableCell>
         {menu && (
           <TableCell>
@@ -651,8 +696,8 @@ function RecurrenceItem({
         period,
         next,
       ]}
-      amount={formatCents(recurrence.amountCents)}
-      amountNote={amountNote}
+      amount={formatCents(shown.cents)}
+      amountNotes={shown.notes}
       menu={menu}
     />
   );
@@ -790,7 +835,7 @@ function PlanItem({
         </TableCell>
         <TableCell className="whitespace-normal">{status}</TableCell>
         <TableCell>
-          <SeriesAmount amount={formatCents(plan.totalCents)} note={amountNote} />
+          <SeriesAmount amount={formatCents(plan.totalCents)} notes={[amountNote]} />
         </TableCell>
         {canEdit && (
           <TableCell>
@@ -814,7 +859,7 @@ function PlanItem({
         status,
       ]}
       amount={formatCents(plan.totalCents)}
-      amountNote={amountNote}
+      amountNotes={[amountNote]}
       menu={menu}
     />
   );
@@ -831,72 +876,103 @@ function remaining(plan: InstallmentPlan) {
 }
 
 /**
- * What the active recurrences add up to, by type: "Por mês: R$ 224,90 em saídas, dos quais
- * R$ 180,00 estimados." The variable ones are only an estimate, and it says so. The yearly ones
- * come apart, "Por ano: …", since they fall in one month only (ADR 0038 note).
+ * What the active recurrences of a group add up to, in cards like Lançamentos' (ADR 0038 note):
+ * "Saídas" and "Entradas", each with the part that is an estimate under it, and the balance when
+ * there are both. A variable one counts as what its next month starts from (`expectedCents`).
+ * Whatever the search: it is the group's total.
  */
-function recurrenceTotals(recurrences: Recurrence[]) {
-  const lines = [
-    total(
-      recurrences.filter((item) => item.intervalMonths !== 12),
-      'Por mês',
-    ),
-    total(
-      recurrences.filter((item) => item.intervalMonths === 12),
-      'Por ano',
-    ),
-  ].filter(Boolean);
-  return lines.length === 0 ? null : lines.join(' ');
-}
-
-function total(recurrences: Recurrence[], label: string) {
+function SeriesTotals({ label, recurrences }: { label: string; recurrences: Recurrence[] }) {
   const sides = (['DEBIT', 'CREDIT'] as const).flatMap((type) => {
     const items = recurrences.filter((item) => item.type === type);
     if (items.length === 0) return [];
-    const total = items.reduce((sum, item) => sum + item.amountCents, 0);
+    const total = items.reduce((sum, item) => sum + expectedCents(item), 0);
     const estimated = items
       .filter((item) => item.variableAmount)
-      .reduce((sum, item) => sum + item.amountCents, 0);
-    const noun = transactionTypeLabels[type].lowerPlural;
-    const part =
-      estimated === 0
-        ? ''
-        : estimated === total
-          ? ', todos estimados'
-          : `, dos quais ${formatCents(estimated)} estimados`;
-    return [`${formatCents(total)} em ${noun}${part}`];
+      .reduce((sum, item) => sum + expectedCents(item), 0);
+    return [{ type, total, estimated }];
   });
-  return sides.length === 0 ? null : `${label}: ${sides.join('; ')}.`;
+  if (sides.length === 0) return null;
+  const items: { label: string; value: string; tone: string; sub: string | null }[] = sides.map(
+    ({ type, total, estimated }) => ({
+      label: transactionTypeLabels[type].plural,
+      value: signedCents(type, total),
+      tone: type === 'CREDIT' ? 'text-credit-foreground' : '',
+      sub:
+        estimated === 0
+          ? null
+          : estimated === total
+            ? 'Todo o valor é estimado'
+            : `${formatCents(estimated)} estimados`,
+    }),
+  );
+  if (sides.length === 2) {
+    const balance = sides.reduce(
+      (sum, side) => sum + (side.type === 'CREDIT' ? side.total : -side.total),
+      0,
+    );
+    items.push({
+      label: 'Saldo',
+      value: formatCents(balance),
+      tone: balance < 0 ? 'text-destructive' : '',
+      sub: null,
+    });
+  }
+  return (
+    // As "Resumo do mês" in Lançamentos: one line each on the phone, columns from sm.
+    <dl
+      aria-label={label}
+      className="bg-card grid gap-1.5 rounded-xl border p-3 sm:grid-cols-3 sm:gap-3"
+    >
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex flex-wrap items-baseline justify-between gap-x-3 sm:grid sm:content-start sm:justify-start sm:gap-0.5"
+        >
+          <dt className="text-muted-foreground text-sm">{item.label}</dt>
+          <dd className={cn('font-semibold whitespace-nowrap tabular-nums', item.tone)}>
+            {item.value}
+          </dd>
+          {item.sub && (
+            <dd className="text-muted-foreground basis-full text-right text-xs sm:text-left">
+              {item.sub}
+            </dd>
+          )}
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 function Section({
   titleId,
   title,
   empty,
+  totals,
   active,
   pastTitle,
   past,
-  summary,
 }: {
   titleId: string;
   title: string;
-  empty: string;
-  /** A line under the title, e.g. what the active ones add up to. */
-  summary?: string | null;
+  /** Said when there is nothing active; null hides the section instead. */
+  empty: string | null;
+  /** What the active ones add up to, above them. */
+  totals?: ReactNode;
   /** The active ones, as a list or a table; null when there is none. */
   active: ReactNode;
-  pastTitle: string;
+  pastTitle?: string;
   /** The past ones, the same way; null when there is none. */
-  past: ReactNode;
+  past?: ReactNode;
 }) {
+  if (!active && !past && empty === null) return null;
   return (
     <section aria-labelledby={titleId} className="grid gap-3">
       {/* Focusable from script: where focus goes after ending one. */}
       <h2 id={titleId} tabIndex={-1} className="font-medium outline-none">
         {title}
       </h2>
-      {summary && <p className="tabular-nums">{summary}</p>}
-      {active ?? <p className="text-muted-foreground">{empty}</p>}
+      {totals}
+      {active ?? (empty && <p className="text-muted-foreground">{empty}</p>)}
       {past && (
         <div className="grid gap-2">
           <h3 className="text-muted-foreground font-medium">{pastTitle}</h3>
@@ -904,6 +980,96 @@ function Section({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The page's groups (ADR 0038 note): "Todo mês" and "Todo ano", each with its totals, then the
+ * ended recurrences and the installment plans. While searching, only what was found, and a group
+ * with nothing found leaves; the totals stay the group's.
+ */
+function SeriesSections({
+  recurrences,
+  plans,
+  searching,
+  search,
+  recurrenceFound,
+  planFound,
+  showRecurrences,
+  showPlans,
+  canEdit,
+}: {
+  recurrences: Recurrence[];
+  plans: InstallmentPlan[];
+  searching: boolean;
+  search: ReactNode;
+  recurrenceFound: (recurrence: Recurrence) => boolean;
+  planFound: (plan: InstallmentPlan) => boolean;
+  showRecurrences: (rows: Recurrence[], actions: boolean) => ReactNode;
+  showPlans: (rows: InstallmentPlan[]) => ReactNode;
+  canEdit: boolean;
+}) {
+  const active = recurrences.filter((item) => item.endPeriod === null);
+  const monthly = active.filter((item) => item.intervalMonths !== 12);
+  const yearly = active.filter((item) => item.intervalMonths === 12);
+  const ended = recurrences.filter((item) => item.endPeriod !== null);
+  const running = plans.filter((plan) => !planIsOver(plan));
+  const over = plans.filter(planIsOver);
+  const shownOf = <T,>(rows: T[], test: (row: T) => boolean) =>
+    searching ? rows.filter(test) : rows;
+  const shown = {
+    monthly: shownOf(monthly, recurrenceFound),
+    yearly: shownOf(yearly, recurrenceFound),
+    ended: shownOf(ended, recurrenceFound),
+    running: shownOf(running, planFound),
+    over: shownOf(over, planFound),
+  };
+  const nothingFound = searching && Object.values(shown).every((rows) => rows.length === 0);
+  // Without a search, the monthly group says when nothing repeats any more.
+  const noneActive = active.length === 0 && !searching;
+
+  return (
+    <>
+      {search}
+      {nothingFound && (
+        <p className="text-muted-foreground">Nenhuma recorrência ou parcelamento encontrado.</p>
+      )}
+      <Section
+        titleId={MONTHLY_TITLE_ID}
+        title="Todo mês"
+        empty={noneActive ? 'Nenhuma recorrência ativa.' : null}
+        totals={
+          shown.monthly.length > 0 && <SeriesTotals label="Total por mês" recurrences={monthly} />
+        }
+        active={showRecurrences(shown.monthly, canEdit)}
+      />
+      <Section
+        titleId={YEARLY_TITLE_ID}
+        title="Todo ano"
+        empty={null}
+        // A yearly one falls in one month only: its own total, never in the monthly one.
+        totals={
+          shown.yearly.length > 0 && <SeriesTotals label="Total por ano" recurrences={yearly} />
+        }
+        active={showRecurrences(shown.yearly, canEdit)}
+      />
+      <Section
+        titleId={ENDED_TITLE_ID}
+        title="Recorrências encerradas"
+        empty={null}
+        // History has nothing to act on: no actions column.
+        active={showRecurrences(shown.ended, false)}
+      />
+      <Section
+        titleId={PLANS_TITLE_ID}
+        title="Parcelamentos"
+        empty={searching ? null : 'Nenhum parcelamento em andamento.'}
+        active={showPlans(shown.running)}
+        pastTitle="Encerrados e quitados"
+        // An ended one with nothing paid can still be deleted: the actions column stays.
+        past={showPlans(shown.over)}
+      />
+    </>
   );
 }
 
@@ -928,6 +1094,35 @@ export function RecurrencesPage() {
     categories.data?.find((item) => item.id === categoryId)?.name ?? null;
   const personName = (personId: string | null) =>
     (personId && people.data?.find((item) => item.id === personId)?.name) || null;
+  const merchantName = (merchantId: string | null) =>
+    (merchantId && merchants.data?.find((item) => item.id === merchantId)?.name) || null;
+  const methodText = usePaymentMethodText();
+
+  // The search over both lists: what the row says, the merchant and the notes too, or the amount.
+  const [search, setSearch] = useState('');
+  const searching = search.trim() !== '';
+  const found = (
+    series: Recurrence | InstallmentPlan,
+    amountCents: number,
+    people: (string | null)[],
+  ) =>
+    matchesSearch(
+      search,
+      series.description,
+      categoryName(series.categoryId),
+      personName(series.personId),
+      merchantName(series.merchantId),
+      methodText(series.paymentMethod, series.cardId),
+      series.notes,
+      ...people,
+    ) || matchesAmount(search, amountCents);
+  const recurrenceFound = (recurrence: Recurrence) =>
+    found(
+      recurrence,
+      shownAmount(recurrence).cents,
+      recurrence.split.map((share) => personName(share.personId)),
+    );
+  const planFound = (plan: InstallmentPlan) => found(plan, plan.totalCents, []);
 
   const recurrenceItem = (recurrence: Recurrence) => (
     <RecurrenceItem
@@ -967,7 +1162,7 @@ export function RecurrencesPage() {
         (item.dueDay === null ? 99 : item.dueMonthOffset * 31 + item.dueDay),
     },
     { label: 'Período', width: 'w-36', sort: (item) => item.endPeriod ?? item.startPeriod },
-    { label: 'Valor', width: 'w-32', align: 'right', sort: (item) => item.amountCents },
+    { label: 'Valor', width: 'w-32', align: 'right', sort: (item) => shownAmount(item).cents },
   ];
   const planColumns: Column<InstallmentPlan>[] = [
     { label: 'Descrição', sort: (item) => item.description },
@@ -1008,42 +1203,27 @@ export function RecurrencesPage() {
             em <TextLink to={`/espacos/${workspace.id}/lancamentos`}>Lançamentos</TextLink>.
           </p>
         ) : (
-          <>
-            <Section
-              titleId={MONTHLY_TITLE_ID}
-              title="Recorrentes"
-              empty="Nenhuma recorrência ativa."
-              summary={recurrenceTotals(recurrences.data.filter((item) => item.endPeriod === null))}
-              active={show(
-                recurrences.data.filter((item) => item.endPeriod === null),
-                recurrenceColumns,
-                recurrenceItem,
-                canEdit,
-              )}
-              pastTitle="Encerradas"
-              // History has nothing to act on: no actions column.
-              past={show(
-                recurrences.data.filter((item) => item.endPeriod !== null),
-                recurrenceColumns,
-                recurrenceItem,
-                false,
-              )}
-            />
-            <Section
-              titleId={PLANS_TITLE_ID}
-              title="Parcelamentos"
-              empty="Nenhum parcelamento em andamento."
-              active={show(
-                plans.data.filter((plan) => !planIsOver(plan)),
-                planColumns,
-                planItem,
-                canEdit,
-              )}
-              pastTitle="Encerrados e quitados"
-              // An ended one with nothing paid can still be deleted: the actions column stays.
-              past={show(plans.data.filter(planIsOver), planColumns, planItem, canEdit)}
-            />
-          </>
+          <SeriesSections
+            recurrences={recurrences.data}
+            plans={plans.data}
+            searching={searching}
+            search={
+              <SearchInput
+                id={SEARCH_ID}
+                label="Buscar recorrência ou parcelamento"
+                placeholder="Buscar recorrência"
+                value={search}
+                onChange={setSearch}
+              />
+            }
+            recurrenceFound={recurrenceFound}
+            planFound={planFound}
+            showRecurrences={(rows, actions) =>
+              show(rows, recurrenceColumns, recurrenceItem, actions)
+            }
+            showPlans={(rows) => show(rows, planColumns, planItem, canEdit)}
+            canEdit={canEdit}
+          />
         ))}
     </>
   );
