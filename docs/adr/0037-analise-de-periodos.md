@@ -105,7 +105,7 @@ A mesma função `matches` aplica os dois a tudo: os totais, o mês a mês e os 
 
 **A página em cartões**, como o Painel (ADR 0045):
 
-- **Totais:** o saldo do período, e Entradas, Gastos e Para guardar com a comparação numa linha curta ("+ R$ 900,00 sobre o período anterior"). O que é o período anterior fica no ⓘ do saldo.
+- **Totais:** o saldo do período, e Entradas, Gastos e Para guardar com a comparação numa linha curta ("+ R$ 900,00 sobre o período anterior"). O que é o período anterior fica no ⓘ do saldo. Desde 2026-10-30, "Para guardar" segue o teto do Painel e o card diz o que fica fora dos gastos ([ADR 0064](0064-metas-como-parte-da-renda.md), nota "Na Análise").
 - **"Mês a mês"** na largura toda, para o gráfico ter espaço para os meses.
 - **Os dois rankings** lado a lado a partir de xl, em vez de empilhados ao lado de um gráfico curto.
 - **As definições e instruções** ("Saídas: gastos e o que foi guardado", "Toque numa categoria…") vão para o ⓘ de cada cartão (`InfoTip`, ADR 0036).

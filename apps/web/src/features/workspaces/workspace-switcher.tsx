@@ -48,7 +48,7 @@ export function WorkspaceSwitcher({
             ref={triggerRef}
             variant="ghost"
             className={cn(
-              '-ml-2 h-11 max-w-full min-w-0 justify-start gap-2 px-2 py-1 text-left font-semibold md:h-auto md:px-2',
+              '-ml-2 h-auto min-h-11 max-w-full min-w-0 justify-start gap-2 px-2 py-1 text-left font-semibold md:px-2',
               className && 'ml-0',
               className,
             )}
@@ -57,7 +57,11 @@ export function WorkspaceSwitcher({
             <span className="sr-only">Trocar de espaço:</span>{' '}
             <span className="grid min-w-0 leading-tight">
               <span className="text-muted-foreground text-xs font-normal">Espaço</span>{' '}
-              <span className="truncate text-sm">{current.name}</span>
+              {/* Up to two lines before the "…": on the phone one line held about ten letters.
+                  The button keeps its text on one line (`whitespace-nowrap`); the name wraps. */}
+              <span className="line-clamp-2 text-sm break-words whitespace-normal">
+                {current.name}
+              </span>
             </span>
             <ChevronDown aria-hidden className="text-muted-foreground" />
           </Button>

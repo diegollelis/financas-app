@@ -84,3 +84,8 @@ O ano vem de `currentPeriod()`.
 - **Minha conta abre na moldura do último espaço usado,** escolhido como "/" escolhe (`pickWorkspace`: o último aberto neste navegador, senão o pessoal). A barra lateral, ou o cabeçalho e a barra inferior no celular, ficam como nas outras páginas, **sem nenhuma seção marcada**, porque a conta não é uma seção do espaço. As seções são o caminho de volta, e o link "Voltar aos espaços" saiu.
 - **A página continua sendo da conta, não do espaço:** ela abre mesmo que o espaço não carregue, e se a lista de espaços falhar, cai no cabeçalho simples de antes.
 - **"Excluir sua conta"** (`/conta/excluir`, o link do e-mail) continua no cartão centralizado das telas de entrada: é uma confirmação, não uma página de uso.
+
+## Nota (2026-10-30): o nome do espaço em até duas linhas
+
+- **Por quê:** no celular, com a marca, o divisor e o menu da conta na mesma linha, sobravam umas dez letras para o nome do espaço, e um nome como "Casa da família" virava "Casa da fa…".
+- **A decisão:** o nome quebra em até duas linhas e só então corta com "…" (`line-clamp-2`). O botão continua com 44 px ou mais, e o cabeçalho cresce quando o nome ocupa duas linhas. Com um nome curto, nada muda. A marca e o rótulo "Espaço" ficam como estão; na lista do menu, os nomes seguem numa linha.

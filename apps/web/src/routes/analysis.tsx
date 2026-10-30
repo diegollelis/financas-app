@@ -163,11 +163,46 @@ const comparisonHelp = (months: number) =>
     : `As comparações usam os mesmos filtros nos ${months} meses logo antes deste período.`;
 
 const spendingHelp = (
-  <p>
-    As saídas fora das metas e das categorias "Nem renda nem gasto", pagas ou não. Guardar nas metas
-    não é gasto e fica à parte.
-  </p>
+  <>
+    <p>
+      As saídas fora das metas e das categorias "Nem renda nem gasto", pagas ou não. Guardar nas
+      metas não é gasto e fica à parte.
+    </p>
+    <p>
+      As saídas numa categoria que não conta como renda nem gasto, como um empréstimo, ficam fora
+      dos gastos, mas descontam do saldo.
+    </p>
+  </>
 );
+
+/**
+ * "Mais R$ 500,00 fora dos gastos": the "Nem renda nem gasto" debits (ADR 0056), out of spending
+ * but in the balance, so the card adds up to it; as the dashboard's "fora da renda".
+ */
+function NeutralNote({ totals }: { totals: Totals }) {
+  if (totals.neutralCents === 0) return null;
+  return (
+    <span className="text-muted-foreground text-sm font-normal">
+      Mais {formatCents(totals.neutralCents)} fora dos gastos
+    </span>
+  );
+}
+
+/**
+ * Under "Para guardar", when the ceiling cut it (ADR 0064 note): what was launched in the goals,
+ * which the balance counts, and how much of it the months' leftover covers.
+ */
+function LaunchedNote({ totals }: { totals: Totals }) {
+  if (totals.appliedCents <= totals.toSaveCents) return null;
+  const launched = `${formatCents(totals.appliedCents)} lançados nas metas`;
+  return (
+    <span className="text-muted-foreground text-sm font-normal">
+      {totals.toSaveCents === 0
+        ? `${launched}; a sobra não cobre.`
+        : `${launched}; a sobra cobre ${formatCents(totals.toSaveCents)}.`}
+    </span>
+  );
+}
 
 /**
  * The range's totals, in a card; the balance leads when both types are on screen (one hero per
@@ -212,6 +247,7 @@ function Totals({
               }
             />
             {credit && <UndatedNote totals={totals} debits={false} />}
+            {!credit && <NeutralNote totals={totals} />}
             {!credit && totals.appliedCents > 0 && (
               <span className="text-muted-foreground">
                 Além disso, {formatCents(totals.appliedCents)} foram para as metas.
@@ -222,7 +258,8 @@ function Totals({
       </div>
     );
   }
-  // Planned counts what is still to be put aside too: not "guardado" yet (ADR 0051).
+  // Planned counts what is still to be put aside too, up to each month's leftover, as the
+  // dashboard's ceiling (ADR 0064 note): not "guardado" yet (ADR 0051).
   const applied = view === 'SETTLED' ? 'Guardado' : 'Para guardar';
   return (
     <div className={CARD_CLASS}>
@@ -257,6 +294,7 @@ function Totals({
         <Figure label="Gastos" help={spendingHelp}>
           {formatCents(totals.expensesCents)}
           <Versus cents={totals.expensesCents} before={previous?.expensesCents} />
+          <NeutralNote totals={totals} />
         </Figure>
         <Figure
           label={applied}
@@ -264,12 +302,13 @@ function Totals({
             <p>
               {view === 'SETTLED'
                 ? 'O que já foi pago nas metas no período.'
-                : 'O que foi lançado para as metas no período, pago ou não.'}
+                : 'O que já foi guardado nas metas, mais o que está lançado e pendente até onde sobra dinheiro em cada mês, como no Painel.'}
             </p>
           }
         >
-          {formatCents(totals.appliedCents)}
-          <Versus cents={totals.appliedCents} before={previous?.appliedCents} />
+          {formatCents(totals.toSaveCents)}
+          <Versus cents={totals.toSaveCents} before={previous?.toSaveCents} />
+          <LaunchedNote totals={totals} />
         </Figure>
       </dl>
     </div>

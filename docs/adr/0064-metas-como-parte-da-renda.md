@@ -75,3 +75,13 @@ Opção 2.
   - a meta reduzida diz "Reduzida pela sobra do mês (plano: R$ X)", e na tabela o plano aparece sob o valor;
   - a "Sobra prevista" diz "Não cobre as metas do plano: elas ficam em R$ X.";
   - "Guardar" sugere o que falta da meta já reduzida.
+
+## Nota (Na Análise, 2026-10-30)
+
+- **Por quê:** na visão prevista da Análise, "Para guardar" somava tudo o que estava lançado nas metas, mesmo num período que gastou mais do que entrou, e sugeria guardar um dinheiro que não sobrou. O card também não fechava o saldo: as saídas "Nem renda nem gasto" ([ADR 0056](0056-categoria-nem-renda-nem-gasto.md)) ficavam fora dos gastos, descontavam do saldo e não apareciam em lugar nenhum.
+- **A regra, mês a mês, como no Painel** (`toSaveCents` em `monthlySeries`):
+  - a sobra do mês é a mesma conta do `available`: entradas, menos as entradas "Nem renda nem gasto", menos os gastos e as saídas "Nem renda nem gasto";
+  - "Para guardar" = o que já foi pago nas metas, mais o pendente até onde a sobra cobre; com a sobra em zero ou negativa, só o que foi pago;
+  - o período soma os meses, então um mês que sobrou não cobre outro que não sobrou.
+- **O que não muda:** o "Saldo do período", que desconta tudo o que foi lançado, como o "Saldo do mês" do Painel, e o "Guardado" da visão realizada.
+- **Na tela:** sob "Gastos", "Mais R$ X fora dos gastos"; sob "Para guardar", quando o teto cortou, "R$ X lançados nas metas; a sobra não cobre." ou "…; a sobra cobre R$ Y.". Assim as linhas do card fecham o saldo.
