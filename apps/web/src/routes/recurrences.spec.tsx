@@ -153,14 +153,19 @@ describe('RecurrencesPage', () => {
     mockRecurrences({ [`GET ${base}/recurrences`]: { body: [aluguel, ipva] } });
     renderApp(page);
 
-    const recurring = await section('Recorrentes');
-    // A yearly one falls in one month only: its own total, not in the monthly one.
-    expect(nbsp(recurring.textContent)).toContain(
-      'Por mês: R$ 1.500,00 em saídas. Por ano: R$ 1.200,00 em saídas.',
+    // A yearly one falls in one month only: a group and a total of its own (ADR 0038 note).
+    const monthly = await section('Todo mês');
+    expect(within(monthly).getByLabelText('Total por mês')).toHaveTextContent(
+      /^Saídas− R\$ 1\.500,00$/,
     );
-    const [active] = within(recurring).getAllByRole('list');
-    expect(rowsOf(active!)).toEqual([
+    expect(rowsOf(within(monthly).getByRole('list'))).toEqual([
       expect.stringMatching(/Aluguel.*Todo mês/),
+    ]);
+    const yearly = await section('Todo ano');
+    expect(within(yearly).getByLabelText('Total por ano')).toHaveTextContent(
+      /^Saídas− R\$ 1\.200,00$/,
+    );
+    expect(rowsOf(within(yearly).getByRole('list'))).toEqual([
       expect.stringMatching(/IPVA.*Todo ano em março.*Desde março de 2026.*Próximo: março de 2027/),
     ]);
     vi.useRealTimers();
@@ -170,21 +175,24 @@ describe('RecurrencesPage', () => {
     mockRecurrences();
     renderApp(page);
 
-    const monthly = await section('Recorrentes');
+    const monthly = await section('Todo mês');
     // What the active ones add up to; the variable one is an estimate. Academia ended.
-    expect(nbsp(monthly.textContent)).toContain(
-      'Por mês: R$ 1.689,90 em saídas, dos quais R$ 189,90 estimados.',
+    expect(within(monthly).getByLabelText('Total por mês')).toHaveTextContent(
+      /^Saídas− R\$ 1\.689,90R\$ 189,90 estimados$/,
     );
-    const [active, ended] = within(monthly).getAllByRole('list');
-    expect(rowsOf(active!)).toEqual([
+    expect(rowsOf(within(monthly).getByRole('list'))).toEqual([
       expect.stringMatching(
         /Aluguel.*Saída.*Moradia.*A pagar para Ana.*Vence dia 10.*Desde janeiro de 2026/,
       ),
-      expect.stringMatching(/Conta de luz.*Varia todo mês.*Contas da casa/),
+      // Nothing paid yet: the amount typed, said to be an estimate.
+      expect.stringMatching(/Conta de luz.*R\$.189,90.*Estimado, varia todo mês.*Contas da casa/),
     ]);
-    expect(within(monthly).getByRole('heading', { name: 'Encerradas' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Todo ano' })).not.toBeInTheDocument();
     // From its first month to its last: the start is not lost once it ends.
-    expect(rowsOf(ended!)).toEqual([expect.stringMatching(/Academia.*Janeiro a maio de 2026/)]);
+    const ended = await section('Recorrências encerradas');
+    expect(rowsOf(within(ended).getByRole('list'))).toEqual([
+      expect.stringMatching(/Academia.*Janeiro a maio de 2026/),
+    ]);
     // History has nothing to act on.
     expect(screen.queryByRole('button', { name: 'Ações de Academia' })).not.toBeInTheDocument();
 
@@ -198,6 +206,73 @@ describe('RecurrencesPage', () => {
     ]);
     expect(rowsOf(over!)).toEqual([expect.stringMatching(/Sofá.*total em 10 de R\$.*Pago/)]);
     expect(screen.queryByRole('button', { name: 'Ações de Sofá' })).not.toBeInTheDocument();
+  });
+
+  it('shows a variable one by the last amount paid, counting its average (ADR 0038 note)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-15T12:00:00-03:00'));
+    const paid = {
+      ...energia,
+      lastSettled: { period: '2026-09', amountCents: 21_240 },
+      estimateCents: 19_800,
+    };
+    const salary = recurrence(5, {
+      type: 'CREDIT',
+      description: 'Salário',
+      categoryId: salario.id,
+      amountCents: 500_000,
+    });
+    mockRecurrences({ [`GET ${base}/recurrences`]: { body: [aluguel, paid, salary] } });
+    renderApp(page);
+
+    const monthly = await section('Todo mês');
+    expect(rowsOf(within(monthly).getByRole('list'))).toContainEqual(
+      expect.stringMatching(/Conta de luz.*R\$.212,40.*Último pago em setembro.*Média: R\$.198,00/),
+    );
+    // The totals count the average, never the amount typed when it was created; the balance
+    // comes with both sides.
+    expect(within(monthly).getByLabelText('Total por mês')).toHaveTextContent(
+      /^Saídas− R\$ 1\.698,00R\$ 198,00 estimadosEntradas\+ R\$ 5\.000,00SaldoR\$ 3\.302,00$/,
+    );
+    vi.useRealTimers();
+  });
+
+  it('searches recurrences and plans by what the row says, the merchant or the amount', async () => {
+    mockRecurrences();
+    renderApp(page);
+    const search = await screen.findByRole('searchbox', {
+      name: 'Buscar recorrência ou parcelamento',
+    });
+
+    // By merchant: only Aluguel, and the groups with nothing found leave.
+    await userEvent.type(search, 'imobiliaria');
+    expect(rowsOf(within(await section('Todo mês')).getByRole('list'))).toEqual([
+      expect.stringMatching(/^Aluguel/),
+    ]);
+    expect(screen.queryByRole('region', { name: 'Parcelamentos' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Recorrências encerradas' }),
+    ).not.toBeInTheDocument();
+    // The total stays the group's.
+    expect(screen.getByLabelText('Total por mês')).toHaveTextContent(/R\$ 1\.689,90/);
+
+    // By the person of a plan.
+    await userEvent.clear(search);
+    await userEvent.type(search, 'bruno');
+    expect(screen.queryByRole('region', { name: 'Todo mês' })).not.toBeInTheDocument();
+    expect(rowsOf(within(await section('Parcelamentos')).getByRole('list'))).toEqual([
+      expect.stringMatching(/^Geladeira/),
+    ]);
+
+    // By amount, and nothing found.
+    await userEvent.clear(search);
+    await userEvent.type(search, '99,90');
+    expect(rowsOf(within(await section('Recorrências encerradas')).getByRole('list'))).toEqual([
+      expect.stringMatching(/^Academia/),
+    ]);
+    await userEvent.clear(search);
+    await userEvent.type(search, 'xyz');
+    expect(screen.getByText('Nenhuma recorrência ou parcelamento encontrado.')).toBeInTheDocument();
   });
 
   it('shows a plan created at 3/10 as the bill does (ADR 0055)', async () => {
@@ -232,7 +307,7 @@ describe('RecurrencesPage', () => {
     mockRecurrences({ [`GET ${base}/recurrences`]: { body: [aluguel, split] } });
     renderApp(page);
 
-    const monthly = await section('Recorrentes');
+    const monthly = await section('Todo mês');
     expect(nbsp(monthly.textContent)).toContain('Dividido com Ana (50%) e Bruno (R$ 30,00)');
 
     await choose('Conta de luz', 'Editar');
@@ -312,7 +387,7 @@ describe('RecurrencesPage', () => {
     });
     renderApp(page);
 
-    const monthly = await section('Recorrentes');
+    const monthly = await section('Todo mês');
     expect(monthly).toHaveTextContent('Vence dia 10 do mês seguinte');
     await choose('Aluguel', 'Editar');
     const dialog = await screen.findByRole('dialog', { name: 'Editar Aluguel' });
@@ -693,7 +768,7 @@ describe('RecurrencesPage', () => {
       mockRecurrences();
       renderApp(page);
 
-      const monthly = await section('Recorrentes');
+      const monthly = await section('Todo mês');
       expect(screen.queryByRole('radiogroup', { name: 'Ver como' })).not.toBeInTheDocument();
       expect(within(monthly).queryByRole('table')).not.toBeInTheDocument();
     });
@@ -705,22 +780,22 @@ describe('RecurrencesPage', () => {
 
       await userEvent.click(await screen.findByRole('radio', { name: 'Tabela' }));
 
-      const monthly = await section('Recorrentes');
-      const [active, ended] = within(monthly).getAllByRole('table');
-      expect(within(active!).getByRole('row', { name: /Aluguel/ })).toHaveTextContent(
+      const active = within(await section('Todo mês')).getByRole('table');
+      const ended = within(await section('Recorrências encerradas')).getByRole('table');
+      expect(within(active).getByRole('row', { name: /Aluguel/ })).toHaveTextContent(
         /Aluguel.*Saída.*Moradia.*A pagar para Ana.*Dia 10.*Desde janeiro de 2026.*R\$.1\.500,00/,
       );
       // By description at first; by amount, highest first, after two clicks.
-      expect(descriptions(active!)).toEqual(['Aluguel', 'Conta de luz']);
-      const amount = within(active!).getByRole('columnheader', { name: /Valor/ });
+      expect(descriptions(active)).toEqual(['Aluguel', 'Conta de luz']);
+      const amount = within(active).getByRole('columnheader', { name: /Valor/ });
       await userEvent.click(within(amount).getByRole('button', { name: /Valor/ }));
-      expect(descriptions(active!)).toEqual(['Conta de luz', 'Aluguel']);
+      expect(descriptions(active)).toEqual(['Conta de luz', 'Aluguel']);
       await userEvent.click(within(amount).getByRole('button', { name: /Valor/ }));
       expect(amount).toHaveAttribute('aria-sort', 'descending');
-      expect(descriptions(active!)).toEqual(['Aluguel', 'Conta de luz']);
+      expect(descriptions(active)).toEqual(['Aluguel', 'Conta de luz']);
       expect(screen.getByRole('button', { name: 'Ações de Aluguel' })).toBeInTheDocument();
       // History: no actions column.
-      expect(within(ended!).queryByRole('columnheader', { name: 'Ações' })).not.toBeInTheDocument();
+      expect(within(ended).queryByRole('columnheader', { name: 'Ações' })).not.toBeInTheDocument();
 
       const plans = await section('Parcelamentos');
       expect(within(plans).getAllByRole('table')[0]).toHaveTextContent(
