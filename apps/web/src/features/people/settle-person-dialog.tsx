@@ -229,7 +229,7 @@ function SettleForm({
   const rewardHint =
     reward.cents > 0 && unit === 'PERCENT'
       ? `${formatCents(reward.cents)} das compras marcadas.`
-      : `O que ${person.name} devolve sobre as compras.`;
+      : 'Devolvido sobre as compras.';
 
   return (
     <>
@@ -316,9 +316,7 @@ function SettleForm({
             id="settle-reward-category"
             label="Categoria da recompensa"
             error={noCategory ? 'Escolha a categoria da recompensa.' : undefined}
-            hint={
-              noCategory ? undefined : `Fica lembrada para o próximo acerto com ${person.name}.`
-            }
+            hint={noCategory ? undefined : 'Fica lembrada para o próximo acerto.'}
           >
             <CategorySelect
               value={categoryId}

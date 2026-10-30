@@ -541,7 +541,8 @@ function PersonRow({
   const [settling, setSettling] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const settleRef = useRef<HTMLButtonElement>(null);
-  // "Pagar a Ana" (ADR 0065): for whoever edits, when something is owed to them now; members too.
+  // "↑ Pagar" opens "Pagar a Ana" (ADR 0065): for whoever edits, when something is owed to them
+  // now; members too.
   const canSettle = canEdit && !person.archived && person.payableCents > 0;
   const toList = () => document.getElementById(LIST_TITLE_ID)?.focus();
   const user = useCurrentUser();
@@ -579,9 +580,14 @@ function PersonRow({
         <span className="flex flex-col items-end gap-2 empty:hidden md:flex-row md:items-center md:gap-1">
           {canSettle && (
             <>
-              <Button ref={settleRef} variant="outline" size="sm" onClick={() => setSettling(true)}>
-                Pagar a {person.name}
-              </Button>
+              {/* The same "↑ Pagar" as a transaction's, named "Pagar: Ana"; red when overdue. */}
+              <SettleButton
+                ref={settleRef}
+                type="DEBIT"
+                description={person.name}
+                overdue={person.overduePayableCents > 0}
+                onClick={() => setSettling(true)}
+              />
               <SettlePersonDialog
                 key={settling ? 'open' : 'closed'}
                 workspaceId={workspaceId}
@@ -606,12 +612,6 @@ function PersonRow({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {/* The row's action, also in words here, as in Lançamentos. */}
-                  {canSettle && (
-                    <DropdownMenuItem onSelect={() => setSettling(true)}>
-                      Pagar a {person.name}
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuItem onSelect={() => setRenaming(true)}>Renomear</DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() =>
