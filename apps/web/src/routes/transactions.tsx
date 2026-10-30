@@ -63,6 +63,7 @@ import { useMerchants } from '@/features/merchants/use-merchants';
 import { withAdoptedNote } from '@/features/installments/adopted';
 import { InstallDialog } from '@/features/installments/install-dialog';
 import { RepeatDialog } from '@/features/recurrences/repeat-dialog';
+import { SettlePersonDialog } from '@/features/people/settle-person-dialog';
 import { usePeople } from '@/features/people/use-people';
 import {
   matchesAmount,
@@ -404,6 +405,7 @@ type RowProps = {
 function useRowActions({
   workspaceId,
   transaction,
+  personName,
   sharedWith,
   shares,
   locked,
@@ -411,7 +413,14 @@ function useRowActions({
   onEdit,
 }: Pick<
   RowProps,
-  'workspaceId' | 'transaction' | 'sharedWith' | 'shares' | 'locked' | 'today' | 'onEdit'
+  | 'workspaceId'
+  | 'transaction'
+  | 'personName'
+  | 'sharedWith'
+  | 'shares'
+  | 'locked'
+  | 'today'
+  | 'onEdit'
 >) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
@@ -420,6 +429,7 @@ function useRowActions({
   const [askingAmount, setAskingAmount] = useState(false);
   const [settlingPart, setSettlingPart] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [settlingPerson, setSettlingPerson] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
   const settleRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateTransaction(workspaceId);
@@ -437,6 +447,11 @@ function useRowActions({
   const installable = repeatable && shares.length === 0;
   // Pending, launched once and not split: part of it can be received or paid (ADR 0057).
   const partable = partiallySettleable(transaction, shares.length > 0);
+  // A debit still owed to someone: "Pagar a Ana" settles all that is owed to them (ADR 0065).
+  const owedTo =
+    transaction.type === 'DEBIT' && !transaction.settledAt && transaction.personId && personName
+      ? { id: transaction.personId, name: personName }
+      : null;
   const labels = settleActionLabels[transaction.type];
   const settledToast =
     transaction.type === 'CREDIT' ? 'Marcado como recebido' : 'Marcado como pago';
@@ -558,6 +573,11 @@ function useRowActions({
                 {settlePartLabels[transaction.type].action}
               </DropdownMenuItem>
             )}
+            {owedTo && (
+              <DropdownMenuItem onSelect={() => setSettlingPerson(true)}>
+                Pagar a {owedTo.name}
+              </DropdownMenuItem>
+            )}
             {transaction.settledAt && (
               <DropdownMenuItem
                 disabled={update.isPending}
@@ -654,6 +674,16 @@ function useRowActions({
             transaction={transaction}
             open={settlingPart}
             onOpenChange={setSettlingPart}
+            returnFocusTo={actionsRef}
+          />
+        )}
+        {owedTo && (
+          <SettlePersonDialog
+            key={settlingPerson ? 'open' : 'closed'}
+            workspaceId={workspaceId}
+            person={owedTo}
+            open={settlingPerson}
+            onOpenChange={setSettlingPerson}
             returnFocusTo={actionsRef}
           />
         )}

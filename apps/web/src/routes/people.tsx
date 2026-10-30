@@ -53,7 +53,8 @@ import {
   useUpdatePerson,
 } from '@/features/people/use-people';
 import { useCurrentUser } from '@/features/auth/use-me';
-import { signedCents } from '@/features/transactions/row-format';
+import { SettlePersonDialog } from '@/features/people/settle-person-dialog';
+import { dayInPeriod, signedCents } from '@/features/transactions/row-format';
 import { StatusBadge } from '@/features/transactions/status-badge';
 import { SettleButton } from '@/features/transactions/settle-button';
 import { SettlePartDialog } from '@/features/transactions/settle-part-dialog';
@@ -395,6 +396,12 @@ function PersonHistory({
                               today={today}
                               canEdit={canEdit}
                             />
+                            {/* Settled with the others in one settlement (ADR 0065). */}
+                            {transaction.settlementId && transaction.settledAt && (
+                              <Badge variant="outline">
+                                Acerto de {dayInPeriod(transaction.settledAt, transaction.period)}
+                              </Badge>
+                            )}
                           </span>
                           {canEdit && status !== 'SETTLED' && transaction.amountEstimated && (
                             <p className="text-muted-foreground text-sm">
@@ -531,7 +538,11 @@ function PersonRow({
   const remove = useDeletePerson(workspaceId);
   const [renaming, setRenaming] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [settling, setSettling] = useState(false);
   const actionsRef = useRef<HTMLButtonElement>(null);
+  const settleRef = useRef<HTMLButtonElement>(null);
+  // "Pagar a Ana" (ADR 0065): for whoever edits, when something is owed to them now; members too.
+  const canSettle = canEdit && !person.archived && person.payableCents > 0;
   const toList = () => document.getElementById(LIST_TITLE_ID)?.focus();
   const user = useCurrentUser();
   // A member's person comes from their account and stays while they do (ADR 0042 note).
@@ -542,7 +553,7 @@ function PersonRow({
     : null;
 
   return (
-    // As a transaction row: who on the left, the amounts on the right; the menu below them on the
+    // As a transaction row: who on the left, the amounts on the right; the actions below them on the
     // phone, where the width is short, and beside them, on the line of the name, from md.
     <li className={`${CARD_ROW} flex items-start gap-3`}>
       <span className="grid min-w-0 flex-1 justify-items-start">
@@ -563,76 +574,101 @@ function PersonRow({
         <span className="font-semibold md:pt-0.5">
           <Balance person={person} />
         </span>
-        {canEdit && !person.isMember && (
-          <>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  ref={actionsRef}
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Ações de ${person.name}`}
-                >
-                  <Ellipsis aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setRenaming(true)}>Renomear</DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    void confirmWith(
-                      update.mutateAsync({ id: person.id, archived: !person.archived }),
-                      person.archived ? `${person.name} reativada` : `${person.name} arquivada`,
-                    ).then(toList)
-                  }
-                >
-                  {person.archived ? 'Reativar' : 'Arquivar'}
-                </DropdownMenuItem>
-                {person.archived && (
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => setConfirmingDelete(true)}
+        {/* As a transaction row (ADR 0036 note): the row's action and the menu under the
+            amounts, stacked on the phone and side by side from md. */}
+        <span className="flex flex-col items-end gap-2 empty:hidden md:flex-row md:items-center md:gap-1">
+          {canSettle && (
+            <>
+              <Button ref={settleRef} variant="outline" size="sm" onClick={() => setSettling(true)}>
+                Pagar a {person.name}
+              </Button>
+              <SettlePersonDialog
+                key={settling ? 'open' : 'closed'}
+                workspaceId={workspaceId}
+                person={person}
+                open={settling}
+                onOpenChange={setSettling}
+                returnFocusTo={settleRef}
+              />
+            </>
+          )}
+          {canEdit && !person.isMember && (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    ref={actionsRef}
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Ações de ${person.name}`}
                   >
-                    Excluir
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <RenameDialog
-              key={renaming ? 'open' : 'closed'}
-              workspaceId={workspaceId}
-              person={person}
-              open={renaming}
-              onOpenChange={setRenaming}
-              returnFocusTo={actionsRef}
-            />
-            <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir {person.name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Só dá para excluir quem não tem lançamentos. Quem tem fica arquivada, com o
-                    histórico guardado.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={() =>
+                    <Ellipsis aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {/* The row's action, also in words here, as in Lançamentos. */}
+                  {canSettle && (
+                    <DropdownMenuItem onSelect={() => setSettling(true)}>
+                      Pagar a {person.name}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={() => setRenaming(true)}>Renomear</DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() =>
                       void confirmWith(
-                        remove.mutateAsync(person.id),
-                        `${person.name} excluída`,
+                        update.mutateAsync({ id: person.id, archived: !person.archived }),
+                        person.archived ? `${person.name} reativada` : `${person.name} arquivada`,
                       ).then(toList)
                     }
                   >
-                    Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
-        )}
+                    {person.archived ? 'Reativar' : 'Arquivar'}
+                  </DropdownMenuItem>
+                  {person.archived && (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => setConfirmingDelete(true)}
+                    >
+                      Excluir
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <RenameDialog
+                key={renaming ? 'open' : 'closed'}
+                workspaceId={workspaceId}
+                person={person}
+                open={renaming}
+                onOpenChange={setRenaming}
+                returnFocusTo={actionsRef}
+              />
+              <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir {person.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Só dá para excluir quem não tem lançamentos. Quem tem fica arquivada, com o
+                      histórico guardado.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() =>
+                        void confirmWith(
+                          remove.mutateAsync(person.id),
+                          `${person.name} excluída`,
+                        ).then(toList)
+                      }
+                    >
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+        </span>
       </span>
     </li>
   );

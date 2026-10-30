@@ -1,9 +1,12 @@
 import {
   personListResponseSchema,
+  personSettlementDraftSchema,
+  personSettlementSchema,
   personSchema,
   transactionListResponseSchema,
   type CreatePersonInput,
   type Person,
+  type SettlePersonInput,
   type UpdatePersonInput,
 } from '@financas/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -85,5 +88,51 @@ export function usePersonTransactions(workspaceId: string, personId: string | nu
         transactionListResponseSchema,
       ),
     enabled: personId !== null,
+  });
+}
+
+/**
+ * What may go into a settlement with this person (ADR 0065): their pending debits and credits and
+ * the reward category suggested. Fresh on each opening: it is the moment of paying.
+ */
+export function useSettlementDraft(workspaceId: string, personId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...peopleKey(workspaceId), personId, 'settlement'],
+    queryFn: () =>
+      apiGet(
+        `/api/workspaces/${workspaceId}/people/${personId}/settlement`,
+        personSettlementDraftSchema,
+      ),
+    enabled,
+    staleTime: 0,
+  });
+}
+
+/**
+ * Settles with the person, or undoes it. Either touches transactions of many months, the totals
+ * of people, the dashboard and the closings: every query of the workspace is refreshed, as after
+ * paying a card's bill.
+ */
+export function useSettlePerson(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ personId, ...input }: SettlePersonInput & { personId: string }) =>
+      apiPost(
+        `/api/workspaces/${workspaceId}/people/${personId}/settlements`,
+        input,
+        personSettlementSchema,
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [...workspacesQueryKey, workspaceId] }),
+  });
+}
+
+export function useUndoSettlement(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ personId, settlementId }: { personId: string; settlementId: string }) =>
+      apiDelete(`/api/workspaces/${workspaceId}/people/${personId}/settlements/${settlementId}`),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [...workspacesQueryKey, workspaceId] }),
   });
 }
