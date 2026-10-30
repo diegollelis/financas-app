@@ -37,7 +37,8 @@ export function AppHeader({ workspace }: { workspace?: ReactNode }) {
   const signOut = useSignOut({ leaveTo: SIGN_IN_PATH });
   return (
     <header className="bg-sidebar/95 sticky top-0 z-40 border-b pt-[env(safe-area-inset-top)] backdrop-blur">
-      <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+      {/* Grows with a workspace name on two lines. */}
+      <div className="flex min-h-14 items-center gap-3 px-4 py-1 sm:px-6">
         <AppBrand className="shrink-0" />
         {workspace && <div aria-hidden className="bg-border h-7 w-px shrink-0" />}
         <div className="min-w-0 flex-1">{workspace}</div>
