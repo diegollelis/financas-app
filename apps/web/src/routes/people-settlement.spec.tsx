@@ -83,7 +83,7 @@ const text = (element: HTMLElement) =>
   element.textContent?.replaceAll(String.fromCharCode(0xa0), ' ');
 
 async function openSettlement() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Pagar a Ana' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Pagar: Ana' }));
   return screen.findByRole('dialog', { name: 'Pagar a Ana' });
 }
 
@@ -102,11 +102,26 @@ describe('Pagar a Ana', () => {
     mockSettlement();
     renderApp(page);
 
-    expect(await screen.findByRole('button', { name: 'Pagar a Ana' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Pagar a Bruno' })).not.toBeInTheDocument();
-    // Also in words in the row's menu, as the row's action is in Lançamentos.
+    // The same "↑ Pagar" as a transaction's, soft while nothing is overdue.
+    const pay = await screen.findByRole('button', { name: 'Pagar: Ana' });
+    expect(pay).toHaveTextContent('Pagar');
+    expect(pay).not.toHaveClass('text-destructive');
+    expect(screen.queryByRole('button', { name: 'Pagar: Bruno' })).not.toBeInTheDocument();
+    // The button already says it: the menu does not repeat it.
     await userEvent.click(screen.getByRole('button', { name: 'Ações de Ana' }));
-    expect(await screen.findByRole('menuitem', { name: 'Pagar a Ana' })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Renomear' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /^Pagar/ })).not.toBeInTheDocument();
+  });
+
+  it('turns red when something owed is overdue', async () => {
+    mockSettlement({
+      [`GET ${base}`]: { body: [{ ...ana, overduePayableCents: 15_000 }, bruno] },
+    });
+    renderApp(page);
+
+    expect(await screen.findByRole('button', { name: 'Pagar: Ana' })).toHaveClass(
+      'text-destructive',
+    );
   });
 
   it('pays the purchases at once, less the reward in percent', async () => {
@@ -198,6 +213,6 @@ describe('Pagar a Ana', () => {
     renderApp(page);
 
     await screen.findByRole('region', { name: 'Pessoas' });
-    expect(screen.queryByRole('button', { name: 'Pagar a Ana' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pagar: Ana' })).not.toBeInTheDocument();
   });
 });
