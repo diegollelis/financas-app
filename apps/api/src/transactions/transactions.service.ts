@@ -65,6 +65,7 @@ export function toTransactionResponse(transaction: TransactionRow): Transaction 
     paymentMethod: transaction.paymentMethod,
     cardId: transaction.cardId,
     splitOfId: transaction.splitOfId,
+    settlementId: transaction.settlementId,
   };
 }
 

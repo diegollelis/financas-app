@@ -38,6 +38,7 @@ model Workspace {
   merchantAliases    MerchantAlias[]
   cards              Card[]
   periodClosings     PeriodClosing[]
+  personSettlements  PersonSettlement[]
   createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -93,6 +94,7 @@ model User {
   linkedPeople    Person[]
   periodsClosed   PeriodClosing[]     @relation("ClosedBy")
   periodsReopened PeriodClosing[]     @relation("ReopenedBy")
+  settlementsMade PersonSettlement[]  @relation("SettledByUser")
 
   @@map("users")
 }
@@ -352,6 +354,11 @@ model Transaction {
   // methods. A split's shares do not inherit it.
   cardId             String?               @map("card_id") @db.Uuid
   card               Card?                 @relation(fields: [cardId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  // The settlement with a person that settled it (ADR 0065). A trigger in the migration clears it
+  // whenever the transaction goes back to pending; undoing the settlement clears it too.
+  settlementId       String?               @map("settlement_id") @db.Uuid
+  settlement         PersonSettlement?     @relation("SettledBy", fields: [settlementId], references: [id], onDelete: SetNull)
+  rewardOf           PersonSettlement?     @relation("Reward")
 
   @@unique([installmentPlanId, installmentNumber])
   @@unique([workspaceId, externalId])
@@ -363,6 +370,7 @@ model Transaction {
   @@index([splitOfId])
   @@index([merchantId])
   @@index([cardId])
+  @@index([settlementId])
   @@map("transactions")
 }
 
@@ -372,19 +380,20 @@ model Transaction {
 // member of a shared workspace gets one, at most one each. Archived, not deleted, once it has
 // transactions.
 model Person {
-  id               String            @id @default(uuid(7)) @db.Uuid
-  workspaceId      String            @map("workspace_id") @db.Uuid
-  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name             String            @db.VarChar(100)
-  memberUserId     String?           @map("member_user_id") @db.Uuid
-  memberUser       User?             @relation(fields: [memberUserId], references: [id], onDelete: SetNull)
-  archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id               String             @id @default(uuid(7)) @db.Uuid
+  workspaceId      String             @map("workspace_id") @db.Uuid
+  workspace        Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String             @db.VarChar(100)
+  memberUserId     String?            @map("member_user_id") @db.Uuid
+  memberUser       User?              @relation(fields: [memberUserId], references: [id], onDelete: SetNull)
+  archivedAt       DateTime?          @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   transactions     Transaction[]
   recurrences      Recurrence[]
   installmentPlans InstallmentPlan[]
   recurrenceShares RecurrenceShare[]
+  settlements      PersonSettlement[]
 
   @@unique([workspaceId, name])
   @@unique([workspaceId, memberUserId])
@@ -687,6 +696,33 @@ model PeriodClosing {
   @@index([closedById])
   @@index([reopenedById])
   @@map("period_closings")
+}
+
+// Acerto com uma pessoa (ADR 0065): the pending transactions of a person settled at once on one
+// day, debits (what was owed) and, when chosen, credits (offset), with the reward the person gave
+// back launched as a credit. The totals are what changed hands that day; the transactions point
+// here with settlement_id. Deleting it (undo) is done by the service, which first takes back
+// what it still settles; deleting the reward alone leaves it without one.
+model PersonSettlement {
+  id                  String        @id @default(uuid(7)) @db.Uuid
+  workspaceId         String        @map("workspace_id") @db.Uuid
+  workspace           Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  personId            String        @map("person_id") @db.Uuid
+  person              Person        @relation(fields: [personId, workspaceId], references: [id, workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  settledAt           DateTime      @map("settled_at") @db.Date
+  debitCents          Int           @map("debit_cents")
+  creditCents         Int           @map("credit_cents")
+  rewardTransactionId String?       @unique @map("reward_transaction_id") @db.Uuid
+  rewardTransaction   Transaction?  @relation("Reward", fields: [rewardTransactionId], references: [id], onDelete: SetNull)
+  createdById         String?       @map("created_by") @db.Uuid
+  createdBy           User?         @relation("SettledByUser", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transactions        Transaction[] @relation("SettledBy")
+
+  @@index([workspaceId, personId])
+  @@index([createdById])
+  @@map("person_settlements")
 }
 
 // The share of one destination in one saved budget, in basis points (ADR 0047): Despesas of the

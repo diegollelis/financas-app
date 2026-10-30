@@ -1,5 +1,11 @@
 import {
   createPersonInputSchema,
+  personSettlementDraftSchema,
+  personSettlementSchema,
+  settlePersonInputSchema,
+  type PersonSettlement,
+  type PersonSettlementDraft,
+  type SettlePersonInput,
   personListResponseSchema,
   personSchema,
   transactionListResponseSchema,
@@ -23,6 +29,8 @@ import {
   type SchemaObject,
 } from '@nestjs/swagger';
 import { z } from 'zod';
+import type { AuthSession } from '../auth/auth.js';
+import { CurrentUser } from '../auth/current-user.decorator.js';
 import {
   CurrentMembership,
   RequireRole,
@@ -30,6 +38,7 @@ import {
   type WorkspaceMembership,
 } from '../workspaces/workspace-member.guard.js';
 import { PeopleService } from './people.service.js';
+import { SettlementsService } from './settlements.service.js';
 
 const openApi = (schema: z.ZodType) =>
   z.toJSONSchema(schema, { target: 'openapi-3.0', io: 'input' }) as SchemaObject;
@@ -39,7 +48,10 @@ const openApi = (schema: z.ZodType) =>
 @Controller('workspaces/:workspaceId/people')
 @WorkspaceScoped()
 export class PeopleController {
-  constructor(private readonly people: PeopleService) {}
+  constructor(
+    private readonly people: PeopleService,
+    private readonly settlements: SettlementsService,
+  ) {}
 
   @Get()
   @ApiOkResponse({
@@ -61,6 +73,63 @@ export class PeopleController {
     @Param('personId') personId: string,
   ): Promise<Transaction[]> {
     return this.people.transactions(membership.workspaceId, personId);
+  }
+
+  @Get(':personId/settlement')
+  @ApiOkResponse({
+    description:
+      'What may go into a settlement (ADR 0065): the pending debits and credits of the person, oldest first, and the category suggested for the reward.',
+    schema: openApi(personSettlementDraftSchema),
+  })
+  @ApiNotFoundResponse({ description: 'Not a person of this workspace.' })
+  settlementDraft(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('personId') personId: string,
+  ): Promise<PersonSettlementDraft> {
+    return this.settlements.draft(membership.workspaceId, personId);
+  }
+
+  @Post(':personId/settlements')
+  @RequireRole('EDITOR')
+  @ApiBody({ schema: openApi(settlePersonInputSchema) })
+  @ApiCreatedResponse({
+    description: 'Settled on that day, with the reward launched; what it settled, for undoing.',
+    schema: openApi(personSettlementSchema),
+  })
+  @ApiBadRequestResponse({
+    description:
+      'INVALID_INPUT: a day in the future or a reward over the debits; INVALID_CATEGORY for the reward.',
+  })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  @ApiNotFoundResponse({ description: 'Not a person of this workspace.' })
+  @ApiConflictResponse({
+    description:
+      'SETTLEMENT_CHANGED: a transaction is not pending of this person; NOTHING_TO_PAY: no debit; PERIOD_CLOSED.',
+  })
+  settle(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @CurrentUser() user: AuthSession['user'],
+    @Param('personId') personId: string,
+    @Body({ schema: settlePersonInputSchema }) input: SettlePersonInput,
+  ): Promise<PersonSettlement> {
+    return this.settlements.settle(membership.workspaceId, personId, user.id, input);
+  }
+
+  @Delete(':personId/settlements/:settlementId')
+  @RequireRole('EDITOR')
+  @HttpCode(204)
+  @ApiNoContentResponse({
+    description: 'Undone: what it still settles back to pending, the reward deleted.',
+  })
+  @ApiForbiddenResponse({ description: 'VIEWERs only read.' })
+  @ApiNotFoundResponse({ description: 'Not a settlement of this person.' })
+  @ApiConflictResponse({ description: 'PERIOD_CLOSED: one of its months is closed.' })
+  undoSettlement(
+    @CurrentMembership() membership: WorkspaceMembership,
+    @Param('personId') personId: string,
+    @Param('settlementId') settlementId: string,
+  ): Promise<void> {
+    return this.settlements.undo(membership.workspaceId, personId, settlementId);
   }
 
   @Post()
