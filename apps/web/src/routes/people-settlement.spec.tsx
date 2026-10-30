@@ -150,6 +150,10 @@ describe('Pagar a Ana', () => {
     await userEvent.type(within(dialog).getByLabelText('Recompensa (opcional)'), '10');
 
     expect(text(dialog)).toContain('R$ 40,00 das compras marcadas.');
+    // What it comes to is tied to the field, for screen readers.
+    expect(within(dialog).getByLabelText('Recompensa (opcional)')).toHaveAccessibleDescription(
+      `${formatCents(4_000)} das compras marcadas.`,
+    );
     expect(text(dialog)).toContain('Recompensa− R$ 40,00Você transfereR$ 360,00');
     // The category of the last reward, or "Bônus", comes chosen.
     expect(

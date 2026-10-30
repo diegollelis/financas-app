@@ -16,6 +16,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { CategorySelect } from '@/features/categories/category-picker';
 import { useCategories } from '@/features/categories/use-categories';
 import { useMerchants } from '@/features/merchants/use-merchants';
@@ -257,7 +258,8 @@ function SettleForm({
           {lines(draft.credits, 'settle-credit')}
         </section>
       )}
-      <div className="grid items-start gap-4 md:grid-cols-2">
+      {/* One column, as in "Pagar fatura": the date short, the reward and its category medium. */}
+      <div className="sm:max-w-56">
         <FormField
           id="settle-settled-at"
           label="Pago em"
@@ -279,39 +281,45 @@ function SettleForm({
             }}
           />
         </FormField>
-        <div className="grid gap-2">
-          <FormField id="settle-reward" label="Recompensa (opcional)" error={reward.error}>
-            <Input
-              inputMode="decimal"
-              autoComplete="off"
-              placeholder={unit === 'PERCENT' ? '0' : '0,00'}
-              value={rewardText}
-              onChange={(event) => {
-                setTouched(true);
-                setRewardText(event.target.value);
-              }}
-            />
-          </FormField>
-          {/* How it is typed, beside what it comes to: under the field, so both line up. */}
-          <div className="flex items-center gap-3">
-            <SegmentedControl
-              label="Recompensa em"
-              className="w-28 shrink-0"
-              options={unitOptions}
-              value={unit}
-              onChange={(next) => {
-                setTouched(true);
-                setUnit(next);
-              }}
-            />
-            {!reward.error && (
-              <p className="text-muted-foreground text-sm" aria-live="polite">
-                {rewardHint}
-              </p>
-            )}
-          </div>
+      </div>
+      {/* Built by hand, as FormField wraps one control: the label, then how it is typed beside
+          the amount on one line, then what it comes to (or the error), tied to the field. */}
+      <div className="grid gap-2 sm:max-w-sm">
+        <Label htmlFor="settle-reward">Recompensa (opcional)</Label>
+        <div className="flex items-center gap-2">
+          <SegmentedControl
+            label="Recompensa em"
+            className="w-28 shrink-0"
+            options={unitOptions}
+            value={unit}
+            onChange={(next) => {
+              setTouched(true);
+              setUnit(next);
+            }}
+          />
+          <Input
+            id="settle-reward"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder={unit === 'PERCENT' ? '0' : '0,00'}
+            value={rewardText}
+            aria-invalid={reward.error ? true : undefined}
+            aria-describedby="settle-reward-note"
+            onChange={(event) => {
+              setTouched(true);
+              setRewardText(event.target.value);
+            }}
+          />
         </div>
-        {reward.cents > 0 && (
+        <p
+          id="settle-reward-note"
+          className={cn('text-sm', reward.error ? 'text-destructive' : 'text-muted-foreground')}
+        >
+          {reward.error ?? rewardHint}
+        </p>
+      </div>
+      {reward.cents > 0 && (
+        <div className="sm:max-w-sm">
           <FormField
             id="settle-reward-category"
             label="Categoria da recompensa"
@@ -327,8 +335,8 @@ function SettleForm({
               options={creditOptions}
             />
           </FormField>
-        )}
-      </div>
+        </div>
+      )}
       {/* One row per line, so the line above the total runs unbroken. */}
       <dl className="grid gap-1 text-sm">
         <div className="flex justify-between gap-4">
