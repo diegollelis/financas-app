@@ -86,3 +86,9 @@ Com o líquido a favor de quem acerta, o botão diz "Receber R$ X de Ana".
   3. Tela (com prévia): o diálogo em Pessoas, com "Desfazer".
   4. Extrato da conta: um Pix para a pessoa que bate com um acerto já feito entra como "Já no app"; sem acerto, oferece "Paga o acerto com Ana", com a diferença como recompensa (no molde do `billPaidBy`).
 - **Fica de fora, por enquanto:** acertar só entradas ("Receber de Ana" sem compras) com um desconto dado; marcar o vale como "da Ana" (um cartão de outra pessoa), já que a pessoa no lançamento basta.
+
+## Nota (a tela, 2026-10-30)
+
+- **Também em Lançamentos:** o menu ⋯ de uma saída pendente com "A pagar para" ganha "Pagar a Ana", que abre o mesmo diálogo com tudo o que se deve à pessoa, não só aquele lançamento. A linha do mês fica como está: um segundo botão de contorno ao lado do "Pagar fatura" disputaria espaço no celular.
+- **Em Pessoas, como uma linha de Lançamentos:** "Pagar a Ana" é a ação da linha, embaixo dos valores com o ⋯ (um sobre o outro no celular, lado a lado a partir de md), e aparece também por extenso no menu ⋯. Vale também para quem é membro do espaço, que não tem menu.
+- **O diálogo** (`features/people/settle-person-dialog.tsx`, a conta em `features/people/settlement.ts`): a recompensa é digitada no campo, e o seletor "% | R$" fica embaixo dele, ao lado do valor calculado ("R$ 50,00 das compras marcadas."). Cada linha diz a categoria, o estabelecimento, o dia da compra e o vencimento, sem o ano quando é o da competência.

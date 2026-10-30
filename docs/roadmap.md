@@ -287,7 +287,7 @@ As versões são tags com versionamento semântico, cada uma com a sua release n
 - [ ] **Acerto com uma pessoa** ([ADR 0065](adr/0065-acerto-com-pessoa.md)): "Pagar a Ana" quita de uma vez o que se deve a uma pessoa (como o vale-alimentação dela usado no mês), compensando ou não o que ela deve, com a recompensa que ela devolve lançada como entrada
   - [x] ADR: um registro do acerto, as entradas desmarcadas para compensar, a recompensa em % ou R$ com a categoria lembrada, desfazer, no glossário e no modelo
   - [x] API: a tabela `person_settlements`, o `settlement_id` nos lançamentos, as rotas, a exportação e os testes
-  - [ ] Tela (com prévia): "Pagar a Ana" em Pessoas, com o resumo do que se transfere e "Desfazer"
+  - [x] Tela (com prévia): "Pagar a Ana" em Pessoas e no menu ⋯ de uma saída "A pagar para" em Lançamentos, com o resumo do que se transfere e "Desfazer" (nota no ADR)
   - [ ] O Pix do acerto no extrato da conta (o acerto já feito como "Já no app"; sem ele, "Paga o acerto com Ana" com a diferença como recompensa)
 - [ ] **Assistente de IA** (em avaliação, [docs/avaliacoes/assistente-de-ia.md](avaliacoes/assistente-de-ia.md)): perguntas sobre as finanças e lançamentos por texto, de preferência com o app como conector (MCP) da IA do próprio usuário, sem custo de IA para o app
 
