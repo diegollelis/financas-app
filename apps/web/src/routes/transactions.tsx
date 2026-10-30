@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
 import { QueryState } from '@/components/query-state';
 import { SegmentedControl } from '@/components/segmented-control';
+import { TotalsCard } from '@/components/totals-card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -154,31 +155,7 @@ function MonthTotals({
       tone: balance < 0 ? 'text-destructive' : '',
     },
   ];
-  return (
-    // On the phone one line each, the label beside the amount, so a large amount never wraps;
-    // three columns from sm.
-    <dl
-      aria-label="Resumo do mês"
-      className="bg-card grid gap-1.5 rounded-xl border p-3 sm:grid-cols-3 sm:gap-3"
-    >
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className="flex flex-wrap items-baseline justify-between gap-x-3 sm:grid sm:content-start sm:justify-start sm:gap-0.5"
-        >
-          <dt className="text-muted-foreground text-sm">{item.label}</dt>
-          <dd className={`font-semibold whitespace-nowrap tabular-nums ${item.tone}`}>
-            {item.value}
-          </dd>
-          {item.sub && (
-            <dd className="text-muted-foreground basis-full text-right text-xs sm:text-left">
-              {item.sub}
-            </dd>
-          )}
-        </div>
-      ))}
-    </dl>
-  );
+  return <TotalsCard label="Resumo do mês" items={items} />;
 }
 
 /** Asks before deleting, naming the transaction (ADR 0036). */

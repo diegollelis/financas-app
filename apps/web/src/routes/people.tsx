@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { SearchInput } from '@/components/search-input';
+import { TotalsCard } from '@/components/totals-card';
 import { PageActionButton } from '@/components/page-action-button';
 import {
   useCreatePerson,
@@ -87,13 +88,50 @@ function Overdue({ cents }: { cents: number }) {
   return <span className="text-destructive text-sm font-normal">{formatCents(cents)} vencido</span>;
 }
 
-/** "Mais R$ 200,00 em parcelas a receber": installments of later months (ADR 0042 note). */
-function futureText(receivableCents: number, payableCents: number) {
-  const parts = [
-    receivableCents > 0 && `${formatCents(receivableCents)} em parcelas a receber`,
-    payableCents > 0 && `${formatCents(payableCents)} em parcelas a pagar`,
-  ].filter(Boolean);
-  return parts.length > 0 ? `Mais ${parts.join(' e ')}` : null;
+/**
+ * Everyone at once, in a card like Lançamentos' totals: what is to come in and to go out up to
+ * this month, each with its overdue part and the installments of later months under it (ADR 0042
+ * note), and the balance of the two.
+ */
+function PeopleTotals({ people }: { people: Person[] }) {
+  const total = (field: NumericField) => people.reduce((sum, person) => sum + person[field], 0);
+  const notes = (overdueCents: number, futureCents: number) =>
+    overdueCents === 0 && futureCents === 0 ? null : (
+      <>
+        {overdueCents > 0 && (
+          <span className="text-destructive block">{formatCents(overdueCents)} vencido</span>
+        )}
+        {futureCents > 0 && (
+          <span className="block">Mais {formatCents(futureCents)} em parcelas</span>
+        )}
+      </>
+    );
+  const receivable = total('receivableCents');
+  const payable = total('payableCents');
+  const balance = receivable - payable;
+  return (
+    <TotalsCard
+      label="Resumo das pessoas"
+      items={[
+        {
+          label: 'A receber',
+          value: signedCents('CREDIT', receivable),
+          tone: 'text-credit-foreground',
+          sub: notes(total('overdueReceivableCents'), total('futureInstallmentsReceivableCents')),
+        },
+        {
+          label: 'A pagar',
+          value: signedCents('DEBIT', payable),
+          sub: notes(total('overduePayableCents'), total('futureInstallmentsPayableCents')),
+        },
+        {
+          label: 'Saldo',
+          value: formatCents(balance),
+          tone: balance < 0 ? 'text-destructive' : undefined,
+        },
+      ]}
+    />
+  );
 }
 
 /**
@@ -619,14 +657,6 @@ export function PeoplePage() {
   );
   const active = pendingFirst(shown.filter((person) => !person.archived));
   const archived = shown.filter((person) => person.archived);
-  const total = (field: NumericField) => everyone.reduce((sum, person) => sum + person[field], 0);
-  const receivable = total('receivableCents');
-  const payable = total('payableCents');
-  const overdue = (cents: number) => (cents > 0 ? ` (${formatCents(cents)} vencido)` : '');
-  const future = futureText(
-    total('futureInstallmentsReceivableCents'),
-    total('futureInstallmentsPayableCents'),
-  );
   const row = (person: Person) => (
     <PersonRow
       key={person.id}
@@ -656,6 +686,8 @@ export function PeoplePage() {
           )
         }
       >
+        {/* Everyone's, whatever the search: before it, as Lançamentos' totals. */}
+        {people.isSuccess && everyone.length > 0 && <PeopleTotals people={everyone} />}
         {/* At the top, as in Categorias and Estabelecimentos (ADR 0036 note). */}
         {people.isSuccess && everyone.length > 0 && (
           <SearchInput
@@ -685,17 +717,6 @@ export function PeoplePage() {
           <h2 id={LIST_TITLE_ID} tabIndex={-1} className="font-medium outline-none">
             Pessoas
           </h2>
-          {everyone.length > 0 && (
-            // Everyone at once: how much is to come in and to go out up to this month.
-            <div className="grid gap-0.5 tabular-nums">
-              <p>
-                A receber: {formatCents(receivable)}
-                {overdue(total('overdueReceivableCents'))}. A pagar: {formatCents(payable)}
-                {overdue(total('overduePayableCents'))}.
-              </p>
-              {future && <p className="text-muted-foreground text-sm">{future}.</p>}
-            </div>
-          )}
           {active.length === 0 && search.trim() !== '' ? (
             <p className="text-muted-foreground">Nenhuma pessoa com “{search.trim()}”.</p>
           ) : active.length === 0 ? (

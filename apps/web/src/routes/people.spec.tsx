@@ -59,7 +59,10 @@ describe('PeoplePage', () => {
     renderApp(page);
 
     const list = await screen.findByRole('region', { name: 'Pessoas' });
-    expect(text(list)).toContain('A receber: R$ 450,00. A pagar: R$ 400,00.');
+    // In a card like Lançamentos' totals, before the search; the balance of the two at the end.
+    expect(text(screen.getByLabelText('Resumo das pessoas'))).toBe(
+      'A receber+ R$ 450,00A pagar− R$ 400,00SaldoR$ 50,00',
+    );
     expect(
       within(list)
         .getAllByRole('listitem')
@@ -88,9 +91,11 @@ describe('PeoplePage', () => {
       expect.stringContaining('Em diaVocê deve R$ 500,00 em parcelas'),
       expect.stringContaining('CarlosVer lançamentosEm dia'),
     ]);
-    expect(text(list)).toContain('A receber: R$ 180,00 (R$ 30,00 vencido). A pagar: R$ 0,00.');
-    expect(text(list)).toContain(
-      'Mais R$ 200,00 em parcelas a receber e R$ 500,00 em parcelas a pagar.',
+    // Under each side: its overdue part and its installments of later months.
+    expect(text(screen.getByLabelText('Resumo das pessoas'))).toBe(
+      'A receber+ R$ 180,00R$ 30,00 vencidoMais R$ 200,00 em parcelas' +
+        'A pagar− R$ 0,00Mais R$ 500,00 em parcelas' +
+        'SaldoR$ 180,00',
     );
   });
 
