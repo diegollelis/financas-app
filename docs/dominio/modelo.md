@@ -75,6 +75,8 @@ Dono de todos os dados financeiros ([ADR 0008](../adr/0008-multi-tenancy-por-esp
 
 Pessoa (`Person`): um contato do espaço, só o nome, para quem usa ou não o app, opcionalmente ligado a um membro. Um lançamento pode ser ligado a uma pessoa (crédito = a receber de, débito = a pagar para), e dividir um gasto cria um crédito pendente "a receber" por pessoa, na categoria Reembolso ([ADR 0042](../adr/0042-pessoas-e-rateio.md)); dividir uma entrada cria um débito pendente "a pagar" por pessoa, na categoria Repasse ([ADR 0052](../adr/0052-divisao-em-entradas-recorrencias-e-parcelamentos.md)).
 
+Acerto (`PersonSettlement`, [ADR 0065](../adr/0065-acerto-com-pessoa.md)): "Pagar a Ana" quita num só dia as saídas pendentes da pessoa e, se se quiser, as entradas dela (compensar). Guarda o dia, as compras, o compensado e a recompensa, uma entrada já recebida do que a pessoa devolveu. Os lançamentos quitados apontam para ele (`settlement_id`); desfazer volta a pendentes os que continuam quitados por ele e exclui a recompensa. Nenhuma saída de pagamento é criada: quitar as compras é o pagamento.
+
 ### Merchant (Estabelecimento) — fase 5 ([ADR 0053](../adr/0053-estabelecimentos.md))
 
 Onde se comprou ou quem pagou: um cadastro do espaço, só o nome (único no espaço, ignorando maiúsculas e acentos), sem tipo e sem categoria fixa. Lançamentos, recorrências e parcelamentos têm um `merchant_id` opcional, herdado por cada mês gerado e cada parcela; as partes de uma divisão não o herdam. Pessoa responde "com quem", estabelecimento responde "onde", e um lançamento pode ter os dois. Arquiva-se em vez de excluir; só um arquivado sem uso é excluído (`MERCHANT_IN_USE`).
