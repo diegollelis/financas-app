@@ -151,6 +151,50 @@ describe('AnalysisPage', () => {
     expect(within(ranking).queryByText('Investimentos')).not.toBeInTheDocument();
   });
 
+  it('adds up to the balance and caps "Para guardar" by the leftover, as the dashboard (ADR 0064 note)', async () => {
+    const investimentos = {
+      id: '01920000-0000-7000-8000-000000000104',
+      name: 'Investimentos',
+      type: 'DEBIT',
+      archived: false,
+      destinationId: '01920000-0000-7000-8000-0000000000d2',
+    };
+    const emprestado = {
+      id: '01920000-0000-7000-8000-000000000106',
+      name: 'Empréstimo feito',
+      type: 'DEBIT',
+      archived: false,
+      neutral: true,
+    };
+    // Spending and a loan lent above the credits; the application is still to be paid.
+    const october = [
+      row('2026-10', 'CREDIT', salario.id, 1_142_689),
+      row('2026-10', 'DEBIT', mercado.id, 1_227_970),
+      row('2026-10', 'DEBIT', emprestado.id, 50_000),
+      row('2026-10', 'DEBIT', investimentos.id, 111_882, 0),
+    ];
+    mockAnalysis(
+      '2026-05',
+      '2026-10',
+      { from: '2026-05', to: '2026-10', rows: october },
+      [],
+      [salario, mercado, emprestado, investimentos],
+    );
+
+    renderApp(`/espacos/${houseId}/analise`);
+
+    const stat = async (label: string) =>
+      nbsp((await screen.findByText(label, { selector: 'dt' })).nextElementSibling?.textContent);
+    // The loan is out of spending but in the balance, and the card says so.
+    expect(await stat('Gastos')).toBe('R$ 12.279,70Mais R$ 500,00 fora dos gastos');
+    // The month leaves nothing: what is pending in the goals does not count, and a line says
+    // what was launched, which the balance still counts.
+    expect(await stat('Para guardar')).toBe(
+      'R$ 0,00R$ 1.118,82 lançados nas metas; a sobra não cobre.',
+    );
+    expect(await stat('Saldo do período')).toContain('2.471,63');
+  });
+
   it('leaves money lent with no due date out of the planned view, and says so (ADR 0057 note)', async () => {
     const emprestimos = {
       id: '01920000-0000-7000-8000-000000000105',

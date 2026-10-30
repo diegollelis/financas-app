@@ -133,6 +133,14 @@ export interface MonthlyPoint {
   appliedCents: number;
   /** The debits in a category marked "Nem renda nem gasto" (ADR 0056): a loan, not spending. */
   neutralCents: number;
+  /** The credits in such a category: money coming back, not income (ADR 0056). */
+  neutralCreditsCents: number;
+  /**
+   * "Para guardar": in the planned view, what was paid into the goals plus what is pending there
+   * up to the month's leftover, the dashboard's ceiling (ADR 0064 note); in the settled view,
+   * what was paid, the same as `appliedCents`.
+   */
+  toSaveCents: number;
   /** Credits minus debits of the competência. */
   balanceCents: number;
   /** Left out of the planned view (ADR 0057 note): to receive, and to pay, with no due date. */
@@ -164,12 +172,16 @@ export function monthlySeries(
         debitsCents: 0,
         appliedCents: 0,
         neutralCents: 0,
+        neutralCreditsCents: 0,
+        toSaveCents: 0,
         balanceCents: 0,
         undatedCreditsCents: 0,
         undatedDebitsCents: 0,
       },
     ]),
   );
+  // What was already paid into the goals in each month: a fact, never cut by the ceiling.
+  const paidIntoGoals = new Map<string, number>();
   for (const row of analysis.rows) {
     const point = points.get(row.period);
     if (!point || !matches(row, filters)) continue;
@@ -180,11 +192,35 @@ export function monthlySeries(
       if (row.type === 'CREDIT') point.undatedCreditsCents += row.undatedCents;
       else point.undatedDebitsCents += row.undatedCents;
     }
-    if (row.type === 'DEBIT' && savingCategoryIds.has(row.categoryId)) point.appliedCents += cents;
-    if (row.type === 'DEBIT' && neutralCategoryIds.has(row.categoryId)) point.neutralCents += cents;
+    if (row.type === 'DEBIT' && savingCategoryIds.has(row.categoryId)) {
+      point.appliedCents += cents;
+      paidIntoGoals.set(row.period, (paidIntoGoals.get(row.period) ?? 0) + row.settledCents);
+    }
+    if (neutralCategoryIds.has(row.categoryId)) {
+      if (row.type === 'DEBIT') point.neutralCents += cents;
+      else point.neutralCreditsCents += cents;
+    }
     point.balanceCents = point.creditsCents - point.debitsCents;
   }
+  for (const point of points.values()) {
+    point.toSaveCents =
+      filters.view === 'SETTLED'
+        ? point.appliedCents
+        : toSave(point, paidIntoGoals.get(point.period) ?? 0);
+  }
   return [...points.values()];
+}
+
+/**
+ * The dashboard's ceiling of the goals (ADR 0064 note), for one month of the planned view: what
+ * is pending in the goals counts only up to the month's leftover (credits that are income, less
+ * spending and the "Nem renda nem gasto" debits, as `available`), and what was paid always counts.
+ */
+function toSave(point: MonthlyPoint, paidCents: number) {
+  const expensesCents = point.debitsCents - point.appliedCents - point.neutralCents;
+  const leftoverCents =
+    point.creditsCents - point.neutralCreditsCents - expensesCents - point.neutralCents;
+  return Math.max(paidCents, Math.min(point.appliedCents, Math.max(0, leftoverCents)));
 }
 
 /**
@@ -203,7 +239,10 @@ export function seriesTotals(series: MonthlyPoint[]) {
     debitsCents,
     expensesCents: debitsCents - appliedCents - neutralCents,
     appliedCents,
+    // Month by month, so a month that leaves money never covers one that does not.
+    toSaveCents: series.reduce((sum, point) => sum + point.toSaveCents, 0),
     neutralCents,
+    neutralCreditsCents: series.reduce((sum, point) => sum + point.neutralCreditsCents, 0),
     balanceCents: creditsCents - debitsCents,
   };
 }

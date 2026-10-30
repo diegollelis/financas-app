@@ -102,6 +102,8 @@ describe('monthlySeries', () => {
       debitsCents: 0,
       appliedCents: 0,
       neutralCents: 0,
+      neutralCreditsCents: 0,
+      toSaveCents: 0,
       balanceCents: 0,
       undatedCreditsCents: 0,
       undatedDebitsCents: 0,
@@ -112,6 +114,8 @@ describe('monthlySeries', () => {
       debitsCents: 260_000,
       appliedCents: 0,
       neutralCents: 0,
+      neutralCreditsCents: 0,
+      toSaveCents: 0,
       balanceCents: 260_000,
       undatedCreditsCents: 0,
       undatedDebitsCents: 0,
@@ -127,6 +131,8 @@ describe('monthlySeries', () => {
       debitsCents: 40_000,
       appliedCents: 0,
       neutralCents: 0,
+      neutralCreditsCents: 0,
+      toSaveCents: 0,
       balanceCents: -40_000,
       undatedCreditsCents: 0,
       undatedDebitsCents: 0,
@@ -150,7 +156,9 @@ describe('monthlySeries', () => {
       debitsCents: 760_000,
       expensesCents: 760_000,
       appliedCents: 0,
+      toSaveCents: 0,
       neutralCents: 0,
+      neutralCreditsCents: 0,
       balanceCents: 760_000,
       undatedCreditsCents: 0,
       undatedDebitsCents: 0,
@@ -190,6 +198,105 @@ describe('monthlySeries', () => {
     expect(
       categoryRanking(analysis, defaultAnalysisFilters, neutral).map((s) => s.categoryId),
     ).toEqual([rent, market]);
+  });
+});
+
+describe('"Para guardar": the dashboard ceiling of the goals (ADR 0064 note)', () => {
+  // Fuel stands in for a goal's category, rent for a loan lent ("Nem renda nem gasto").
+  const saving = new Set([fuel]);
+  const neutral = new Set([rent]);
+  const month = (rows: AnalysisRow[], from = '2026-10', to = '2026-10'): Analysis => ({
+    from,
+    to,
+    rows,
+  });
+  const totals = (data: Analysis, view: AnalysisFilters['view'] = 'PLANNED') =>
+    seriesTotals(monthlySeries(data, { ...defaultAnalysisFilters, view }, saving, neutral));
+
+  it('counts everything launched in the goals when the leftover covers it', () => {
+    const data = month([
+      row('2026-10', 'CREDIT', salary, 500_000),
+      row('2026-10', 'DEBIT', market, 300_000),
+      row('2026-10', 'DEBIT', fuel, 100_000, 0),
+    ]);
+
+    expect(totals(data)).toMatchObject({ appliedCents: 100_000, toSaveCents: 100_000 });
+  });
+
+  it('counts what is pending only up to the leftover', () => {
+    const data = month([
+      row('2026-10', 'CREDIT', salary, 500_000),
+      row('2026-10', 'DEBIT', market, 460_000),
+      row('2026-10', 'DEBIT', fuel, 100_000, 0),
+    ]);
+
+    expect(totals(data)).toMatchObject({ appliedCents: 100_000, toSaveCents: 40_000 });
+  });
+
+  it('is zero with nothing paid when the month leaves nothing, the balance unchanged', () => {
+    // As in the print: spending, and a loan lent, above the credits.
+    const data = month([
+      row('2026-10', 'CREDIT', salary, 1_142_689),
+      row('2026-10', 'DEBIT', market, 1_227_970),
+      row('2026-10', 'DEBIT', rent, 50_000),
+      row('2026-10', 'DEBIT', fuel, 111_882, 0),
+    ]);
+
+    expect(totals(data)).toMatchObject({
+      expensesCents: 1_227_970,
+      neutralCents: 50_000,
+      appliedCents: 111_882,
+      toSaveCents: 0,
+      balanceCents: -247_163,
+    });
+  });
+
+  it('keeps what was already paid into the goals, whatever the leftover', () => {
+    const data = month([
+      row('2026-10', 'CREDIT', salary, 300_000),
+      row('2026-10', 'DEBIT', market, 400_000),
+      row('2026-10', 'DEBIT', fuel, 100_000, 30_000),
+    ]);
+
+    expect(totals(data)).toMatchObject({ appliedCents: 100_000, toSaveCents: 30_000 });
+  });
+
+  it('leaves money coming back out of the leftover, as the dashboard does', () => {
+    // A loan lent coming back is no new money to save (ADR 0056 note).
+    const data = month([
+      row('2026-10', 'CREDIT', salary, 300_000),
+      row('2026-10', 'CREDIT', rent, 200_000),
+      row('2026-10', 'DEBIT', market, 300_000),
+      row('2026-10', 'DEBIT', fuel, 100_000, 0),
+    ]);
+
+    expect(totals(data)).toMatchObject({ neutralCreditsCents: 200_000, toSaveCents: 0 });
+  });
+
+  it('caps month by month: one month with money never covers another without', () => {
+    const data = month(
+      [
+        row('2026-09', 'CREDIT', salary, 500_000),
+        row('2026-09', 'DEBIT', market, 200_000),
+        row('2026-09', 'DEBIT', fuel, 100_000, 0),
+        row('2026-10', 'CREDIT', salary, 200_000),
+        row('2026-10', 'DEBIT', market, 300_000),
+        row('2026-10', 'DEBIT', fuel, 100_000, 0),
+      ],
+      '2026-09',
+    );
+
+    expect(totals(data)).toMatchObject({ appliedCents: 200_000, toSaveCents: 100_000 });
+  });
+
+  it('is what was paid in the settled view', () => {
+    const data = month([
+      row('2026-10', 'CREDIT', salary, 300_000),
+      row('2026-10', 'DEBIT', market, 400_000),
+      row('2026-10', 'DEBIT', fuel, 100_000, 30_000),
+    ]);
+
+    expect(totals(data, 'SETTLED')).toMatchObject({ appliedCents: 30_000, toSaveCents: 30_000 });
   });
 });
 

@@ -170,6 +170,8 @@ function CategoryDetail({
     debitsCents: credit ? 0 : cents,
     appliedCents: 0,
     neutralCents: 0,
+    neutralCreditsCents: 0,
+    toSaveCents: 0,
     balanceCents: 0,
     undatedCreditsCents: 0,
     undatedDebitsCents: 0,
