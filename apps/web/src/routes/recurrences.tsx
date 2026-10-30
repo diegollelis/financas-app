@@ -28,6 +28,7 @@ import { SearchInput } from '@/components/search-input';
 import { QueryState } from '@/components/query-state';
 import { ResponsiveDialog } from '@/components/responsive-dialog';
 import { TextLink } from '@/components/text-link';
+import { TotalsCard, type TotalsItem } from '@/components/totals-card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -892,19 +893,17 @@ function SeriesTotals({ label, recurrences }: { label: string; recurrences: Recu
     return [{ type, total, estimated }];
   });
   if (sides.length === 0) return null;
-  const items: { label: string; value: string; tone: string; sub: string | null }[] = sides.map(
-    ({ type, total, estimated }) => ({
-      label: transactionTypeLabels[type].plural,
-      value: signedCents(type, total),
-      tone: type === 'CREDIT' ? 'text-credit-foreground' : '',
-      sub:
-        estimated === 0
-          ? null
-          : estimated === total
-            ? 'Todo o valor é estimado'
-            : `${formatCents(estimated)} estimados`,
-    }),
-  );
+  const items: TotalsItem[] = sides.map(({ type, total, estimated }) => ({
+    label: transactionTypeLabels[type].plural,
+    value: signedCents(type, total),
+    tone: type === 'CREDIT' ? 'text-credit-foreground' : '',
+    sub:
+      estimated === 0
+        ? null
+        : estimated === total
+          ? 'Todo o valor é estimado'
+          : `${formatCents(estimated)} estimados`,
+  }));
   if (sides.length === 2) {
     const balance = sides.reduce(
       (sum, side) => sum + (side.type === 'CREDIT' ? side.total : -side.total),
@@ -917,30 +916,7 @@ function SeriesTotals({ label, recurrences }: { label: string; recurrences: Recu
       sub: null,
     });
   }
-  return (
-    // As "Resumo do mês" in Lançamentos: one line each on the phone, columns from sm.
-    <dl
-      aria-label={label}
-      className="bg-card grid gap-1.5 rounded-xl border p-3 sm:grid-cols-3 sm:gap-3"
-    >
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className="flex flex-wrap items-baseline justify-between gap-x-3 sm:grid sm:content-start sm:justify-start sm:gap-0.5"
-        >
-          <dt className="text-muted-foreground text-sm">{item.label}</dt>
-          <dd className={cn('font-semibold whitespace-nowrap tabular-nums', item.tone)}>
-            {item.value}
-          </dd>
-          {item.sub && (
-            <dd className="text-muted-foreground basis-full text-right text-xs sm:text-left">
-              {item.sub}
-            </dd>
-          )}
-        </div>
-      ))}
-    </dl>
-  );
+  return <TotalsCard label={label} items={items} />;
 }
 
 function Section({
