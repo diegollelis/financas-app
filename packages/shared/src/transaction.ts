@@ -161,6 +161,8 @@ export const transactionSchema = z.object({
   cardId: z.uuid().nullable().default(null),
   /** The debit this share was split from (ADR 0042); null otherwise. */
   splitOfId: z.uuid().nullable().default(null),
+  /** The settlement with a person that settled it (ADR 0065); null otherwise. */
+  settlementId: z.uuid().nullable().default(null),
 });
 
 export type Transaction = z.infer<typeof transactionSchema>;

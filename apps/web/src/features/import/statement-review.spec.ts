@@ -60,6 +60,7 @@ const transaction = (n: number, fields: Partial<Transaction>): Transaction => ({
   paymentMethod: null,
   cardId: null,
   splitOfId: null,
+  settlementId: null,
   ...fields,
 });
 
