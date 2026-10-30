@@ -187,6 +187,16 @@ export const recurrenceSchema = z.object({
       }),
     )
     .default([]),
+  /** Its latest settled month (ADR 0038 note); null while none is. */
+  lastSettled: z
+    .object({ period: periodSchema, amountCents: z.number().int() })
+    .nullable()
+    .default(null),
+  /**
+   * A variable one: what its next month starts from, the average of its last settled (ADR 0038
+   * note), or the amount typed with none yet; null for a fixed one.
+   */
+  estimateCents: z.number().int().nullable().default(null),
 });
 
 /**

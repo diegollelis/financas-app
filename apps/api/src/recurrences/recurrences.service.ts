@@ -38,7 +38,11 @@ import { followDescription, followDueDate } from '../transactions/share-descript
 
 type RecurrenceWithShares = RecurrenceRow & { shares: RecurrenceShareRow[] };
 
-function toResponse(recurrence: RecurrenceWithShares): Recurrence {
+type SettledMonth = { period: string; amountCents: number };
+
+/** `settled`: its settled months, newest first (ADR 0038 note). */
+function toResponse(recurrence: RecurrenceWithShares, settled: SettledMonth[]): Recurrence {
+  const last = settled[0];
   return {
     id: recurrence.id,
     type: recurrence.type,
@@ -62,6 +66,14 @@ function toResponse(recurrence: RecurrenceWithShares): Recurrence {
       amountCents,
       basisPoints,
     })),
+    lastSettled: last ? { period: last.period, amountCents: last.amountCents } : null,
+    // The same estimate the next month it generates starts from.
+    estimateCents: recurrence.variableAmount
+      ? estimateAmount(
+          settled.map((month) => month.amountCents),
+          recurrence.amountCents,
+        )
+      : null,
   };
 }
 
@@ -99,7 +111,42 @@ export class RecurrencesService {
       include: { shares: true },
       orderBy: [{ endPeriod: { sort: 'desc', nulls: 'first' } }, { description: 'asc' }],
     });
-    return recurrences.map(toResponse);
+    return this.withHistory(workspaceId, recurrences);
+  }
+
+  /**
+   * The responses, with what each one's settled months say (ADR 0038 note): the last amount
+   * paid or received and, for a variable one, the estimate. One query for all of them.
+   */
+  private async withHistory(
+    workspaceId: string,
+    recurrences: RecurrenceWithShares[],
+  ): Promise<Recurrence[]> {
+    if (recurrences.length === 0) return [];
+    const rows = await this.prisma.forWorkspace(workspaceId).transaction.findMany({
+      where: {
+        workspaceId,
+        settledAt: { not: null },
+        occurrence: { is: { recurrenceId: { in: recurrences.map((item) => item.id) } } },
+      },
+      orderBy: { period: 'desc' },
+      select: { period: true, amountCents: true, occurrence: { select: { recurrenceId: true } } },
+    });
+    const settled = new Map<string, SettledMonth[]>();
+    for (const { period, amountCents, occurrence } of rows) {
+      if (!occurrence) continue;
+      const months = settled.get(occurrence.recurrenceId) ?? [];
+      months.push({ period, amountCents });
+      settled.set(occurrence.recurrenceId, months);
+    }
+    return recurrences.map((recurrence) =>
+      toResponse(recurrence, settled.get(recurrence.id) ?? []),
+    );
+  }
+
+  private async respond(workspaceId: string, recurrence: RecurrenceWithShares) {
+    const [response] = await this.withHistory(workspaceId, [recurrence]);
+    return response as Recurrence;
   }
 
   /** Creates it and its transaction in the first competência right away. */
@@ -143,7 +190,7 @@ export class RecurrencesService {
       include: { shares: true },
     });
     await this.materialize(workspaceId, [input.startPeriod]);
-    return toResponse(recurrence);
+    return this.respond(workspaceId, recurrence);
   }
 
   /**
@@ -245,7 +292,7 @@ export class RecurrencesService {
         if (isDuplicate(error)) throw refuse('Este lançamento já é de uma recorrência.');
         throw error;
       });
-    return toResponse(recurrence);
+    return this.respond(workspaceId, recurrence);
   }
 
   /**
@@ -348,7 +395,7 @@ export class RecurrencesService {
         await this.followAmount(workspaceId, transaction.id, input.amountCents, recurrence.shares);
       }
     }
-    return toResponse(recurrence);
+    return this.respond(workspaceId, recurrence);
   }
 
   /**

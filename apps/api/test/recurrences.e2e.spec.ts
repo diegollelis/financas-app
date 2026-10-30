@@ -855,6 +855,55 @@ describe('recurrences', () => {
       expect((await transactionsOf(month(1)))[0]).toMatchObject({ amountCents: 21_000 });
     });
 
+    it('lists the last month settled and the estimate of the next (ADR 0038 note)', async () => {
+      const { create, energy, categoryId, transactionsOf, base, browser } = await setUp();
+      const list = async () =>
+        recurrenceListResponseSchema.parse(
+          (await browser.get(`${base}/recurrences`).expect(200)).body,
+        );
+      const settle = async (period: string, amountCents: number) => {
+        const [transaction] = (await transactionsOf(period)).filter(
+          (t) => t.description === 'Conta de luz',
+        );
+        await browser
+          .patch(`${base}/transactions/${transaction?.id}`)
+          .send({ amountCents, settledAt: `${period}-05` })
+          .expect(200);
+      };
+      const light = await create(energy({ variableAmount: true, startPeriod: month(-4) }));
+      const internet = await create(
+        energy({ description: 'Internet', categoryId: categoryId('Assinaturas', 'DEBIT') }),
+      );
+
+      // Nothing settled yet: the amount typed is the estimate.
+      expect(light).toMatchObject({ lastSettled: null, estimateCents: 18_000 });
+      expect(internet).toMatchObject({ lastSettled: null, estimateCents: null });
+
+      // Four months settled: the last one, and the average of the last three.
+      await settle(month(-4), 10_000);
+      await settle(month(-3), 20_000);
+      await settle(month(-2), 22_000);
+      await settle(month(-1), 24_000);
+      const [settledInternet] = await transactionsOf(thisMonth).then((rows) =>
+        rows.filter((t) => t.description === 'Internet'),
+      );
+      await browser
+        .patch(`${base}/transactions/${settledInternet?.id}`)
+        .send({ settledAt: `${thisMonth}-05` })
+        .expect(200);
+
+      const recurrences = await list();
+      expect(recurrences.find((item) => item.id === light.id)).toMatchObject({
+        amountCents: 18_000,
+        lastSettled: { period: month(-1), amountCents: 24_000 },
+        estimateCents: 22_000,
+      });
+      expect(recurrences.find((item) => item.id === internet.id)).toMatchObject({
+        lastSettled: { period: thisMonth, amountCents: 18_000 },
+        estimateCents: null,
+      });
+    });
+
     it('confirms the amount when it is given or settled, and never goes back to estimate', async () => {
       const { create, energy, transactionsOf, base, browser } = await setUp();
       await create(energy({ variableAmount: true }));
