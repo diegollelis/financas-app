@@ -172,3 +172,11 @@ Um teste do dono mostrou que encerrar uma recorrência criada pelo "Tornar recor
 - **Refazer as parcelas** (mudar valor, quantidade ou parcela inicial com nada pago) recria todas, inclusive a adotada, que deixa de ser o lançamento de antes: a marca é apagada.
 - **O que já existia:** a migração marca as recorrências do "Tornar recorrente" anteriores à coluna. O adotado é o lançamento do primeiro mês criado antes da recorrência; um mês gerado é sempre criado depois dela.
 - As respostas trazem `adoptedTransactionId`, e os diálogos de encerrar e excluir (em Lançamentos e em Recorrências) acrescentam: "O lançamento que já existia antes continua, como avulso, se ainda estiver pendente."
+
+## Nota (último valor pago e estimativa na lista, 2026-10-29)
+
+Na tela "Recorrências", o card de uma recorrência variável mostrava o valor digitado na criação, que nunca muda, e o total "Por mês" somava esse valor. Cada mês, porém, começa da média dos 3 últimos pagos. O que a tela mostrava era um palpite antigo.
+
+- **`GET /recurrences` traz o histórico de cada uma:** `lastSettled` (`{ period, amountCents }` do último mês pago ou recebido, `null` sem nenhum) e `estimateCents` (só na variável: de onde o próximo mês começa, a mesma `estimateAmount` da geração, com o valor digitado enquanto nada foi pago; `null` na fixa). As respostas de criar, alterar e "Tornar recorrente" trazem os dois também.
+- **Uma consulta para todas:** os lançamentos pagos ligados às ocorrências das recorrências do espaço, do mais novo para o mais antigo. Nada é guardado: o histórico é o dos próprios lançamentos, como no resumo do mês (ADR 0031).
+- Na tela, a variável passa a mostrar o último pago como valor principal, com a média embaixo, e os totais usam a estimativa.
