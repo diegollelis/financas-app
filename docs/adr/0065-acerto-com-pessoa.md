@@ -94,3 +94,30 @@ Com o líquido a favor de quem acerta, o botão diz "Receber R$ X de Ana".
 - **O menu ⋯ da pessoa não repete a ação.** Foi uma decisão do dono do projeto depois de conferir em produção, uma exceção à regra da skill de interface ("a ação da linha também por extenso no menu"): o botão já diz o que faz, e a pessoa é a do próprio card.
 - **O diálogo** (`features/people/settle-person-dialog.tsx`, a conta em `features/people/settlement.ts`): os campos ficam numa coluna, como no "Pagar fatura": "Pago em" curto, e a recompensa e a categoria numa largura média. O seletor "% | R$" fica ao lado do campo da recompensa, numa linha, e embaixo vem o valor calculado ("R$ 50,00 das compras marcadas.", ou "Devolvido sobre as compras." sem valor), ligado ao campo. Duas colunas deixavam a recompensa espremida e a categoria sozinha numa linha, e foram trocadas depois de um teste em produção. Cada linha diz a categoria, o estabelecimento, o dia da compra e o vencimento, sem o ano quando é o da competência.
 - **Os textos de ajuda não repetem o nome da pessoa,** para economizar tela no celular ("Fica lembrada para o próximo acerto."). O nome fica no título, em "Compensar o que Ana te deve" e em "Ana te transfere", onde diz quem faz o quê.
+
+## Nota (o Pix do acerto no extrato da conta, 2026-11-04)
+
+O passo 4. Na revisão do extrato da conta ([ADR 0061](0061-extrato-da-conta-e-conferencia.md)), um Pix com uma pessoa do espaço pode ser o acerto com ela. Antes, ele só podia casar com um lançamento de mesmo valor, entrar como lançamento novo (a saída em dobro, porque as compras já estão lançadas) ou ficar fora.
+
+- **O movimento fica no acerto.** O acerto não tem uma saída própria (quitar as compras é o pagamento), então o identificador do movimento vai para o próprio acerto: `person_settlements.external_id`, único no espaço junto com o dos lançamentos (a importação confere os dois). O acerto guarda também a importação que o criou (`import_id`) ou que o conferiu (`reconciled_import_id`). Um movimento já importado num acerto é reconhecido na próxima importação, como o de um lançamento.
+- **A pessoa do Pix** é achada como no recebimento parcial: o nome da outra parte, quando o extrato diz que é uma pessoa (CPF), igual ao de uma pessoa ativa do espaço, sem diferenciar maiúsculas e acentos.
+- **"Já no app" (o acerto já feito):** um Pix da pessoa com o valor transferido no acerto (`settlementTransferCents`: as compras, menos o compensado, menos a recompensa) e até 5 dias de distância do dia do acerto, num acerto ainda sem movimento. Quando o valor é positivo, o Pix é enviado ("Você transfere"); quando é negativo, é recebido ("Ana te transfere"). Importar só grava o identificador no acerto. Essa conferência vem antes da de lançamentos.
+- **"Paga o acerto com Ana" (o acerto ainda não feito), só num Pix enviado:**
+  - **As compras:** as saídas pendentes da pessoa até o mês do Pix, como as que o diálogo traz marcadas. Ficam de fora o empréstimo sem vencimento (que é do "Pagamento parcial") e os meses de recorrência à frente. Nada é compensado.
+  - **Quando é oferecido:** quando o Pix fica entre **50% e 100%** do total das compras, e nenhuma saída sozinha tem o valor exato (a saída de valor exato continua casando com o lançamento, como antes). Fora dessa faixa, ou quando o Pix passa do total, a linha entra desmarcada, dizendo quanto a pessoa tem a receber.
+  - **A recompensa** é a diferença entre as compras e o Pix, quando houver, na categoria escolhida como no diálogo: a da última recompensa da pessoa, senão "Bônus".
+  - **Importar** faz o mesmo que "Pagar a Ana": quita as compras no dia do Pix, lança a recompensa recebida nesse dia e cria o acerto, já com o identificador do movimento.
+  - "Não é este" transforma a linha num lançamento novo, como nas outras conferências.
+- **A ordem na revisão:** o acerto já feito, a saída de mesmo valor, o acerto novo, o "Valor diferente" e, por último, o pagamento parcial.
+- **Desfazer a importação:** um acerto criado por ela é desfeito como em "Desfazer" (as compras que continuam quitadas naquele dia voltam a pendentes, e a recompensa e o acerto são excluídos). Um acerto que ela só conferiu fica, sem o identificador.
+- **Na API:**
+  - a importação aceita `settlements`, cada item no formato `{ settlementId, externalId }` (conferir) ou `{ personId, transactionIds, settledAt, externalId, rewardCents }` (criar);
+  - algo que mudou desde a revisão dá 409 `STATEMENT_MATCH_CHANGED`;
+  - a lista conta `settlementCount`;
+  - os candidatos do extrato trazem os acertos sem movimento dos dias do arquivo;
+  - a exportação leva as colunas novas.
+- **Na tela:**
+  - o selo "Já no app" ou "Paga o acerto", com o que o acerto quita ("Quita 4 saídas de Ana (R$ 520,00); recompensa de R$ 52,00");
+  - a linha "Acertos com pessoas" na Conferência;
+  - os acertos contados no botão e no aviso de sucesso;
+  - o desfazer explica o que volta.

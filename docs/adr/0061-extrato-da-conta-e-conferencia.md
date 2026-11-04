@@ -174,3 +174,7 @@ A revisão da fatura só desmarcava o que parecia já lançado: a compra com o m
   - **A última parcela:** ela tinha uma regra própria, "entra como lançamento simples", que rodava antes da conferência. Uma última parcela já lançada como compra simples (com "Parcela 5/5" nas observações) viria de novo como lançamento novo. Agora ela é conferida antes, como qualquer compra.
   - **A data da compra:** a conferência exigia o mesmo dia. Uma compra lançada à mão costuma ficar um ou dois dias antes do dia que o banco registra. Agora vale uma diferença de até 3 dias, para o mesmo estabelecimento (ou descrição) e o mesmo valor, ficando com a mais próxima. Ao conferir, o lançamento passa a ter o dia da fatura.
   - **As parcelas de um parcelamento que já existe:** vinham desmarcadas, com aviso. Agora são conferidas com a parcela daquele mês ("Já lançado"), quando ela está no app.
+
+## Nota (o Pix do acerto com uma pessoa, 2026-11-04)
+
+A conferência também reconhece o acerto com uma pessoa: um Pix com o valor de um acerto já feito entra como "Já no app", e um Pix que paga as compras pendentes de uma pessoa pode virar o acerto ("Paga o acerto com Ana"), com a diferença como recompensa. O identificador do movimento fica no próprio acerto. As regras estão na nota de 2026-11-04 do [ADR 0065](0065-acerto-com-pessoa.md).
