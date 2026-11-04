@@ -118,6 +118,9 @@ const exportPersonSettlementSchema = z.object({
   debitCents: z.number().int(),
   creditCents: z.number().int(),
   rewardTransactionId: z.uuid().nullable(),
+  /** The Pix of an account statement it is, and the import that made it (ADR 0065 note). */
+  externalId: z.string().nullable().default(null),
+  importId: z.uuid().nullable().default(null),
   createdBy: z.string().nullable(),
   createdAt: instant,
 });
