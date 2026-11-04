@@ -512,6 +512,9 @@ model TransactionImport {
   transactions     Transaction[]     @relation("ImportedBy")
   reconciled       Transaction[]     @relation("ReconciledBy")
   installmentPlans InstallmentPlan[]
+  // Settlements it created or matched from a Pix (ADR 0065 note).
+  settlements           PersonSettlement[] @relation("SettlementImportedBy")
+  reconciledSettlements PersonSettlement[] @relation("SettlementReconciledBy")
 
   @@index([workspaceId, createdAt])
   @@map("imports")
@@ -719,9 +722,21 @@ model PersonSettlement {
   createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   transactions        Transaction[] @relation("SettledBy")
+  // The Pix of an account statement it is (ADR 0065 note of 2026-11-04): a settlement launches
+  // no payment of its own, so the movement's identifier lives here, unique in the workspace
+  // like the transactions' (the import checks both). The import that created it (undoing it
+  // undoes the settlement) or that matched it (undoing it clears the identifier).
+  externalId          String?            @map("external_id") @db.VarChar(100)
+  importId            String?            @map("import_id") @db.Uuid
+  importedBy          TransactionImport? @relation("SettlementImportedBy", fields: [importId], references: [id], onDelete: SetNull)
+  reconciledImportId  String?            @map("reconciled_import_id") @db.Uuid
+  reconciledBy        TransactionImport? @relation("SettlementReconciledBy", fields: [reconciledImportId], references: [id], onDelete: SetNull)
 
+  @@unique([workspaceId, externalId])
   @@index([workspaceId, personId])
   @@index([createdById])
+  @@index([importId])
+  @@index([reconciledImportId])
   @@map("person_settlements")
 }
 

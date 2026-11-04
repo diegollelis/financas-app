@@ -2,8 +2,10 @@ import {
   dueDateFor,
   formatCents,
   installmentsCreated,
+  isNewSettlement,
   normalizeName,
   normalizeStatementTitle,
+  settlementTransferCents,
   shiftPeriod,
   type CreateImportInput,
   type Import,
@@ -15,6 +17,7 @@ import {
   type ImportMatchInput,
   type ImportMerchantAliasInput,
   type ImportPartInput,
+  type ImportSettlementInput,
   type StatementBank,
   todayIso,
 } from '@financas/shared';
@@ -29,6 +32,7 @@ import { ensureCardGiven, ensureUsableCard } from '../cards/ensure-card.js';
 import { ensureUsableCategories } from '../categories/ensure-category.js';
 import { Prisma, type TransactionImport } from '../generated/prisma/client.js';
 import { PeopleService } from '../people/people.service.js';
+import { SettlementsService, type PreparedSettlement } from '../people/settlements.service.js';
 import { ensureOpenPeriods } from '../periods/period-lock.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { RecurrencesService } from '../recurrences/recurrences.service.js';
@@ -38,7 +42,12 @@ import { toTransactionResponse, withOrigin } from '../transactions/transactions.
 
 type ImportRow = TransactionImport & {
   createdBy: { name: string } | null;
-  _count: { installmentPlans: number; reconciled: number };
+  _count: {
+    installmentPlans: number;
+    reconciled: number;
+    settlements: number;
+    reconciledSettlements: number;
+  };
 };
 
 /** A movement of the statement is already in the app: the review was opened before it came. */
@@ -55,6 +64,15 @@ const matchChanged = () =>
     message:
       'Um dos lançamentos conferidos mudou ou foi excluído. Abra o extrato de novo para conferir.',
   });
+
+/**
+ * A settlement with a person changed since the review (ADR 0065 note): read as any match that
+ * changed, since the person sees the statement's review, not the settlement.
+ */
+const settlementOfImportChanged = (error: unknown) =>
+  (error instanceof ConflictException || error instanceof NotFoundException) &&
+  (error instanceof NotFoundException ||
+    (error.getResponse() as { code?: string }).code === 'SETTLEMENT_CHANGED');
 
 /**
  * How the loans an import took parts of were before it (ADR 0061 note), kept with the import:
@@ -135,6 +153,7 @@ function toResponse(row: ImportRow, dependents = noDependents): Import {
     reconciledCount: row._count.reconciled,
     partCount: readRestoreData(row.restoreData)?.parts ?? 0,
     billCount: readRestoreData(row.restoreData)?.bills.length ?? 0,
+    settlementCount: row._count.settlements + row._count.reconciledSettlements,
     label: row.label,
     statementDueDate: row.statementDueDate && toIsoDate(row.statementDueDate),
     kind: row.kind,
@@ -161,7 +180,14 @@ function kindOf(input: CreateImportInput): { kind: ImportKind; bank: StatementBa
 
 const withCreator = {
   createdBy: { select: { name: true } },
-  _count: { select: { installmentPlans: true, reconciled: true } },
+  _count: {
+    select: {
+      installmentPlans: true,
+      reconciled: true,
+      settlements: true,
+      reconciledSettlements: true,
+    },
+  },
 } as const;
 
 /**
@@ -175,6 +201,7 @@ export class ImportsService {
     private readonly prisma: PrismaService,
     private readonly people: PeopleService,
     private readonly recurrences: RecurrencesService,
+    private readonly settlements: SettlementsService,
   ) {}
 
   /** Newest first. */
@@ -246,16 +273,16 @@ export class ImportsService {
     const matches = input.matches ?? [];
     const parts = input.parts ?? [];
     const bills = input.bills ?? [];
+    const settlements = input.settlements ?? [];
     await ensureUsableCategories(this.prisma, workspaceId, [...input.transactions, ...plans]);
     await this.checkBillCards(workspaceId, bills);
     await this.checkCards(workspaceId, input);
-    const found = await this.checkMovements(
-      workspaceId,
-      input.transactions,
-      matches,
-      parts.map((part) => part.externalId),
-    );
+    const found = await this.checkMovements(workspaceId, input.transactions, matches, [
+      ...parts.map((part) => part.externalId),
+      ...settlements.map((item) => item.externalId),
+    ]);
     const restore = await this.checkParts(workspaceId, parts);
+    const settling = await this.checkSettlements(workspaceId, settlements);
     const newAliases = await this.newAliases(workspaceId, aliases);
     const merchantIds = await this.merchantIds(workspaceId, [
       ...input.transactions.map((transaction) => transaction.merchantName),
@@ -301,6 +328,9 @@ export class ImportsService {
       ...periods,
       // A bill it paid: the month of the payment (ADR 0062 note).
       ...bills.map((bill) => bill.settledAt.slice(0, 7)),
+      // A settlement it made or matched: the month of the Pix (ADR 0065 note).
+      ...settling.made.map(({ prepared }) => prepared.settledAt.slice(0, 7)),
+      ...settling.matched.map((item) => item.period),
       // A card's match settles nothing: the month of the transaction it found (ADR 0061 note).
       ...matches.flatMap((match) => {
         const month = match.settledAt?.slice(0, 7) ?? found.get(match.transactionId)?.period;
@@ -382,6 +412,21 @@ export class ImportsService {
             },
           });
         }
+        // The settlements of its Pix (ADR 0065 note): one already in the app takes the movement,
+        // and one not made yet is made as "Pagar a Ana" makes it, brought by this import.
+        for (const item of settling.matched) {
+          const { count } = await tx.personSettlement.updateMany({
+            where: { id: item.settlementId, workspaceId, externalId: null },
+            data: { externalId: item.externalId, reconciledImportId: row.id },
+          });
+          if (count === 0) throw matchChanged();
+        }
+        for (const { prepared, externalId } of settling.made) {
+          await this.settlements.write(tx, workspaceId, userId, prepared, {
+            externalId,
+            importId: row.id,
+          });
+        }
         // The card bills it paid (ADR 0062 note), as "Pagar fatura" settles them; what each one
         // settled is kept with the import, for undoing it.
         const paidBills: RestoreData['bills'] = [];
@@ -414,17 +459,26 @@ export class ImportsService {
                 include: withCreator,
               })
             : row;
-        return { ...withBills, _count: { ...withBills._count, reconciled: matches.length } };
+        return {
+          ...withBills,
+          _count: {
+            ...withBills._count,
+            reconciled: matches.length,
+            settlements: settling.made.length,
+            reconciledSettlements: settling.matched.length,
+          },
+        };
       }, IMPORT_TRANSACTION)
       .catch((error: unknown) => {
         // Another import brought one of these movements meanwhile (the unique key).
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           throw lineImported();
         }
-        // A transaction it matched was deleted meanwhile.
+        // A transaction it matched was deleted meanwhile, or one a settlement settles was paid.
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
           throw matchChanged();
         }
+        if (settlementOfImportChanged(error)) throw matchChanged();
         throw error;
       });
     // Its pending shares fall due with it, and are of the same day (ADR 0052 note, 0055).
@@ -590,23 +644,25 @@ export class ImportsService {
     workspaceId: string,
     transactions: CreateImportInput['transactions'],
     matches: ImportMatchInput[],
-    partIds: string[],
+    otherIds: string[],
   ): Promise<Map<string, { pending: boolean; amountCents: number; period: string }>> {
     const externalIds = [
       ...transactions.flatMap((transaction) => transaction.externalId ?? []),
       ...matches.flatMap((match) => match.externalId ?? []),
-      ...partIds,
+      ...otherIds,
     ];
     if (externalIds.length === 0 && matches.length === 0) return new Map();
     const db = this.prisma.forWorkspace(workspaceId);
-    const [known, matched] = await Promise.all([
+    const [known, knownInSettlements, matched] = await Promise.all([
       db.transaction.count({ where: { workspaceId, externalId: { in: externalIds } } }),
+      // A settlement's Pix (ADR 0065 note) is a movement already in the app too.
+      db.personSettlement.count({ where: { workspaceId, externalId: { in: externalIds } } }),
       db.transaction.findMany({
         where: { workspaceId, id: { in: matches.map((match) => match.transactionId) } },
         select: { id: true, externalId: true, settledAt: true, amountCents: true, period: true },
       }),
     ]);
-    if (known > 0) throw lineImported();
+    if (known + knownInSettlements > 0) throw lineImported();
     // One that took another movement meanwhile; a card's match brings none (ADR 0061 note).
     const withMovement = new Set(
       matches.filter((match) => match.externalId).map((match) => match.transactionId),
@@ -623,6 +679,62 @@ export class ImportsService {
         { pending: row.settledAt === null, amountCents: row.amountCents, period: row.period },
       ]),
     );
+  }
+
+  /**
+   * The settlements of an account statement's Pix (ADR 0065 note), checked before anything is
+   * written: one already in the app must still be there without a movement; one to make is
+   * checked as "Pagar a Ana" checks it, its reward in the category remembered for the person.
+   * Anything that changed since the review is STATEMENT_MATCH_CHANGED.
+   */
+  private async checkSettlements(workspaceId: string, settlements: ImportSettlementInput[]) {
+    const matched: { settlementId: string; externalId: string; period: string }[] = [];
+    const made: { prepared: PreparedSettlement; externalId: string }[] = [];
+    const toMatch = settlements.flatMap((item) => (isNewSettlement(item) ? [] : [item]));
+    if (toMatch.length > 0) {
+      const found = await this.prisma.forWorkspace(workspaceId).personSettlement.findMany({
+        where: {
+          workspaceId,
+          id: { in: toMatch.map((item) => item.settlementId) },
+          externalId: null,
+        },
+        select: { id: true, settledAt: true },
+      });
+      for (const item of toMatch) {
+        const settlement = found.find((row) => row.id === item.settlementId);
+        if (!settlement) throw matchChanged();
+        matched.push({
+          settlementId: item.settlementId,
+          externalId: item.externalId,
+          period: toIsoDate(settlement.settledAt).slice(0, 7),
+        });
+      }
+    }
+    for (const item of settlements) {
+      if (!isNewSettlement(item)) continue;
+      const categoryId =
+        item.rewardCents > 0
+          ? await this.settlements.rewardCategoryId(workspaceId, item.personId)
+          : null;
+      if (item.rewardCents > 0 && !categoryId) {
+        throw new BadRequestException({
+          code: 'INVALID_INPUT',
+          message:
+            'Não há uma categoria de entrada ativa para a recompensa do acerto. Faça o acerto em Pessoas.',
+        });
+      }
+      const prepared = await this.settlements
+        .prepare(workspaceId, item.personId, {
+          transactionIds: item.transactionIds,
+          settledAt: item.settledAt,
+          reward: categoryId ? { amountCents: item.rewardCents, categoryId } : undefined,
+        })
+        .catch((error: unknown) => {
+          throw settlementOfImportChanged(error) ? matchChanged() : error;
+        });
+      made.push({ prepared, externalId: item.externalId });
+    }
+    return { matched, made };
   }
 
   /**
@@ -823,6 +935,19 @@ export class ImportsService {
         select: { restoreData: true },
       });
       if (!row) return false;
+      // The settlements of its Pix (ADR 0065 note): one it matched stays, without the movement;
+      // one it made is undone as "Desfazer" does, the reward deleted with it.
+      await tx.personSettlement.updateMany({
+        where: { workspaceId, reconciledImportId: importId },
+        data: { externalId: null },
+      });
+      const made = await tx.personSettlement.findMany({
+        where: { workspaceId, importId },
+        select: { id: true, settledAt: true, rewardTransactionId: true },
+      });
+      for (const settlement of made) {
+        await this.settlements.undoIn(tx, workspaceId, settlement);
+      }
       // The bills it paid go back to pending, only what is still settled on that day (ADR 0062
       // note): one settled again since keeps the new day.
       for (const bill of readRestoreData(row.restoreData)?.bills ?? []) {
@@ -897,13 +1022,39 @@ export class ImportsService {
     for (let period = first; period <= last; period = shiftPeriod(period, 1)) months.push(period);
     await this.recurrences.materialize(workspaceId, months);
     const db = this.prisma.forWorkspace(workspaceId);
-    const [known, transactions] = await Promise.all([
+    const [known, knownSettlements, settlements, transactions] = await Promise.all([
       input.externalIds.length === 0
         ? []
         : db.transaction.findMany({
             where: { workspaceId, externalId: { in: input.externalIds } },
             select: { id: true, externalId: true },
           }),
+      input.externalIds.length === 0
+        ? []
+        : db.personSettlement.findMany({
+            where: { workspaceId, externalId: { in: input.externalIds } },
+            select: { id: true, externalId: true },
+          }),
+      // The settlements a Pix may be (ADR 0065 note): without a movement, around the statement.
+      db.personSettlement.findMany({
+        where: {
+          workspaceId,
+          externalId: null,
+          settledAt: {
+            gte: shiftDay(input.from, -SETTLED_WINDOW_DAYS),
+            lte: shiftDay(input.to, SETTLED_WINDOW_DAYS),
+          },
+        },
+        orderBy: [{ settledAt: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          id: true,
+          personId: true,
+          settledAt: true,
+          debitCents: true,
+          creditCents: true,
+          rewardTransaction: { select: { amountCents: true } },
+        },
+      }),
       db.transaction.findMany({
         where: {
           workspaceId,
@@ -923,8 +1074,29 @@ export class ImportsService {
       }),
     ]);
     return {
-      known: known.map((row) => ({ externalId: row.externalId!, transactionId: row.id })),
+      known: [
+        ...known.map((row) => ({
+          externalId: row.externalId!,
+          transactionId: row.id,
+          settlementId: null,
+        })),
+        ...knownSettlements.map((row) => ({
+          externalId: row.externalId!,
+          transactionId: null,
+          settlementId: row.id,
+        })),
+      ],
       transactions: transactions.map(toTransactionResponse),
+      settlements: settlements.map((row) => ({
+        id: row.id,
+        personId: row.personId,
+        settledAt: toIsoDate(row.settledAt),
+        transferCents: settlementTransferCents({
+          debitCents: row.debitCents,
+          creditCents: row.creditCents,
+          rewardCents: row.rewardTransaction?.amountCents ?? 0,
+        }),
+      })),
     };
   }
 

@@ -341,6 +341,8 @@ export class DataExportService {
         debitCents: settlement.debitCents,
         creditCents: settlement.creditCents,
         rewardTransactionId: settlement.rewardTransactionId,
+        externalId: settlement.externalId,
+        importId: settlement.importId,
         createdBy: settlement.createdBy?.name ?? null,
         createdAt: iso(settlement.createdAt),
       })),

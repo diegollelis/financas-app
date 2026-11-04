@@ -138,6 +138,40 @@ export const importBillInputSchema = z.object({
 
 export type ImportBillInput = z.infer<typeof importBillInputSchema>;
 
+/**
+ * The Pix of an account statement that is a settlement with a person (ADR 0065 note of
+ * 2026-11-04). Either one already made in the app, which takes the movement's identifier, or
+ * one made by the import, as "Pagar a Ana" makes it: the debits settled on the Pix's day and the
+ * reward (what was owed less what the Pix paid) launched received, in the category the API
+ * remembers for the person. Undoing the import undoes a settlement it made and clears the
+ * identifier of one it matched.
+ */
+export const importSettlementMatchInputSchema = z.object({
+  settlementId: z.uuid(),
+  externalId: externalIdSchema,
+});
+
+export const importNewSettlementInputSchema = z.object({
+  personId: z.uuid(),
+  transactionIds: z.array(z.uuid()).min(1).max(MAX_IMPORT_TRANSACTIONS),
+  settledAt: isoDateSchema,
+  externalId: externalIdSchema,
+  rewardCents: z.number().int().min(0),
+});
+
+export const importSettlementInputSchema = z.union([
+  importSettlementMatchInputSchema,
+  importNewSettlementInputSchema,
+]);
+
+export type ImportSettlementInput = z.infer<typeof importSettlementInputSchema>;
+export type ImportNewSettlementInput = z.infer<typeof importNewSettlementInputSchema>;
+
+/** Whether a settlement of the import is one to make (and not one already in the app). */
+export const isNewSettlement = (
+  settlement: ImportSettlementInput,
+): settlement is ImportNewSettlementInput => 'personId' in settlement;
+
 /** What an import brought (ADR 0060): the app's spreadsheet, or a bank's statement. */
 export const importKindSchema = z.enum(['TEMPLATE', 'CARD_STATEMENT', 'ACCOUNT_STATEMENT']);
 
@@ -172,6 +206,8 @@ export const createImportInputSchema = z
     parts: z.array(importPartInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
     /** Card bills the account statement paid (ADR 0062 note). */
     bills: z.array(importBillInputSchema).max(100).optional(),
+    /** Pix that are settlements with a person (ADR 0065 note). */
+    settlements: z.array(importSettlementInputSchema).max(MAX_IMPORT_TRANSACTIONS).optional(),
     /** "Origem" (ADR 0055 note). */
     label: importLabelSchema.nullable().optional(),
     /** The due date of the card statement imported, when it is one. */
@@ -187,7 +223,8 @@ export const createImportInputSchema = z
         (input.plans?.length ?? 0) +
         (input.matches?.length ?? 0) +
         (input.parts?.length ?? 0) +
-        (input.bills?.length ?? 0) >
+        (input.bills?.length ?? 0) +
+        (input.settlements?.length ?? 0) >
       0,
     { message: 'Escolha ao menos um lançamento para importar.', path: ['transactions'] },
   )
@@ -198,14 +235,25 @@ export const createImportInputSchema = z
         ...input.transactions.flatMap((transaction) => transaction.externalId ?? []),
         ...(input.matches ?? []).flatMap((match) => match.externalId ?? []),
         ...(input.parts ?? []).map((part) => part.externalId),
+        ...(input.settlements ?? []).map((settlement) => settlement.externalId),
       ];
       const matched = (input.matches ?? []).map((match) => match.transactionId);
       // A loan may get several parts, but is never also a match.
       const parted = new Set((input.parts ?? []).map((part) => part.transactionId));
+      // A transaction is settled by one settlement, and is then neither a match nor a part.
+      const settled = (input.settlements ?? []).flatMap((settlement) =>
+        isNewSettlement(settlement) ? settlement.transactionIds : [],
+      );
+      const matchedSettlements = (input.settlements ?? []).flatMap((settlement) =>
+        isNewSettlement(settlement) ? [] : [settlement.settlementId],
+      );
       return (
         new Set(ids).size === ids.length &&
         new Set(matched).size === matched.length &&
-        matched.every((id) => !parted.has(id))
+        matched.every((id) => !parted.has(id)) &&
+        new Set(settled).size === settled.length &&
+        settled.every((id) => !parted.has(id) && !matched.includes(id)) &&
+        new Set(matchedSettlements).size === matchedSettlements.length
       );
     },
     { message: 'Um movimento do extrato aparece duas vezes.', path: ['matches'] },
@@ -241,6 +289,11 @@ export const importSchema = z.object({
   partCount: z.number().int().default(0),
   /** Card bills it paid (ADR 0062 note); undoing it takes them back to pending. */
   billCount: z.number().int().default(0),
+  /**
+   * Settlements with a person it made or matched from a Pix (ADR 0065 note). Undoing it undoes
+   * the ones it made; the ones it matched stay, without the movement's identifier.
+   */
+  settlementCount: z.number().int().default(0),
   /** "Origem", as typed; null for an import made before it, or without one. */
   label: z.string().nullable().default(null),
   /** The due date of the card statement, when it was one. */
@@ -298,14 +351,37 @@ export const importCandidatesInputSchema = z
 export type ImportCandidatesInput = z.infer<typeof importCandidatesInputSchema>;
 
 export const importCandidatesResponseSchema = z.object({
-  /** The movements of the file already in the app, and which transaction has each one. */
-  known: z.array(z.object({ externalId: externalIdSchema, transactionId: z.uuid() })),
+  /**
+   * The movements of the file already in the app, and which transaction has each one, or which
+   * settlement with a person (ADR 0065 note), which launches no transaction of its own.
+   */
+  known: z.array(
+    z.object({
+      externalId: externalIdSchema,
+      transactionId: z.uuid().nullable(),
+      settlementId: z.uuid().nullable().default(null),
+    }),
+  ),
   /**
    * The transactions a movement may be, without a movement yet: the pending ones from a year
    * before the statement to the month after it (recurrence months created first), and the ones
    * settled within a week of it.
    */
   transactions: z.array(transactionSchema),
+  /**
+   * The settlements with a person without a movement yet, made within a week of the statement
+   * (ADR 0065 note), with what changed hands: positive when you paid, negative when you received.
+   */
+  settlements: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        personId: z.uuid(),
+        settledAt: isoDateSchema,
+        transferCents: z.number().int(),
+      }),
+    )
+    .default([]),
 });
 
 export type ImportCandidatesResponse = z.infer<typeof importCandidatesResponseSchema>;

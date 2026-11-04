@@ -16,6 +16,7 @@ import {
 import { z } from 'zod';
 import { ensureUsableCategory } from '../categories/ensure-category.js';
 import { ensureOpenPeriods } from '../periods/period-lock.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, setWorkspaceContext } from '../prisma/prisma.service.js';
 import { toDate } from '../transactions/dates.js';
 import { toTransactionResponse, withOrigin } from '../transactions/transactions.service.js';
@@ -28,6 +29,21 @@ const settlementChanged = () =>
     code: 'SETTLEMENT_CHANGED',
     message: 'Algum lançamento do acerto mudou ou já foi quitado. Abra o acerto de novo.',
   });
+
+/** A settlement checked and ready to write (`SettlementsService.prepare`). */
+export type PreparedSettlement = {
+  personId: string;
+  ids: string[];
+  debitCents: number;
+  creditCents: number;
+  settledAt: string;
+  reward: { amountCents: number; categoryId: string; description: string } | null;
+  /** The competências it touches: the transactions' and the reward's. */
+  periods: string[];
+};
+
+/** Where a settlement came from, when an account statement's Pix made it (ADR 0065 note). */
+export type SettlementOrigin = { externalId: string; importId: string };
 
 /**
  * Acerto com uma pessoa (ADR 0065): what you owe a person settled at once on one day, offsetting
@@ -82,6 +98,33 @@ export class SettlementsService {
     userId: string,
     input: SettlePersonInput,
   ): Promise<PersonSettlement> {
+    const prepared = await this.prepare(workspaceId, personId, input);
+    const created = await this.prisma.$transaction(async (tx) => {
+      await setWorkspaceContext(tx, workspaceId);
+      return this.write(tx, workspaceId, userId, prepared);
+    });
+    return {
+      id: created.settlementId,
+      personId,
+      settledAt: input.settledAt,
+      debitCents: prepared.debitCents,
+      creditCents: prepared.creditCents,
+      reward: created.rewardRow ? toTransactionResponse(created.rewardRow) : null,
+      transactionIds: prepared.ids,
+    };
+  }
+
+  /**
+   * Everything checked before the interactive transaction (which never calls ensureOpenPeriods):
+   * the person, the day, each transaction pending and of the person, at least one debit, the
+   * reward within the debits in an active credit category, and every month open (ADR 0063).
+   * An account statement's import calls it too (ADR 0065 note).
+   */
+  async prepare(
+    workspaceId: string,
+    personId: string,
+    input: SettlePersonInput,
+  ): Promise<PreparedSettlement> {
     const person = await this.findPerson(workspaceId, personId);
     const invalid = (message: string) =>
       new BadRequestException({ code: 'INVALID_INPUT', message });
@@ -124,63 +167,78 @@ export class SettlementsService {
       }
       await ensureUsableCategory(this.prisma, workspaceId, reward.categoryId, 'CREDIT');
     }
-    await ensureOpenPeriods(this.prisma, workspaceId, [
-      ...rows.map((row) => row.period),
-      ...(reward ? [rewardPeriod] : []),
-    ]);
+    const periods = [...rows.map((row) => row.period), ...(reward ? [rewardPeriod] : [])];
+    await ensureOpenPeriods(this.prisma, workspaceId, periods);
 
-    // Read before the interactive transaction, which holds a connection of its own.
-    const rewardText =
-      reward && (reward.description ?? rewardDescription(await this.shownName(person)));
-    const day = toDate(input.settledAt);
-    const created = await this.prisma.$transaction(async (tx) => {
-      await setWorkspaceContext(tx, workspaceId);
-      const rewardRow =
-        reward &&
-        (await tx.transaction.create({
+    return {
+      personId,
+      ids,
+      debitCents,
+      creditCents,
+      settledAt: input.settledAt,
+      // Read before the interactive transaction, which holds a connection of its own.
+      reward: reward
+        ? {
+            amountCents: reward.amountCents,
+            categoryId: reward.categoryId,
+            description: reward.description ?? rewardDescription(await this.shownName(person)),
+          }
+        : null,
+      periods,
+    };
+  }
+
+  /**
+   * Writes a prepared settlement inside the caller's interactive transaction, which already has
+   * the RLS context: the reward, the settlement and its transactions settled on its day. Throws
+   * SETTLEMENT_CHANGED when one of them is no longer pending, so the whole transaction rolls back.
+   */
+  async write(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    userId: string,
+    prepared: PreparedSettlement,
+    origin?: SettlementOrigin,
+  ) {
+    const { personId, ids, reward } = prepared;
+    const day = toDate(prepared.settledAt);
+    const rewardRow = reward
+      ? await tx.transaction.create({
           data: {
             workspaceId,
             type: 'CREDIT',
-            description: rewardText ?? rewardDescription(person.name),
+            description: reward.description,
             categoryId: reward.categoryId,
             amountCents: reward.amountCents,
-            period: rewardPeriod,
+            period: prepared.settledAt.slice(0, 7),
             settledAt: day,
             occurredOn: day,
             personId,
           },
           include: withOrigin,
-        }));
-      const settlement = await tx.personSettlement.create({
-        data: {
-          workspaceId,
-          personId,
-          settledAt: day,
-          debitCents,
-          creditCents,
-          rewardTransactionId: rewardRow ? rewardRow.id : null,
-          createdById: userId,
-        },
-      });
-      // Pending and of this person still, now that the transaction holds them.
-      const { count } = await tx.transaction.updateMany({
-        where: { workspaceId, id: { in: ids }, personId, settledAt: null },
-        // Settling confirms an estimated amount (ADR 0038), as "Pagar fatura" does.
-        data: { settledAt: day, amountEstimated: false, settlementId: settlement.id },
-      });
-      if (count !== ids.length) throw settlementChanged();
-      return { settlement, rewardRow };
+        })
+      : null;
+    const settlement = await tx.personSettlement.create({
+      data: {
+        workspaceId,
+        personId,
+        settledAt: day,
+        debitCents: prepared.debitCents,
+        creditCents: prepared.creditCents,
+        rewardTransactionId: rewardRow ? rewardRow.id : null,
+        createdById: userId,
+        externalId: origin?.externalId ?? null,
+        importId: origin?.importId ?? null,
+      },
     });
-
-    return {
-      id: created.settlement.id,
-      personId,
-      settledAt: input.settledAt,
-      debitCents,
-      creditCents,
-      reward: created.rewardRow ? toTransactionResponse(created.rewardRow) : null,
-      transactionIds: ids,
-    };
+    // Pending and of this person still, now that the transaction holds them.
+    const { count } = await tx.transaction.updateMany({
+      where: { workspaceId, id: { in: ids }, personId, settledAt: null },
+      // Settling confirms an estimated amount (ADR 0038), as "Pagar fatura" does.
+      data: { settledAt: day, amountEstimated: false, settlementId: settlement.id },
+    });
+    if (count !== ids.length) throw settlementChanged();
+    return { settlementId: settlement.id, rewardRow };
   }
 
   /**
@@ -206,25 +264,38 @@ export class SettlementsService {
 
     await this.prisma.$transaction(async (tx) => {
       await setWorkspaceContext(tx, workspaceId);
-      await tx.transaction.updateMany({
-        where: { workspaceId, settlementId, settledAt: settlement.settledAt },
-        data: { settledAt: null, settlementId: null },
-      });
-      if (settlement.rewardTransactionId) {
-        await tx.transaction.deleteMany({
-          where: { workspaceId, id: settlement.rewardTransactionId },
-        });
-      }
-      // What is left linked (settled on another day) is unlinked by the foreign key.
-      await tx.personSettlement.deleteMany({ where: { workspaceId, id: settlementId } });
+      await this.undoIn(tx, workspaceId, settlement);
     });
+  }
+
+  /**
+   * Undoes a settlement inside the caller's interactive transaction (with the RLS context): what
+   * it still settles on its day back to pending, the reward and the settlement deleted. Undoing
+   * the import that made it from a Pix calls it too (ADR 0065 note).
+   */
+  async undoIn(
+    tx: Prisma.TransactionClient,
+    workspaceId: string,
+    settlement: { id: string; settledAt: Date; rewardTransactionId: string | null },
+  ) {
+    await tx.transaction.updateMany({
+      where: { workspaceId, settlementId: settlement.id, settledAt: settlement.settledAt },
+      data: { settledAt: null, settlementId: null },
+    });
+    if (settlement.rewardTransactionId) {
+      await tx.transaction.deleteMany({
+        where: { workspaceId, id: settlement.rewardTransactionId },
+      });
+    }
+    // What is left linked (settled on another day) is unlinked by the foreign key.
+    await tx.personSettlement.deleteMany({ where: { workspaceId, id: settlement.id } });
   }
 
   /**
    * The reward's category remembered: the one of the person's last reward, while still active;
    * otherwise "Bônus", when the workspace has it active.
    */
-  private async rewardCategoryId(workspaceId: string, personId: string): Promise<string | null> {
+  async rewardCategoryId(workspaceId: string, personId: string): Promise<string | null> {
     const db = this.prisma.forWorkspace(workspaceId);
     const last = await db.personSettlement.findFirst({
       where: {

@@ -6,6 +6,8 @@ import {
   installmentPlanListResponseSchema,
   MAX_IMPORT_TRANSACTIONS,
   merchantListResponseSchema,
+  personSchema,
+  personSettlementDraftSchema,
   transactionListResponseSchema,
   transactionSchema,
   type CreateTransactionInput,
@@ -935,6 +937,261 @@ describe('imports', () => {
               .expect(400)
           ).body,
         ).toMatchObject({ code: 'INVALID_INPUT' });
+      });
+    });
+
+    describe('the Pix of a settlement with a person (ADR 0065 note)', () => {
+      async function withAna() {
+        const user = await withLaunched();
+        const ana = personSchema.parse(
+          (await user.browser.post(`${user.base}/people`).send({ name: 'Ana Exemplo' }).expect(201))
+            .body,
+        );
+        // What was bought with Ana's meal voucher in October: owed to her.
+        const bought = await Promise.all(
+          [20_000, 30_000].map((amountCents) =>
+            user.launch({
+              description: 'Mercado no vale',
+              categoryId: user.categoryId('Mercado', 'DEBIT'),
+              amountCents,
+              personId: ana.id,
+              paymentMethod: 'MEAL_VOUCHER',
+            }),
+          ),
+        );
+        const candidates = async (externalIds: string[] = []) =>
+          importCandidatesResponseSchema.parse(
+            (
+              await user.browser
+                .post(`${user.base}/imports/candidates`)
+                .send({ from: '2026-10-01', to: '2026-10-31', externalIds })
+                .expect(200)
+            ).body,
+          );
+        const draft = async () =>
+          personSettlementDraftSchema.parse(
+            (await user.browser.get(`${user.base}/people/${ana.id}/settlement`).expect(200)).body,
+          );
+        return { ...user, ana, bought, candidates, draft };
+      }
+
+      it('makes the settlement of a Pix: the debits settled on its day, the difference as the reward', async () => {
+        const { browser, base, ana, bought, candidates, draft, categoryId, transactionsOf } =
+          await withAna();
+
+        const created = importSchema.parse(
+          (
+            await browser
+              .post(`${base}/imports`)
+              .send({
+                ...account,
+                transactions: [],
+                settlements: [
+                  {
+                    personId: ana.id,
+                    transactionIds: bought.map((tx) => tx.id),
+                    settledAt: '2026-10-30',
+                    externalId: id(7),
+                    rewardCents: 5_000,
+                  },
+                ],
+              })
+              .expect(201)
+          ).body,
+        );
+
+        expect(created).toMatchObject({ settlementCount: 1, transactionCount: 0 });
+        expect(created.firstPeriod).toBe('2026-10');
+        const october = await transactionsOf('2026-10');
+        for (const tx of bought) {
+          expect(october.find((row) => row.id === tx.id)).toMatchObject({
+            settledAt: '2026-10-30',
+            settlementId: expect.any(String) as string,
+          });
+        }
+        expect(
+          october.find((row) => row.description === 'Recompensa de Ana Exemplo'),
+        ).toMatchObject({
+          type: 'CREDIT',
+          amountCents: 5_000,
+          settledAt: '2026-10-30',
+          categoryId: categoryId('Bônus', 'CREDIT'),
+          personId: ana.id,
+        });
+        expect((await draft()).debits).toEqual([]);
+        // Imported again, the Pix is known, as the settlement's.
+        const known = await candidates([id(7)]);
+        expect(known.known).toEqual([
+          { externalId: id(7), transactionId: null, settlementId: expect.any(String) as string },
+        ]);
+        expect(known.settlements).toEqual([]);
+        const again = await browser
+          .post(`${base}/imports`)
+          .send({
+            ...account,
+            transactions: [
+              {
+                type: 'DEBIT',
+                description: 'Ana Exemplo',
+                categoryId: categoryId('Mercado', 'DEBIT'),
+                amountCents: 45_000,
+                period: '2026-10',
+                settledAt: '2026-10-30',
+                externalId: id(7),
+              },
+            ],
+          })
+          .expect(409);
+        expect(again.body).toMatchObject({ code: 'STATEMENT_LINE_IMPORTED' });
+      });
+
+      it('undoing the import undoes the settlement it made, the reward with it', async () => {
+        const { browser, base, personalWorkspaceId, ana, bought, draft, transactionsOf } =
+          await withAna();
+        const created = importSchema.parse(
+          (
+            await browser
+              .post(`${base}/imports`)
+              .send({
+                ...account,
+                transactions: [],
+                settlements: [
+                  {
+                    personId: ana.id,
+                    transactionIds: bought.map((tx) => tx.id),
+                    settledAt: '2026-10-30',
+                    externalId: id(7),
+                    rewardCents: 5_000,
+                  },
+                ],
+              })
+              .expect(201)
+          ).body,
+        );
+
+        await browser.delete(`${base}/imports/${created.id}`).expect(204);
+
+        expect((await draft()).debits.map((tx) => tx.id).sort()).toEqual(
+          bought.map((tx) => tx.id).sort(),
+        );
+        const october = await transactionsOf('2026-10');
+        expect(october.some((row) => row.description.startsWith('Recompensa'))).toBe(false);
+        expect(october.filter((row) => row.settlementId !== null)).toEqual([]);
+        expect(await t.prisma.forWorkspace(personalWorkspaceId).personSettlement.count()).toBe(0);
+      });
+
+      it('matches a settlement already made: it takes the movement, and undoing keeps it without', async () => {
+        const { browser, base, personalWorkspaceId, ana, bought, candidates, categoryId } =
+          await withAna();
+        await browser
+          .post(`${base}/people/${ana.id}/settlements`)
+          .send({
+            transactionIds: bought.map((tx) => tx.id),
+            settledAt: '2026-10-29',
+            reward: { amountCents: 5_000, categoryId: categoryId('Bônus', 'CREDIT') },
+          })
+          .expect(201);
+        const [settlement] = (await candidates()).settlements;
+        expect(settlement).toMatchObject({
+          personId: ana.id,
+          settledAt: '2026-10-29',
+          transferCents: 45_000,
+        });
+
+        const created = importSchema.parse(
+          (
+            await browser
+              .post(`${base}/imports`)
+              .send({
+                ...account,
+                transactions: [],
+                settlements: [{ settlementId: settlement!.id, externalId: id(7) }],
+              })
+              .expect(201)
+          ).body,
+        );
+
+        expect(created).toMatchObject({ settlementCount: 1, transactionCount: 0 });
+        expect((await candidates([id(7)])).known).toEqual([
+          { externalId: id(7), transactionId: null, settlementId: settlement!.id },
+        ]);
+        await browser.delete(`${base}/imports/${created.id}`).expect(204);
+        // The settlement stays, without the movement: the statement matches it again.
+        expect((await candidates()).settlements.map((item) => item.id)).toEqual([settlement!.id]);
+        expect(await t.prisma.forWorkspace(personalWorkspaceId).personSettlement.count()).toBe(1);
+      });
+
+      it('refuses a settlement that changed since the review, writing nothing', async () => {
+        const { browser, base, ana, bought, candidates } = await withAna();
+        // One of the debits was paid by hand meanwhile.
+        await browser
+          .patch(`${base}/transactions/${bought[0]!.id}`)
+          .send({ settledAt: '2026-10-28' })
+          .expect(200);
+        const paid = await browser
+          .post(`${base}/imports`)
+          .send({
+            ...account,
+            transactions: [],
+            settlements: [
+              {
+                personId: ana.id,
+                transactionIds: bought.map((tx) => tx.id),
+                settledAt: '2026-10-30',
+                externalId: id(7),
+                rewardCents: 0,
+              },
+            ],
+          })
+          .expect(409);
+        expect(paid.body).toMatchObject({ code: 'STATEMENT_MATCH_CHANGED' });
+
+        // A settlement that took another movement meanwhile.
+        await browser
+          .post(`${base}/people/${ana.id}/settlements`)
+          .send({ transactionIds: [bought[1]!.id], settledAt: '2026-10-29' })
+          .expect(201);
+        const [settlement] = (await candidates()).settlements;
+        await browser
+          .post(`${base}/imports`)
+          .send({
+            ...account,
+            transactions: [],
+            settlements: [{ settlementId: settlement!.id, externalId: id(7) }],
+          })
+          .expect(201);
+        const taken = await browser
+          .post(`${base}/imports`)
+          .send({
+            ...account,
+            transactions: [],
+            settlements: [{ settlementId: settlement!.id, externalId: id(8) }],
+          })
+          .expect(409);
+        expect(taken.body).toMatchObject({ code: 'STATEMENT_MATCH_CHANGED' });
+        expect((await browser.get(`${base}/imports`).expect(200)).body).toHaveLength(1);
+      });
+
+      it('refuses a transaction in a settlement that is also a match', async () => {
+        const { browser, base, ana, bought } = await withAna();
+        const response = await browser
+          .post(`${base}/imports`)
+          .send({
+            ...account,
+            transactions: [],
+            matches: [{ transactionId: bought[0]!.id, externalId: id(6), settledAt: '2026-10-30' }],
+            settlements: [
+              {
+                personId: ana.id,
+                transactionIds: bought.map((tx) => tx.id),
+                settledAt: '2026-10-30',
+                externalId: id(7),
+                rewardCents: 0,
+              },
+            ],
+          })
+          .expect(400);
+        expect(response.body).toMatchObject({ code: 'INVALID_INPUT' });
       });
     });
 

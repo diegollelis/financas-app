@@ -6,7 +6,8 @@ import { SettlementsService } from './settlements.service.js';
 @Module({
   controllers: [PeopleController],
   providers: [PeopleService, SettlementsService],
-  // The import finds people by name, as the page shows them (members by their account's name).
-  exports: [PeopleService],
+  // The import finds people by name, as the page shows them (members by their account's name),
+  // and makes or undoes the settlement of an account statement's Pix (ADR 0065 note).
+  exports: [PeopleService, SettlementsService],
 })
 export class PeopleModule {}
