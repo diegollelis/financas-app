@@ -125,6 +125,7 @@ describe('transactions', () => {
         paymentMethod: null,
         cardId: null,
         splitOfId: null,
+        settlementId: null,
       });
       expect(await list(browser, workspaceId, '2026-10')).toEqual([light]);
       expect(await list(browser, workspaceId, '2026-11')).toEqual([]);

@@ -331,6 +331,38 @@ describe('TransactionsPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens "Pagar a Ana" from a debit still owed to her (ADR 0065)', async () => {
+    const voucher = transaction(8, {
+      type: 'DEBIT',
+      description: 'Mercado no vale',
+      categoryId: marketCategory.id,
+      amountCents: 12_000,
+      personId: ana.id,
+    });
+    mockTransactions({
+      [`GET ${base}`]: { body: [voucher, light] },
+      [`GET ${peopleBase}`]: { body: [{ ...ana, payableCents: 12_000 }] },
+      [`GET ${peopleBase}/${ana.id}/settlement`]: {
+        body: { debits: [voucher], credits: [], rewardCategoryId: null },
+      },
+    });
+    renderApp(`/espacos/${houseId}/lancamentos`);
+
+    const menu = await openActions('Mercado no vale');
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Pagar a Ana' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Pagar a Ana' });
+    expect(
+      await within(dialog).findByRole('button', {
+        name: `Pagar ${formatCents(12_000)} (1 lançamento)`,
+      }),
+    ).toBeEnabled();
+
+    // A debit owed to nobody has no such item.
+    await userEvent.keyboard('{Escape}');
+    const other = await openActions('Conta de luz');
+    expect(within(other).queryByRole('menuitem', { name: /^Pagar a/ })).not.toBeInTheDocument();
+  });
+
   it('offers "Recebimento parcial" only for a pending one launched once, not split', async () => {
     const share = transaction(5, {
       type: 'CREDIT',

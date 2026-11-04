@@ -57,6 +57,8 @@ const exportTransactionSchema = z.object({
   /** The card it was paid or received with (ADR 0062). */
   cardId: z.uuid().nullable().default(null),
   splitOfId: z.uuid().nullable(),
+  /** The settlement with a person that settled it (ADR 0065). */
+  settlementId: z.uuid().nullable().default(null),
   createdAt: instant,
   updatedAt: instant,
 });
@@ -103,6 +105,21 @@ const exportPeriodClosingSchema = z.object({
   reopenedAt: instant.nullable(),
   reopenedBy: z.string().nullable(),
   reopenReason: z.string().nullable(),
+});
+
+/**
+ * A settlement with a person (ADR 0065): the day, what was owed and offset, and the credit of the
+ * reward; its transactions point to it with settlementId.
+ */
+const exportPersonSettlementSchema = z.object({
+  id: z.uuid(),
+  personId: z.uuid(),
+  settledAt: z.string(),
+  debitCents: z.number().int(),
+  creditCents: z.number().int(),
+  rewardTransactionId: z.uuid().nullable(),
+  createdBy: z.string().nullable(),
+  createdAt: instant,
 });
 
 /** A destination of the budget (ADR 0047), with the category of its applications. */
@@ -229,6 +246,7 @@ const ownedWorkspaceSchema = z.object({
   installmentPlans: z.array(exportInstallmentPlanSchema),
   imports: z.array(exportImportSchema),
   periodClosings: z.array(exportPeriodClosingSchema).default([]),
+  personSettlements: z.array(exportPersonSettlementSchema).default([]),
 });
 
 /** A workspace of someone else: only the participation; its data belongs to its owner. */

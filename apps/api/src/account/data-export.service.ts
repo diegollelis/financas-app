@@ -30,6 +30,7 @@ export const EXPORTED_TABLES: Record<string, string> = {
   installment_plans: 'installmentPlans',
   imports: 'imports',
   period_closings: 'periodClosings',
+  person_settlements: 'personSettlements',
 };
 
 const iso = (date: Date) => date.toISOString();
@@ -116,6 +117,7 @@ export class DataExportService {
       installmentPlans,
       imports,
       periodClosings,
+      personSettlements,
     ] = await Promise.all([
       this.prisma.member.findMany({
         where,
@@ -155,6 +157,11 @@ export class DataExportService {
         where,
         include: { closedBy: { select: { name: true } }, reopenedBy: { select: { name: true } } },
         orderBy: [{ period: 'asc' }, { closedAt: 'asc' }],
+      }),
+      db.personSettlement.findMany({
+        where,
+        include: { createdBy: { select: { name: true } } },
+        orderBy: [{ settledAt: 'asc' }, { createdAt: 'asc' }],
       }),
     ]);
 
@@ -212,6 +219,7 @@ export class DataExportService {
         paymentMethod: transaction.paymentMethod,
         cardId: transaction.cardId,
         splitOfId: transaction.splitOfId,
+        settlementId: transaction.settlementId,
         createdAt: iso(transaction.createdAt),
         updatedAt: iso(transaction.updatedAt),
       })),
@@ -325,6 +333,16 @@ export class DataExportService {
         reopenedAt: isoOrNull(closing.reopenedAt),
         reopenedBy: closing.reopenedBy?.name ?? null,
         reopenReason: closing.reopenReason,
+      })),
+      personSettlements: personSettlements.map((settlement) => ({
+        id: settlement.id,
+        personId: settlement.personId,
+        settledAt: toIsoDate(settlement.settledAt),
+        debitCents: settlement.debitCents,
+        creditCents: settlement.creditCents,
+        rewardTransactionId: settlement.rewardTransactionId,
+        createdBy: settlement.createdBy?.name ?? null,
+        createdAt: iso(settlement.createdAt),
       })),
     };
   }

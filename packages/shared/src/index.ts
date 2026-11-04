@@ -20,6 +20,7 @@ export * from './period-closing.ts';
 export * from './invitation.ts';
 export * from './money-and-dates.ts';
 export * from './person.ts';
+export * from './person-settlement.ts';
 export * from './recurrence.ts';
 export * from './statement.ts';
 export * from './statement-sources.ts';
